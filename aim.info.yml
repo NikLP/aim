@@ -1,0 +1,9 @@
+name: AIM
+type: module
+description: 'Content entity for agent memory facts (PoC, no moderation gate yet).'
+package: AIM
+core_version_requirement: ^11
+dependencies:
+  - drupal:options
+  - ai:ai
+  - search_api:search_api

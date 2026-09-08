@@ -1,0 +1,4 @@
+administer aim memory:
+  title: 'Administer AIM memory facts'
+  description: 'Create, edit, and delete memory facts.'
+  restrict access: true
