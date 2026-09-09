@@ -1,0 +1,18 @@
+parameters:
+    level: 1
+    fileExtensions:
+        - php
+        - module
+        - inc
+        - install
+        - theme
+        - profile
+    reportUnmatchedIgnoredErrors: false
+    ignoreErrors:
+        # new static() is a best practice in Drupal, so we cannot fix that.
+        - "#^Unsafe usage of new static#"
+        # league/commonmark is an optional (suggest-only) dependency, guarded
+        # at runtime via class_exists() in DocumentGeneratorService::generate().
+        -
+            message: "#Instantiated class League\\\\CommonMark\\\\CommonMarkConverter not found\\.#"
+            path: modules/annotations_docs/src/DocumentGeneratorService.php

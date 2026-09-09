@@ -4,7 +4,10 @@
 Search API's AI Search backend into a MariaDB `VECTOR` column, with real
 embeddings generated via amazee.ai and a real semantic query returning the
 right result. A working extraction prototype (`drush aim:extract`) turns raw
-text into classified, scoped facts via a real chat provider call.
+text into classified, scoped facts via a real chat provider call, and a
+direct `drush aim:remember`/`drush aim:recall` pair lets an agent that has
+already done its own reasoning write and query facts with no extra chat
+call.
 See [CLAUDE.md](CLAUDE.md) for the current build state and
 [ADR-003-drupal-native-agent-memory.md](../../../../ADR-003-drupal-native-agent-memory.md)
 for the full rationale and history.
@@ -103,6 +106,10 @@ mutates live site structure, so it requires a dry-run/human-review gate before
    <file>` sends text to a real chat provider and creates classified,
    scoped facts from it. See CLAUDE.md's "Extraction" section for the
    details and what's still manual (invocation, not the source itself).
+   `drush aim:remember`/`drush aim:recall` (CLAUDE.md's "CLI agent
+   adapter" section) cover the other case: a caller, like a Claude Code
+   session, that has already decided what's worth remembering and just
+   needs a direct write/query path with no extra chat call.
 3. Wire an unattended `drupal/ai` provider for autonomous, cron-driven
    operation, plus the governance layer (Guardrails, draft-to-trusted) that
    the PoC is deliberately skipping for now.

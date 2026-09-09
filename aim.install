@@ -1,0 +1,25 @@
+<?php
+
+/**
+ * @file
+ * Install hooks for the AIM module.
+ */
+
+declare(strict_types=1);
+
+use Drupal\search_api\IndexInterface;
+
+/**
+ * Implements hook_install().
+ */
+function aim_install(): void {
+  // ai_vdb_provider_mariadb only creates/ALTERs the collection table from
+  // hook_search_api_index_update(), which does not fire for the insert that
+  // config/install triggers. Re-saving forces that update path once the
+  // index already exists, so the collection table and its attribute columns
+  // actually get created on a fresh install. See CLAUDE.md.
+  $index = \Drupal::entityTypeManager()->getStorage('search_api_index')->load('aim_vector_index');
+  if ($index instanceof IndexInterface) {
+    $index->save();
+  }
+}

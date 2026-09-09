@@ -100,6 +100,225 @@ touching this config again:
   the table if this happens rather than fighting it; there's nothing
   irreplaceable in a vector collection, it's a derived index.
 
+**Confirmed `aim_facts` has a real ANN index, not a brute-force scan
+(2026-09-09)**, checked directly against the running DB rather than assumed:
+`SHOW CREATE TABLE aim_facts` on this DDEV site (MariaDB 11.8.9) shows
+`` VECTOR KEY `embedding` (`embedding`) `DISTANCE`='cosine' `` -
+MariaDB 11.7+'s native HNSW-based approximate-nearest-neighbor vector index,
+created automatically by `ai_vdb_provider_mariadb`'s `createCollection()`,
+no manual step needed. This directly answers a scale worry raised the same
+day: whether `aim` growing into thousands of facts (e.g. a grilling-skill
+session run at volume) would degrade query performance on a site sharing
+its DB/CPU with a live working site. It won't, on the similarity-search
+side: HNSW is built for exactly this scale (hundreds of thousands to low
+millions of vectors on modest hardware), so raw query cost isn't the
+limiting factor here. The earlier DB-pressure note under "Ideas raised, not
+designed" (`aim_facts` ~50% bigger per row than `aim_fact`) is still true and
+still worth watching, but as a storage/IO capacity question, not evidence
+the index degrades under load.
+
+**What would actually strain the shared DB/CPU at real volume is the
+write-path workload, which isn't built yet - not the vector engine.** Per
+the AI dependency map, every fact write costs an embedding call regardless
+of volume, and decision 7's Guardrails can add an LLM call per candidate
+fact - both real costs that scale linearly with fact count, unlike HNSW
+query cost. A grilling session naively writing one raw fact per sentence at
+volume would hit embeddings/Guardrails rate limits and cost before it ever
+troubled MariaDB, and would also flood `aim_fact` with near-duplicate rows
+with no way to merge them at scale - `drush aim:consolidate` (see
+"Consolidation" below, built 2026-09-09) covers the on-demand phase 1 case,
+but nothing runs it automatically yet. So: route real volume through
+decision 4's queue, with consolidation wired into that same worker, rather
+than pointing a real grilling session at high fact throughput and sweeping
+by hand after the fact - that's the actual scale risk in "thousands of
+facts in days," not the database or the bundle/scope model discussed above.
+
+**Storage math and pattern-recognition, asked the same day (2026-09-09).**
+Back-of-envelope from the measured numbers above (9 `aim_fact` rows =
+0.06 MB, 8 `aim_facts` rows = 0.14 MB): roughly 7KB/row on the entity side,
+18KB/row on the vector side (`VECTOR(1024)` as float32 is 4KB of raw vector
+data alone; the rest is HNSW graph overhead plus the attribute columns). At
+1,000 facts that's roughly 7MB + 18MB; at 10,000, roughly 70MB + 180MB -
+both trivial for a shared DB host, nowhere near "concern" territory. Disk
+space only becomes a real line item in the hundreds-of-thousands-to-millions
+range, a couple of orders of magnitude past what a grilling-session-driven
+store would plausibly reach. What would show up first at real volume isn't
+raw disk, it's `aim_facts` outgrowing the shared host's InnoDB buffer pool -
+HNSW's query-speed advantage depends on the index staying memory-resident,
+so a large vector table competing for buffer-pool room alongside a live
+site's own working set is the more realistic pressure point than disk
+filling up. Worth checking once fact count reaches the tens of thousands,
+not now.
+
+Yes, this is a recognized pattern, not something unusual: structured
+records in the system of record (`aim_fact`) plus a separate vector index
+keyed by entity ID for semantic retrieval is the standard shape of RAG/
+vector search in production - Postgres+pgvector, Elasticsearch's
+`dense_vector`, or an app DB paired with a dedicated vector store like
+Pinecone/Weaviate/Qdrant are all the same two-part shape, all commonly
+HNSW-based ANN under the hood, same as MariaDB's native vector index here.
+The one less-mainstream choice is putting the vector index *inside* the
+same relational DB as the app data rather than a dedicated vector-store
+service - MariaDB's native `VECTOR` type is genuinely new (11.7, 2025) -
+but that choice is what buys decision 1's actual goal (in-database mode,
+ACID/transaction guarantees with the rest of Drupal intact), a real
+advantage over the dual-write consistency problem most RAG stacks have to
+manage by hand between an app DB and a separate vector store.
+
+**Config now ships in `config/install`, not just the live site (2026-09-09).**
+`search_api.server.aim_vector`, `search_api.index.aim_vector_index` and the
+simple config `ai_search.index.aim_vector_index` were all hand-built
+directly against this DDEV site (drush, the UI) and only lived in the
+database. They're now exported into
+`web/modules/custom/aim/config/install/`, so `drush en aim` on a fresh site
+reproduces the same server/index/field setup instead of requiring the same
+manual steps again. Two things had to happen alongside the export, not just
+a file copy:
+
+- `aim.info.yml` gained `ai:ai_search` and
+  `ai_vdb_provider_mariadb:ai_vdb_provider_mariadb` as dependencies - the
+  exported server config's own `dependencies.module` needs both, and config
+  import fails on an unmet dependency. Deliberately did **not** add
+  `ai_provider_amazeeio` as a hard dependency even though the shipped
+  `backend_config` hard-codes amazee.ai plugin IDs (`chat_model`,
+  `embeddings_engine`) - decision 5 keeps Ollama as an equal option, so
+  forcing amazee.ai as a module dependency would be wrong for a
+  sovereign-only deployment. The shipped config is a starting default, not
+  a contract: a site running pure Ollama overrides
+  `search_api.server.aim_vector`'s `backend_config` after install to point
+  at its own provider's plugin IDs.
+- Added `aim.install` with a `hook_install()` that reloads and re-saves the
+  `aim_vector_index` entity. This exists purely to trigger the
+  create-vs-update gotcha's own documented fix (two paragraphs up)
+  automatically: config/install's module-enable import does a single insert,
+  same as `Index::create()->save()`, so without this the collection table
+  and its attribute columns would silently not exist after a fresh install,
+  exactly as when this was first built by hand.
+
+Not yet verified by an actual fresh-install run - doing that on this site
+would mean `drush pmu aim` first, which drops the `aim_fact` base table and
+destroys the 9 real fact rows and their vector data that exist right now.
+That's exactly the kind of data the "Schema/config changes during early
+development" rule below stopped covering once the `state` field went in;
+don't reinstall this module to test the export without asking first, and
+prefer a disposable environment for that test over this one.
+
+Not "a Recipe" deliberately: a Drupal Recipe is a one-time,
+`drush recipe apply`-driven bundle, and decision 8 already gives "recipe"
+its own specific, higher-stakes meaning here (an AI-generated site-building
+recipe behind a dry-run/review gate). Using the same word for "the config
+this module ships with" would conflate two different things. `config/install`
+is also just the ordinary mechanism for "this config should exist whenever
+this module is enabled," which is what's actually needed here.
+
+**Exporting real fact rows as default content: works, tested 2026-09-09,
+doesn't touch the vector index.** Core (not the old contrib `default_content`
+module - this is Drupal 11's own experimental `Drupal\Core\DefaultContent`
+system) ships `content:export`/`content:import` commands. Correction to how
+to invoke them: `web/core/scripts/drupal` (the form the annotations project
+documents) fails in this repo's layout - its fallback autoload path assumes
+`vendor/` sits inside the docroot, but this project has `web/` as docroot
+with `vendor/` one level up, so it throws
+`Failed opening required '.../web/vendor/autoload.php'`. Use
+`vendor/bin/dr` instead (`ddev exec /var/www/html/vendor/bin/dr
+content:export aim_fact <id>`), the composer-installed shim that sets the
+autoload path correctly - same command set, this repo's layout just needs
+the other entry point.
+
+Confirmed empirically, not just from reading the exporter's source: it's a
+pure read of entity field data (`$entity->getFieldDefinitions()`), so it
+cannot touch `search_api` or the `aim_facts` vector collection table -
+exported facts 1 and 9 while both were live-indexed, nothing in either
+table changed. `state` round-trips cleanly: fact 9 (state TRUE) exported a
+real `state: [{value: true}]` key; fact 1 (state NULL) omitted the `state`
+key from the YAML entirely, rather than emitting `value: null` - clean,
+unambiguous, matches the field's own "absent means not a flag" semantics.
+
+One real gotcha before actually shipping this as module content: the `uid`
+owner reference exports as `target_id: 0` (anonymous) for both facts,
+because neither export pulled in `--with-dependencies`. Without that flag,
+a reference to an entity that isn't part of the export set gets flattened
+to a dummy/zero target rather than carried through some other way - so
+re-importing these YAML files anywhere would silently reassign every
+fact's owner to Anonymous. `--with-dependencies` would fix that by also
+exporting the referenced `user` entity, but the exporter deliberately
+includes the **pre-hashed password** on any exported user account (see
+`Exporter::export()`), which is exactly wrong for an admin/personal
+account ending up in a git-committed module. Don't reach for
+`--with-dependencies` here; if authorship needs to survive export, that's
+a reason to reconsider what `uid` should even reference for demo/PoC
+facts, not a reason to export real user accounts. **Settled 2026-09-09:
+exported facts coming back in as Anonymous is fine, not a concern worth
+solving.**
+
+**No equivalent way to export the vector data itself (2026-09-09).**
+`content:export` only knows about content entities; `aim_facts` (the
+MariaDB collection table `ai_vdb_provider_mariadb` manages) isn't one - it's
+a derived index the same way a search index or a cache table is, outside
+Drupal's Entity/Field API entirely, so core's DefaultContent system has no
+way to reach it, and never will without aim writing its own exporter for
+it specifically. That's not a gap worth closing at current scale: "cheap
+and local-friendly" (AI dependency map above) describes the per-call cost
+and the option to run with zero marginal $ (Ollama), **not** that
+reindexing is free - correcting the framing here, 2026-09-09, called out
+correctly: reindexing after import is a genuine from-scratch recompute,
+every fact's text gets re-sent to the embeddings engine and a fresh vector
+gets stored, nothing carries over from the export. At 9 facts that's
+trivial; at real volume it's a real batch job whose time scales with fact
+count, and whose $ cost scales too if pointed at a paid provider rather
+than local Ollama. Reindexing after import (`drush search-api:index
+aim_vector_index`, or `--index` on a fresh `aim:extract`) is still the
+right default - a bespoke dump/restore would also have to remap
+`drupal_entity_id` (keyed by the serial ID, which changes across
+environments/imports - see below) from the old ID to whatever the
+newly-imported entity gets, matched via UUID, real custom tooling either
+way. Revisit building that tooling specifically once fact volume or a paid
+embeddings bill makes "just reindex" a real cost, not while it's still a
+handful of facts.
+
+The serial `id` and the entity's own `uuid` key are deliberately excluded
+from the exported field data too (core's own design, not aim-specific) -
+`_meta.uuid` is what identifies the entity on import instead. That also
+means the vector collection table's `drupal_entity_id` (keyed by the
+serial ID, e.g. `entity:aim_fact/9:en` - confirmed via `DESCRIBE
+aim_facts`) has no relationship to what gets exported: importing this
+content anywhere (a fresh site, or back into this one) will not
+reproduce any vector rows, by design. That's expected, not "breaking" the
+index - reindex after import (`drush search-api:index aim_vector_index` or
+`--index` on a fresh extract), same as any other newly-written batch of
+facts.
+
+**`aim_fact` gained an optional `state` boolean field (2026-09-09).** Not
+every fact is a flag, so it's nullable - set it when a fact is itself an
+on/off assertion (e.g. "opted out of marketing email" = TRUE), leave it
+unset for plain prose facts. Applied via
+`\Drupal::entityDefinitionUpdateManager()->installFieldStorageDefinition()`
+rather than a reinstall, because there was real data by this point (8 facts,
+already indexed) that a reinstall would have destroyed - this is exactly the
+moment the "reinstall, no update hooks" rule up in "Schema/config changes
+during early development" said to stop applying. `getFieldStorageDefinitions()`
+gives the storage definition object the method needs; `updatedb:status`
+does *not* surface pending entity-definition changes (it only covers
+`hook_update_N`/post_update) - check `\Drupal::entityDefinitionUpdateManager()
+->needsUpdates()` / `->getChangeSummary()` directly instead. Verified: all 8
+existing facts survived with `state` NULL, new facts can set it.
+
+**NULL is sufficient for "not a state fact," confirmed both ways
+(2026-09-09).** Live-tested the unset direction too, not just "never set":
+loaded fact 9 (`state` TRUE), set it to `NULL` and saved, confirmed the raw
+DB column read back `NULL`, then set it back to `TRUE` and confirmed that
+too - `$fact->set('state', NULL)` genuinely clears the field rather than
+coercing to `FALSE`, symmetric with a fact that never had `state` set in
+the first place. So yes: unset (`NULL`) means "this fact carries no
+boolean assertion," `TRUE`/`FALSE` mean it does, and flipping a fact back
+to unset later (e.g. a flag that turns out not to have been a flag) is a
+plain field update, nothing special required.
+
+See "Ideas raised, not designed" below for the taxonomy idea this pairs
+with: this boolean field covers true on/off flags; a small curated set of
+named values (contact preference, a "traits" tag) still wants a taxonomy
+term reference, not this field.
+
 ## Architecture decisions (binding until superseded by a new ADR)
 
 1. **Storage:** entities with `VECTOR` fields via `ai_vdb_provider_mariadb`,
@@ -138,7 +357,15 @@ touching this config again:
    as a second product surface. Its own hard rule: **no `drush recipe apply`
    on an AI-generated recipe without a dry-run/human-review step first** -
    this mutates live site structure, a different and higher-stakes risk than
-   writing a memory fact.
+   writing a memory fact. **Confirmed 2026-09-09: a Tool API implementation
+   already exists** - `mcp_tools_recipes` (submodule of the `mcp_tools`
+   project, 352 installs) ships `CreateRecipe`, `ValidateRecipe`,
+   `ApplyRecipe`, `GetRecipe`, `ListRecipes`, `GetAppliedRecipes` as real
+   Tool API plugins. Not installed, not vetted for the dry-run/review gate
+   above - beta-only releases, no official security-advisory coverage yet,
+   pulls in a fairly heavy dependency chain (pathauto, metatag, webform
+   among 13 deps). Check whether it already implements a dry-run pattern
+   before building one from scratch, when this surface actually gets built.
 
 ## AI dependency map
 
@@ -157,6 +384,102 @@ integrations. That path needs a real Anthropic Console API key (or stays on
 local Ollama). Subscription quota only covers Claude Code/claude.ai/Desktop
 sessions, i.e. the interactive PoC reasoning step, not the shipped product's
 cron-driven extraction.
+
+**Cost of un-deferring decision 3's governance layer, raised 2026-09-09
+because `aim` runs beside an existing site sharing its DB/CPU, not on
+dedicated infrastructure.** The two halves have very different cost
+profiles and shouldn't be lumped together as one worry:
+
+- **Content Moderation's own footprint is cheap.** A `moderation_state`
+  field plus a revision table and one extra row per save is the same
+  mechanism `node` uses at sites with orders of magnitude more content and
+  more revisions per item than this will ever see at PoC/small-deployment
+  scale - not the part worth being cautious about. The real schema lift
+  (noted above, under "facts and state, same entity or split") is making
+  `aim_fact` revisionable in the first place, a one-time change, not an
+  ongoing per-write cost.
+- **Guardrails (decision 7) is the actual added cost, and it's an LLM
+  call, not DB/CPU load as such.** It runs once per candidate fact, before
+  write. Decision 5 already makes the provider a choice, not a mandate:
+  pointing Guardrails at amazee.ai keeps this to network latency and API
+  cost on the shared box, no local compute contention at all. Local Ollama
+  is the option that would actually compete with the host site for CPU
+  (or GPU) - a real concern if that path gets used, but not the only path,
+  and not the default one right now (decision 6: PoC reasoning happens in
+  an interactive Claude Code session, nothing unattended is configured
+  yet).
+
+Net: don't let "the trust gate is heavy" become the read-out here. Content
+Moderation's DB cost is negligible at this scale; Guardrails' cost is real
+but is a provider choice already covered by decision 5, and defaults to
+hosted (network), not local (shared-box CPU), unless deliberately pointed
+at Ollama. Measure actual headroom on the shared box before treating this
+as a blocker either way, rather than assuming.
+
+**What Guardrails' LLM cost actually is, checked against the real plugins
+shipped in `web/modules/contrib/ai/src/Plugin/AiGuardrail/` (2026-09-09),
+not assumed:** Guardrails is a plugin type, not one fixed mechanism, and a
+Guardrail Set is a chosen combination of them - the cost depends entirely
+on which plugins are in the set applied to fact-writing. Two of the three
+shipped plugins cost nothing extra in LLM terms, confirmed by reading their
+`processInput()` - neither calls `->chat()` nor implements
+`NonDeterministicGuardrailInterface`:
+
+- `RegexpGuardrail` - pattern matching against the text. Free.
+- `InputLengthLimit` - a length/token-count check. Free.
+- `RestrictToTopic` - the one real cost. One extra chat completion call per
+  protected input (so, per candidate fact if wired into extraction),
+  prompt = the candidate text plus a configured valid/invalid topic list,
+  asking for a small JSON list of which topics are present - a
+  classification-shaped call, not a generation-shaped one, and it has its
+  own `llm_provider`/`llm_model` config independent of whatever model does
+  extraction (defaults to the site-wide default chat provider if unset, so
+  it can deliberately be pointed at something cheaper).
+
+So "mandatory Guardrails" (decision 7) doesn't imply a mandatory extra LLM
+call - a Guardrail Set built from just `RegexpGuardrail` +
+`InputLengthLimit` satisfies the decision at zero extra LLM cost;
+`RestrictToTopic` is only as expensive as choosing to add semantic topic
+judgment on top, and that choice comes with its own model/provider knob.
+
+**Why the ECA plugins, when ECA already has a State API
+(`Drupal\eca\EcaState`)? Checked against its actual source
+(2026-09-09).** `EcaState extends \Drupal\Core\State\State` - it
+literally *is* Drupal core's State API, just pointed at its own key/value
+collection (`'eca'`) instead of the default one, with a couple of
+timestamp/timeout helpers (`setTimestamp()`, `hasTimestampExpired()`) layered
+on top for automation bookkeeping like debouncing a repeated event. That
+makes it a poor fit for anything this project means by "memory," on every
+axis this conversation has touched:
+
+- **Flat and global**, not scoped by subject - no `scope`+`subject`
+  addressing at all, just a bare key you'd have to invent a naming
+  convention for by hand.
+- **No governance** - no permissions, no Content Moderation, no revisions,
+  nothing decision 3 requires.
+- **No retrieval** - no vector index, no Search API, no semantic query, no
+  attribute filtering.
+- **Not exportable**, tying directly into the export question above: State
+  API data is deliberately outside Drupal's Config and Content Entity
+  systems (that's the whole point of State vs. Config in core), so it can
+  never be reached by `content:export` either - the exact same "not an
+  entity" gap the vector table has, for the same underlying reason.
+
+So: keep `aim_fact.state`, don't move it to `EcaState` - and the ECA
+plugins aren't competing with the State API at all, they're the only bridge
+from ECA's automation world into the actual memory store (governed,
+subject-scoped, searchable, exportable). `EcaState` is exactly the kind of
+thing the earlier "don't conflate facts with what's directly available from
+the current request/automation context" caution was warning about -
+automation scratch space, not memory, and a model reaching for it instead
+of `FactWrite` would be making that exact mistake.
+
+Side note found while checking this: `ai`'s own `ai_eca` submodule is
+deprecated (`lifecycle: deprecated`, being removed in `ai:2.0.0`,
+superseded by an external `ai_integration_eca` project). Not relevant to
+what's built here - `aim_eca` depends on `eca:eca` directly, not `ai_eca` -
+but worth knowing before reaching for it if AI-flavored ECA integration
+ever comes up for another reason.
 
 ## Extraction (design notes, not built yet)
 
@@ -213,36 +536,632 @@ the top-level one.
    source turns out to be (a webhook, new content, a case update) instead
    of a manually-supplied file. Same write path, just automated.
 
-**Idea raised, not designed: extraction as a curated Skill.** The
-elicitation side of this - the structured conversation that decides what's
-worth extracting - could be built as a Claude Code Skill rather than ad hoc
-prompting. This is the same territory as ADR-003's open question 8
-("Speckit-for-Drupal's actual question sets") and its "second product
-surface" (spec-gathering conversation → Drupal Recipe): a well-curated
-elicitation Skill could plausibly be the front end for both the
-retrospective memory-extraction case and the generative spec-gathering case,
-sharing one structured-conversation mechanism. Nothing designed here yet -
-what questions, in what order, per use case - just worth remembering this
-connects to that open question rather than being a new idea from scratch.
+**Extraction as a curated Skill: built (2026-09-09).**
+`.claude/skills/aim-discovery/SKILL.md` ("the grill") is a structured,
+caring discovery-interview Skill covering purpose/audience, current state,
+content/structure, voice and personality, policy/constraints, and
+operational facts. It doesn't extract or write facts itself - it distills
+each topic into a short summary, writes it to a scratch file, and runs
+`drush aim:extract` against it, same pipeline as everything else, mostly
+`scope: site`. Explicitly out of scope: generating a Recipe from what's
+gathered (decision 8's heavier, dry-run-gated territory) - this Skill only
+populates memory. Voice/personality is deliberately just one of its topic
+sections, not a separate mechanism - see ADR-003's CCC discussion for why
+brand voice already lives conceptually in the site-memory scope.
+
+This is the same territory as ADR-003's open question 8 ("Speckit-for-
+Drupal's actual question sets") and its "second product surface"
+(spec-gathering conversation → Drupal Recipe) - a well-curated elicitation
+Skill could plausibly also front the generative spec-gathering case later,
+sharing this same structured-conversation mechanism. Not attempted yet.
+
+## CLI agent adapter (built 2026-09-09)
+
+`drush aim:extract` is the wrong tool for a Claude Code session (or any
+agent already doing its own reasoning) to write memory with - it makes its
+*own* LLM call to decide what's worth remembering, which is redundant when
+the calling agent already did that reasoning as part of the conversation.
+The direct pair, no LLM round-trip:
+
+- **`drush aim:remember <text> [--scope] [--subject] [--source] [--state]`**
+  - validates `scope` against the same four values `AimFact`'s field
+  definition allows (defaults to `site`), `$storage->create([...])->save()`
+  exactly like `extract()`'s loop body already does per-fact, minus the LLM
+  call around it, then prints the created fact's ID back so a caller has it
+  for any follow-up.
+- **`drush aim:recall <text> [--scope] [--subject] [--limit] [--format]`** -
+  loads `aim_vector_index` the same way `extract()`'s indexing branch does,
+  runs `$index->query()->keys($text)`, adds `addCondition('scope', ...)` /
+  `addCondition('subject', ...)` only when those options are set, caps with
+  `range(0, $limit)`, `->execute()`, prints each result's score plus the
+  underlying fact's `scope`/`subject`/`text`/`source`/`state`. Supports
+  `--format=json` for an agent that intends to parse output rather than
+  read a table.
+
+Both live on the existing `AimCommands` class
+(`src/Drush/Commands/AimCommands.php`, alongside `extract()`), not a new
+class - same DI, same `entityTypeManager`/`aiProvider` constructor already
+there (`recall()` only needs `entityTypeManager`, same as `extract()`'s
+`--index` branch). No schema changes, no new dependencies.
+
+**Gotcha hit while building `recall()`, confirmed 2026-09-09:
+`$index->query()->keys(...)->execute()` silently returns zero results when
+run from drush, no error at all.** Drush runs as the anonymous user (uid 0)
+by default, and `ai_search`'s backend (`SearchApiAiSearchBackend::doSearch()`)
+applies a real entity access check per match
+(`$this->checkEntityAccess($match['drupal_entity_id'])`) unless the query
+sets `search_api_bypass_access`; a match anonymous can't view is silently
+dropped from the loop, not reported as an error or a permission problem.
+`aim_fact` grants no view access to anonymous, so every match was being
+filtered out - confirmed by comparison: the identical query returned 0
+results as anonymous and 8 as uid 1 (via `account_switcher`).
+
+First fix tried was `$query->setOption('search_api_bypass_access', TRUE)`
+unconditionally - rejected on review: an unconditional access bypass sitting
+in committed code is a bad default to leave lying around, independent of
+whether today's trust model happens to make it harmless. **What `recall()`
+actually does instead:** loads user 1 and runs the query through
+`\Drupal::service('account_switcher')` (`switchTo()` before `execute()`,
+`switchBack()` in a `finally`), so the query is still subject to real entity
+access, just evaluated as an actual account rather than skipped entirely.
+
+**This is a genuine improvement, not a solved problem - flag it if it comes
+up again.** It swaps one implicit assumption for a narrower one: instead of
+"skip the check," it's now "uid 1 holds a role with `is_admin: true`"
+(confirmed as the actual mechanism - core's blanket-permission grant lives
+on the role, via `UserRolesAccessPolicy` reading `Role::isAdmin()`, the same
+mechanism behind the existing "administrator role has every permission"
+gotcha under Drupal gotchas below, not a hardcoded uid-1 special case
+anywhere in core). If uid 1 on some environment doesn't hold an is_admin
+role, `recall()` goes back to silently returning zero results, the exact
+failure mode this was meant to fix - `recall()` only guards against uid 1
+not existing at all, not against it lacking the right role. The actually
+correct fix is decision 3's governance layer: a real `aim_fact`-specific
+permission plus a dedicated non-superuser service account for CLI tooling,
+deferred along with the rest of governance. Worth knowing before writing
+`QueryFacts`'s eventual CLI-adjacent testing, or any other `search_api`
+query against an access-controlled entity run from drush/cron context - the
+same silent-empty-result trap applies there too, and the same "account-
+switch to uid 1, not a bypass" pattern is the fix, with the same caveat.
+
+**Precedent check against Hermes Agent (Nous Research), researched
+2026-09-09** to inform the shape of this before building it, prompted by
+"what are other tools doing for agent memory." Hermes exposes a single
+`memory` tool to its agent with an `action` enum (`add`/`replace`/`remove`),
+a `target` (`"memory"` vs `"user"`), and for `replace`/`remove` a
+substring-match `old_text` instead of an ID. What transfers: **one unified
+entry point with an action parameter** beats several separate tool
+definitions for agent ergonomics - `aim:remember`/`aim:recall` are shaped
+that way, and the wrapping Skill below frames them as one capability, not
+two commands. What doesn't transfer, and shouldn't: Hermes has **no
+read/search tool for its core memory at all** - `MEMORY.md`/`USER.md` are
+hard-capped at ~800/~500 tokens and injected wholesale into the system
+prompt every session, which only works because the store is deliberately
+tiny. Substring-matched `replace`/`remove` is a reasonable hack at that
+scale but would be fragile and a poor fit for `aim_fact`, which is ID/UUID
+and scope+subject addressed and meant to scale past what fits in a prompt -
+`aim:recall` (real semantic query, not "dump everything") is the correct
+divergence, not a gap to close. Hermes's own `replace` is functionally
+aim's already-planned similarity-threshold consolidation step (AI
+dependency map above), just done via vector distance instead of substring
+matching - a better fit for this project's scale, nothing to import there.
+
+**The Skill**, `.claude/skills/aim-memory/SKILL.md` (site-root `.claude`,
+same location as `aim-discovery`), same bare frontmatter shape (`name` +
+one-line `description`, nothing else). Unlike `aim-discovery` (which
+distills a conversation into a file and shells out to `aim:extract` once),
+this one is meant to be reached for continuously through a session:
+instructs the agent to call `drush aim:remember`/`drush aim:recall`
+directly via Bash whenever it learns or needs something scope-appropriate,
+framed explicitly as one memory capability with two directions so a future
+edit doesn't quietly drift back into N narrow tool-shaped instructions.
+Includes a "don't remember what's already available from context" line,
+echoing the same design boundary `aim_eca`'s `FactWrite` action follows
+(see "ECA integration" below) - it applies just as much to an agent
+deciding what to write via this Skill as it does to an ECA model.
+
+## Consolidation (Phase 1 built 2026-09-09)
+
+`drush aim:consolidate [--scope] [--provider] [--model] [--auto-threshold]
+[--ambiguous-threshold] [--dry-run]` is the on-demand sweep from decision
+6's build order (phase 1: real chat call on demand, not unattended) - the
+Queue API + crontab phase 2 (decision 4) isn't built. Design informed by a
+precedent check against Mem0 and Hindsight before building: Mem0's
+extraction-then-"update" stage picks one of ADD/UPDATE/DELETE/NOOP per
+candidate against retrieved neighbors - that vocabulary is adopted directly.
+Hindsight calls its own mechanism "LLM-powered consolidation," which
+validated the AI dependency map's existing split (conflict/merge decisions
+= reasoning-grade LLM, similarity-threshold cases = vector math only) rather
+than requiring a fix to it - what was missing was the algorithm under the
+table, not the table. Hindsight also skips hard-deleting on contradiction,
+letting a superseded fact fade via recency-weighted retrieval instead - that
+argues for soft-supersede over DELETE here too, which is what got built.
+
+**Schema addition, same pattern as `state`:** two new nullable base fields
+on `aim_fact`, added via `installFieldStorageDefinition()` (real data
+existed - 9 facts - so this needed the same non-destructive path as `state`,
+not a reinstall):
+
+- `expires` (timestamp) - when set, the fact is superseded. Consolidation
+  sets this instead of deleting, to preserve an audit trail per decision 3's
+  governance concerns.
+- `related` (`entity_reference` to `aim_fact`, unlimited cardinality) - the
+  fact(s) this one is linked to, e.g. the survivor that superseded it. This
+  is the "explicit graph" half of the fact-to-fact-relations idea below,
+  now actually populated by consolidation rather than just proposed.
+
+Gotcha hit installing these: `EntityDefinitionUpdateManager::
+getFieldStorageDefinition()` reads the *last installed* schema, so it
+returns NULL for a field that was never installed - the working call is
+`\Drupal::service('entity_field.manager')->getBaseFieldDefinitions('aim_fact')`,
+which reads the entity class's current definitions, and even that needs a
+`drush cr` first if the class was just edited (the base field definitions
+are cached too).
+
+**`aim:consolidate`'s algorithm, v1 (simplest thing - sweep everything,
+trivial at current scale):** for each `aim_fact` without `expires` already
+set (optionally filtered by `--scope`), run the same `aim_vector_index`
+query `recall()` already uses, scoped to that fact's own scope+subject,
+excluding itself and anything already consumed by a decision earlier in
+this run. Whichever of the pair has the lower id is treated as "kept" (the
+established fact), the higher id as "candidate" (the newer restatement
+being evaluated against it) - a stand-in for real write-order until phase 2
+triggers consolidation from actual fact creation instead of a retroactive
+sweep.
+
+- Score above `--ambiguous-threshold`: not related enough, skip, no cost.
+- Score at or below `--auto-threshold`: obvious duplicate, no LLM call -
+  candidate gets `expires` set and `related` pointing at kept (NOOP shape).
+- Otherwise (the ambiguous band): one `StructuredOutputSchema` chat call,
+  same pattern `extractFacts()` already uses, asking the model to choose
+  ADD/UPDATE/DELETE/NOOP for the specific pair. Applied as: **ADD** - both
+  stand, nothing changes. **UPDATE** - kept's `text` is overwritten with the
+  model's merged statement, candidate gets `expires`/`related` (soft
+  superseded, but contributed new information to the surviving fact).
+  **NOOP** - candidate gets `expires`/`related`, kept's text is left alone
+  (pure restatement, nothing to merge). **DELETE** - candidate is hard
+  deleted; reserved for cases the model judges shouldn't exist as a memory
+  at all, not the default outcome.
+
+`--dry-run` prints the same decision table without saving anything - this
+is the first command in the module that can mutate or retire existing
+facts rather than only ever creating new ones, so a preview mode is a real
+safety need, not overengineering.
+
+**Threshold defaults, empirically set against real data (2026-09-09), not
+borrowed from Mem0's or Hindsight's own (different) embedding models, per
+the open question the design brief flagged.** Watching `aim:recall`'s score
+column (lower = closer match) against this site's actual 9 facts and the
+`amazeeio__titan-embed-text-v2:0` embeddings: a genuine near-duplicate pair
+(fact 2 "The support desk is staffed 9-5 UK time." vs fact 7 "The site's
+support desk is only staffed Monday to Friday, 9 to 5, UK time.") scored
+0.338; a distinct fact about the same person (contact preference vs.
+timezone) scored 0.563. `--auto-threshold` defaults to 0.35,
+`--ambiguous-threshold` to 0.65 - a narrow gap by design, since the real
+data showed "obvious dupe" and "same subject, different fact" sitting only
+about 0.2 apart. Revisit as real fact volume grows past a handful.
+
+**Gotcha, found by rerunning the sweep right after an apply and getting the
+same pair again:** the vector index has no idea `expires` exists (it isn't
+an indexed attribute), so a fact already retired by an earlier consolidation
+run keeps resurfacing as everyone's nearest neighbor. Fixed in two places:
+`findNearestNeighbor()` skips any candidate whose `expires` is already set,
+and `recall()` now filters `expires`-set facts out of its own results for
+the same reason - a retired fact was still fully answering live queries
+until this was added, which defeats the entire point of retiring it.
+
+**Real finding that led to a real fix, same day: two known-duplicate facts
+(1 and 3, both "Nik prefers email over phone," worded differently) never
+got compared, because the neighbor search scoped strictly by `subject`
+string and one used subject `1` (a uid) while the other used `Nik` (a
+name).** This was the free-text `subject` drift the taxonomy idea below
+already worried about, showing up live rather than hypothetically. Fixing
+consolidation's matching logic wouldn't have addressed the root cause
+(subject *addressing*, not matching) - see "User-scope facts now require a
+real account" below for what actually fixed it.
+
+**User-scope facts now require a real account (decided and built
+2026-09-09), fixing the drift above at the source.** `subject` was always
+documented as meant to hold a uid for `scope: user` facts, but it was a
+free string that merely happened to contain one - nothing stopped "1" and
+"Nik" from addressing the same person without ever matching. Decision:
+a `scope: user` fact must be about an account that actually exists on this
+site. Mechanism:
+
+- New base field `subject_uid` (`entity_reference` to `user`, cardinality
+  1), installed the same `installFieldStorageDefinition()` way as `state`
+  and `expires`. `subject` (the string field) is now only meaningful for
+  `role` (a role machine name) and `case` (a case ID) scope - for
+  `scope: user` it stays empty, `subject_uid` is the single source of
+  truth.
+- **`aim:remember`** resolves `--subject` (a uid or a username) to a real
+  account via a new `resolveAccount()` helper when `--scope=user`, and
+  refuses to save if it doesn't resolve - the same "reject rather than
+  silently corrupt" posture as `--state`'s validation.
+- **`aim:extract`** does the same resolution automatically against
+  whatever subject string the model returned, per fact. If it doesn't
+  resolve, that candidate fact is skipped (with a warning naming the
+  count), not saved with a broken/unaddressable subject. This is a real,
+  deliberate behavior change: extraction can now silently drop a
+  correctly-extracted fact about a real person who simply has no account
+  yet - an accepted consequence of "must have an account," not a bug to
+  fix later.
+- **`findNearestNeighbor()`** (inside `aim:consolidate`) no longer adds a
+  `subject` index condition for `scope: user` - `subject_uid` isn't an
+  indexed attribute, so it over-fetches (range 20 instead of 5) and
+  post-filters candidates in PHP for exact `subject_uid` equality instead.
+- **`aim:recall`** gained a separate `--subject-uid` option (uid or
+  username, resolved the same way) rather than overloading `--subject`
+  with scope-dependent meaning - a CLI flag that means two different
+  things depending on another flag's value is a footgun worth avoiding
+  even at the cost of one more option. Same over-fetch-then-post-filter
+  shape as consolidation's fix.
+- The 5 existing `scope: user` facts (1, 3, 4, 5, 9 - all genuinely about
+  the same person, confirmed against this site's actual accounts, only
+  uid 1 and anonymous exist here) were migrated by hand: `subject_uid` set
+  to 1, `subject` string cleared.
+
+**Verified end to end after the fix:** facts 1 and 3 now correctly appear
+as a pair (score 0.474, the ambiguous band) and the classification call
+returned UPDATE - fact 1's `text` became "Nik prefers to be contacted by
+email rather than phone for support follow-ups" (a real merge of both
+statements), fact 3 got `expires`/`related` set. This is the fix actually
+resolving the bug it was built for, not just passing a synthetic test.
+
+**Follow-up closed same day: `aim_eca`'s three plugins updated to match.**
+All still expose the same plain "Subject" textfield in the model editor
+(a config field can't conditionally change shape based on another field's
+value without more machinery than this warranted) but now resolve it to a
+real account at execution time when scope is user, via a new shared
+`AccountResolverTrait` (`aim_eca/src/AccountResolverTrait.php`, `use`d by
+all three) - the same uid-or-username resolution `AimCommands::
+resolveAccount()` does, duplicated rather than shared across modules since
+`aim_eca` and `aim`'s Drush commands don't otherwise share code.
+`FactWrite` throws if scope=user and the subject doesn't resolve, same
+posture as `aim:remember`'s validation, and sets `subject_uid` instead of
+`subject` on the created fact. `FactQuery` resolves the same way, then
+post-filters (subject_uid isn't an indexed attribute, over-fetches at 5x
+limit) - and picked up the `expires`-filtering fix `recall()` got earlier,
+which it had drifted out of sync with since it was built by mirroring an
+older version of that method. `FactState` matches on `subject_uid` instead
+of `subject` in its `loadByProperties()` lookup when scope=user, and
+short-circuits to a non-match if the configured subject doesn't resolve to
+an account (an unresolvable subject can't have written a fact to begin
+with, so the condition just evaluates false rather than throwing - a
+condition failing to match is a normal outcome, not an error, unlike
+`FactWrite`/`FactQuery` where garbage input should stop a write or a
+query). Not yet exercised through an actual ECA model - `eca` still isn't
+enabled on this site - so this is verified by phpcs and `php -l` only, same
+caveat the original build already carried.
+
+**Open governance question, flagged not resolved, carried over from the
+design brief:** decision 7 says every LLM-proposed candidate fact goes
+through Guardrails before being written "anywhere," worded with extraction
+in mind - one new fact at a time. A consolidation UPDATE/DELETE is also an
+LLM-proposed write, just targeting an existing fact instead of a new one.
+Decision 7 doesn't explicitly say whether that counts, and `aim:consolidate`
+doesn't call Guardrails today. Doesn't block anything right now (every
+write already goes live unreviewed regardless of source, per the PoC
+deviations noted at the top of this file), but settle it before decision
+3's governance layer gets un-deferred, not after consolidation is already
+running unattended via phase 2.
+
+## ECA integration (built 2026-09-08)
+
+`aim_eca` (`web/modules/custom/aim/modules/aim_eca`) is a submodule, not a
+change to `aim` itself: `aim.info.yml` has no ECA dependency, so the site
+stays exactly as installed until someone deliberately enables both `eca` and
+`aim_eca`. `drupal/eca` (`^3.1`, currently `3.1.7`) is already
+composer-present in this repo but not enabled - confirmed via `drush pml`,
+only `aim` shows enabled. That is the intended state; don't enable `eca` on
+this site without being asked.
+
+`aim_eca` ships three plugins, all named `Fact<Verb>`/`aim_fact_<verb>`
+for a consistent, alphabetized set in ECA's model editor (`Fact Query`,
+`Fact State`, `Fact Write`): the write path, `FactWrite`
+(`src/Plugin/Action/FactWrite.php`, plugin ID `aim_fact_write`; named
+`WriteFact`/`aim_write_fact` until the naming was made consistent
+2026-09-09, before `eca` was ever enabled anywhere so nothing depended on
+the old ID), that maps an ECA model's configured values (with full token
+support: scope, subject, text, source, and an optional true/false/token
+`state`) onto a new `aim_fact`, the same shape `drush aim:extract` writes;
+and two read-side complements, `FactQuery` (action, `aim_fact_query`) and
+`FactState` (condition, `aim_fact_state`) - see "Retrieve/condition ECA
+plugins" under "Ideas raised, not designed" below for what those two do.
+`FactWrite` extends
+`Drupal\eca\Plugin\Action\ConfigurableActionBase`, not Drupal core's own
+bare `Action` base class - worth knowing before writing another ECA plugin
+here: **ECA does not have its own action plugin type.** It reuses Drupal
+core's native `#[Action]` attribute and `plugin.manager.action` wholesale
+(confirmed against `web/core/lib/Drupal/Core/Action/`); any core Action
+plugin, ECA-aware or not, already shows up in ECA's model editor the moment
+ECA is enabled, zero extra dependency required. `eca`'s own
+`Plugin\Action\ActionBase`/`ConfigurableActionBase` just layer extra
+constructor-injected services (`tokenService`, `EcaState`, a dedicated
+logger channel) on top of that same plugin type via a `final __construct()`,
+and the only reason to extend eca's version instead of core's bare one is to
+get `$this->tokenService->replaceClear()` / `addTokenData()`, i.e. token
+support, which is the entire point of a fact-writing action driven by a
+model's event context. That's why `aim_eca` still has to depend on `eca`
+even though the underlying plugin type doesn't require it.
+
+**Design boundary, not yet enforced anywhere except by convention:** this
+action is a write path, same as `drush aim:extract` - it stores whatever the
+model hands it, it doesn't decide what's worth remembering. Don't wire an
+ECA model to write a fact for something already available for free from the
+current request or entity context (the acting user's roles, the node being
+viewed, a field value still live on an unchanged entity) - that's a stale
+duplicate waiting to happen, not memory. This action exists for values that
+would otherwise be lost once the triggering event passes: a submitted
+webform value, a decision made mid-workflow, something pulled from an
+external system during that one event.
+
+`https://ecaguide.org/llms.txt` is a real, working agent-friendly docs
+index (confirmed 2026-09-08) - one Markdown-suffixed page per doc URL (e.g.
+`https://ecaguide.org/eca/extend/plugins/index.md`), covering install,
+modelers, and a plugin reference for every bundled Event/Action/Condition.
+Thin on custom-plugin-authoring specifics in practice, though (the
+"Developing Plugins" page mostly points at `drush gen eca-action` and the
+existing plugin source rather than spelling out the base class/attribute
+contract) - reading the installed module's own source
+(`web/modules/contrib/eca/src/Plugin/Action/`) plus a real shipped example
+(`ConfigurableActionBase`, `ActionBase`, and any concrete `#[Action]`
+implementation) was more reliable for this than the docs site.
 
 ## Ideas raised, not designed
 
-Two more, not yet built, kept here so they don't evaporate between sessions:
+Four more, not yet built, kept here so they don't evaporate between sessions:
 
 - **Typed/boolean facts could skip the vector pipeline entirely.** A
   flag-shaped fact ("user prefers email over phone") doesn't need semantic
   similarity to retrieve, just an indexed lookup by scope+subject against
-  `aim_fact`'s own table. A Drupal cache API layer (keyed by scope+subject,
-  tagged so a save invalidates it) makes sense on top of that lookup for a
-  hot path, but only once there's a typed-fact concept (a `value_type`/
-  `value` field, or a separate bundle) to look up in the first place. Don't
+  `aim_fact`'s own table. Refined 2026-09-09: a generic `value_type`/`value`
+  field pair isn't the smart version of this - **taxonomy** is. A true on/off
+  flag is a plain Boolean field, nothing gained from taxonomy. A categorical
+  fact with a small curated set of values (contact preference: email/phone/
+  SMS; a "traits" tag) is genuinely better as a taxonomy term reference than
+  free text or an enum column - controlled vocabulary Drupal already
+  manages, editors can prune/merge terms normally, Views/Search API facet on
+  it for free, avoids the free-text drift a plain `subject` string invites
+  ("Nik" vs "nik" - the *identifier* half of this got fixed 2026-09-09, see
+  "User-scope facts now require a real account" above: `subject_uid` is now
+  a real `entity_reference` to `user` for `scope: user` facts specifically.
+  This taxonomy idea is still open for the separate *categorical-value*
+  case - contact preference, traits - which is a different field, not
+  `subject`). A fact becomes "this subject is tagged with this term",
+  an entity reference, not a value pair. A Drupal cache API layer (keyed by
+  scope+subject, tagged so a save invalidates it) makes sense on top of
+  either shape for a hot path, but only once there's a real recurring
+  category worth curating (contact preference is the first candidate). Don't
   add this speculatively; wait for an actual hot-path check that needs it.
+  (2026-09-09: `aim_eca`'s `FactWrite` action only knows about the two
+  shapes that exist today, prose `text` and boolean `state` - if the
+  taxonomy shape gets built, that action needs a matching entity-reference
+  config field, not a third string field bolted on.)
+
+  **Placement, if this gets built (2026-09-09):** one vocabulary per
+  category type (`contact_preference`, `traits`, ...), shipped as module
+  default config the same way the search_api config above now is, each kept
+  independently prunable. On `aim_fact` side: a single new
+  `entity_reference` field (e.g. `category`), cardinality 1, with
+  `target_bundles` listing every relevant vocabulary at once - Drupal
+  already lets one field span several vocabularies (it's how core's own
+  default "Tags" field works), and which category a term belongs to falls
+  out of `$term->bundle()`, no second field needed to track that. If a
+  subject needs more than one categorical tag, that's more `aim_fact` rows
+  (one term each), not a multi-value field on one row - matches every other
+  field on this entity being "one row, one atomic assertion."
+
+  **Facets are not an alternative to this (2026-09-09), asked because
+  `search_api` is already in play and `drupal/facets` (`^3.0`) has since
+  been added to composer.json (not yet enabled).** Facets are a query-time
+  filtering UI over an already-indexed attribute - they answer "let someone
+  narrow search results by this value," not "how is this value stored and
+  curated," which is what taxonomy is actually for. The two aren't
+  competing: a taxonomy term reference would typically be indexed as an
+  attribute (same as `scope`/`subject`/`source` already are) and *then*
+  optionally exposed as a facet on top, if there's ever a human-facing
+  results page. There isn't one yet - every current and planned consumer
+  (`drush aim:extract`'s retrieval, `FactWrite`, an eventual query action)
+  talks to the index directly via `$index->query()->keys(...)->execute()`,
+  so a facets UI has nothing to attach to right now.
+
+  **Actual DB pressure, measured 2026-09-09, not guessed:** 9 `aim_fact`
+  rows = 0.06 MB, the `aim_facts` vector collection table (8 rows indexed
+  so far) = 0.14 MB, whole site DB = 18.5 MB. A plain attribute or taxonomy
+  reference field costs nothing worth mentioning at this scale, same as
+  `scope`/`subject`/`source` already indexed as attributes today. The real
+  cost driver, if this ever needs revisiting, is the `VECTOR(1024)` column
+  itself: `aim_facts` is already ~50% bigger than `aim_fact` per equivalent
+  row despite storing far less data, and that ratio is what to watch as
+  fact volume grows, not anything to do with taxonomy or facets.
 - **Fact verification as a user-facing feature, not just a governance
   gate.** The draft-to-trusted review step (decisions 3/7) could double as
   a mobile-friendly "here's what I remember about you, confirm or correct"
   aide-memoire, valuable to the person reviewing it independent of it also
   being the safety gate. When that review UI actually gets built, default
   to something a person would want to use, not an admin moderation queue.
+- **Fact-to-fact relations (2026-09-09), prompted by "is this Obsidian?".**
+  Not built, and today's schema has no link between facts at all - the only
+  connective tissue is the shared `scope`+`subject` pair and whatever the
+  vector index finds semantically similar. Obsidian's actual value isn't
+  atomic notes, it's the graph those notes form via authored `[[links]]`
+  plus a graph view over it. Two ways to get graph-shaped value here,
+  neither built, cheap to add later, don't add speculatively:
+  1. **Explicit graph:** a multi-value `entity_reference` base field on
+     `aim_fact` targeting `aim_fact` itself (same pattern as every other
+     field already on this entity - plain SQL, no new infrastructure).
+     Gives authored, curated edges, but requires something to actually
+     author them (a human reviewer, or an extraction step told to look for
+     relations).
+  2. **Implicit graph, already half-there for free:** the vector index
+     already answers "what's related to this fact" via cosine similarity,
+     with zero schema change - this is Obsidian's "graph view" without the
+     authoring step, computed rather than typed by hand. A "related facts"
+     feature could just be a query against `aim_vector_index`, not a
+     stored relation at all.
+  A graph *view* (force-directed visualization) is a separate, purely
+  presentational layer on top of either - Drupal has nothing built-in for
+  this, would need a small custom JS visualization fed by either source.
+  Don't build any of this until there's an actual reason to browse facts as
+  a graph rather than query them, per the module's own git-vs-SQL framing:
+  this project stores facts in SQL specifically because it doesn't want
+  Obsidian's file-vault model, so "graph view" here means a query result
+  rendered as a graph, not a stored file network.
+
+  **Built 2026-09-09, alongside consolidation:** `related` (`entity_reference`
+  to `aim_fact`, unlimited cardinality) is now a real base field, added the
+  same way `state` was. The prediction two paragraphs up held: no human
+  types the equivalent of `[[links]]` - `drush aim:consolidate` populates
+  `related` itself, from the same vector-similarity comparison it already
+  has to run to decide ADD/UPDATE/DELETE/NOOP, at zero extra cost. See
+  "Consolidation" above for the actual mechanism, thresholds, and gotchas.
+  What's still true from the original idea: `related` only records the
+  supersedes/superseded-by edge consolidation creates, not a general
+  authored graph - that's still the unbuilt "explicit graph" half if it's
+  ever wanted for its own sake, independent of consolidation.
+
+  **Facts and state, same entity or split (2026-09-09)?** Recommendation:
+  same entity, don't split. Every shape so far (prose, boolean, and
+  taxonomy/categorical if it gets built) is still the same conceptual
+  object - one atomic assertion - just with a different optional structured
+  field riding alongside the required `text`. Splitting into a second
+  entity type would duplicate governance, Search API indexing, permissions
+  and every ECA action across both for no real gain. The dimension actually
+  worth separating is *bundle*, not entity type - and that's already
+  spoken for: bundles are earmarked for the *scope* axis (user/role/site/
+  case), deferred per the PoC-deviations note near the top of this file.
+  Drupal entities get exactly one bundle dimension, so scope-as-bundle and
+  shape-as-bundle (statement/flag/category) can't both happen on the same
+  entity type. Don't bundle on shape; revisit only if scope bundles
+  actually get built and this becomes a real conflict instead of a
+  hypothetical one.
+- **Fact expiry and a possible review status (2026-09-09).** Originally
+  raised as forking into two different-sized pieces; half 1 got built, but
+  as a side effect of consolidation, not as the standalone TTL mechanism
+  described below:
+  1. **Expiry is cheap and additive - built, but not the way this
+     originally proposed.** The nullable `expires` timestamp base field
+     exists (see "Consolidation" above), but nothing sets it on a schedule
+     or by staleness/age - only `drush aim:consolidate` sets it, as a
+     "this fact is superseded" marker, and only `aim:recall` currently
+     checks it (filters expired facts out of results at query time, not a
+     scheduled job that acts on anything past its date). A real
+     scheduled-TTL mechanism, if one still gets wanted independent of
+     consolidation, is still unbuilt - decision 4's Queue API + dedicated
+     crontab, not `hook_cron`, same as originally proposed here.
+  2. **"Force into review status" is a bigger decision than it sounds.**
+     This isn't a new concern alongside decision 3's draft-to-trusted gate -
+     it's that gate arriving early, just triggered by staleness instead of
+     by extraction. Building a separate ad hoc `review_status` field now
+     would just get replaced by Content Moderation later, which decision 3
+     already commits to. The real cost of pulling decision 3 forward:
+     Content Moderation requires the entity to be **revisionable**, and
+     `aim_fact` has no revision support at all today (no revision entity
+     key, no revision table) - so "ship a workflow" isn't just adding a
+     field, it's adding revisions to the entity first, a real schema lift,
+     not a small one.
+  Don't build either half without confirming which one is wanted: `expires`
+  alone doesn't need a workflow, but a real review-status gate should be
+  decision 3's Content Moderation, not a smaller thing that gets thrown
+  away once decision 3 actually gets un-deferred.
+- **Retrieve/condition ECA plugins - built (2026-09-09).** Read-side
+  complements to `FactWrite`, same use case as originally scoped: a model
+  that needs to branch on, or pull in, memory it already has. Named
+  `FactQuery`/`FactState` (not `QueryFacts`) so all three `aim_eca` plugins
+  share one `Fact<Verb>` shape - `FactWrite` was itself renamed from
+  `WriteFact` in the same pass, purely for this consistency, see "ECA
+  integration" above.
+  - **`FactQuery` Action**, `aim_eca/src/Plugin/Action/FactQuery.php`,
+    plugin ID `aim_fact_query`. Config: token-supported search text,
+    optional `scope`/`subject` filters (`scope` uses the same
+    select-with-`#eca_token_select_option` pattern as `FactWrite`, left
+    `#required => FALSE` so ECA's own "undefined" option means "no scope
+    restriction" rather than a bespoke sentinel value), a result-limit
+    (plain number field, default 10, matching `aim:recall`'s default), and
+    a required `token_name`. `execute()` loads `aim_vector_index` and runs
+    `$index->query()->keys(...)->execute()`, the exact same call already
+    proven and shipped in `drush aim:recall` (`AimCommands::recall()`) -
+    mirrored that working code rather than the earlier, only-planned
+    sketch of it.
+  - **Resolved: what `addTokenData()` does with a result list.** Checked
+    against `eca`'s own source
+    (`Drupal\eca\Token\TokenDecoratorTrait::addTokenData()`), not assumed.
+    A plain PHP array has no resolvable token type (`getTokenType()` only
+    recognizes `EntityInterface` and `DataTransferObject`), so passing one
+    directly falls through to the same branch that wraps chained-token
+    data: a new `DataTransferObject` gets registered under the key, then
+    `$dto->setValue($data)` stores the array as that DTO's value. This is
+    exactly the mechanism `eca`'s own `ListOperationBase` relies on (it
+    explicitly does `DataTransferObject::create([])` for the same reason)
+    - so `FactQuery` hands `addTokenData()` a plain array of loaded
+    `aim_fact` entities directly, no manual DTO wrapping needed on this
+    module's side.
+  - **`FactState` Condition**, `aim_eca/src/Plugin/ECA/Condition/
+    FactState.php`, plugin ID `aim_fact_state`, extends `Drupal\eca\
+    Plugin\ECA\Condition\ConditionBase` (confirmed: conditions are ECA's
+    own plugin type, not core's like Action - attribute is `Drupal\eca\
+    Attribute\EcaCondition`). Config: `scope`, `subject`, expected boolean
+    `state`, all token-capable, same field pattern as `FactWrite`.
+    `evaluate(): bool` does a direct `loadByProperties(['scope' => ...,
+    'subject' => ..., 'state' => $expected])` against `aim_fact`'s own
+    table, not a vector query, per the boolean-facts-skip-the-vector-
+    pipeline idea below - `state` is a boolean column, so this condition
+    can never match a fact that never had `state` set, only ones
+    explicitly `TRUE` or `FALSE`. Respects the negate checkbox every ECA
+    condition gets from `ConditionBase`, via `$this->negationCheck(...)`.
+  No DB migration needed for either - both are new plugin files in the
+  already-`eca`-dependent `aim_eca` submodule, `aim_fact`'s schema
+  unchanged. Not yet exercised through an actual ECA model - `eca` isn't
+  enabled on this site (see "ECA integration" above) - so discovery of
+  these plugin IDs in ECA's model editor is unverified beyond syntax and
+  matching the shape of the already-proven `FactWrite`/`recall()` code
+  they're built from.
+- **Pre-extraction summarization as a dedup lever, raised 2026-09-09.**
+  Idea: reduce duplicate/near-duplicate facts at the source by having an AI
+  pass summarize a conversation before extraction runs against it, rather
+  than relying only on post-write similarity-threshold consolidation (AI
+  dependency map above). Not a substitute for consolidation, complementary
+  to it: pre-extraction summarization only catches duplication *within* one
+  session's raw material before facts are ever written; it does nothing for
+  two separate sessions independently producing the same or a
+  near-identical fact, which is exactly what post-write vector-similarity
+  consolidation exists to catch. Likely wanted together once consolidation
+  gets built, not instead of it.
+
+  Already partially the existing pattern, not a new mechanism: this is what
+  the aim-discovery Skill ("the grill") already does today, per-topic - it
+  distills a topic into a short summary, writes it to a scratch file, then
+  runs `aim:extract` against that file rather than raw conversation (see
+  "Extraction as a curated Skill" above). What "summarize/write the
+  conversation out before extraction" would add on top is doing this
+  generally, for any conversational memory-write path, not just the
+  grilling Skill's structured interview.
+
+  **Flag, not yet resolved:** writing a conversation out to markdown ad hoc
+  brushes directly against the standing no-transcript-recording constraint
+  above - that constraint is about what gets *persisted*, not about
+  ephemeral working files. `aim:extract`'s own input file, and the grilling
+  Skill's scratch summary file, are already never stored anywhere, which is
+  the precedent to follow: a summarization-before-extraction step is fine
+  as long as the intermediate markdown stays scratch/ephemeral (discarded
+  after the extract call) and never becomes a committed field, table, or
+  module asset. If it's ever meant to persist - e.g. for audit or
+  debugging - that's the no-recording default being reopened for real, not
+  a side effect of building this dedup mechanism, and needs its own
+  explicit decision first, same as the reopened note above already says.
+- **EU AI Act disclosure obligation, flagged 2026-09-09, not designed.**
+  `aim` mediates AI-generated content back to end users (extracted facts,
+  eventually recipes/recommendations) - the EU AI Act's transparency
+  obligations (Article 50: users must be told they're interacting with an
+  AI system or viewing AI-generated content) are a plausible fit once this
+  moves past PoC into anything user-facing.
+  `drupal/ai_disclosure` (`https://www.drupal.org/project/ai_disclosure`) is
+  a candidate module for this - not evaluated yet (maturity, what it
+  actually covers, whether it fits this project's shape). Revisit before
+  any non-PoC/public-facing surface ships, alongside decision 3's
+  governance layer - this is a legal requirement, not an architectural
+  nice-to-have, so don't let it slide past an actual launch.
 
 ## Dev process and rules
 
@@ -302,10 +1221,18 @@ the exact pinned versions first.
 Fix small findings (typos, style violations, a genuine new dictionary word)
 inline in the same pass rather than queuing them for later review.
 
-`drupal/core-dev` (dev-only, `composer require --dev drupal/core-dev:^11.4`)
-is what provides `drupal/coder` (phpcs) and phpstan/mglaman-phpstan-drupal -
-not yet installed at time of writing, so the commands above will fail until
-it is.
+`drupal/core-dev` (dev-only) is what provides `drupal/coder` (phpcs) and
+phpstan/mglaman-phpstan-drupal. Installed 2026-09-09 via `ddev composer
+require --dev drupal/core-dev:^11.4 -W` - plain `composer require` fails
+here without `-W` (`--with-all-dependencies`): `phpunit/phpunit` needs
+`sebastian/diff ^6.0.2`, but this project's lock had it pinned at `7.0.1`.
+`-W` downgrades it to `6.0.2`, which `drupal/core`'s own constraint
+(`^4 || ^5 || ^6 || ^7`) still permits, so this is safe - confirmed via a
+`--dry-run` first: 85 new dev-only packages, that one downgrade, zero
+removals. `vendor/bin/phpcs` only works through `ddev exec` (or inside the
+container generally) - the host has no `php` on `PATH`, so running it
+directly from a host shell fails with `env: 'php': No such file or
+directory`; that's an environment gap, not a composer.json problem.
 
 ### Drupal gotchas
 

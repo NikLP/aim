@@ -57,8 +57,13 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface {
 
     $fields['subject'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Subject'))
-      ->setDescription(t('Who or what the fact is about: a uid, a role machine name, or a case ID. Empty for site scope.'))
+      ->setDescription(t('Who or what the fact is about: a role machine name or a case ID. Empty for site scope. Not used for user scope, see subject_uid.'))
       ->setSetting('max_length', 255);
+
+    $fields['subject_uid'] = BaseFieldDefinition::create('entity_reference')
+      ->setLabel(t('Subject (user)'))
+      ->setDescription(t('The real Drupal account this fact is about, when scope is user. A fact cannot be about a person with no account on this site; unlike subject, this is a real reference, not a free-text string that merely happens to hold a uid.'))
+      ->setSetting('target_type', 'user');
 
     $fields['text'] = BaseFieldDefinition::create('string_long')
       ->setLabel(t('Text'))
@@ -69,6 +74,20 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface {
       ->setLabel(t('Source'))
       ->setDescription(t('Free-text provenance reference for the episode this fact was extracted from.'))
       ->setSetting('max_length', 2048);
+
+    $fields['state'] = BaseFieldDefinition::create('boolean')
+      ->setLabel(t('State'))
+      ->setDescription(t('Optional on/off value when this fact is itself a flag (e.g. "opted out of marketing email" = TRUE). Leave empty for facts that are just prose with no boolean shape.'));
+
+    $fields['expires'] = BaseFieldDefinition::create('timestamp')
+      ->setLabel(t('Expires'))
+      ->setDescription(t('When set, this fact is superseded and should be excluded from retrieval past this time. Set by consolidation instead of deleting the fact outright, to preserve an audit trail.'));
+
+    $fields['related'] = BaseFieldDefinition::create('entity_reference')
+      ->setLabel(t('Related facts'))
+      ->setDescription(t('Other aim_fact entities this one is linked to, e.g. the fact that superseded it during consolidation.'))
+      ->setSetting('target_type', 'aim_fact')
+      ->setCardinality(BaseFieldDefinition::CARDINALITY_UNLIMITED);
 
     $fields += static::ownerBaseFieldDefinitions($entity_type);
     $fields['uid']

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="annotations">
+  <description>Drupal coding standards for the AIM module suite.</description>
+
+  <file>.</file>
+  <arg name="extensions" value="php,module,inc,install,info.yml"/>
+
+  <!-- Enforce the Drupal standard. -->
+  <rule ref="Drupal"/>
+  <rule ref="DrupalPractice"/>
+
+  <!-- Exclude generated and third-party paths. -->
+  <exclude-pattern>*/vendor/*</exclude-pattern>
+  <exclude-pattern>*/node_modules/*</exclude-pattern>
+</ruleset>

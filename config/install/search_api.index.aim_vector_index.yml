@@ -1,0 +1,62 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - search_api.server.aim_vector
+  module:
+    - aim
+id: aim_vector_index
+name: 'AIM Vector Index'
+description: null
+read_only: false
+field_settings:
+  scope:
+    label: Scope
+    datasource_id: 'entity:aim_fact'
+    property_path: scope
+    type: string
+    dependencies:
+      module:
+        - aim
+  source:
+    label: Source
+    datasource_id: 'entity:aim_fact'
+    property_path: source
+    type: string
+    dependencies:
+      module:
+        - aim
+  subject:
+    label: Subject
+    datasource_id: 'entity:aim_fact'
+    property_path: subject
+    type: string
+    dependencies:
+      module:
+        - aim
+  text:
+    label: Text
+    datasource_id: 'entity:aim_fact'
+    property_path: text
+    type: string
+    dependencies:
+      module:
+        - aim
+datasource_settings:
+  'entity:aim_fact': {  }
+processor_settings:
+  add_url: {  }
+  aggregated_field: {  }
+  custom_value: {  }
+  entity_type: {  }
+  language_with_fallback: {  }
+  rendered_item: {  }
+tracker_settings:
+  default:
+    indexing_order: fifo
+options:
+  cron_limit: 50
+  delete_on_fail: true
+  index_directly: false
+  track_changes_in_references: true
+server: aim_vector

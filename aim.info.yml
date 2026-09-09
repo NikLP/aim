@@ -1,9 +1,11 @@
 name: AIM
 type: module
-description: 'Content entity for agent memory facts (PoC, no moderation gate yet).'
+description: 'AI Memory (WIP)'
 package: AIM
 core_version_requirement: ^11
 dependencies:
   - drupal:options
   - ai:ai
+  - ai:ai_search
+  - ai_vdb_provider_mariadb:ai_vdb_provider_mariadb
   - search_api:search_api

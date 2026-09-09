@@ -1,0 +1,8 @@
+name: 'AIM ECA integration'
+type: module
+description: 'ECA action plugins to write/query/etc via an ECA model.'
+package: AIM
+core_version_requirement: ^11
+dependencies:
+  - aim:aim
+  - eca:eca
