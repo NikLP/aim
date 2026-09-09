@@ -15,6 +15,13 @@ use Drupal\Core\Session\AccountInterface;
  * resolve it the same way drush aim:remember/aim:extract do rather than
  * writing or querying against a free-text string that merely looks like a
  * uid.
+ *
+ * Delegates to \Drupal\aim\Service\AimMemoryManager::resolveAccount() via
+ * the service container rather than constructor injection: eca's
+ * ActionBase/ConditionBase both declare a `final __construct()` (CLAUDE.md,
+ * "ECA integration"), so a plugin extending either cannot add a new
+ * injected constructor argument. The service locator call here is the
+ * pragmatic way around that, not a stylistic choice.
  */
 trait AccountResolverTrait {
 
@@ -28,16 +35,7 @@ trait AccountResolverTrait {
    *   The matching account, or NULL if none exists.
    */
   protected function resolveAccount(string $value): ?AccountInterface {
-    $storage = $this->entityTypeManager->getStorage('user');
-
-    if (ctype_digit($value)) {
-      $account = $storage->load((int) $value);
-      return $account instanceof AccountInterface ? $account : NULL;
-    }
-
-    $accounts = $storage->loadByProperties(['name' => $value]);
-    $account = reset($accounts);
-    return $account instanceof AccountInterface ? $account : NULL;
+    return \Drupal::service('aim.memory_manager')->resolveAccount($value);
   }
 
 }

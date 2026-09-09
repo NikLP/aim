@@ -97,6 +97,26 @@ final class AimMemoryManager {
   }
 
   /**
+   * Resolves the site-wide default chat provider and model.
+   *
+   * Mirrors `AiAssistantApiRunner::getProviderAndModel()`'s own
+   * `__default__` handling - a caller with no opinion on which provider to
+   * use should resolve this instead of hardcoding one, so it follows
+   * whatever `ai.settings`' `default_providers.chat` is currently set to
+   * rather than drifting out of sync with it. Written after a hardcoded
+   * `'anthropic'`/`'claude-sonnet-5'` default in `AimCommands` had to be
+   * hand-edited twice already this project when the site's working
+   * provider changed.
+   *
+   * @return array
+   *   An array with keys 'provider_id' and 'model_id', or empty if no
+   *   default chat provider is configured.
+   */
+  public function getDefaultChatProvider(): array {
+    return $this->aiProvider->getDefaultProviderForOperationType('chat');
+  }
+
+  /**
    * Runs a search_api query as user 1, since some callers have no user.
    *
    * Drush (and cron) runs as the anonymous user by default, which has no
@@ -542,6 +562,7 @@ final class AimMemoryManager {
       strict: TRUE,
       json_schema: [
         'type' => 'object',
+        'additionalProperties' => FALSE,
         'properties' => [
           'decision' => [
             'type' => 'string',
@@ -610,11 +631,13 @@ final class AimMemoryManager {
       strict: TRUE,
       json_schema: [
         'type' => 'object',
+        'additionalProperties' => FALSE,
         'properties' => [
           'facts' => [
             'type' => 'array',
             'items' => [
               'type' => 'object',
+              'additionalProperties' => FALSE,
               'properties' => [
                 'scope' => [
                   'type' => 'string',

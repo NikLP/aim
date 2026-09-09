@@ -388,18 +388,139 @@ cron-driven extraction.
 **No free tier on the Anthropic Console API, confirmed by a real call
 (2026-09-09).** `ai_provider_anthropic` is installed, enabled, and
 correctly configured (a real `sk-ant-api03-...` key via the `key` module,
-`getConfiguredModels('chat')` lists the current Claude lineup fine), but
-with zero credit purchased on the account, even a single one-word chat
-request to the cheapest model (`claude-haiku-4-5-20251001`) is rejected
-outright with `Drupal\ai\Exception\AiQuotaException`: "Your credit balance
-is too low to access the Anthropic API." This is Anthropic's API rejecting
-the request pre-flight, before generating or billing any tokens, not a
-Drupal-side wiring problem. So: this provider is genuinely blocked until
-real $ credit is added to the Console account, same as the paragraph above
-already implied - there is no free quota to prototype against here, unlike
-Ollama (free, local) or amazee.ai (works today on the account already set
-up). Don't spend more time debugging config on this provider without
-credit; the fix is adding credit, not code.
+`getConfiguredModels('chat')` lists the current Claude lineup fine). With
+zero credit purchased on the account, even a single one-word chat request
+to the cheapest model (`claude-haiku-4-5-20251001`) was rejected outright
+with `Drupal\ai\Exception\AiQuotaException`: "Your credit balance is too
+low to access the Anthropic API" - Anthropic's API rejecting the request
+pre-flight, before generating or billing any tokens, not a Drupal-side
+wiring problem. Confirms there is no free quota to prototype against here,
+unlike Ollama (free, local) or amazee.ai (already working on this project).
+
+**Credit added same day, provider now live.** The identical call
+(`claude-haiku-4-5-20251001`, one-word prompt) now returns a real
+completion instead of `AiQuotaException`. `ai_provider_anthropic` is a
+working third chat/reasoning option on this site as of 2026-09-09,
+alongside amazee.ai and (once configured) Ollama - decision 5's sovereignty
+point still stands, this is a second non-local option, not a local one.
+
+**Default reasoning provider swapped from amazee.ai to Anthropic, same
+day, once credit made it usable.** `ai.settings`'s site-wide default chat
+provider was already `anthropic`/`claude-sonnet-5` by this point (set
+during the module setup above). Two more `amazeeio` references still
+needed updating by hand, both chat-only, not embeddings - **Anthropic has
+no embeddings API at all**, confirmed via `$provider->isUsable('embeddings')`
+returning `FALSE` (Anthropic has never shipped one; they point people at
+Voyage AI). Don't try to point `embeddings_engine` at `anthropic` - it is
+structurally not possible, not just unconfigured.
+
+- `AimCommands::extract()`/`consolidate()`'s PHP default option arrays -
+  `provider`/`model` now default to `anthropic`/`claude-sonnet-5` instead
+  of `amazeeio`/`claude-4-5-sonnet` (a stale model id besides).
+- `search_api.server.aim_vector`'s `backend_config.chat_model` -
+  `amazeeio__claude-4-5-haiku` to `anthropic__claude-sonnet-5`. This one is
+  a genuine chat call (the `contextual_chunks` embedding strategy uses a
+  chat model to write a contextual blurb per chunk before embedding it),
+  not embeddings, so it's swappable - unlike `embeddings_engine` on the
+  same config, which stays on amazee.ai (still broken, see "No equivalent
+  way to..." above's sibling note on the recall bug). Updated in both the
+  live config and the shipped `config/install/search_api.server.
+  aim_vector.yml`, so a fresh install matches what's actually running here
+  rather than drifting. Deliberately did **not** add `ai_provider_anthropic`
+  as a hard `aim.info.yml` dependency for this, same neutrality reasoning
+  already applied to `ai_provider_amazeeio` above - it's a second non-local
+  provider, not a special case.
+
+**`AimCommands`' hardcoded `'anthropic'`/`'claude-sonnet-5'` PHP defaults
+removed the same day, once they'd already needed hand-editing twice.**
+`extract()`/`consolidate()`'s `--provider`/`--model` options now default to
+`NULL`; a new `AimMemoryManager::getDefaultChatProvider()` (a thin wrapper
+over `AiProviderPluginManager::getDefaultProviderForOperationType('chat')`,
+the exact same call `ai_assistant_api`'s own `AiAssistantApiRunner::
+getProviderAndModel()` makes for its `__default__` case) resolves
+`ai.settings`' site-wide default chat provider instead, via a new shared
+`AimCommands::resolveChatProvider()` helper, erroring clearly if neither an
+explicit option nor a site default is available. These commands now follow
+whatever the site-wide default is set to, rather than needing a code change
+every time it changes - closing the exact class of drift this session hit
+twice already (see the two provider-swap notes above).
+
+**Real gotcha hit swapping this, not a config mistake: Anthropic's
+structured-output mode is stricter than amazee.ai's Bedrock-backed one.**
+The same `extractFacts()`/`classifyPair()` calls that already needed an
+explicit top-level `'type' => 'object'` for amazee.ai (see the gotcha under
+"Extraction" below) failed against Anthropic with `response_format.
+json_schema.schema: For 'object' type, 'additionalProperties' must be
+explicitly set to false` - Anthropic requires `additionalProperties: false`
+on *every* object level of the schema, not just the top one. Fixed by
+adding it to both the top-level schema and the nested `items` object in
+`extractFacts()`'s facts-array schema, and the top-level schema in
+`classifyPair()`'s decision schema (`AimMemoryManager.php`). This is a pure
+addition to the schema (a stricter, still-valid JSON Schema constraint),
+not an Anthropic-only branch, so it doesn't regress the amazee.ai path -
+untested against amazee.ai after the change, but nothing about the fix is
+provider-conditional. Verified against real Anthropic calls after the fix:
+`extractFacts()` returned a correctly-shaped fact from a real sentence,
+and `classifyPair()` returned a correct NOOP decision on a real
+near-duplicate pair (two disposable test facts, created and deleted in the
+same check, not left in the store).
+
+**The amazee.ai embeddings bug (the one blocking `aim_recall` since earlier
+this session) is fixed, same day - root cause was the account's model
+lineup changing, not a lingering config mistake.** `titan-embed-text-v2:0`
+is gone from the account entirely; `mistral-embed` is now the only
+embeddings-shaped model available (confirmed against the account's current
+model list - everything else offered is chat, vision, transcription, or
+image-gen). `search_api.server.aim_vector`'s `backend_config.embeddings_engine`
+changed to `amazeeio__mistral-embed`, in both the live config and shipped
+`config/install/search_api.server.aim_vector.yml`. `mistral-embed` outputs
+1024-dim vectors, confirmed by a real call before changing anything -
+matches the existing `VECTOR(1024)` column exactly, no schema change
+needed.
+
+**Real lesson on how this got diagnosed, worth remembering:** a raw `curl`
+straight to amazee.ai's `/v1/models` with the stored key's raw value
+(extracted via the `key` module purely for that one diagnostic call)
+returned a `401`/"Invalid proxy server token" - looked like a stale
+credential. It was a red herring. The actual representative test - calling
+`$provider->embeddings(...)` through Drupal's own `ai.provider` service,
+the exact code path `aim` itself uses - worked fine with the same stored
+key, no auth error at all. `/v1/models` is evidently a separate, stricter
+(or just differently-behaved) endpoint on amazee's gateway than the
+completion/embeddings endpoints actually used; testing against it directly
+was testing the wrong thing. The general principle holds and is worth
+keeping: test AI provider behavior through Drupal's own provider
+abstraction, not by extracting the raw key and calling the third-party API
+directly - not just because it's the more representative test, but because
+in this case the two paths gave genuinely different, contradictory
+answers, and the direct-API one was the misleading one.
+
+**Reindexing after this hit both collection-table gotchas already
+documented above, back to back, in a new context (`search-api:clear` +
+`search-api:index`, not a fresh module install this time) - same fixes
+applied, worth confirming the documented remedies still hold under a
+different trigger:** clearing the index left `aim_facts` with only its
+native columns (`scope`/`subject`/`source`/`text` gone), reproducing "the
+collection table only gets created/ALTERed on index *update*, not
+*create*." Re-saving the index entity to trigger the fix hit the second
+documented gotcha immediately - `createCollection()` throwing "Table
+'aim_facts' already exists" instead of being idempotent. Same remedy as
+before: `DROP TABLE aim_facts`, re-save the index entity (recreated with
+every attribute column present), then `drush search-api:index
+aim_vector_index` - 10/10 items indexed successfully under the new
+embeddings engine.
+
+**Full pipeline verified end to end after all of this, not just
+individual pieces:** `drush aim:recall "email preference"` returned real,
+sensibly-ranked results (the two actual email-preference facts scored
+well ahead of everything else). Then closed the loop on the chatbot path
+specifically, since that's exactly where recall failed earlier in this
+session - asked `aim_demo_assistant` "When is the site down for
+maintenance?" in a fresh `/api/deepchat` request, and it correctly
+recalled the fact remembered earlier in this same session ("closes for
+maintenance every Sunday morning") and answered from it. Remember and
+recall both now work through every consumer that matters: CLI, and the
+live chat widget.
 
 **Cost of un-deferring decision 3's governance layer, raised 2026-09-09
 because `aim` runs beside an existing site sharing its DB/CPU, not on
@@ -702,11 +823,34 @@ catches `\InvalidArgumentException`/`\RuntimeException` to print via
 throw those two exception types rather than talking to `io()` directly, so
 a Tool API plugin or a Form can catch and present the same failures in its
 own idiom instead of a CLI-shaped one. This also closes a real duplication
-`aim_eca` had already hit: its `AccountResolverTrait` reimplements
+`aim_eca` had already hit: its `AccountResolverTrait` reimplemented
 `resolveAccount()` because there was nothing shared to call - not migrated
 to the service in this pass (out of scope for the extraction itself), but
-now a straightforward follow-up since the logic lives in an injectable
-service both modules can depend on.
+migrated the same day, see below.
+
+**`aim_eca` pointed at the shared service, same day.**
+`AccountResolverTrait::resolveAccount()` (`aim_eca/src/
+AccountResolverTrait.php`) now just calls
+`\Drupal::service('aim.memory_manager')->resolveAccount($value)` instead of
+re-running the uid/username lookup by hand - one line instead of the
+duplicated logic. Not constructor injection: `eca`'s own `ActionBase` and
+`ConditionBase` both declare a `final __construct()` (see "ECA
+integration" below), so `FactWrite`/`FactQuery`/`FactState` cannot add a
+new injected argument the way a normal Drupal plugin would - the service
+locator call is the pragmatic way around that constraint, not a stylistic
+regression. Scoped deliberately narrow: `FactWrite`'s create-and-save body
+and `FactQuery`'s index-query body still duplicate (rather than call)
+`remember()`/`recall()` - both are close mirrors of the service methods
+already, but folding them in changes more surface (error-message wording,
+`FactQuery`'s token-data shape, `FactWrite`'s ECA-specific `source`
+defaulting) than the account-resolver dedup does, and none of `aim_eca` is
+exercised through a real ECA model yet (`eca` still isn't enabled on this
+site). Left as a follow-up, not done speculatively. Verified by `php -l`
+and a full phpcs pass only, same caveat every other `aim_eca` change in
+this file already carries - the underlying `aim.memory_manager` call this
+now delegates to was itself confirmed working via `drush php:eval` in the
+service-extraction work above, so behavior parity is inferred from that,
+not independently re-tested end to end.
 
 Verified via `drush php:eval` against `aim.memory_manager` (resolved uid 1,
 loaded `aim_vector_index`) and a full phpcs pass, no behavior change
@@ -964,6 +1108,146 @@ contract) - reading the installed module's own source
 (`web/modules/contrib/eca/src/Plugin/Action/`) plus a real shipped example
 (`ConfigurableActionBase`, `ActionBase`, and any concrete `#[Action]`
 implementation) was more reliable for this than the docs site.
+
+## Chat interface (demo, built 2026-09-09)
+
+The "average Joe" access path from CLAUDE.md's earlier service-extraction
+note: a real, visitor-facing chat widget that can remember and recall
+`aim` facts, not just drush/CLI access. Built for a short demo, not
+production - see "Deliberately narrowed scope" below for what's cut.
+
+**Mechanism: `drupal/ai`'s own AI Assistant API, not the separate Tool API
+module.** `ai_assistant_api` and `ai_chatbot` are submodules bundled inside
+`drupal/ai` (already a hard dependency of `aim`) - composer-present, just
+not enabled, zero new packages needed. They are unrelated to the `tool`/
+MCP module (still not installed) - `ai_assistant_api` has its own
+function-calling plugin type, `#[AiAssistantAction]`
+(`AiAssistantActionInterface`/`AiAssistantActionBase`), a different
+mechanism from both ECA's reuse of core Action plugins and a Tool API
+plugin. Found a real shipped example to build from: `ai_search`'s
+`RagAction` does search_api-backed retrieval in the same shape `aim`'s
+`recall()` needs.
+
+**`Drupal\aim\Plugin\AiAssistantAction\AimMemoryAction`**
+(`src/Plugin/AiAssistantAction/AimMemoryAction.php`, plugin id
+`aim_memory_action`) exposes two actions to the assistant, `aim_remember`
+and `aim_recall`, both thin wrappers over `AimMemoryManager` - same pattern
+as `aim_eca`'s plugins, third consumer of the shared service. Unlike
+`aim_eca`, `AiAssistantActionBase`'s constructor is **not** final, so this
+one uses normal constructor DI for `AimMemoryManager`, no service-locator
+workaround needed. `aim.info.yml` gained `ai:ai_assistant_api` as a
+dependency.
+
+**Deliberately narrowed scope, decided before building:** locked to
+`scope: site` on both `aim_remember` and `aim_recall`, hardcoded in the
+plugin, not exposed as a parameter the LLM can set. Two separate reasons,
+not one:
+
+- **Identity isn't resolved.** A chat visitor here is not tied to a real
+  Drupal account, and `scope: user` facts require one
+  (`AccountResolverTrait`/"User-scope facts now require a real account"
+  above). Per-visitor identity binding (session-to-account mapping,
+  consent) is real, unbuilt complexity, correctly out of scope for a demo.
+- **Privacy, not just an unbuilt feature.** Locking `aim_recall` to
+  `scope: site` too (not just `aim_remember`) matters independently: with
+  no scope restriction, `aim_recall` could have surfaced a real `scope:
+  user` fact (e.g. a contact preference) back to an anonymous demo
+  visitor who has no business seeing it. This was caught before building,
+  not found as a bug afterward.
+
+Since `scope` is fixed by the plugin rather than left for the model to
+classify, there is no live "how do we classify this fact" question for
+this demo - every fact this action touches is site-scoped by construction,
+the same default `aim-discovery` already uses.
+
+**Gotchas hit standing this up, all environment/contrib quirks, not `aim`
+bugs:**
+
+- **`ai_assistant_api`'s newer versions push new assistants toward the
+  `ai_agents` module** - `AiAssistantForm::form()` refuses to render a
+  create form for a new, non-agent assistant unless `ai_agents` is also
+  enabled ("All assistants going forward will be agents"). This is a
+  **UI-only** gate: `AiAssistantApiRunner::process()` still fully supports
+  the legacy `actions_enabled`/`AiAssistantActionPluginManager` path at
+  runtime as long as the entity's `ai_agent` field is empty (confirmed by
+  reading the runner's source, not assumed). Worked around by creating the
+  `ai_assistant` config entity directly via `drush php:eval` /
+  `EntityStorage::create()->save()` instead of the admin form - `aim_demo_
+  assistant`, `llm_provider: anthropic`, `llm_model: claude-haiku-4-5-
+  20251001`, `actions_enabled: {aim_memory_action: []}`, `use_function_
+  calling: FALSE` (uses the module's default two-pass JSON pre-prompt flow,
+  not native tool calling - simpler, and what `listActions()`/
+  `provideFewShotLearningExample()` are actually for in this flow).
+
+  **Sharpened same day, from the admin UI's own deprecation warning on
+  `aim_demo_assistant`'s edit form:** "This assistant is using the old AI
+  Assistant API for 1.0.0... The old one will be removed in 2.0.0." Not
+  just discouraged, an actual removal date - `AimMemoryAction`'s whole
+  integration mechanism (`#[AiAssistantAction]`/`actions_enabled`) has a
+  real expiration once `drupal/ai` ships 2.0.0. Checked what migrating
+  would actually involve before deciding whether to do it now:
+  `ai_agents` (the replacement, using "Tools" instead of "Actions") is
+  **not composer-present in this project at all** - not a config flip,
+  a new `composer require` plus an unfamiliar plugin contract, and
+  recreating `aim_demo_assistant` as agent-backed. Decision: don't migrate
+  now - this is still explicitly a demo, the current mechanism is proven
+  working end to end, and `ai:2.0.0` isn't imminent. Track as real, dated
+  debt; revisit once this moves past demo status or `ai:2.0.0` gets closer,
+  not before.
+- **Can't functionally test via `drush php:eval`.**
+  `AssistantMessageBuilder::getPrePromptDrupalContext()` calls Drupal's
+  title resolver against the *current route*, which is null outside a real
+  HTTP request - `drush php:eval` has no routed request, so this throws a
+  `TypeError` immediately. Not a bug in `aim`'s plugin; genuine end-to-end
+  verification needs a real HTTP request. Worked around with `curl` against
+  the live `/api/deepchat` endpoint (`ai_chatbot`'s newer, recommended
+  DeepChat widget, not the older `ai_chatbot_block` form - the admin UI
+  itself flags the older block as being replaced by this one) rather than
+  a browser, since no browser tool is available in this environment - this
+  is real HTTP-request verification, just not visual/interactive.
+- **The CSRF token for `/api/deepchat` is a `token` query parameter, not a
+  header, and not literally named `csrf_token` despite the route
+  requirement key (`_csrf_token: 'TRUE'`) and even the error message text
+  both saying "csrf_token"** - confirmed by reading core's
+  `CsrfAccessCheck::access()` directly: it reads `$request->query->get(
+  'token', '')`. `POST /api/deepchat/session` returns a raw token string
+  (tied to the session cookie); append it as `?token=...` on the actual
+  `/api/deepchat` request. Cost real time guessing wrong twice (header,
+  then `?csrf_token=`) before reading the actual check.
+  Also needed the `access deepchat api` permission granted to `anonymous`
+  (not granted by default) for an unauthenticated demo visitor to reach
+  either endpoint at all.
+
+**Verified working, not just wired up:** a real `curl` conversation through
+`/api/deepchat` against `aim_demo_assistant` - "Please remember that the
+demo site closes for maintenance every Sunday morning." - produced a real
+new `aim_fact` (id 12, `scope: site`, `source: chatbot:aim_demo_assistant`),
+confirmed by querying the entity afterward, not just trusting the chat
+reply text. `aim_remember` works end to end through the live chat pipeline.
+
+**`aim_recall` through the chatbot hits the same pre-existing amazee.ai
+embeddings bug already flagged under "No free tier on the Anthropic
+Console API" above** (`Invalid model name passed in model=titan-embed-
+text-v2:0`), not a new problem - a follow-up question in the same chat
+thread failed with the identical error `drush aim:recall` already hit.
+Because `AimMemoryAction` calls the same `AimMemoryManager::recall()` every
+other consumer does, fixing the amazee.ai embeddings model name (once the
+correct current model id is known - the account's own error suggests
+calling `/v1/models` to check) fixes recall for CLI, ECA, and the chatbot
+simultaneously. Left alone in this pass - it's a separate provider/account
+config issue, not something to fix silently while wiring up a different
+feature.
+
+**A `ai_deepchat_block` was placed** (`olivero_aimdemochat`, `content`
+region, theme `olivero`) pointed at `aim_demo_assistant`, so the widget is
+also reachable through an actual browser, not just `curl` - confirmed the
+front page still returns 200 with the widget's markup/library attached
+after placing it.
+
+**Parked, not acted on:** the user suggested splitting chatbot-facing code
+into its own submodule (`aim_chatbot`, mirroring `aim_eca`'s pattern)
+rather than living inside `aim` itself - explicitly "not for now," worth
+doing once this moves past demo status.
 
 ## Ideas raised, not designed
 

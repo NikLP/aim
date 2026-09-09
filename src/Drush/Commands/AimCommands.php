@@ -73,8 +73,8 @@ final class AimCommands extends DrushCommands {
   public function extract(
     string $file,
     array $options = [
-      'provider' => 'amazeeio',
-      'model' => 'claude-4-5-sonnet',
+      'provider' => NULL,
+      'model' => NULL,
       'source' => NULL,
       'index' => FALSE,
     ],
@@ -89,7 +89,13 @@ final class AimCommands extends DrushCommands {
       return;
     }
 
-    $facts = $this->memoryManager->extractFacts($text, $options['provider'], $options['model']);
+    $provider = $this->resolveChatProvider($options);
+    if ($provider === NULL) {
+      return;
+    }
+    [$provider_id, $model_id] = $provider;
+
+    $facts = $this->memoryManager->extractFacts($text, $provider_id, $model_id);
     if (empty($facts)) {
       $this->io()->note('The model returned no facts worth remembering.');
       return;
@@ -315,18 +321,24 @@ final class AimCommands extends DrushCommands {
   public function consolidate(
     array $options = [
       'scope' => NULL,
-      'provider' => 'amazeeio',
-      'model' => 'claude-4-5-sonnet',
+      'provider' => NULL,
+      'model' => NULL,
       'auto-threshold' => 0.35,
       'ambiguous-threshold' => 0.65,
       'dry-run' => FALSE,
     ],
   ): void {
+    $provider = $this->resolveChatProvider($options);
+    if ($provider === NULL) {
+      return;
+    }
+    [$provider_id, $model_id] = $provider;
+
     try {
       $result = $this->memoryManager->consolidate(
         $options['scope'] ?: NULL,
-        $options['provider'],
-        $options['model'],
+        $provider_id,
+        $model_id,
         (float) $options['auto-threshold'],
         (float) $options['ambiguous-threshold'],
         !empty($options['dry-run']),
@@ -349,6 +361,37 @@ final class AimCommands extends DrushCommands {
     else {
       $this->io()->success(count($result['rows']) . ' decision(s) applied.');
     }
+  }
+
+  /**
+   * Resolves --provider/--model options, falling back to the site default.
+   *
+   * Deliberately does not hardcode a fallback provider/model: a literal
+   * default here would be exactly the kind of value that already had to be
+   * hand-edited twice this project when the site's working provider
+   * changed. Resolving `ai.settings`' own default chat provider instead
+   * means these commands automatically follow it.
+   *
+   * @param array $options
+   *   The command options array, read for 'provider' and 'model'.
+   *
+   * @return array|null
+   *   A [provider_id, model_id] pair, or NULL if neither option was given
+   *   and no default chat provider is configured (an error has already
+   *   been printed to the user in that case).
+   */
+  protected function resolveChatProvider(array $options): ?array {
+    if (!empty($options['provider']) && !empty($options['model'])) {
+      return [$options['provider'], $options['model']];
+    }
+
+    $default = $this->memoryManager->getDefaultChatProvider();
+    if (empty($default['provider_id']) || empty($default['model_id'])) {
+      $this->io()->error('No --provider/--model given, and no default chat provider is configured. Set one at /admin/config/ai/settings, or pass --provider and --model explicitly.');
+      return NULL;
+    }
+
+    return [$default['provider_id'], $default['model_id']];
   }
 
 }

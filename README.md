@@ -94,6 +94,85 @@ mutates live site structure, so it requires a dry-run/human-review gate before
 - `drupal/ai` (provider abstraction, Guardrails submodule)
 - Local Ollama container for zero-API-key PoC development
 
+## Setting up vector search (fresh install, or after a provider change)
+
+`config/install` ships the *structure* of the vector search server/index -
+field mappings, the AI Search backend wiring, the collection-table schema -
+but **not a working AI provider**. The `chat_model`/`embeddings_engine`
+plugin IDs it ships with are this site's current working choice at the time
+they were last exported, not a portable default: they reference a specific
+provider, model, and API key a fresh site won't have, and - proven twice in
+one afternoon building this - can go stale on an *already-working* site too,
+the moment the account's available models change underneath it. Don't expect
+`drush en aim` alone to leave vector search actually working; that isn't a
+bug, it's expected, and always needed this manual step, just undocumented
+until now.
+
+Run this after enabling `aim` on a fresh site, or whenever `drush aim:recall`
+starts erroring on the embeddings call:
+
+1. **Enable and configure a real AI provider module** for chat and
+   embeddings - `ai_provider_anthropic`, `ai_provider_amazeeio`, or
+   `ai_provider_ollama` (decision 5 in CLAUDE.md: Ollama is the only local/
+   sovereign option). Anthropic has no embeddings API at all - don't try to
+   point `embeddings_engine` at it.
+2. **Store the provider's API key as a `key` entity**
+   (Configuration > System > Keys, or `drush key:`) - referenced from the
+   search server's `backend_config`, same as any `drupal/ai` consumer.
+3. **Check what models the key actually has access to through Drupal's own
+   provider service**, not by calling the third-party API directly - the
+   direct-API path can give a misleading answer (see CLAUDE.md's
+   "amazee.ai embeddings bug" note for a real example of this happening):
+
+   ```bash
+   drush php:eval "print_r(\Drupal::service('ai.provider')->createInstance('<provider_id>')->getConfiguredModels('chat'));"
+   ```
+
+   Swap `'chat'` for `'embeddings'` to check the embeddings side. Model
+   lineups on a hosted account can and do change without warning.
+4. **Point `search_api.server.aim_vector`'s `backend_config` at the real
+   provider/model IDs**, each in `<provider_id>__<model_id>` form:
+
+   ```bash
+   drush config:set search_api.server.aim_vector backend_config.chat_model '<provider>__<model>'
+   drush config:set search_api.server.aim_vector backend_config.embeddings_engine '<provider>__<model>'
+   ```
+
+5. **If the new embeddings model's output dimension differs from 1024**,
+   verify first with a real call (`$provider->embeddings(new
+   EmbeddingsInput('test'), '<model>', [])`, count the returned array),
+   then update `embeddings_engine_configuration.dimensions` to match, and
+   drop and recreate the collection table (`DROP TABLE aim_facts` before
+   step 6) - `VECTOR` columns are fixed-width, can't be altered in place.
+6. **Re-save the index entity** to force the collection table's attribute
+   columns to exist - a known `ai_vdb_provider_mariadb` gotcha (CLAUDE.md,
+   "Vector search is working end to end"):
+
+   ```bash
+   drush php:eval "\Drupal::entityTypeManager()->getStorage('search_api_index')->load('aim_vector_index')->save();"
+   ```
+
+   If this throws "Table already exists", the table is mid-recreate from a
+   previous attempt - `DROP TABLE aim_facts` and re-run this step.
+7. **Reindex every fact, not incrementally** - a provider/model change
+   means every existing vector is in the old model's embedding space, not
+   comparable to new queries even at the same dimension:
+
+   ```bash
+   drush search-api:clear aim_vector_index -y
+   drush search-api:index aim_vector_index
+   ```
+
+8. **Verify with a real query**: `drush aim:recall "<something you know is
+   in there>"` should return sane, correctly-ranked results.
+
+None of this touches `aim_fact` itself - the real facts are plain Drupal
+content entities, never at risk from a provider change. Steps 5-7 cost real
+embedding-API credit (one call per fact, or per chunk under the
+`contextual_chunks` strategy) and scale with fact count - trivial at PoC
+scale, a real line item once volume grows (see CLAUDE.md's AI dependency
+map).
+
 ## Build order
 
 1. **PoC.** Prove the schema and vector search work end to end. Done -

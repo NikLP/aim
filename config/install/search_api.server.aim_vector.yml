@@ -9,13 +9,13 @@ name: 'AIM Vector Search'
 description: ''
 backend: search_api_ai_search
 backend_config:
-  chat_model: amazeeio__claude-4-5-haiku
+  chat_model: anthropic__claude-sonnet-5
   database: mariadb
   database_settings:
     database_name: ''
     collection: aim_facts
     metric: cosine_similarity
-  embeddings_engine: 'amazeeio__titan-embed-text-v2:0'
+  embeddings_engine: amazeeio__mistral-embed
   embeddings_engine_configuration:
     set_dimensions: true
     dimensions: 1024

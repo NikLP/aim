@@ -7,5 +7,6 @@ dependencies:
   - drupal:options
   - ai:ai
   - ai:ai_search
+  - ai:ai_assistant_api
   - ai_vdb_provider_mariadb:ai_vdb_provider_mariadb
   - search_api:search_api
