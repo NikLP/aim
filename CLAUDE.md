@@ -1622,6 +1622,126 @@ actually resolves the service fresh from a rebuilt container - if a
 chatbot/CLI call starts throwing a raw `ArgumentCountError` after a service
 constructor gains an argument, check the cache before the code.
 
+## Admin UI: fact listing and manual queue trigger (built 2026-09-09)
+
+Prompted by trying to actually demo this: there was no way to see what
+`aim` currently remembers short of drush/`php:eval`, and no way to trigger
+`aim_consolidate` manually except `drush queue:run` - both real gaps for
+anyone who isn't at a terminal. Two small, unrelated fixes landed together
+since both came up in the same conversation.
+
+**`drupal/queue_ui` installed and enabled** (`composer require
+drupal/queue_ui:^3.2`, `drush en queue_ui`) - gives
+`/admin/config/system/queue-ui` with a per-queue "Run" button, including
+`aim_consolidate`, auto-discovered with zero integration code on `aim`'s
+side. This is the actual answer to "how do I trigger consolidation without
+a terminal": a `cron` key on `AimConsolidateQueueWorker` was explicitly
+rejected (see "Consolidation phase 2" above) because it would mix
+consolidation's LLM-call cost into `hook_cron`, exactly what decision 4
+rules out - `queue_ui`'s button only runs on an explicit click, so it has
+none of that conflict. Not added to `aim.info.yml` as a hard dependency -
+it's an operational convenience for whoever administers a site running
+`aim`, not something `aim`'s own functionality needs to work, same
+reasoning already applied to not hard-depending on a specific AI provider.
+
+**`aim_fact` gained Views integration.** The entity had zero handlers
+declared at all before this - no `views_data`, no `list_builder`, nothing,
+confirmed by reading `AimFact.php`'s `#[ContentEntityType]` attribute
+directly. Added one line, `handlers: ['views_data' =>
+\Drupal\views\EntityViewsData::class]` - the generic, un-subclassed handler
+that auto-generates Views integration from the entity's own field
+definitions, no custom code needed (the same class core's simpler content
+entities use directly, more complex ones like `media` subclass it for
+extra computed fields `aim_fact` doesn't need). Confirmed via
+`views.views_data`'s service: `scope`, `subject`, `subject_uid`, `text`,
+`source`, `state`, `expires` (plus `id`/`uid`/`created`/`changed`) all show
+up as real Views fields immediately after a cache rebuild - `related` did
+not (a multi-value `entity_reference` needs more than the generic handler
+provides to expose cleanly; not pursued, not needed for a simple listing).
+
+**Shipped a real admin View**, `views.view.aim_facts` (`config/install/
+views.view.aim_facts.yml`), a table at `/admin/content/aim-facts` -
+`id`/`scope`/`subject`/`subject (user)`/`text`/`source`/`state`/`retired
+at` columns, sorted newest-first, access-gated on the entity's own
+`administer aim memory` permission, "still live" shown for `expires` when
+empty rather than a blank cell. `aim.info.yml` gained `views:views` as a
+dependency, since a shipped View config entity genuinely needs it (unlike
+the provider dependencies this file deliberately omits elsewhere).
+
+**Real gotcha hit building this, worth remembering for any future admin
+View:** a `menu.type: 'default tab'` display, at a path that ISN'T meant
+to compete for an existing tab set, silently registers its route at the
+WRONG path. First attempt used `path: admin/content/aim-facts` with
+`menu.type: 'default tab'` (copied from node's own `content` view as a
+template) - the resulting route resolved to `/admin/content`, not
+`/admin/content/aim-facts`, confirmed by querying the `router` DB table
+directly, not assumed. Root cause, confirmed by comparing against node's
+*live* config (not just its shipped default): `'default tab'` is meant for
+a display that becomes the default view shown at an EXISTING tab set's
+root path (paired with a `tab_options` block registering the parent menu
+link at a DIFFERENT path, e.g. `user_admin_people`'s `List` tab at
+`admin/people/list` under a `People` parent at `admin/people`) - it is not
+just "put this in a menu," and Drupal computes the actual registered route
+from the tab-set hierarchy, not literally from the display's own `path`
+value. `system.admin_content` and `view.content.page_1` already both claim
+`/admin/content`, and the `'default tab'` type resolved my new display
+into that same existing tab set instead of creating a new one. Fixed by
+using `menu.type: normal` instead (a plain admin menu link, no tab-set
+semantics, no `tab_options` needed) - confirmed via the same router-table
+query afterward, and by fetching the actual page with a real authenticated
+`curl` request (all 11 real facts rendered correctly in the table, not
+just a 200 status).
+
+**Exported everything live-only into `config/install`, not just the View
+- the user's own ask, "as well as anything else that's stuck in
+config."** Two real gaps found by comparing live entity queries against
+`config/install`'s file list (`drush config:status` is the wrong tool for
+this specifically - it compares against the site's config **sync**
+directory, not a module's `config/install`, which is a separate, one-time,
+install-time mechanism; conflating the two would have missed both gaps):
+
+- `ai_assistant_api.ai_assistant.aim_demo_assistant` - the demo chatbot
+  assistant itself, created by hand via `drush php:eval` when the chat
+  interface was first built and never exported.
+- `block.block.olivero_aimdemochat` - the block placement, same story.
+  Its own computed dependencies genuinely include `theme: [olivero]` -
+  `aim.info.yml` cannot declare a module-level dependency on a theme (that
+  mechanism does not exist for modules), so a site without Olivero
+  installed would fail to import this one specific config file on `drush
+  en aim`, while everything else still installs fine. Not treated as a
+  blocker: Olivero is Drupal core's own default theme, present on
+  effectively every install profile. `aim.info.yml` gained `ai:ai_chatbot`
+  as a dependency, since the block's own computed dependencies need it and
+  nothing else in `aim.info.yml` already required it.
+
+**Real, worth-remembering mistake caught and fixed in the same pass: do
+not hand-type a config entity's `dependencies` or (for Views)
+`cache_metadata` key when authoring `config/install` by hand.** Both are
+computed by Drupal itself (`ConfigEntityBase::calculateDependencies()`, or
+Views' own cache-metadata calculation) and get silently overwritten the
+moment the entity is saved - a hand-typed guess only survives until the
+first `->save()` call, which already happens during the verification
+import. Found by writing a small comparison script (decode each
+`config/install/*.yml`, strip `uuid`/`_core`, compare against
+`\Drupal::config($name)->getRawData()`) after doing exactly this by hand
+for the guardrail configs, the demo assistant, and the first draft of the
+View - all showed real, non-cosmetic drift (missing `config:
+system.menu.admin` dependency on the View from its own admin-menu link,
+wrong `cache_metadata.contexts` copied from node's content view template
+instead of reflecting this view's actual `perm`-based access check). Fixed
+by re-fetching each entity's real `getRawData()` after a proper save and
+overwriting the `config/install` file with that exact content (module/
+`uuid`/`_core` stripped) rather than continuing to hand-type guesses -
+same principle this file has already established for provider config
+(`search_api.server.aim_vector.yml`), just missed on the first pass here
+because these felt like "simple" config entities where hand-typing seemed
+safe. It generally is not, for any field a `calculateDependencies()` or
+per-display cache-metadata pass can touch.
+
+All nine files in `config/install` were confirmed byte-for-byte equal to
+their live counterparts (module/`uuid`/`_core` aside) after this pass, not
+just visually similar - the same comparison script, rerun clean.
+
 ## Ideas raised, not designed
 
 Kept here so they don't evaporate between sessions, not yet built:

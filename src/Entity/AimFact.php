@@ -12,6 +12,7 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\user\EntityOwnerInterface;
 use Drupal\user\EntityOwnerTrait;
+use Drupal\views\EntityViewsData;
 
 /**
  * Defines the AIM fact content entity.
@@ -24,6 +25,9 @@ use Drupal\user\EntityOwnerTrait;
   id: 'aim_fact',
   label: new TranslatableMarkup('AIM fact'),
   label_collection: new TranslatableMarkup('AIM facts'),
+  handlers: [
+    'views_data' => EntityViewsData::class,
+  ],
   entity_keys: [
     'id' => 'id',
     'uuid' => 'uuid',

@@ -8,5 +8,7 @@ dependencies:
   - ai:ai
   - ai:ai_search
   - ai:ai_assistant_api
+  - ai:ai_chatbot
   - ai_vdb_provider_mariadb:ai_vdb_provider_mariadb
   - search_api:search_api
+  - views:views

@@ -1,0 +1,33 @@
+langcode: en
+status: true
+dependencies: {  }
+id: aim_demo_assistant
+label: 'AIM Memory Demo'
+description: 'Demo assistant that can remember and recall site-scoped facts via aim.'
+system_prompt: ''
+pre_action_prompt: ''
+instructions: "You are a helpful assistant for this site. You can remember short facts about the site for later, and recall facts already remembered when they might help answer a specific question. Only remember things that are genuinely worth keeping long-term, not small talk. If asked a broad or open-ended question like 'what do you know' or 'tell me everything', do not try to recall or list everything remembered - ask what specifically they'd like to know instead."
+allow_history: none
+history_context_length: '2'
+error_message: 'I am sorry, something went wrong. Please try again.'
+specific_error_messages:
+  AiBadRequestException: ''
+  AiRateLimitException: ''
+  AiQuotaException: ''
+  AiSetupFailureException: ''
+  AiRequestErrorException: ''
+llm_provider: anthropic
+llm_model: claude-haiku-4-5-20251001
+llm_configuration:
+  max_tokens: 4096
+  temperature: 0.0
+  top_k: 0.0
+actions_enabled:
+  aim_memory_action: {  }
+roles:
+  anonymous: anonymous
+  authenticated: 0
+  content_editor: 0
+  administrator: 0
+use_function_calling: false
+ai_agent: null

@@ -188,7 +188,11 @@ map).
    `drush aim:remember`/`drush aim:recall` (CLAUDE.md's "CLI agent
    adapter" section) cover the other case: a caller, like a Claude Code
    session, that has already decided what's worth remembering and just
-   needs a direct write/query path with no extra chat call.
+   needs a direct write/query path with no extra chat call. For a human
+   admin rather than an agent or a terminal: `/admin/content/aim-facts`
+   lists every remembered fact, and `drupal/queue_ui`
+   (`/admin/config/system/queue-ui`) gives a manual "Run" button for the
+   consolidation queue - see CLAUDE.md's "Admin UI" section.
 3. Wire an unattended `drupal/ai` provider for autonomous, cron-driven
    operation, plus the rest of the governance layer (Content Moderation,
    draft-to-trusted) that the PoC is deliberately skipping for now.

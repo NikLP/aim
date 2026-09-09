@@ -1,0 +1,39 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - ai_chatbot
+  theme:
+    - olivero
+id: olivero_aimdemochat
+theme: olivero
+region: content
+weight: -10
+provider: null
+plugin: ai_deepchat_block
+settings:
+  id: ai_deepchat_block
+  label: 'AIM Memory Demo Chat'
+  label_display: visible
+  provider: ai_chatbot
+  ai_assistant: aim_demo_assistant
+  bot_name: 'AIM Assistant'
+  bot_image: /modules/contrib/ai/modules/ai_chatbot/assets/ai-icon-gradient.svg
+  use_username: 1
+  default_username: Visitor
+  use_avatar: 0
+  default_avatar: ''
+  first_message: 'Hi! Ask me a specific question about this site (like our hours, policies, or how something works), or tell me something worth remembering for next time.'
+  loading_message: Thinking...
+  stream: 0
+  toggle_state: open
+  width: 400px
+  height: 500px
+  placement: bottom-right
+  show_structured_results: false
+  show_copy_icon: true
+  collapse_minimal: false
+  style_file: 'module:ai_chatbot:toolbar.yml'
+  verbose_mode: false
+  expansion_method: expand
+visibility: {  }
