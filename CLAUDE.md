@@ -385,6 +385,22 @@ local Ollama). Subscription quota only covers Claude Code/claude.ai/Desktop
 sessions, i.e. the interactive PoC reasoning step, not the shipped product's
 cron-driven extraction.
 
+**No free tier on the Anthropic Console API, confirmed by a real call
+(2026-09-09).** `ai_provider_anthropic` is installed, enabled, and
+correctly configured (a real `sk-ant-api03-...` key via the `key` module,
+`getConfiguredModels('chat')` lists the current Claude lineup fine), but
+with zero credit purchased on the account, even a single one-word chat
+request to the cheapest model (`claude-haiku-4-5-20251001`) is rejected
+outright with `Drupal\ai\Exception\AiQuotaException`: "Your credit balance
+is too low to access the Anthropic API." This is Anthropic's API rejecting
+the request pre-flight, before generating or billing any tokens, not a
+Drupal-side wiring problem. So: this provider is genuinely blocked until
+real $ credit is added to the Console account, same as the paragraph above
+already implied - there is no free quota to prototype against here, unlike
+Ollama (free, local) or amazee.ai (works today on the account already set
+up). Don't spend more time debugging config on this provider without
+credit; the fix is adding credit, not code.
+
 **Cost of un-deferring decision 3's governance layer, raised 2026-09-09
 because `aim` runs beside an existing site sharing its DB/CPU, not on
 dedicated infrastructure.** The two halves have very different cost
@@ -659,6 +675,47 @@ Includes a "don't remember what's already available from context" line,
 echoing the same design boundary `aim_eca`'s `FactWrite` action follows
 (see "ECA integration" below) - it applies just as much to an agent
 deciding what to write via this Skill as it does to an ECA model.
+
+**Service extraction, built 2026-09-09, prompted by "how does an average
+Joe or average Drupal person interact with this?"** Drush-only access is a
+dead end for anyone who isn't a developer or a CLI-capable agent - there is
+still no form, page, or block anywhere in the module. The two real fronts
+for that (a Tool API plugin so a chatbot can call remember/recall on a
+visitor's behalf, and a human-facing "here's what we remember about you"
+review page, see "Fact verification as a user-facing feature" under "Ideas
+raised, not designed") both need the same logic `AimCommands` already had,
+without a `$this->io()` call baked into the middle of it. All of it moved
+out into `Drupal\aim\Service\AimMemoryManager`
+(`src/Service/AimMemoryManager.php`, registered as `aim.memory_manager` in
+`aim.services.yml`): `resolveAccount()`, `loadVectorIndex()`, `reindex()`,
+`executeAsAdmin()`, `extractFacts()`, `createFactsFromCandidates()`,
+`remember()`, `recall()`, `consolidate()`, and consolidate's private
+`findNearestNeighbor()`/`classifyPair()` helpers - every gotcha documented
+above (the drush-runs-as-anonymous account-switch fix, the `expires`
+not-an-indexed-attribute filtering, the `subject_uid` post-filter
+over-fetch) moved with the code, unchanged.
+
+`AimCommands` is now a thin front end: it parses CLI option strings (e.g.
+`--state=true` to a real bool), calls the service, and prints the result or
+catches `\InvalidArgumentException`/`\RuntimeException` to print via
+`$this->io()->error()`. The service methods that can fail on bad input
+throw those two exception types rather than talking to `io()` directly, so
+a Tool API plugin or a Form can catch and present the same failures in its
+own idiom instead of a CLI-shaped one. This also closes a real duplication
+`aim_eca` had already hit: its `AccountResolverTrait` reimplements
+`resolveAccount()` because there was nothing shared to call - not migrated
+to the service in this pass (out of scope for the extraction itself), but
+now a straightforward follow-up since the logic lives in an injectable
+service both modules can depend on.
+
+Verified via `drush php:eval` against `aim.memory_manager` (resolved uid 1,
+loaded `aim_vector_index`) and a full phpcs pass, no behavior change
+intended or observed. `drush aim:recall` itself couldn't be exercised
+end-to-end in the same pass: the amazee.ai embeddings call failed with
+"Invalid model name passed in model=titan-embed-text-v2:0" - a provider/API
+issue surfaced deep inside `search_api`/`ai_search`'s HTTP layer, unrelated
+to this refactor (the failure is before any `aim` code runs), not yet
+investigated.
 
 ## Consolidation (Phase 1 built 2026-09-09)
 

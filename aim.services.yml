@@ -1,0 +1,8 @@
+services:
+  aim.memory_manager:
+    class: Drupal\aim\Service\AimMemoryManager
+    arguments:
+      - '@ai.provider'
+      - '@entity_type.manager'
+      - '@account_switcher'
+      - '@datetime.time'
