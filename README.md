@@ -190,8 +190,16 @@ map).
    session, that has already decided what's worth remembering and just
    needs a direct write/query path with no extra chat call.
 3. Wire an unattended `drupal/ai` provider for autonomous, cron-driven
-   operation, plus the governance layer (Guardrails, draft-to-trusted) that
-   the PoC is deliberately skipping for now.
+   operation, plus the rest of the governance layer (Content Moderation,
+   draft-to-trusted) that the PoC is deliberately skipping for now.
+   Guardrails' cheap, no-LLM-call path (`RegexpGuardrail` +
+   `InputLengthLimit`) is already wired into every write - see CLAUDE.md's
+   "Guardrails cheap-path initial offering" section. Consolidation's own
+   unattended path is also built: a Queue API worker enqueued on every
+   fact write, drained only by a dedicated crontab entry (never
+   `hook_cron`) - see CLAUDE.md's "Consolidation phase 2" section for the
+   mechanism, and a real threshold-miscalibration bug it caught and fixed
+   along the way.
 
 See [ADR-003](../../../../ADR-003-drupal-native-agent-memory.md) for the full
 context (market comparison against Mem0/Zep/Kenkeep, memory-poisoning risk

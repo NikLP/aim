@@ -1,0 +1,18 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - ai.ai_guardrail.aim_max_length
+    - ai.ai_guardrail.aim_no_markup
+  module:
+    - ai
+id: aim_write_guardrails
+label: 'AIM: fact write guardrails'
+description: 'Applied to every candidate fact before it is stored.'
+stop_threshold: 1.0
+pre_generate_guardrails:
+  plugin_id:
+    - aim_max_length
+    - aim_no_markup
+post_generate_guardrails:
+  plugin_id: []

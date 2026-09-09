@@ -151,6 +151,12 @@ final class FactWrite extends ConfigurableActionBase {
       throw new \InvalidArgumentException('The fact text is empty.');
     }
 
+    // Same guardrail check drush aim:remember and the chatbot's aim_remember
+    // action run before creating a fact (CLAUDE.md decision 7) - a value an
+    // ECA model hands this action is proposed content the same way an
+    // extracted or chatbot-written fact is, not inherently more trusted.
+    \Drupal::service('aim.memory_manager')->runGuardrails($text);
+
     $subject = $this->tokenService->replaceClear($this->configuration['subject']);
 
     $source = $this->tokenService->replaceClear($this->configuration['source']);
@@ -196,6 +202,7 @@ final class FactWrite extends ConfigurableActionBase {
 
     $fact = $this->entityTypeManager->getStorage('aim_fact')->create($values);
     $fact->save();
+    \Drupal::service('aim.memory_manager')->enqueueForConsolidation((int) $fact->id());
 
     if ($this->configuration['token_name'] !== '') {
       $this->tokenService->addTokenData($this->configuration['token_name'], $fact);

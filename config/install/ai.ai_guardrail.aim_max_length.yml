@@ -1,0 +1,15 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - ai
+id: aim_max_length
+label: 'AIM: maximum fact length'
+description: 'Rejects candidate fact text longer than a short atomic statement should reasonably be.'
+guardrail: input_length_limit
+guardrail_settings:
+  max_length: 2000
+  use_tokens: false
+  tokenizer_model: gpt-4
+  check_all_messages: false
+  violation_message: 'Fact text is @count @unit long, which exceeds the maximum of @max @unit. A fact should be a short, atomic statement.'

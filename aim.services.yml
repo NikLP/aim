@@ -6,3 +6,5 @@ services:
       - '@entity_type.manager'
       - '@account_switcher'
       - '@datetime.time'
+      - '@Drupal\ai\Guardrail\AiGuardrailRepository'
+      - '@queue'

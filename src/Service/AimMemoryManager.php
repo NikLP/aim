@@ -7,9 +7,12 @@ namespace Drupal\aim\Service;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\Dto\StructuredOutputSchema;
+use Drupal\ai\Guardrail\AiGuardrailRepository;
+use Drupal\ai\Guardrail\Result\StopResult;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountSwitcherInterface;
 use Drupal\aim\Entity\AimFact;
@@ -34,6 +37,45 @@ final class AimMemoryManager {
   protected const ALLOWED_SCOPES = ['user', 'role', 'site', 'case'];
 
   /**
+   * The AI Guardrail Set applied to every candidate fact before it is saved.
+   *
+   * See CLAUDE.md decision 7 and config/install/ai.ai_guardrail_set.
+   * aim_write_guardrails.yml for the shipped set (RegexpGuardrail +
+   * InputLengthLimit, no extra LLM call).
+   */
+  protected const GUARDRAIL_SET_ID = 'aim_write_guardrails';
+
+  /**
+   * The Queue API queue that aim_consolidate's QueueWorker plugin drains.
+   *
+   * Deliberately not touched by hook_cron (decision 4, CLAUDE.md
+   * "Consolidation (phase 2)") - only a dedicated crontab entry running
+   * `drush queue:run aim_consolidate` processes it.
+   */
+  protected const CONSOLIDATE_QUEUE_ID = 'aim_consolidate';
+
+  /**
+   * Score at or below which a neighbor is retired automatically, no LLM call.
+   *
+   * Public and shared between the CLI sweep's option default and the queue
+   * worker, so the two can't drift out of sync the way AimCommands'
+   * hardcoded provider/model defaults already did twice earlier this
+   * project. Empirically set against amazeeio__mistral-embed (see
+   * CLAUDE.md's "Consolidation" section) - recalibrated 2026-09-09 from an
+   * earlier 0.35/0.65 pair that was calibrated against
+   * titan-embed-text-v2:0 and never re-checked after that model was
+   * discontinued mid-session and swapped for mistral-embed.
+   */
+  public const DEFAULT_AUTO_THRESHOLD = 0.05;
+
+  /**
+   * Score at or below which an ambiguous neighbor gets a classification call.
+   *
+   * See DEFAULT_AUTO_THRESHOLD.
+   */
+  public const DEFAULT_AMBIGUOUS_THRESHOLD = 0.20;
+
+  /**
    * Constructs an AimMemoryManager object.
    *
    * @param \Drupal\ai\AiProviderPluginManager $aiProvider
@@ -46,13 +88,98 @@ final class AimMemoryManager {
    *   (drush, cron).
    * @param \Drupal\Component\Datetime\TimeInterface $time
    *   The time service, used to stamp facts retired by consolidation.
+   * @param \Drupal\ai\Guardrail\AiGuardrailRepository $guardrailRepository
+   *   The AI guardrail repository, used to load the write-guardrail set.
+   * @param \Drupal\Core\Queue\QueueFactory $queueFactory
+   *   The queue factory, used to enqueue newly-written facts for async
+   *   consolidation.
    */
   public function __construct(
     protected AiProviderPluginManager $aiProvider,
     protected EntityTypeManagerInterface $entityTypeManager,
     protected AccountSwitcherInterface $accountSwitcher,
     protected TimeInterface $time,
+    protected AiGuardrailRepository $guardrailRepository,
+    protected QueueFactory $queueFactory,
   ) {}
+
+  /**
+   * Enqueues a fact for async consolidation against its nearest neighbor.
+   *
+   * Decision 4 (CLAUDE.md): consolidation runs unattended via Queue API,
+   * not on the live request path and not mixed into hook_cron. Public, not
+   * just called internally by remember()/createFactsFromCandidates():
+   * aim_eca's FactWrite action calls this directly via the service locator
+   * for the same reason it calls runGuardrails() that way (ConfigurableAction
+   * Base's final __construct()).
+   *
+   * @param int $factId
+   *   The ID of the newly-created fact.
+   */
+  public function enqueueForConsolidation(int $factId): void {
+    $this->queueFactory->get(self::CONSOLIDATE_QUEUE_ID)->createItem($factId);
+  }
+
+  /**
+   * Loads a single aim_fact by ID.
+   *
+   * @param int $factId
+   *   The fact ID.
+   *
+   * @return \Drupal\aim\Entity\AimFact|null
+   *   The fact, or NULL if it does not exist.
+   */
+  public function loadFact(int $factId): ?AimFact {
+    $fact = $this->entityTypeManager->getStorage('aim_fact')->load($factId);
+    return $fact instanceof AimFact ? $fact : NULL;
+  }
+
+  /**
+   * Runs candidate fact text through the aim_write_guardrails set.
+   *
+   * Decision 7 (CLAUDE.md): every candidate fact is treated as untrusted
+   * input by default. The shipped set only contains RegexpGuardrail and
+   * InputLengthLimit (no NonDeterministicGuardrailInterface plugin), so this
+   * never makes an LLM call - see the AI dependency map in CLAUDE.md. If the
+   * set has been removed from this site, guardrail checking is silently
+   * skipped rather than blocking every write.
+   *
+   * Public, not just used internally by remember()/createFactsFromCandidates():
+   * aim_eca's FactWrite action calls this directly via the service locator
+   * (its ActionBase has a final __construct(), the same reason
+   * AccountResolverTrait calls resolveAccount() that way) rather than
+   * duplicating the check, since a fact written by an ECA model is exactly
+   * the kind of proposed-by-something-else write decision 7 is aimed at.
+   *
+   * @param string $text
+   *   The candidate fact text.
+   *
+   * @throws \InvalidArgumentException
+   *   If a guardrail's aggregated stop score reaches the set's stop
+   *   threshold.
+   */
+  public function runGuardrails(string $text): void {
+    $guardrail_set = $this->guardrailRepository->getGuardrailSetById(self::GUARDRAIL_SET_ID);
+    if (!$guardrail_set) {
+      return;
+    }
+
+    $input = new ChatInput([new ChatMessage('user', $text)]);
+    $aggregated_score = 0.0;
+    $messages = [];
+
+    foreach ($guardrail_set->getPreGenerateGuardrails() as $guardrail) {
+      $result = $guardrail->processInput($input);
+      if (!$result instanceof StopResult) {
+        continue;
+      }
+      $aggregated_score += $result->getScore();
+      $messages[] = $result->getMessage();
+      if ($aggregated_score >= $guardrail_set->getStopThreshold()) {
+        throw new \InvalidArgumentException('Guardrail check failed: ' . implode(' ', $messages));
+      }
+    }
+  }
 
   /**
    * Resolves a uid or username to a real user account.
@@ -168,13 +295,15 @@ final class AimMemoryManager {
    *   The created fact.
    *
    * @throws \InvalidArgumentException
-   *   If scope is invalid, or scope=user and subject does not resolve to a
-   *   real account.
+   *   If scope is invalid, scope=user and subject does not resolve to a real
+   *   account, or the text fails a guardrail check.
    */
   public function remember(string $text, string $scope, ?string $subject, ?string $source, ?bool $state): AimFact {
     if (!in_array($scope, self::ALLOWED_SCOPES, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', self::ALLOWED_SCOPES));
     }
+
+    $this->runGuardrails($text);
 
     $values = [
       'scope' => $scope,
@@ -208,6 +337,7 @@ final class AimMemoryManager {
     /** @var \Drupal\aim\Entity\AimFact $entity */
     $entity = $this->entityTypeManager->getStorage('aim_fact')->create($values);
     $entity->save();
+    $this->enqueueForConsolidation((int) $entity->id());
 
     return $entity;
   }
@@ -221,16 +351,29 @@ final class AimMemoryManager {
    *   Provenance tag stored on every created fact.
    *
    * @return array
-   *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[]) and
-   *   'skipped' (int, the number of user-scope candidates whose subject did
-   *   not resolve to a real account).
+   *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[]), 'skipped'
+   *   (int, the number of user-scope candidates whose subject did not
+   *   resolve to a real account), and 'blocked' (int, the number of
+   *   candidates a guardrail rejected, per decision 7).
    */
   public function createFactsFromCandidates(array $facts, string $source): array {
     $storage = $this->entityTypeManager->getStorage('aim_fact');
     $created = [];
     $skipped = 0;
+    $blocked = 0;
 
     foreach ($facts as $fact) {
+      try {
+        $this->runGuardrails($fact['text']);
+      }
+      catch (\InvalidArgumentException) {
+        // Every candidate is checked independently: one rejected fact
+        // should not abort the rest of an extraction batch, the same
+        // posture already taken for an unresolvable user-scope subject.
+        $blocked++;
+        continue;
+      }
+
       $values = [
         'text' => $fact['text'],
         'source' => $source,
@@ -256,10 +399,11 @@ final class AimMemoryManager {
 
       $entity = $storage->create($values);
       $entity->save();
+      $this->enqueueForConsolidation((int) $entity->id());
       $created[] = $entity;
     }
 
-    return ['created' => $created, 'skipped' => $skipped];
+    return ['created' => $created, 'skipped' => $skipped, 'blocked' => $blocked];
   }
 
   /**
@@ -351,7 +495,11 @@ final class AimMemoryManager {
    * is retired automatically, an ambiguous case gets a single classification
    * call (ADD/UPDATE/DELETE/NOOP), and anything past the ambiguous
    * threshold is left alone at zero cost. Retiring a fact sets its
-   * `expires` field rather than deleting it, to keep an audit trail.
+   * `expires` field rather than deleting it, to keep an audit trail. An
+   * UPDATE whose merged text fails the aim_write_guardrails check (decision
+   * 7) is downgraded to a synthetic BLOCKED decision instead: both facts
+   * are left untouched, since a rejected merge should not still retire the
+   * candidate on the strength of text nobody approved.
    *
    * @param string|null $scope
    *   Restrict the sweep to one scope: user, role, site, case.
@@ -415,48 +563,151 @@ final class AimMemoryManager {
       $kept = $fact->id() < $neighbor->id() ? $fact : $neighbor;
       $candidate = $fact->id() < $neighbor->id() ? $neighbor : $fact;
 
-      if ($score <= $autoThreshold) {
-        $decision = 'NOOP';
-        $merged_text = NULL;
-      }
-      else {
-        [$decision, $merged_text] = $this->classifyPair($kept, $candidate, $providerId, $modelId);
-      }
+      $decision = $this->decideAndApply($kept, $candidate, $score, $autoThreshold, $providerId, $modelId, $dryRun);
 
       $handled[$kept->id()] = TRUE;
       $handled[$candidate->id()] = TRUE;
       $rows[] = [$kept->id(), $candidate->id(), round($score, 3), $decision];
-
-      if ($dryRun) {
-        continue;
-      }
-
-      switch ($decision) {
-        case 'UPDATE':
-          $kept->set('text', $merged_text);
-          $kept->save();
-          $candidate->set('expires', $this->time->getRequestTime());
-          $candidate->set('related', [$kept->id()]);
-          $candidate->save();
-          break;
-
-        case 'NOOP':
-          $candidate->set('expires', $this->time->getRequestTime());
-          $candidate->set('related', [$kept->id()]);
-          $candidate->save();
-          break;
-
-        case 'DELETE':
-          $candidate->delete();
-          break;
-
-        case 'ADD':
-          // Genuinely distinct facts, nothing to change.
-          break;
-      }
     }
 
     return ['rows' => $rows, 'has_facts' => TRUE];
+  }
+
+  /**
+   * Runs a single fact against its nearest neighbor and applies a decision.
+   *
+   * The per-fact counterpart to consolidate()'s sweep: used by
+   * AimConsolidateQueueWorker to process one newly-written fact, enqueued
+   * by enqueueForConsolidation() (decision 4's Queue API automation). No
+   * $handled registry is needed here the way consolidate()'s sweep needs
+   * one - each queue item is processed and saved independently, so a later
+   * item sees an already-`expires`-set fact and findNearestNeighbor()
+   * already filters those out.
+   *
+   * @param \Drupal\aim\Entity\AimFact $fact
+   *   The fact to consolidate.
+   * @param string $providerId
+   *   The AI provider plugin ID to use for ambiguous cases.
+   * @param string $modelId
+   *   The chat model ID to use for ambiguous cases.
+   * @param float $autoThreshold
+   *   Score at or below which a neighbor is retired automatically, no LLM
+   *   call.
+   * @param float $ambiguousThreshold
+   *   Score at or below which an ambiguous neighbor gets a classification
+   *   call. Above this, the fact is left alone.
+   *
+   * @return array|null
+   *   A [kept id, candidate id, score, decision] tuple, or NULL if no
+   *   eligible neighbor was found.
+   *
+   * @throws \RuntimeException
+   *   If the vector index does not exist.
+   */
+  public function consolidateFact(AimFact $fact, string $providerId, string $modelId, float $autoThreshold, float $ambiguousThreshold): ?array {
+    $index = $this->loadVectorIndex();
+    if (!$index) {
+      throw new \RuntimeException('The aim_vector_index search index does not exist.');
+    }
+
+    $neighbor_result = $this->findNearestNeighbor($index, $fact, []);
+    if ($neighbor_result === NULL) {
+      return NULL;
+    }
+    [$neighbor, $score] = $neighbor_result;
+    if ($score > $ambiguousThreshold) {
+      return NULL;
+    }
+
+    $kept = $fact->id() < $neighbor->id() ? $fact : $neighbor;
+    $candidate = $fact->id() < $neighbor->id() ? $neighbor : $fact;
+
+    $decision = $this->decideAndApply($kept, $candidate, $score, $autoThreshold, $providerId, $modelId, FALSE);
+
+    return [$kept->id(), $candidate->id(), round($score, 3), $decision];
+  }
+
+  /**
+   * Decides and, unless dry-running, applies a consolidation outcome.
+   *
+   * Shared by consolidate()'s sweep and consolidateFact()'s per-item path -
+   * both already know the pair and its similarity score, only how they got
+   * there differs. An UPDATE whose merged text fails the aim_write_
+   * guardrails check (decision 7) is downgraded to a synthetic BLOCKED
+   * outcome instead of falling back to NOOP: NOOP would still retire the
+   * candidate, discarding whatever new information it held, on the
+   * strength of merged text nobody approved.
+   *
+   * @param \Drupal\aim\Entity\AimFact $kept
+   *   The established fact.
+   * @param \Drupal\aim\Entity\AimFact $candidate
+   *   The newer fact being evaluated against it.
+   * @param float $score
+   *   The similarity score between the two.
+   * @param float $autoThreshold
+   *   Score at or below which the candidate is retired automatically, no
+   *   LLM call.
+   * @param string $providerId
+   *   The AI provider plugin ID to use for ambiguous cases.
+   * @param string $modelId
+   *   The chat model ID to use for ambiguous cases.
+   * @param bool $dryRun
+   *   If TRUE, the decision is computed but nothing is saved.
+   *
+   * @return string
+   *   The decision: ADD, UPDATE, DELETE, NOOP, or the synthetic BLOCKED.
+   */
+  protected function decideAndApply(AimFact $kept, AimFact $candidate, float $score, float $autoThreshold, string $providerId, string $modelId, bool $dryRun): string {
+    if ($score <= $autoThreshold) {
+      $decision = 'NOOP';
+      $merged_text = NULL;
+    }
+    else {
+      [$decision, $merged_text] = $this->classifyPair($kept, $candidate, $providerId, $modelId);
+      if ($decision === 'UPDATE') {
+        try {
+          $this->runGuardrails($merged_text);
+        }
+        catch (\InvalidArgumentException) {
+          $decision = 'BLOCKED';
+        }
+      }
+    }
+
+    if ($dryRun) {
+      return $decision;
+    }
+
+    switch ($decision) {
+      case 'UPDATE':
+        $kept->set('text', $merged_text);
+        $kept->save();
+        $candidate->set('expires', $this->time->getRequestTime());
+        $candidate->set('related', [$kept->id()]);
+        $candidate->save();
+        break;
+
+      case 'NOOP':
+        $candidate->set('expires', $this->time->getRequestTime());
+        $candidate->set('related', [$kept->id()]);
+        $candidate->save();
+        break;
+
+      case 'DELETE':
+        $candidate->delete();
+        break;
+
+      case 'ADD':
+        // Genuinely distinct facts, nothing to change.
+        break;
+
+      case 'BLOCKED':
+        // A guardrail rejected the proposed merged text; leave both
+        // facts exactly as they were, same as ADD.
+        break;
+    }
+
+    return $decision;
   }
 
   /**

@@ -39,14 +39,18 @@ save/load via `drush php:eval`. Not yet added: `ai_vdb_provider_mariadb`,
 
 **PoC deviations from the binding decisions below (temporary, not a
 redesign):** at the user's direction, the governance layer is deferred to
-keep the first slice small. `aim_fact` has no moderation state, no
-Guardrails call, and no draft-to-trusted gate - every fact is live the
-moment it's saved. It also uses one flat `scope` list field (user/role/
-site/case) rather than four separate bundles. Both are meant to be added
-back, not abandoned: re-introduce Content Moderation + Guardrails before any
-non-PoC data goes in, per decisions 3, 7 and 8. `no-update-hooks-yet` still
-applies, so this is a cheap reinstall away from becoming bundle-per-scope
-whenever that's worth doing.
+keep the first slice small. `aim_fact` has no moderation state and no
+draft-to-trusted gate - every fact is live the moment it's saved. It also
+uses one flat `scope` list field (user/role/site/case) rather than four
+separate bundles. Both are meant to be added back, not abandoned:
+re-introduce Content Moderation before any non-PoC data goes in, per
+decisions 3 and 8. `no-update-hooks-yet` still applies, so this is a cheap
+reinstall away from becoming bundle-per-scope whenever that's worth doing.
+Decision 7's Guardrails call is no longer part of this deviation - the
+cheap, no-LLM-call path (`RegexpGuardrail` + `InputLengthLimit`) is wired
+into every `aim_fact` write today, see "Guardrails cheap-path initial
+offering" below. What's still deferred is the human review half
+(draft-to-trusted), not the guardrail check itself.
 
 **Correction to the storage decision below:** `ai_vdb_provider_mariadb` does
 not expose a Field API field type to attach a `VECTOR` column directly to an
@@ -579,6 +583,118 @@ call - a Guardrail Set built from just `RegexpGuardrail` +
 `RestrictToTopic` is only as expensive as choosing to add semantic topic
 judgment on top, and that choice comes with its own model/provider knob.
 
+**Guardrails cheap-path initial offering: built 2026-09-09.** No new module
+needed - `AiGuardrail`/`AiGuardrailSet` config entities, the
+`plugin.manager.ai_guardrail` plugin type, and the `RegexpGuardrail`/
+`InputLengthLimit`/`RestrictToTopic` plugins all ship inside `drupal/ai`
+itself (`ai.info.yml` already a hard `aim` dependency), not a separate
+Guardrails submodule - confirmed by reading `ai.info.yml` and
+`web/modules/contrib/ai/src/Plugin/AiGuardrail/` directly rather than
+assumed. Nothing to `composer require`.
+
+Ships two `ai_guardrail` config entities plus one `ai_guardrail_set`
+tying them together, all in `config/install/` alongside the search_api
+config: `aim_max_length` (`input_length_limit`, 2000 characters - a memory
+fact is meant to be one short atomic statement, per `extractFacts()`'s own
+prompt), `aim_no_markup` (`regexp_guardrail`, `/<[a-z][\s\S]*>/i` - facts
+are stored and later rendered as plain text, e.g. in the chat widget's
+reply and any future review UI, so HTML markup in a fact is out of place
+defense-in-depth rather than a business rule), and `aim_write_guardrails`
+(the set, `stop_threshold: 1.0`, both plugins in
+`pre_generate_guardrails`). Neither plugin implements
+`NonDeterministicGuardrailInterface`, so this set never makes an LLM call -
+confirmed against both plugins' `processInput()`, not assumed.
+
+**Where it's wired in:** `AimMemoryManager::runGuardrails(string $text)`
+(protected), called from both `remember()` and `createFactsFromCandidates()`
+before an entity is created. It loads `aim_write_guardrails` via the
+autowired `Drupal\ai\Guardrail\AiGuardrailRepository` service (new
+constructor argument, `aim.services.yml` updated), builds a throwaway
+`ChatInput`/`ChatMessage` wrapping the candidate text (the guardrail
+plugins only know how to read a `ChatInput`, there is no bare-string
+entry point - confirmed against `RegexpGuardrail`/`InputLengthLimit`'s own
+`processInput()`, both `instanceof ChatInput`-check immediately), and
+replicates the same score-aggregation-against-`getStopThreshold()` logic
+`GuardrailsEventSubscriber::applyPreGenerateGuardrails()` uses for a real
+chat call, simplified since this call site needs none of that subscriber's
+streaming/fiber/non-deterministic-depth machinery. If the guardrail set
+has been removed from a site, checking is silently skipped rather than
+blocking every write - matches decision 5's "provider/config is a site
+choice" posture elsewhere in this file, not a bypass anyone can trigger
+from a candidate fact's own content.
+
+A guardrail stop throws `\InvalidArgumentException`, not `\RuntimeException`
+- deliberately, so every existing caller's error handling covers this with
+zero additional changes: `AimCommands::remember()` and
+`AimMemoryAction::rememberAction()` already only catch
+`\InvalidArgumentException` around `remember()` (the same exception scope=
+user validation already throws), so a blocked fact prints a clean error
+instead of an uncaught stack trace or a 500 in the chatbot. `extract()`'s
+batch path is different on purpose: `createFactsFromCandidates()` catches
+the exception per-candidate inside its loop rather than letting one
+rejected fact abort the whole batch, incrementing a new `blocked` counter
+alongside the existing `skipped` (unresolvable user-scope subject) one -
+`AimCommands::extract()` reports both. `aim:remember` and `extractFacts()`
+were both exercised for real against this site's live data: a plain fact
+saved normally (id 16); `<script>alert(1)</script>` and a 2500-character
+string were both rejected with the expected violation message and left no
+`aim_fact` row behind; a two-candidate batch through
+`createFactsFromCandidates()` created the clean one and blocked the
+markup one (`created: 1, blocked: 1`), confirming the batch does not abort
+on the first rejection.
+
+**Both gaps flagged when the cheap-path offering first landed were closed
+the same day, once flagged as worth covering.**
+
+- **`aim_eca`'s `FactWrite`** now calls
+  `\Drupal::service('aim.memory_manager')->runGuardrails($text)` right
+  after resolving `$text` (token replacement) and before building `$values`
+  - a service-locator call, not constructor DI, for the same reason
+  `AccountResolverTrait::resolveAccount()` already is one:
+  `ConfigurableActionBase` (which `FactWrite` extends) declares a `final
+  __construct()`, so no subclass can add a new injected argument (see "ECA
+  integration" below). `runGuardrails()` had to become `public` for this -
+  it was `protected`, used only internally by `remember()`/
+  `createFactsFromCandidates()` until now. A rejection throws
+  `\InvalidArgumentException`, the same exception `execute()` already
+  throws for every other validation failure in this action (invalid scope,
+  empty text, unresolvable subject), so this needed no new error-handling
+  path, just one more thing that can trigger the existing one. Still only
+  verified by phpcs and `php -l`, same caveat every other `aim_eca` change
+  in this file carries - `eca` isn't enabled on this site, so there is no
+  way to exercise this through a real model yet.
+- **`aim:consolidate`'s UPDATE path** now runs the model's `merged_text`
+  through `runGuardrails()` before applying it. A rejection downgrades the
+  decision to a synthetic `BLOCKED` outcome (shown as such in both
+  `--dry-run` and normal output) rather than silently falling back to
+  NOOP: NOOP would still retire the candidate fact (set `expires`/
+  `related`), discarding whatever new information it held, on the strength
+  of merged text nobody approved - `BLOCKED` leaves both facts completely
+  untouched instead, same as `ADD`. This closes the "does a consolidation
+  UPDATE/DELETE count as an LLM-proposed write" question left open when
+  consolidation was first built - settled as: UPDATE's merged text does,
+  DELETE/NOOP don't (neither writes any new text - DELETE only removes a
+  row, NOOP only sets `expires`/`related` on the already-existing
+  candidate, so there is nothing new for a guardrail to check in either
+  case).
+
+  Verification here is narrower than most of this file's other real
+  end-to-end checks, worth being honest about: `AimMemoryManager` is
+  `final` (deliberately - not worth defeating that for a test), so there
+  is no way to subclass it and force `classifyPair()` to return a
+  guardrail-violating `merged_text` on demand, and a real chat call can't
+  be relied on to propose HTML markup or a 2000+ character merge just to
+  exercise this branch. What's actually verified: `runGuardrails()`
+  itself rejecting markup/oversized text was already proven live earlier
+  this session (a `<script>` payload and a 2500-character string both
+  correctly blocked with no `aim_fact` row left behind); a real
+  `drush aim:consolidate --dry-run` run against this site's live data
+  after this change produced the same NOOP/ADD decisions as before with
+  no regression (one real ambiguous-band classification call included).
+  The three-line `if ($decision === 'UPDATE') { try {...} catch {...} }`
+  integration connecting the two is a direct, easily-reviewed change, not
+  independently exercised end to end.
+
 **Why the ECA plugins, when ECA already has a State API
 (`Drupal\eca\EcaState`)? Checked against its actual source
 (2026-09-09).** `EcaState extends \Drupal\Core\State\State` - it
@@ -1035,17 +1151,168 @@ query). Not yet exercised through an actual ECA model - `eca` still isn't
 enabled on this site - so this is verified by phpcs and `php -l` only, same
 caveat the original build already carried.
 
-**Open governance question, flagged not resolved, carried over from the
-design brief:** decision 7 says every LLM-proposed candidate fact goes
-through Guardrails before being written "anywhere," worded with extraction
-in mind - one new fact at a time. A consolidation UPDATE/DELETE is also an
-LLM-proposed write, just targeting an existing fact instead of a new one.
-Decision 7 doesn't explicitly say whether that counts, and `aim:consolidate`
-doesn't call Guardrails today. Doesn't block anything right now (every
-write already goes live unreviewed regardless of source, per the PoC
-deviations noted at the top of this file), but settle it before decision
-3's governance layer gets un-deferred, not after consolidation is already
-running unattended via phase 2.
+**Governance question this raised, settled 2026-09-09 once the cheap-path
+Guardrails offering existed to settle it against:** decision 7 says every
+LLM-proposed candidate fact goes through Guardrails before being written
+"anywhere," worded with extraction in mind - one new fact at a time. A
+consolidation UPDATE is also an LLM-proposed write, just targeting an
+existing fact's text instead of a new one. Settled as: yes, it counts.
+`aim:consolidate`'s UPDATE decision now runs the model's `merged_text`
+through the same `aim_write_guardrails` set every other write does before
+applying it, downgrading to a synthetic `BLOCKED` outcome (both facts left
+untouched) on rejection rather than falling back to NOOP, which would
+still have retired the candidate on the strength of unapproved text. DELETE
+and NOOP were confirmed not to need this - neither writes any new text, so
+there is nothing for a guardrail to check. See "Guardrails cheap-path
+initial offering" above for the mechanism and its verification caveats.
+
+## Consolidation phase 2: queue automation (built 2026-09-09)
+
+Decision 4's "Queue API + a dedicated crontab entry, separate from
+`hook_cron`" for consolidation, built once Guardrails' cheap-path offering
+existed to settle the open governance question above. Granularity: one
+queue item per newly-written fact, not a periodic full sweep -
+`remember()` and `createFactsFromCandidates()` (`AimMemoryManager`) call a
+new `enqueueForConsolidation(int $factId)` right after `save()`, which
+pushes the fact's ID onto the `aim_consolidate` queue. `aim_eca`'s
+`FactWrite` calls the same method via the service locator, same reason
+(and same "not yet exercised, `eca` isn't enabled" caveat) as its
+`runGuardrails()` call. This also fixes a real inefficiency in the
+existing sweep: `consolidate()` only skips facts with `expires` already
+set, so a fact correctly judged distinct (ADD) has nothing marking it done
+and gets re-compared against the whole corpus on every future sweep.
+Per-fact processing means each fact is evaluated once, at creation.
+
+**New plugin:**
+`src/Plugin/QueueWorker/AimConsolidateQueueWorker.php`, plugin ID
+`aim_consolidate`. Deliberately carries no `cron` key on its `#[QueueWorker]`
+attribute, confirmed against `Drupal\Core\Queue\Attribute\QueueWorker`'s own
+source (`cron` is an optional, default-NULL array; omitting it means
+Drupal's own `Cron::processQueues()` never touches this queue) - this is
+the actual mechanism behind "separate from hook_cron," not a convention.
+Confirmed live: a `drush cron` run left a pending queue item completely
+untouched (still there afterward), while `drush queue:run aim_consolidate`
+drained it immediately. The queue is only meant to be drained by a real
+external crontab entry, not built as Drupal-side scheduling:
+
+```crontab
+* * * * * drush queue:run aim_consolidate
+```
+
+(DDEV-wrapped for this environment: `* * * * * ddev exec drush queue:run
+aim_consolidate`.) The user asked, separately, whether to also give this
+queue worker a `cron` key as a UI-triggerable demo convenience - declined,
+since that's exactly what decision 4 rules out (mixing consolidation's
+LLM-call cost into the shared site's general cron cycle). The clean way to
+get a UI "run this queue now" button without touching `hook_cron` at all
+is `drupal/queue_ui` (contrib, not yet composer-required here) - its
+manual per-queue "Run" button is triggered only on an explicit click, no
+scheduling involved, so it doesn't have the same conflict. Not added
+speculatively; a real candidate if a demo UI trigger is wanted later.
+
+**Shared decision+apply logic, extracted rather than duplicated.**
+`consolidate()`'s loop used to inline "score <= auto-threshold ? NOOP :
+classifyPair() + guardrail-check-and-maybe-downgrade-to-BLOCKED, then apply
+via a switch statement" per pair. That's now `AimMemoryManager::
+decideAndApply(AimFact $kept, AimFact $candidate, float $score, float
+$autoThreshold, string $providerId, string $modelId, bool $dryRun): string`
+- moved, not rewritten, so `consolidate()`'s own neighbor lookup, `$handled`
+cross-item tracking, and dry-run wrapping stay exactly where they were,
+only the "decide + apply" middle moved out. A new `consolidateFact(AimFact
+$fact, ...): ?array` is the per-item counterpart the queue worker calls:
+its own `findNearestNeighbor($index, $fact, [])` (no `$handled` registry
+needed - each queue item is processed and saved independently, so a later
+item sees an already-`expires`-set fact and `findNearestNeighbor()` already
+filters those out), then `decideAndApply(..., dryRun: FALSE)`. Confirmed
+behavior-preserving: `drush aim:consolidate --dry-run` against real site
+data produced identical rows and scores (modulo float noise, 0.239 vs
+0.238) before and after this refactor.
+
+**Two real problems found during verification, not typos - both fixed the
+same day, not shipped as known debt.** Verifying this by hand (creating
+disposable near-duplicate/distinct test fact triples, per this file's
+established pattern) surfaced genuine correctness gaps rather than
+confirming the feature worked as designed:
+
+1. **Threshold miscalibration, made materially worse by automation.** The
+   auto/ambiguous thresholds (0.35/0.65) were empirically set against
+   `titan-embed-text-v2:0` (see "Threshold defaults" under the original
+   Consolidation section above) and never re-checked after that model was
+   discontinued mid-session and swapped for `amazeeio__mistral-embed` (see
+   "The amazee.ai embeddings bug" above). Real evidence: a genuine
+   near-duplicate pair now scores ~0.02 under mistral-embed, but a
+   same-subject-different-fact pair and a genuinely unrelated fact both
+   scored ~0.17-0.27 - the *entire* observed range sits under the old 0.35
+   auto-threshold, meaning every pair looked like an "obvious duplicate, no
+   LLM review" case regardless of actual content. Confirmed via a live
+   test: three disposable facts (a near-duplicate pair plus one distinct
+   fact) got compared against pre-existing unrelated real facts instead of
+   each other and silently auto-retired with zero LLM review. This bug
+   predates today's queue work - the same miscalibration is present in the
+   on-demand CLI sweep, confirmed by rerunning `drush aim:consolidate
+   --dry-run` before touching any code and seeing the same pattern (fact 12
+   vs. fact 16, two unrelated facts, scoring 0.238 - inside the old
+   auto-threshold). What the queue automation changes is the blast radius:
+   the CLI sweep only ran when a human explicitly invoked it (and could
+   `--dry-run` first); the queue runs on every write, unattended, with the
+   PoC's still-deferred draft-to-trusted gate meaning nothing catches a bad
+   auto-retirement after the fact either.
+
+   **Fix: recalibrated the same day, against real mistral-embed scores,
+   confirmed no real data was ever damaged** (the miscalibrated thresholds
+   were only ever exercised via `--dry-run` this session, never applied for
+   real). New defaults, `AimMemoryManager::DEFAULT_AUTO_THRESHOLD = 0.05`
+   / `DEFAULT_AMBIGUOUS_THRESHOLD = 0.20` - public constants, single source
+   for both `AimCommands::consolidate()`'s CLI option defaults and the
+   queue worker, closing the exact class of drift the provider/model
+   defaults already hit twice earlier this project (see "AimCommands'
+   hardcoded... PHP defaults removed" above). Re-running `drush
+   aim:consolidate --dry-run` against the real corpus under the new
+   thresholds is itself a meaningful correction, not just a recalibration
+   exercise: two pairs that used to auto-NOOP with zero review under the
+   old thresholds now correctly reach `classifyPair()` and get judged ADD
+   (genuinely distinct, not duplicates) - the old calibration would have
+   silently merged real, unrelated facts the first time `aim:consolidate`
+   ever ran for real (without `--dry-run`) or the queue went live.
+
+2. **A write/index/consolidate race the queue design didn't originally
+   account for.** `index_directly` is deliberately off (see "Vector search
+   is working end to end" above) - a fact is not searchable the moment it
+   is saved. Two facts enqueued back to back would each be asked to
+   consolidate before the other was indexed, and would never find each
+   other as neighbors - confirmed live with a genuinely near-duplicate test
+   pair that missed each other entirely for exactly this reason on the
+   first attempt. Fix: `AimConsolidateQueueWorker::processItem()` now calls
+   `$this->memoryManager->reindex()` before `consolidateFact()` - this is
+   the specific exception the original vector-search notes above already
+   anticipated almost verbatim ("Only flip it on for a specific
+   queue-worker-driven write that's already off the request path anyway").
+   Confirmed fixed: a repeat of the same near-duplicate test, with zero
+   manual `search-api:index` run in between, correctly found and retired
+   the duplicate against its neighbor on the first `drush queue:run
+   aim_consolidate`.
+
+All verification used disposable test facts, deleted (and the index
+reindexed to remove them) immediately after each check - none left in the
+store. Final state confirmed clean: `drush cron` does not drain the queue,
+`drush queue:run aim_consolidate` does, `drush aim:consolidate --dry-run`
+against real data is unaffected by the refactor except for the intended
+threshold correction, and no test data or stray queue items remain.
+
+**Verified through the live chat widget too, not just drush, once all of
+the above landed.** A real `curl` conversation with `aim_demo_assistant`
+(same `/api/deepchat` mechanism as "Chat interface" below) asked it to
+remember a disposable test fact - it was genuinely created (confirmed by
+querying the entity afterward, the reply text alone said something oddly
+phrased ("I've already got that one saved!") that didn't match ground
+truth, another instance of this project's standing "don't trust the chat
+reply text" rule), and `enqueueForConsolidation()` fired correctly from a
+live HTTP request context too (queue count went from 0 to 1). A follow-up
+question through the same widget correctly recalled and answered from the
+fact just saved. `drush queue:run aim_consolidate` then processed the
+resulting item and correctly left it alone (no false-positive match
+against unrelated real facts). Test fact deleted and the index reindexed
+afterward; no leftover state.
 
 ## ECA integration (built 2026-09-08)
 
@@ -1244,14 +1511,120 @@ also reachable through an actual browser, not just `curl` - confirmed the
 front page still returns 200 with the widget's markup/library attached
 after placing it.
 
+**Real gotcha, found by the user actually opening a browser (the exact gap
+`curl`-only verification couldn't catch): `placement: toolbar` is not a
+sane default for this block, don't use it.** It's what the block's own
+`defaultConfiguration()` ships, and what got carried over unquestioned when
+this block was placed - the widget never visually appeared, despite every
+server-side check (block enabled, access allowed, markup present in a
+fresh uncached response) coming back clean. Root cause: `placement:
+toolbar` routes rendering through a *different* template
+(`ai-deepchat--toolbar.html.twig`, a sidebar-panel-style widget with its
+own header/dropdown/close-button chrome and its own `ai_chatbot/toolbar-
+chatbot` library) instead of the self-contained floating-widget path -
+confirmed by reading `DeepChatFormBlock.php`, not guessed. Something in
+that path silently fails to render on this theme (not root-caused further,
+not worth it once the fix was known). Fixed by setting `placement:
+bottom-right` instead - a real, independent config option, distinct from
+the separate `style_file`/"Style" field (which stays `module:
+ai_chatbot:toolbar.yml`; `style_file` is only relevant, and only shown in
+the block's own settings form, when `placement` isn't `toolbar` - the two
+are different axes, position vs. visual skin, and only one of them was
+broken). This is exactly the kind of failure `curl`-based verification
+structurally cannot catch - the markup being present in the HTTP response
+says nothing about whether the client-side widget actually renders. The
+"start the dev server and use the feature in a browser" testing rule
+exists for precisely this gap; there was no browser tool available in this
+environment to close it directly, so it took the user's own manual check
+to catch.
+
 **Parked, not acted on:** the user suggested splitting chatbot-facing code
 into its own submodule (`aim_chatbot`, mirroring `aim_eca`'s pattern)
 rather than living inside `aim` itself - explicitly "not for now," worth
 doing once this moves past demo status.
 
+**Chatbot not answering "what do you know about this site" - root-caused
+and fixed 2026-09-09, not a new bug class.** The user hit this by opening
+the widget and asking "tell me some things you already remember about this
+site," and got "I don't have any facts remembered about this site yet...
+this is the beginning of our conversation" despite real `scope: site` facts
+existing. Confirmed via direct `curl` against `/api/deepchat` that the
+underlying pipeline was never the problem: the identical assistant, fresh
+session, correctly answered "When is the site down for maintenance?" from a
+remembered fact in the same test pass, and `drush aim:recall` returned the
+same facts correctly outside the chatbot too. The gap was entirely in
+whether the assistant's pre-action decision step chooses to call
+`aim_recall` at all for a given phrasing.
+
+Root cause, confirmed by reading `ai_assistant_api`'s source
+(`AiAssistantApiRunner::process()`, `Service/AssistantMessageBuilder.php`):
+with `use_function_calling: FALSE`, this assistant uses the legacy two-pass
+flow - a first LLM call is asked to either emit a JSON action call or
+answer in prose, decided entirely from the action's `description` and
+`provideFewShotLearningExample()` output (`AimMemoryAction.php`), not a
+structured-output/schema call. `aim_recall`'s only few-shot example pairs a
+topical query ("support desk hours") with the action; nothing models a
+generic "what do you know" meta-request, so the model had nothing telling
+it that counts as recall-worthy and defaulted to prose. `allow_history:
+none` on the assistant compounds this: with history off,
+`getMessageHistory()` sends only the current message, so every turn
+genuinely is "the beginning of the conversation" to the model, not a
+figure of speech.
+
+**Considered fix, rejected on review: don't broaden the trigger.**
+Broadening `aim_recall`'s description/few-shot examples so a generic "what
+do you know" query reliably fires it was the first idea, flagged by the
+user as too loose before building. The chatbot's `aim_recall` has no way to
+hold anything back once it decides to search: it's locked to `scope: site`
+(see "Deliberately narrowed scope" above), but nothing partitions *within*
+that scope by audience or sensitivity today. Making the trigger fire more
+eagerly, ahead of any such partitioning existing, widens exactly the
+surface a real access-control gap would exploit - "some site-scoped facts
+probably shouldn't be volunteered to an anonymous visitor just because they
+asked broadly enough" is a real, unbuilt concern, one level more granular
+than the bundle-per-scope deferral in the PoC-deviations note at the top of
+this file and decision 3's governance layer (those partition *between*
+scopes; this is *within* `scope: site`). Don't revisit loosening the
+few-shot examples/description until per-fact visibility/audience control
+exists.
+
+**Fix actually applied instead: tightened the UX copy, left the trigger
+alone.** Two live config changes, no code:
+
+- `block.block.olivero_aimdemochat`'s `settings.first_message` (the
+  widget's greeting) reworded from "Ask me anything about this site, or
+  tell me something worth remembering" to invite a specific question or a
+  fact to remember, not an open browse.
+- `ai_assistant_api.ai_assistant.aim_demo_assistant`'s `instructions`
+  gained an explicit line: if asked something broad/open-ended ("what do
+  you know", "tell me everything"), redirect to "what specifically would
+  you like to know" instead of attempting a broad recall.
+
+Neither is shipped in `config/install` - none of the chatbot demo config
+(`aim_demo_assistant`, the block) is exported there yet, same as noted
+under "Chat interface" above; these are live-site-only edits, same status
+as the assistant entity itself. Verified with the same
+`curl`-against-`/api/deepchat` method used to build this feature: the
+broad "tell me some things you already remember" prompt now gets
+redirected to a specific-question ask instead of a dead-end non-answer,
+and the topical maintenance-hours question still correctly recalls and
+answers from the remembered fact - the narrow trigger condition itself is
+unchanged.
+
+**Unrelated crash hit and fixed while testing this:** every `/api/deepchat`
+message was failing with `ArgumentCountError: Too few arguments to function
+Drupal\aim\Service\AimMemoryManager::__construct(), 4 passed... exactly 5
+expected` - a stale container cache left over from `AimMemoryManager`
+gaining its 5th constructor argument (`AiGuardrailRepository`, for the
+Guardrails wiring above), not a code bug. `drush cr` fixed it immediately.
+Worth remembering because this class of failure is silent until something
+actually resolves the service fresh from a rebuilt container - if a
+chatbot/CLI call starts throwing a raw `ArgumentCountError` after a service
+constructor gains an argument, check the cache before the code.
+
 ## Ideas raised, not designed
 
-Four more, not yet built, kept here so they don't evaporate between sessions:
+Kept here so they don't evaporate between sessions, not yet built:
 
 - **Typed/boolean facts could skip the vector pipeline entirely.** A
   flag-shaped fact ("user prefers email over phone") doesn't need semantic
@@ -1503,6 +1876,24 @@ Four more, not yet built, kept here so they don't evaporate between sessions:
   any non-PoC/public-facing surface ships, alongside decision 3's
   governance layer - this is a legal requirement, not an architectural
   nice-to-have, so don't let it slide past an actual launch.
+- **Sub-scope visibility/audience control on `aim_fact`, raised 2026-09-09
+  by the chatbot's "what do you know" trigger question above.** Today's
+  privacy boundary is coarse: the chatbot's `aim_recall` is locked to
+  `scope: site` (see "Deliberately narrowed scope" under "Chat interface"),
+  which stops it leaking `scope: user`/`role`/`case` facts, but nothing
+  stops it surfacing *any* `scope: site` fact to *any* visitor - there's no
+  notion of "this site fact is public-facing" vs. "this site fact is
+  internal-only" within a scope. Not urgent while the chatbot's trigger
+  stays narrow (see above - that narrowness is doing real work as a stopgap
+  right now), but a real gap the moment either the trigger loosens or a
+  second, less-curated consumer of `scope: site` facts shows up. Two
+  candidate shapes, neither designed in detail: a boolean-ish
+  `public`/`internal` flag (cheap, coarse, same pattern as `state`), or
+  folding this into the taxonomy/categorical idea above (an `audience` term
+  reference alongside `contact_preference`/`traits`) if a small curated
+  vocabulary of audiences ever makes sense. Don't build either
+  speculatively - the PoC only has one real consumer (the demo chatbot) and
+  it's already scoped narrowly enough not to need this yet.
 
 ## Dev process and rules
 

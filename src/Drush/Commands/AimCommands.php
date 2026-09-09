@@ -108,6 +108,10 @@ final class AimCommands extends DrushCommands {
       $this->io()->warning("{$result['skipped']} user-scope fact(s) skipped: the model's subject did not resolve to a real account on this site.");
     }
 
+    if ($result['blocked'] > 0) {
+      $this->io()->warning("{$result['blocked']} fact(s) blocked by a guardrail check.");
+    }
+
     if (empty($result['created'])) {
       $this->io()->note('No facts were saved.');
       return;
@@ -285,12 +289,19 @@ final class AimCommands extends DrushCommands {
    * happens when the model explicitly says the candidate should not exist
    * as a memory at all.
    *
-   * The two threshold defaults were picked empirically against this site's
-   * real fact data and the amazeeio titan-embed-text-v2:0 embeddings on
-   * 2026-09-09 (a genuine near-duplicate pair scored ~0.34-0.47, a distinct
-   * fact about the same subject scored ~0.56-0.60), not carried over from
-   * Mem0's or Hindsight's own models. Re-check with `drush aim:recall`'s
-   * score column as real fact volume grows.
+   * The two threshold defaults (\Drupal\aim\Service\AimMemoryManager::
+   * DEFAULT_AUTO_THRESHOLD / DEFAULT_AMBIGUOUS_THRESHOLD) were picked
+   * empirically against this site's real fact data, not carried over from
+   * Mem0's or Hindsight's own models. Recalibrated 2026-09-09 against
+   * amazeeio__mistral-embed (a genuine near-duplicate pair scored ~0.02, a
+   * distinct fact about the same subject or an unrelated fact both scored
+   * ~0.17-0.27) - the original 0.35/0.65 pair was calibrated against
+   * titan-embed-text-v2:0 and was never re-checked after that model was
+   * discontinued and swapped mid-session; it sat entirely above the range
+   * mistral-embed actually produces, so every pair looked like an
+   * auto-duplicate. Re-check with `drush aim:recall`'s score column
+   * whenever the embeddings model changes, not just as real fact volume
+   * grows.
    *
    * @param array $options
    *   Command options.
@@ -323,8 +334,8 @@ final class AimCommands extends DrushCommands {
       'scope' => NULL,
       'provider' => NULL,
       'model' => NULL,
-      'auto-threshold' => 0.35,
-      'ambiguous-threshold' => 0.65,
+      'auto-threshold' => AimMemoryManager::DEFAULT_AUTO_THRESHOLD,
+      'ambiguous-threshold' => AimMemoryManager::DEFAULT_AMBIGUOUS_THRESHOLD,
       'dry-run' => FALSE,
     ],
   ): void {

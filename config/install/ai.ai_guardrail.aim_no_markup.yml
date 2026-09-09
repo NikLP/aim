@@ -1,0 +1,13 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - ai
+id: aim_no_markup
+label: 'AIM: no HTML markup'
+description: 'Rejects candidate fact text containing HTML tags, since fact text is stored and later rendered as plain text.'
+guardrail: regexp_guardrail
+guardrail_settings:
+  regexp_pattern: '/<[a-z][\s\S]*>/i'
+  scan_all_user_messages: false
+  violation_message: 'Fact text contains HTML markup, which is not allowed in a memory fact.'
