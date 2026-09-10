@@ -1,13 +1,14 @@
 # CLAUDE.md
 
 Operating guide for Claude Code sessions in this repo. See
-[README.md](README.md) for the project pitch,
-[adr/](adr/0000-index.md) for the decision records, and
-[ADR-003-drupal-native-agent-memory.md](../../../../ADR-003-drupal-native-agent-memory.md)
-for the original, deeper rationale (market comparison, risk analysis) those
-are downstream of. This file is the day-to-day reference: current state,
-exact commands, and gotchas worth not rediscovering. Don't restate an ADR's
-reasoning here - link to it.
+[README.md](README.md) for the project pitch and
+[adr/](adr/0000-index.md) for the decision records - including
+[ADR-0010](adr/0010-drupal-native-agent-memory-rationale.md), the original,
+deeper rationale (market comparison, risk analysis) ADR-0001 through 0009
+are downstream of, folded into this directory 2026-09-10 (previously a
+standalone root-level document). This file is the day-to-day reference:
+current state, exact commands, and gotchas worth not rediscovering. Don't
+restate an ADR's reasoning here - link to it.
 
 ## Project snapshot
 
@@ -26,9 +27,10 @@ Environment: DDEV, `drupal11` type, PHP 8.4, MariaDB 11.8, docroot `web/`.
 
 **Enabled:** `aim`, `aim_chatbot`, `ai_agents`, `ai_assistant_api`,
 `ai_chatbot`, `ai_search`, `ai_provider_anthropic`, `ai_provider_amazeeio`,
-`ai_vdb_provider_mariadb`, `search_api`, `views`, `queue_ui`.
+`ai_provider_ollama`, `ai_vdb_provider_mariadb`, `search_api`, `views`,
+`queue_ui`.
 **Composer-present but not enabled:** `eca`/`aim_eca` (don't enable without
-being asked), `ai_context` (CCC), `ai_provider_ollama`.
+being asked), `ai_context` (CCC).
 
 **PoC deviations from [ADR-0001](adr/0001-storage-and-scope-model.md)/
 [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md) (temporary,
@@ -80,12 +82,30 @@ Not one "AI" - check this before assuming a step needs a paid API call:
 | Embedding generation (every write and query) | Small embedding model | Cheap, local-friendly (Ollama) |
 
 **Current site config:** site-wide default chat provider is
-`anthropic`/`claude-sonnet-5` (`ai.settings`); embeddings are
-`amazeeio__mistral-embed` (1024-dim) - Anthropic has no embeddings API at
-all, don't try to point `embeddings_engine` at it. `AimCommands`'
-`--provider`/`--model` options default to `NULL` and resolve the site-wide
-default via `AimMemoryManager::getDefaultChatProvider()` rather than a
-hardcoded PHP default, so they follow whatever the site default is set to.
+`anthropic`/`claude-sonnet-5` (`ai.settings`); `search_api.server.aim_vector`
+`backend_config.embeddings_engine` is `ollama__nomic-embed-text:latest`
+(768-dim, switched from `amazeeio__mistral-embed`/1024-dim on 2026-09-10 -
+see "Local Ollama" below) - Anthropic has no embeddings API at all, don't
+try to point `embeddings_engine` at it. `AimCommands`' `--provider`/
+`--model` options default to `NULL` and resolve the site-wide default via
+`AimMemoryManager::getDefaultChatProvider()` rather than a hardcoded PHP
+default, so they follow whatever the site default is set to (chat stays on
+`anthropic` - the swap only touched embeddings).
+
+**Local Ollama** (`ai_provider_ollama`, host_name/port config): points at
+the *host's* Ollama install (`http://host.docker.internal:11434`), not a
+container-local one. Don't use the `tyler36/ddev-ollama` DDEV addon
+alongside this - it runs a second Ollama daemon in its own container with
+its own empty model volume, completely unaware of the host's model cache,
+so anything pulled through it (or through a provider pointed at it)
+re-downloads from scratch even if the same model already exists on the
+host. Host-side prerequisite: Ollama defaults to binding `127.0.0.1` only,
+which the DDEV network can't reach - needs `OLLAMA_HOST=0.0.0.0:11434` set
+on the host's Ollama service (e.g. `systemctl edit ollama` + restart)
+before `http://host.docker.internal:11434` becomes reachable from the web
+container. Only `nomic-embed-text` (embeddings-only, 768-dim) is loaded so
+far - extraction/consolidation still need a chat-capable model pulled
+before Ollama can cover the "Reasoning-grade LLM" row above.
 
 A Claude Pro/Max subscription cannot power an unattended `drupal/ai`
 provider (Anthropic prohibits subscription OAuth for third-party
@@ -132,6 +152,15 @@ worker's own `reindex()` call handle it. `aim_facts` has a real MariaDB
   despite its docstring - rerunning it against an existing table throws
   instead of no-op'ing; fix is `DROP TABLE aim_facts` and re-save, not
   fighting the exception.
+- `drush search-api:clear aim_vector_index` can itself drop and reprovision
+  `aim_facts` down to just the base columns (`content`/`drupal_entity_id`/
+  `drupal_long_id`/`server_id`/`index_id`/`embedding`), silently losing
+  `scope`/`source`/`subject`/`text` - a subsequent `search-api:index` then
+  fails `mysqli_sql_exception: Unknown column 'scope'`. Fix is the same
+  index entity `->save()` as above to restore the attribute columns, not
+  running `search-api:clear` again. After a `DROP TABLE`-and-reindex cycle
+  (e.g. following an embeddings dimension change), reindex directly with
+  `search-api:index` and skip the `search-api:clear` step entirely.
 - `drush config:status` is the wrong tool for checking whether live config
   matches a module's `config/install` - it compares against the site's
   config **sync** directory, a separate mechanism.
@@ -213,10 +242,22 @@ two directions. Don't remember what's already available from context.
 [--ambiguous-threshold] [--dry-run]` - on-demand sweep. Algorithm, schema,
 and thresholds in
 [ADR-0005](adr/0005-consolidation-algorithm.md). **Current threshold
-defaults:** `AimMemoryManager::DEFAULT_AUTO_THRESHOLD = 0.05`,
-`DEFAULT_AMBIGUOUS_THRESHOLD = 0.20` (recalibrated against the current
-`mistral-embed` embeddings - re-check these any time the embeddings
-provider/model changes, they don't transfer).
+defaults:** `AimMemoryManager::DEFAULT_AUTO_THRESHOLD = 0.09`,
+`DEFAULT_AMBIGUOUS_THRESHOLD = 0.45` - recalibrated 2026-09-10 against
+`ollama__nomic-embed-text:latest` (previously 0.05/0.20, tuned for
+`mistral-embed`, went stale the moment `embeddings_engine` switched - see
+AI dependency map above).
+
+First pass set auto-threshold to 0.12 from two known duplicate pairs
+(0.059/0.082). Caught too loose by live testing the same day: "Nik likes
+chocolate biscuits" vs. "Nik likes chocolate digestives" (genuinely
+distinct, not a restatement) scored 0.1186 and auto-merged with zero LLM
+review, silently dropping the digestives fact from recall. Pulled back to
+0.09, clearly below that false positive - this embedding model apparently
+packs "related but distinct" closer to "duplicate" than mistral-embed did,
+so the safe no-review auto-merge band is narrower here. Small sample -
+re-check as real data grows, and prefer widening the ambiguous band over
+the auto-merge band if it happens again.
 
 **Automated path:** `AimConsolidateQueueWorker` (plugin ID
 `aim_consolidate`) - `remember()`/`createFactsFromCandidates()` enqueue
@@ -244,11 +285,54 @@ other as neighbors.
     already-superseded facts in PHP, or a retired fact keeps resurfacing.
 - `scope: user` neighbor matching over-fetches (5x the limit) and
   post-filters on `subject_uid` in PHP, since it isn't an indexed
-  attribute.
+  attribute. Fix identified 2026-09-10, not yet built: index `subject_uid`
+  as a search_api attribute (same mechanism `scope`/`subject`/`source`
+  already use) and filter server-side instead of over-fetching.
 
 Manual trigger without a terminal: `drupal/queue_ui` at
 `/admin/config/system/queue-ui` (per-queue "Run" button, explicit click
 only - deliberately not a `cron` key on the worker, see ADR-0003).
+
+## Benchmarking
+
+`drush aim:benchmark [--scope] [--checkpoints] [--queries] [--cleanup]` and
+`drush aim:benchmark-cleanup <tag>` - built 2026-09-10 to answer ADR-0010's
+open question 5 (retrieval latency asserted safe, never measured) with a
+real number instead of more reasoning about the SQL layer. Generates
+synthetic facts from a small template/word-pool generator (not
+`devel_generate` - composer-present but not wired to `aim_fact`'s bundle),
+reindexes, and times a batch of `recall()` calls at each requested
+fact-count checkpoint.
+
+Deliberately bypasses `remember()`'s guardrail check and the consolidation
+queue: synthetic text needs neither, and queuing thousands of facts for
+LLM-mediated consolidation would turn a latency benchmark into an
+uncontrolled reasoning-call bill the moment `aim_consolidate`'s crontab next
+runs. Cost is predictable - one embedding-API call per generated fact, at
+`reindex()` time, nothing else. Every generated fact is tagged
+`source=<run tag>` so `aim:benchmark-cleanup` (or `--cleanup` on the same
+invocation) can remove exactly that run's data.
+
+**First real numbers (5 then 15 site-scope facts,
+`amazeeio__mistral-embed`):** `recall()` averaged 450-540ms. At this scale
+that's dominated by `recall()`'s own query-embedding network round trip to
+the hosted provider, not by the SQL/HNSW search itself - see ADR-0010's
+updated open question 5.
+
+**Confirmed 2026-09-10, same checkpoints, `ollama__nomic-embed-text:latest`
+(local):** `recall()` averaged 33-35ms - roughly 15x faster, confirming the
+network-hop theory rather than the SQL/HNSW layer being the cost. Still not
+yet run at meaningful scale (thousands of facts, to see whether recall time
+actually grows with corpus size independent of the embedding call).
+
+**Recommended next fix, not yet built:** cache query embeddings via
+Drupal's Cache API, keyed on (query text, embeddings model ID) - the
+mapping is deterministic per model, so this needs no invalidation logic at
+all. This site has no Redis today (`cache.default` resolves to
+`Drupal\Core\Cache\DatabaseBackend`), so start DB-backed; add Redis only if
+that itself becomes a bottleneck. Complementary to a local Ollama
+embeddings provider, not a substitute - caching only helps *repeat*
+queries, a local model helps every query. See TODO.md.
 
 ## Chatbot
 
@@ -400,6 +484,58 @@ authorship on re-import is accepted, not a problem to solve.
   node-specific). Real future fit once Content Moderation lands: a
   ready-made admin UI for the `related`/`expires` supersede graph instead
   of custom-building one.
+- **Supersede-reason field.** A short field (e.g. `related_reason`)
+  alongside `related`/`expires`, recording *why* consolidation superseded a
+  fact (duplicate/merge/conflict/manual), not just that it did - the
+  concrete, checkable "provenance on invalidation" parity target from
+  ADR-0010's 2026-09-10 widened appraisal. Feasible as one field populated
+  at `consolidateFact()`'s existing call site. A full separate "event fact"
+  bundle/entity type for this was considered and rejected for now:
+  `aim_fact` is single-bundle today, and ADR-0002's deferred Content
+  Moderation revisioning would likely give a proper audit trail for free
+  once built, making a bespoke event type duplicate work.
+- **Bi-temporal fact validity.** `aim_fact` has `created`/`expires`, but
+  neither is independently assertable as "when this became true in
+  reality" versus "when the system learned it." A fact reported late (a
+  user says today "I moved three months ago") has no field for the
+  real-world date separate from today's write timestamp. Zep-style
+  two-axis timestamps are the model to borrow from if this becomes a real
+  problem; not designed.
+- **Source-boundary policy per site archetype.** Ties to ADR-0010's
+  still-undesigned "speckit-for-Drupal" idea (its open question 8): each
+  discovery-skill archetype (commerce, support, ...) should declare its own
+  allowed-source boundaries as config, likely as its own Guardrail set (the
+  same mechanism `aim_write_guardrails` is already one instance of), not a
+  single global policy.
+- **Extraction-input guardrailing, distinct from candidate-fact
+  guardrailing.** Guardrails today only filters the *output* of extraction
+  (candidate fact text, via `runGuardrails()`). Nothing filters the *input*
+  to an extraction call - a source document engineered to manipulate the
+  extracting model into asserting a false-but-textually-clean fact would
+  pass every existing check. Matters once ingesting raw source material
+  (see the media ingestion idea below) becomes real; plain user-typed text
+  carries a much smaller version of this risk today.
+- **Taxonomy field, revisited.** The original caution above ("wait for a
+  real recurring category") assumed the field would be admin-curation
+  metadata only. It's more concretely motivated if it also does routing
+  work - which discovery-skill archetype/source-policy/guardrail set
+  governs a fact - rather than just being a browsable tag. Worth building
+  once the archetype/info-pack design (previous bullet) is real, not
+  before.
+- **Graduated-detail retrieval (OpenViking-style L0/L1/L2).** Store a short
+  one-line abstract plus fuller detail tiers, fetch only the level a query
+  needs, to cut retrieved-context token cost. Relevant to the
+  token-efficiency parity target in ADR-0010's widened appraisal if
+  retrieval volume ever makes that a real cost. Source: an unverified
+  third-party summary, not independently confirmed - treat as a candidate
+  mechanism, not a validated one.
+- **Media/source ingestion for re-analysis.** Agreed shape if this is ever
+  built (2026-09-10): reference existing Media entities rather than `aim`
+  owning its own copy, private file scheme (not public) for anything
+  sensitive, given this system is treated as potentially business-critical.
+  Still gated behind the separate, still-open "does aim ever store source
+  material at all" question under Extraction above - this only settles the
+  *shape*, not whether it happens.
 
 ## Dev process and rules
 

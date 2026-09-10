@@ -375,6 +375,146 @@ final class AimCommands extends DrushCommands {
   }
 
   /**
+   * Benchmarks recall latency at increasing fact counts.
+   *
+   * Generates synthetic facts in batches up to each requested checkpoint,
+   * reindexes, then times a batch of recall() calls at that fact count -
+   * see CLAUDE.md's AI dependency map and ADR-0010's open question 5
+   * (retrieval latency asserted safe by reasoning about SQL cost, never
+   * actually benchmarked). Generation bypasses guardrails and the
+   * consolidation queue (see AimMemoryManager::generateBenchmarkFacts()),
+   * so the only real cost here is one embedding-API call per generated
+   * fact, at reindex time - no reasoning/LLM calls anywhere in this
+   * command, cost is predictable up front.
+   *
+   * @param array $options
+   *   Command options.
+   *
+   * @command aim:benchmark
+   * @aliases aim-benchmark
+   *
+   * @option scope Which scope pool to generate facts into: site, role, case, or user.
+   * @option checkpoints Comma-separated cumulative fact counts to measure at.
+   * @option queries How many timed recall() calls to run at each checkpoint.
+   * @option cleanup Delete every fact this run created once the benchmark finishes.
+   *
+   * @usage drush aim:benchmark --checkpoints=50,200,500 --cleanup
+   *   Time recall() at three fact counts up to 500, then remove them all.
+   * @usage drush aim:benchmark --scope=user --checkpoints=100,500
+   *   Benchmark scope=user (exercises the subject_uid over-fetch gotcha).
+   */
+  #[CLI\Command(name: 'aim:benchmark', aliases: ['aim-benchmark'])]
+  #[CLI\Option(name: 'scope', description: 'Which scope pool to generate facts into: site, role, case, or user.')]
+  #[CLI\Option(name: 'checkpoints', description: 'Comma-separated cumulative fact counts to measure at.')]
+  #[CLI\Option(name: 'queries', description: 'How many timed recall() calls to run at each checkpoint.')]
+  #[CLI\Option(name: 'cleanup', description: 'Delete every fact this run created once the benchmark finishes.')]
+  #[CLI\Usage(name: 'drush aim:benchmark --checkpoints=50,200,500 --cleanup', description: 'Generate up to 500 site-scope facts in three steps, timing recall() at each, then remove them all.')]
+  public function benchmark(
+    array $options = [
+      'scope' => 'site',
+      'checkpoints' => '50,200,500',
+      'queries' => 10,
+      'cleanup' => FALSE,
+    ],
+  ): void {
+    $scope = $options['scope'];
+    if (!in_array($scope, ['user', 'role', 'site', 'case'], TRUE)) {
+      $this->io()->error('Invalid --scope "' . $scope . '", expected one of: user, role, site, case.');
+      return;
+    }
+
+    $checkpoints = array_unique(array_map('intval', explode(',', (string) $options['checkpoints'])));
+    sort($checkpoints);
+    $queryCount = max(1, (int) $options['queries']);
+    $runTag = 'benchmark:' . date('Ymd-His');
+
+    $subjectUids = [];
+    if ($scope === 'user') {
+      $subjectUids = $this->memoryManager->sampleUserIds();
+      if (empty($subjectUids)) {
+        $this->io()->error('No real user accounts found to benchmark scope=user against (a user-scope fact must reference a real account, ADR-0007).');
+        return;
+      }
+      $this->io()->note('Distributing generated facts across ' . count($subjectUids) . ' real account(s).');
+    }
+
+    $sampleQueries = [
+      'email preference', 'billing question', 'mobile app issue',
+      'onboarding process', 'dashboard feedback', 'support ticket follow-up',
+      'notification settings', 'integration request',
+    ];
+
+    $this->io()->note("Run tag: $runTag. Bypasses guardrails and consolidation (synthetic text needs neither) - the only real cost is one embedding-API call per fact at reindex time.");
+
+    $rows = [];
+    $createdSoFar = 0;
+    foreach ($checkpoints as $target) {
+      if ($target > $createdSoFar) {
+        $this->memoryManager->generateBenchmarkFacts($scope, $target - $createdSoFar, $runTag, $subjectUids);
+        $createdSoFar = $target;
+      }
+
+      $indexStart = microtime(TRUE);
+      $indexed = $this->memoryManager->reindex();
+      $indexMs = (int) round((microtime(TRUE) - $indexStart) * 1000);
+
+      $subjectUid = $scope === 'user' ? (string) $subjectUids[array_rand($subjectUids)] : NULL;
+      $timings = [];
+      for ($i = 0; $i < $queryCount; $i++) {
+        $start = microtime(TRUE);
+        try {
+          $this->memoryManager->recall($sampleQueries[$i % count($sampleQueries)], $scope, NULL, $subjectUid, 10);
+        }
+        catch (\InvalidArgumentException | \RuntimeException $e) {
+          $this->io()->error($e->getMessage());
+          return;
+        }
+        $timings[] = (microtime(TRUE) - $start) * 1000;
+      }
+      sort($timings);
+      $avg = (int) round(array_sum($timings) / count($timings));
+      $p95 = (int) round($timings[(int) floor(0.95 * (count($timings) - 1))]);
+
+      $rows[] = [$createdSoFar, $indexed ?? 'n/a', $indexMs, $avg, $p95];
+    }
+
+    $this->io()->table(['Facts', 'Indexed this batch', 'Reindex ms', 'Recall avg ms', 'Recall p95 ms'], $rows);
+
+    if (!empty($options['cleanup'])) {
+      $deleted = $this->memoryManager->deleteBenchmarkFacts($runTag);
+      $this->memoryManager->reindex();
+      $this->io()->success("Cleaned up $deleted benchmark fact(s).");
+    }
+    else {
+      $this->io()->note("Benchmark facts left in place, tagged source=\"$runTag\". Remove them later with: drush aim:benchmark-cleanup $runTag");
+    }
+  }
+
+  /**
+   * Deletes every fact created by a previous aim:benchmark run.
+   *
+   * @param string $runTag
+   *   The run tag printed by aim:benchmark, e.g. benchmark:20260910-141500.
+   *
+   * @command aim:benchmark-cleanup
+   * @aliases aim-benchmark-cleanup
+   *
+   * @usage drush aim:benchmark-cleanup benchmark:20260910-141500
+   *   Remove every fact tagged with that benchmark run and reindex.
+   */
+  #[CLI\Command(name: 'aim:benchmark-cleanup', aliases: ['aim-benchmark-cleanup'])]
+  #[CLI\Argument(name: 'runTag', description: 'The run tag printed by aim:benchmark.')]
+  public function benchmarkCleanup(string $runTag): void {
+    $deleted = $this->memoryManager->deleteBenchmarkFacts($runTag);
+    if ($deleted === 0) {
+      $this->io()->note('No facts found tagged "' . $runTag . '".');
+      return;
+    }
+    $this->memoryManager->reindex();
+    $this->io()->success("Deleted $deleted fact(s), reindexed.");
+  }
+
+  /**
    * Resolves --provider/--model options, falling back to the site default.
    *
    * Deliberately does not hardcode a fallback provider/model: a literal

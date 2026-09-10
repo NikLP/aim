@@ -60,20 +60,65 @@ final class AimMemoryManager {
    * Public and shared between the CLI sweep's option default and the queue
    * worker, so the two can't drift out of sync the way AimCommands'
    * hardcoded provider/model defaults already did twice earlier this
-   * project. Empirically set against amazeeio__mistral-embed (see
-   * CLAUDE.md's "Consolidation" section) - recalibrated 2026-09-09 from an
-   * earlier 0.35/0.65 pair that was calibrated against
-   * titan-embed-text-v2:0 and never re-checked after that model was
-   * discontinued mid-session and swapped for mistral-embed.
+   * project. Empirically set against ollama__nomic-embed-text:latest (see
+   * CLAUDE.md's "Consolidation" section) - recalibrated 2026-09-10 from an
+   * earlier 0.05/0.20 pair that was calibrated against amazeeio's
+   * mistral-embed and never re-checked after the site's embeddings_engine
+   * was switched to a local Ollama model.
+   *
+   * First pass set this to 0.12 from two known duplicate pairs (cosine
+   * distance 0.059 and 0.082). That was too loose - live testing produced
+   * a real false auto-merge at 0.1186 ("Nik likes chocolate biscuits" vs.
+   * "Nik likes chocolate digestives", genuinely distinct preferences, not
+   * a restatement) that got silently retired with zero LLM review. Pulled
+   * back to sit clearly below that observed false positive - this small
+   * embedding model apparently packs "same topic, different content" much
+   * closer to "restated duplicate" than mistral-embed did, so the safe
+   * auto-merge band is narrower here than the first calibration assumed.
+   * Still not a large sample - re-check as real data grows, and favor the
+   * ambiguous (LLM-reviewed) band over widening this one on a hunch.
    */
-  public const DEFAULT_AUTO_THRESHOLD = 0.05;
+  public const DEFAULT_AUTO_THRESHOLD = 0.09;
 
   /**
    * Score at or below which an ambiguous neighbor gets a classification call.
    *
-   * See DEFAULT_AUTO_THRESHOLD.
+   * See DEFAULT_AUTO_THRESHOLD. Set to cover the observed
+   * distinct-but-topically-related band (0.29-0.41) for an LLM judgment
+   * call, while still excluding clearly unrelated pairs (0.67+).
    */
-  public const DEFAULT_AMBIGUOUS_THRESHOLD = 0.20;
+  public const DEFAULT_AMBIGUOUS_THRESHOLD = 0.45;
+
+  /**
+   * Sentence templates generateBenchmarkFacts() fills in with random words.
+   *
+   * Deliberately not Faker/devel_generate output - those aren't wired to
+   * aim_fact's bundle, and this needs semantically plausible short
+   * statements (so recall() queries have something real to match), not
+   * arbitrary lorem ipsum.
+   */
+  protected const BENCHMARK_TEMPLATES = [
+    'Prefers %s over %s for %s.',
+    'Uses %s for %s on a regular basis.',
+    'Mentioned interest in %s during a recent %s.',
+    'Works mainly on %s, occasionally touches %s.',
+    'Asked about %s pricing for %s.',
+    'Reported an issue with %s while using %s.',
+    'Recommended %s to a colleague for %s.',
+    'Follows up on %s roughly every %s.',
+  ];
+
+  /**
+   * Word pool BENCHMARK_TEMPLATES draws from.
+   */
+  protected const BENCHMARK_WORDS = [
+    'email', 'phone', 'chat', 'billing', 'onboarding', 'the mobile app',
+    'the API', 'support tickets', 'the newsletter', 'dark mode',
+    'accessibility', 'the checkout flow', 'exports', 'the dashboard',
+    'notifications', 'two-factor login', 'the search feature', 'reporting',
+    'integrations', 'the calendar view', 'week', 'month', 'quarter',
+    'marketing', 'engineering', 'sales', 'support', 'design', 'product',
+  ];
 
   /**
    * Constructs an AimMemoryManager object.
@@ -270,6 +315,117 @@ final class AimMemoryManager {
     finally {
       $this->accountSwitcher->switchBack();
     }
+  }
+
+  /**
+   * Returns a sample of real, active account IDs for user-scope benchmarking.
+   *
+   * A scope=user fact must reference a real account (ADR-0007) - can't be
+   * fabricated, so benchmarking that scope round-robins generated facts
+   * across whichever real accounts the site already has.
+   *
+   * @param int $limit
+   *   Maximum number of account IDs to return.
+   *
+   * @return int[]
+   *   Active, non-anonymous, non-uid-1 account IDs.
+   */
+  public function sampleUserIds(int $limit = 20): array {
+    $ids = $this->entityTypeManager->getStorage('user')->getQuery()
+      ->accessCheck(FALSE)
+      ->condition('uid', 1, '>')
+      ->condition('status', 1)
+      ->range(0, $limit)
+      ->execute();
+    return array_values(array_map('intval', $ids));
+  }
+
+  /**
+   * Creates synthetic facts for benchmarking recall/consolidation at scale.
+   *
+   * Bypasses remember()'s guardrail check and consolidation enqueue on
+   * purpose: generated text has nothing for a guardrail to catch, and
+   * queuing thousands of facts for LLM-mediated consolidation would turn a
+   * latency benchmark into an uncontrolled reasoning-call bill the moment
+   * aim_consolidate's crontab entry next runs (CLAUDE.md's "Consolidation"
+   * section). The only real cost this leaves is one embedding-API call per
+   * fact, at reindex() time. Every created fact is tagged $runTag as its
+   * source so deleteBenchmarkFacts() can find and remove exactly this run's
+   * data afterward.
+   *
+   * @param string $scope
+   *   One of user, role, site, case.
+   * @param int $count
+   *   How many facts to create.
+   * @param string $runTag
+   *   Provenance tag stored on every created fact.
+   * @param int[] $subjectUids
+   *   For scope=user, the pool of real account IDs to assign facts to,
+   *   round-robin (see sampleUserIds()). Ignored for other scopes.
+   *
+   * @return int[]
+   *   The created fact IDs.
+   *
+   * @throws \InvalidArgumentException
+   *   If scope is invalid, or scope=user and $subjectUids is empty.
+   */
+  public function generateBenchmarkFacts(string $scope, int $count, string $runTag, array $subjectUids = []): array {
+    if (!in_array($scope, self::ALLOWED_SCOPES, TRUE)) {
+      throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', self::ALLOWED_SCOPES));
+    }
+    if ($scope === 'user' && empty($subjectUids)) {
+      throw new \InvalidArgumentException('scope=user needs at least one real account ID in $subjectUids.');
+    }
+
+    $storage = $this->entityTypeManager->getStorage('aim_fact');
+    $ids = [];
+    for ($i = 0; $i < $count; $i++) {
+      $template = self::BENCHMARK_TEMPLATES[array_rand(self::BENCHMARK_TEMPLATES)];
+      $words = [];
+      for ($p = 0; $p < substr_count($template, '%s'); $p++) {
+        $words[] = self::BENCHMARK_WORDS[array_rand(self::BENCHMARK_WORDS)];
+      }
+      $text = vsprintf($template, $words) . ' (#' . uniqid() . ')';
+
+      $values = [
+        'scope' => $scope,
+        'text' => $text,
+        'source' => $runTag,
+        'subject' => '',
+      ];
+      if ($scope === 'user') {
+        $values['subject_uid'] = $subjectUids[$i % count($subjectUids)];
+      }
+
+      /** @var \Drupal\aim\Entity\AimFact $entity */
+      $entity = $storage->create($values);
+      $entity->save();
+      $ids[] = (int) $entity->id();
+    }
+
+    return $ids;
+  }
+
+  /**
+   * Deletes every fact created by a benchmark run, by its source tag.
+   *
+   * @param string $runTag
+   *   The run tag passed to generateBenchmarkFacts().
+   *
+   * @return int
+   *   The number of facts deleted.
+   */
+  public function deleteBenchmarkFacts(string $runTag): int {
+    $storage = $this->entityTypeManager->getStorage('aim_fact');
+    $ids = $storage->getQuery()
+      ->accessCheck(FALSE)
+      ->condition('source', $runTag)
+      ->execute();
+    if (empty($ids)) {
+      return 0;
+    }
+    $storage->delete($storage->loadMultiple($ids));
+    return count($ids);
   }
 
   /**

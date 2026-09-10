@@ -8,12 +8,13 @@ text into classified, scoped facts via a real chat provider call, and a
 direct `drush aim:remember`/`drush aim:recall` pair lets an agent that has
 already done its own reasoning write and query facts with no extra chat
 call.
-See [CLAUDE.md](CLAUDE.md) for the current build state,
+See [CLAUDE.md](CLAUDE.md) for the current build state and
 [adr/](adr/0000-index.md) for the concrete decisions made while building
-it, and
-[ADR-003-drupal-native-agent-memory.md](../../../../ADR-003-drupal-native-agent-memory.md)
-for the original, deeper rationale (market comparison, risk analysis) this
-repo's own ADRs are downstream of.
+it, including
+[ADR-0010](adr/0010-drupal-native-agent-memory-rationale.md), the original,
+deeper rationale (market comparison, risk analysis) this repo's other ADRs
+are downstream of - folded into this directory 2026-09-10, previously a
+standalone root-level document.
 
 ## The premise
 
@@ -159,10 +160,16 @@ starts erroring on the embeddings call:
    previous attempt - `DROP TABLE aim_facts` and re-run this step.
 7. **Reindex every fact, not incrementally** - a provider/model change
    means every existing vector is in the old model's embedding space, not
-   comparable to new queries even at the same dimension:
+   comparable to new queries even at the same dimension. If step 5 dropped
+   and rebuilt `aim_facts` (a dimension change), the table is already
+   empty - reindex directly and **skip `search-api:clear`**: it reprovisions
+   `aim_facts` down to just the base columns, silently dropping `scope`/
+   `source`/`subject`/`text` again, and the next `search-api:index` fails
+   `Unknown column 'scope'` (fix: re-run step 6's `->save()` to restore
+   them, then index). If no dimension change happened (dimension unchanged
+   from step 5), `search-api:clear` is safe to run first:
 
    ```bash
-   drush search-api:clear aim_vector_index -y
    drush search-api:index aim_vector_index
    ```
 
@@ -210,8 +217,11 @@ map).
 
 See [adr/](adr/0000-index.md) for the concrete decisions made while building
 this (storage/scope, governance, consolidation, the chatbot mechanism, and
-more), and [ADR-003](../../../../ADR-003-drupal-native-agent-memory.md) for
-the deeper original context (market comparison against Mem0/Zep/Kenkeep,
+more), including
+[ADR-0010](adr/0010-drupal-native-agent-memory-rationale.md) for the deeper
+original context (market comparison, widened 2026-09-10 to seven systems -
+Mem0, Zep, Letta/MemGPT, OpenAI, LangGraph/LangMem, Cognee, Supermemory -
+with concrete parity targets instead of architectural bullet points;
 memory-poisoning risk analysis, write-concurrency mitigations, and the open
 questions still blocking a build commitment).
 
@@ -225,4 +235,4 @@ The ADR lists eleven; the ones that block starting real (non-PoC) work:
 3. Local model choice and hardware sizing for the sovereign tier.
 4. Relationship to `ai_agents`/`ai_search` - compose with them, or standalone?
 
-Full list: [ADR-003 § Open questions](../../../../ADR-003-drupal-native-agent-memory.md#open-questions).
+Full list: [ADR-0010 § Open questions](adr/0010-drupal-native-agent-memory-rationale.md#open-questions).

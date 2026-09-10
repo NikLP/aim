@@ -13,3 +13,4 @@ Architecture Decision Records for the `aim` module.
 | [0007](0007-user-scope-requires-real-account.md) | User-scope facts must reference a real Drupal account | Accepted |
 | [0008](0008-chatbot-integration-mechanism.md) | Chatbot integration: `ai_agents` tools, not a CCC content source | Accepted |
 | [0009](0009-recipe-apply-safety-gate.md) | No unattended `drush recipe apply` on an AI-generated recipe | Accepted (design only, not yet built) |
+| [0010](0010-drupal-native-agent-memory-rationale.md) | Original rationale, market appraisal, and risk analysis (folded in from repo root 2026-09-10) | Accepted as founding rationale, superseded by 0001-0009 for binding decisions |
