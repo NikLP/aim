@@ -8,9 +8,12 @@ text into classified, scoped facts via a real chat provider call, and a
 direct `drush aim:remember`/`drush aim:recall` pair lets an agent that has
 already done its own reasoning write and query facts with no extra chat
 call.
-See [CLAUDE.md](CLAUDE.md) for the current build state and
+See [CLAUDE.md](CLAUDE.md) for the current build state,
+[adr/](adr/0000-index.md) for the concrete decisions made while building
+it, and
 [ADR-003-drupal-native-agent-memory.md](../../../../ADR-003-drupal-native-agent-memory.md)
-for the full rationale and history.
+for the original, deeper rationale (market comparison, risk analysis) this
+repo's own ADRs are downstream of.
 
 ## The premise
 
@@ -205,10 +208,12 @@ map).
    mechanism, and a real threshold-miscalibration bug it caught and fixed
    along the way.
 
-See [ADR-003](../../../../ADR-003-drupal-native-agent-memory.md) for the full
-context (market comparison against Mem0/Zep/Kenkeep, memory-poisoning risk
-analysis, write-concurrency mitigations, and the open questions still
-blocking a build commitment).
+See [adr/](adr/0000-index.md) for the concrete decisions made while building
+this (storage/scope, governance, consolidation, the chatbot mechanism, and
+more), and [ADR-003](../../../../ADR-003-drupal-native-agent-memory.md) for
+the deeper original context (market comparison against Mem0/Zep/Kenkeep,
+memory-poisoning risk analysis, write-concurrency mitigations, and the open
+questions still blocking a build commitment).
 
 ## Open questions
 
