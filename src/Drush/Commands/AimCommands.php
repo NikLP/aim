@@ -56,18 +56,22 @@ final class AimCommands extends DrushCommands {
    * @option provider The AI provider plugin ID to use.
    * @option model The chat model ID to use.
    * @option source Provenance tag stored on every created fact.
+   * @option subject-uid A uid or username of a real account to attach any scope=user candidate to. Omit to skip all scope=user candidates (see ADR-0011).
    * @option index Reindex the vector index immediately after saving.
    *
    * @usage drush aim:extract notes.txt
    *   Extract facts from notes.txt using the default provider and model.
    * @usage drush aim:extract notes.txt --provider=openai --model=gpt-4o --index
    *   Use a different provider and reindex immediately.
+   * @usage drush aim:extract notes.txt --subject-uid=42
+   *   Attach any scope=user candidate the model finds to account 42.
    */
   #[CLI\Command(name: 'aim:extract', aliases: ['aim-extract'])]
   #[CLI\Argument(name: 'file', description: 'Path to a text file to extract facts from.')]
   #[CLI\Option(name: 'provider', description: 'The AI provider plugin ID to use.')]
   #[CLI\Option(name: 'model', description: 'The chat model ID to use.')]
   #[CLI\Option(name: 'source', description: 'Provenance tag stored on every created fact.')]
+  #[CLI\Option(name: 'subject-uid', description: 'A uid or username of a real account to attach any scope=user candidate to. Omit to skip all scope=user candidates.')]
   #[CLI\Option(name: 'index', description: 'Reindex the vector index immediately after saving.')]
   #[CLI\Usage(name: 'drush aim:extract notes.txt', description: 'Extract facts from notes.txt using the default provider and model.')]
   public function extract(
@@ -76,6 +80,7 @@ final class AimCommands extends DrushCommands {
       'provider' => NULL,
       'model' => NULL,
       'source' => NULL,
+      'subject-uid' => NULL,
       'index' => FALSE,
     ],
   ): void {
@@ -102,10 +107,16 @@ final class AimCommands extends DrushCommands {
     }
 
     $source = $options['source'] ?? ('extract:' . basename($file));
-    $result = $this->memoryManager->createFactsFromCandidates($facts, $source);
+    try {
+      $result = $this->memoryManager->createFactsFromCandidates($facts, $source, $options['subject-uid'] ?: NULL);
+    }
+    catch (\InvalidArgumentException $e) {
+      $this->io()->error($e->getMessage());
+      return;
+    }
 
     if ($result['skipped'] > 0) {
-      $this->io()->warning("{$result['skipped']} user-scope fact(s) skipped: the model's subject did not resolve to a real account on this site.");
+      $this->io()->warning("{$result['skipped']} user-scope fact(s) skipped: no --subject-uid was given to attach them to.");
     }
 
     if ($result['blocked'] > 0) {

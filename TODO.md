@@ -90,8 +90,13 @@ questions" section)
 - [ ] Instrument `recall()` to log embed-time vs. DB-search-time separately,
       before further latency work - confirms the split rather than
       inferring it from one aggregate number.
+- [ ] Fix abstention correctness in `aim_chatbot:recall`
+      (`AimRecall::execute()`) - no similarity-score threshold today, only
+      a zero-rows check, so a poor top match still gets formatted as
+      "Relevant facts:" instead of an honest no-match response.
 
-(CLAUDE.md, "Ideas raised, not designed" and "Benchmarking" sections)
+(CLAUDE.md, "Ideas raised, not designed", "Benchmarking", and "Chatbot"
+sections)
 
 ## Backlog - explicitly "wait for a trigger" per the docs' own framing
 

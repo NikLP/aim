@@ -66,7 +66,7 @@ final class AimRemember extends FunctionCallBase implements ExecutableFunctionCa
       $this->setOutput('No fact text provided, nothing saved.');
       return;
     }
-    
+
     try {
       $fact = $this->memoryManager->remember($text, self::FACT_SCOPE, NULL, 'chatbot:aim_chatbot', NULL);
       $this->setOutput('Saved fact ' . $fact->id() . ': ' . $text);

@@ -198,9 +198,15 @@ transcript recording - the `source` field is a short provenance pointer,
 never the raw dialogue. Don't add a field/table storing full transcripts
 without this being explicitly revisited first.
 
-`--scope=user` candidates that don't resolve to a real account are skipped
-(with a warning), not saved with a broken subject - see
-[ADR-0007](adr/0007-user-scope-requires-real-account.md).
+`--subject-uid` (uid or username) attaches every model-classified
+`scope=user` candidate to that one real account; without it every
+`scope=user` candidate is skipped (with a warning), unconditionally -
+extraction never attempts to match the model's own freeform subject text
+against the accounts table. See
+[ADR-0007](adr/0007-user-scope-requires-real-account.md) for why user
+scope requires a real account at all, and
+[ADR-0011](adr/0011-extraction-explicit-subject-uid.md) for why the match
+can't be model-guessed.
 
 **Skill:** `.claude/skills/aim-discovery/` ("the grill") - a structured
 discovery interview that distills each topic into a summary and runs it
@@ -374,6 +380,16 @@ and why. Current shape:
 - `ai_agent`'s "tools" are the same `#[FunctionCall]`/
   `plugin.manager.ai.function_calls` type CCC's own tools use, not a
   bespoke `ai_agents`-only mechanism.
+- Abstention correctness is unverified: `AimRecall::execute()` (the
+  `aim_chatbot:recall` tool) only special-cases the zero-rows case ("No
+  relevant facts found.") - there's no similarity-score threshold, so any
+  non-empty result set, even one where the best match is a poor one, still
+  gets formatted as "Relevant facts:" and handed to the model. A visitor's
+  off-topic question could get a confidently-worded answer built from
+  irrelevant facts instead of an honest "don't know." Flagged from the
+  2026-09-10 competitive review, not yet reproduced with a real query. Fix
+  candidate: a minimum-score cutoff before formatting output, not just the
+  existing empty check.
 
 **CCC (`ai_context`), not enabled on this site.** No Guardrails-equivalent
 - its governance is Content Moderation for its own curated

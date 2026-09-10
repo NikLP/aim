@@ -505,18 +505,36 @@ final class AimMemoryManager {
    *   A list of ['scope' => ..., 'subject' => ..., 'text' => ...] arrays.
    * @param string $source
    *   Provenance tag stored on every created fact.
+   * @param string|null $subjectUid
+   *   A uid or username of a real account to attach to any candidate the
+   *   model classifies as scope=user. See ADR-0011: extraction never
+   *   resolves scope=user against the model's own freeform subject text -
+   *   a document naming someone is no guarantee that person has an account
+   *   on this site. NULL means no such account was supplied, so every
+   *   scope=user candidate is skipped.
    *
    * @return array
    *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[]), 'skipped'
-   *   (int, the number of user-scope candidates whose subject did not
-   *   resolve to a real account), and 'blocked' (int, the number of
+   *   (int, the number of user-scope candidates skipped because no
+   *   $subjectUid was supplied), and 'blocked' (int, the number of
    *   candidates a guardrail rejected, per decision 7).
+   *
+   * @throws \InvalidArgumentException
+   *   If $subjectUid is given but does not resolve to a real account.
    */
-  public function createFactsFromCandidates(array $facts, string $source): array {
+  public function createFactsFromCandidates(array $facts, string $source, ?string $subjectUid = NULL): array {
     $storage = $this->entityTypeManager->getStorage('aim_fact');
     $created = [];
     $skipped = 0;
     $blocked = 0;
+
+    $subjectAccount = NULL;
+    if (!empty($subjectUid)) {
+      $subjectAccount = $this->resolveAccount($subjectUid);
+      if (!$subjectAccount) {
+        throw new \InvalidArgumentException('No user account found for subject-uid "' . $subjectUid . '". A user-scope fact must be about a real account.');
+      }
+    }
 
     foreach ($facts as $fact) {
       try {
@@ -536,16 +554,17 @@ final class AimMemoryManager {
       ];
 
       if ($fact['scope'] === 'user') {
-        // Same account-resolution rule as remember() - the model can only
-        // return a name it read from the source text, which may not
-        // resolve to one.
-        $account = !empty($fact['subject']) ? $this->resolveAccount((string) $fact['subject']) : NULL;
-        if (!$account) {
+        // Never resolve the model's own freeform subject text against the
+        // accounts table (ADR-0011) - a source document naming someone is
+        // no guarantee that person is this site's user. Only a caller-
+        // supplied $subjectAccount, resolved once above, can attach a
+        // scope=user candidate to a real account.
+        if (!$subjectAccount) {
           $skipped++;
           continue;
         }
         $values['scope'] = 'user';
-        $values['subject_uid'] = $account->id();
+        $values['subject_uid'] = $subjectAccount->id();
         $values['subject'] = '';
       }
       else {

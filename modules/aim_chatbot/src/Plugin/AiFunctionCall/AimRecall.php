@@ -76,7 +76,7 @@ final class AimRecall extends FunctionCallBase implements ExecutableFunctionCall
       $this->setOutput('Could not search memory: ' . $e->getMessage());
       return;
     }
-    
+
     if (empty($rows)) {
       $this->setOutput('No relevant facts found.');
       return;
