@@ -22,12 +22,11 @@ llm_configuration:
   max_tokens: 4096
   temperature: 0.0
   top_k: 0.0
-actions_enabled:
-  aim_memory_action: {  }
+actions_enabled: {  }
 roles:
   anonymous: anonymous
   authenticated: 0
   content_editor: 0
   administrator: 0
 use_function_calling: false
-ai_agent: null
+ai_agent: aim_chatbot

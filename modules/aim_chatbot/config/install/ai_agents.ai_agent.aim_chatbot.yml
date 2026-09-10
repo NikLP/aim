@@ -1,0 +1,40 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - aim_chatbot
+id: aim_chatbot
+label: 'AIM Memory Demo'
+description: 'Demo agent that can remember and recall site-scoped facts via aim.'
+system_prompt: "You are a helpful assistant for this site. You can remember short facts about the site for later, and recall facts already remembered when they might help answer a specific question. Only remember things that are genuinely worth keeping long-term, not small talk. If asked a broad or open-ended question like 'what do you know' or 'tell me everything', do not try to recall or list everything remembered - ask what specifically they'd like to know instead."
+secured_system_prompt: ''
+tools:
+  'aim_chatbot:remember': true
+  'aim_chatbot:recall': true
+tool_settings:
+  'aim_chatbot:remember':
+    return_directly: 0
+    require_usage: 0
+    description_override: ''
+    progress_message: ''
+    use_artifacts: 0
+  'aim_chatbot:recall':
+    return_directly: 0
+    require_usage: 0
+    description_override: ''
+    progress_message: ''
+    use_artifacts: 0
+tool_usage_limits:
+  'aim_chatbot:remember': {  }
+  'aim_chatbot:recall': {  }
+orchestration_agent: false
+triage_agent: false
+max_loops: 3
+max_loops_message: ''
+default_information_tools: ''
+exclude_users_role: false
+masquerade_roles: {  }
+structured_output_enabled: false
+structured_output_schema: ''
+hostname_filter_disabled: false
+guardrail_set: aim_write_guardrails
