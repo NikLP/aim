@@ -1,0 +1,8 @@
+langcode: en
+status: true
+dependencies: {  }
+name: 'AIM Category'
+vid: aim_category
+description: 'Curated terms for AIM memory.'
+weight: 0
+new_revision: false

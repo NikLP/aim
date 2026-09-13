@@ -1,0 +1,6 @@
+langcode: en
+status: true
+dependencies: {  }
+id: aim_recall
+tool_id: aim_recall
+description: 'Searches previously remembered aim facts for anything semantically relevant.'

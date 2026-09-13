@@ -154,10 +154,12 @@ final class AimCommands extends DrushCommands {
    *
    * Unlike aim:extract, this does not decide what is worth remembering -
    * it stores exactly what the caller (typically an agent that already did
-   * that reasoning as part of its own conversation) hands it.
+   * that reasoning as part of its own conversation) hands it. Pass --file
+   * instead of $text to save several facts (each with its own scope/
+   * subject/etc.) in one command invocation, one Drupal bootstrap.
    *
-   * @param string $text
-   *   The fact text, one short statement.
+   * @param string|null $text
+   *   The fact text, one short statement. Omit when using --file.
    * @param array $options
    *   Command options.
    *
@@ -168,39 +170,55 @@ final class AimCommands extends DrushCommands {
    * @option subject Who or what the fact is about. For scope=user, a uid or username of a real account on this site. Empty for site scope.
    * @option source Provenance tag for this fact.
    * @option state Optional boolean flag value: true or false. Omit for facts with no boolean shape.
+   * @option category Comma-separated term name(s) from the aim_category vocabulary. A name with no matching term is skipped.
+   * @option asserted When this fact became true in reality, if different from now (any strtotime()-parseable string). Omit unless a caller explicitly knows an earlier date.
+   * @option file Path to a JSON file: an array of fact objects (same fields as the options above, plus "text"), saved in one bootstrap instead of $text/the other options.
    *
    * @usage drush aim:remember "Prefers email over phone." --scope=user --subject=42
    *   Save a plain prose fact about a user, by uid or username.
    * @usage drush aim:remember "Opted out of marketing email." --scope=user --subject=42 --state=true
    *   Save a fact that is itself a boolean flag.
+   * @usage drush aim:remember "Moved to Manchester." --scope=user --subject=42 --asserted="3 months ago"
+   *   Save a fact whose real-world date is earlier than today.
+   * @usage drush aim:remember --file=facts.json
+   *   Save every fact object in facts.json in one bootstrap.
    */
   #[CLI\Command(name: 'aim:remember', aliases: ['aim-remember'])]
-  #[CLI\Argument(name: 'text', description: 'The fact text, one short statement.')]
+  #[CLI\Argument(name: 'text', description: 'The fact text, one short statement. Omit when using --file.')]
   #[CLI\Option(name: 'scope', description: 'One of user, role, site, case.')]
   #[CLI\Option(name: 'subject', description: 'Who or what the fact is about. For scope=user, a uid or username of a real account.')]
   #[CLI\Option(name: 'source', description: 'Provenance tag for this fact.')]
   #[CLI\Option(name: 'state', description: 'Optional boolean flag value: true or false. Omit for facts with no boolean shape.')]
+  #[CLI\Option(name: 'category', description: 'Comma-separated term name(s) from the aim_category vocabulary.')]
+  #[CLI\Option(name: 'asserted', description: 'When this fact became true in reality, if different from now.')]
+  #[CLI\Option(name: 'file', description: 'Path to a JSON file of fact objects, saved in one bootstrap instead of $text/the other options.')]
   #[CLI\Usage(name: 'drush aim:remember "Prefers email over phone." --scope=user --subject=42', description: 'Save a plain prose fact about a user, by uid or username.')]
+  #[CLI\Usage(name: 'drush aim:remember --file=facts.json', description: 'Save every fact in facts.json in one bootstrap.')]
   public function remember(
-    string $text,
+    ?string $text = NULL,
     array $options = [
       'scope' => 'site',
       'subject' => NULL,
       'source' => NULL,
       'state' => NULL,
+      'category' => NULL,
+      'asserted' => NULL,
+      'file' => NULL,
     ],
   ): void {
-    $state = NULL;
-    if ($options['state'] !== NULL) {
-      $state = filter_var($options['state'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-      if ($state === NULL) {
-        $this->io()->error('Invalid --state "' . $options['state'] . '", expected true or false.');
-        return;
-      }
+    if (!empty($options['file'])) {
+      $this->rememberBatch($options['file']);
+      return;
+    }
+
+    if ($text === NULL || trim($text) === '') {
+      $this->io()->error('Provide fact text, or --file with a JSON array of fact objects.');
+      return;
     }
 
     try {
-      $fact = $this->memoryManager->remember($text, $options['scope'], $options['subject'], $options['source'], $state);
+      [$state, $category, $asserted] = $this->parseRememberFields($options);
+      $fact = $this->memoryManager->remember($text, $options['scope'], $options['subject'], $options['source'], $state, $category, $asserted);
     }
     catch (\InvalidArgumentException $e) {
       $this->io()->error($e->getMessage());
@@ -208,6 +226,102 @@ final class AimCommands extends DrushCommands {
     }
 
     $this->io()->success('Created aim_fact ' . $fact->id() . '.');
+  }
+
+  /**
+   * Saves every fact object in a JSON file, one bootstrap for the batch.
+   *
+   * Mirrors createFactsFromCandidates()'s per-item resilience: one bad
+   * entry (missing text, invalid scope, a rejected guardrail) is reported
+   * and skipped rather than aborting the rest of the file.
+   *
+   * @param string $file
+   *   Path to a JSON file containing an array of fact objects. Each object
+   *   uses the same field names as aim:remember's own options (text,
+   *   scope, subject, source, state, category, asserted); category may be
+   *   a JSON array instead of a comma-separated string.
+   */
+  private function rememberBatch(string $file): void {
+    if (!is_readable($file)) {
+      $this->io()->error("Cannot read file: $file");
+      return;
+    }
+
+    $entries = json_decode(file_get_contents($file), TRUE);
+    if (!is_array($entries)) {
+      $this->io()->error('Expected --file to contain a JSON array of fact objects.');
+      return;
+    }
+
+    $created = 0;
+    foreach ($entries as $i => $entry) {
+      if (empty($entry['text'])) {
+        $this->io()->warning("Entry $i: missing text, skipped.");
+        continue;
+      }
+
+      try {
+        [$state, $category, $asserted] = $this->parseRememberFields($entry);
+        $fact = $this->memoryManager->remember(
+          $entry['text'],
+          $entry['scope'] ?? 'site',
+          $entry['subject'] ?? NULL,
+          $entry['source'] ?? NULL,
+          $state,
+          $category,
+          $asserted,
+        );
+      }
+      catch (\InvalidArgumentException $e) {
+        $this->io()->warning("Entry $i: " . $e->getMessage());
+        continue;
+      }
+
+      $this->io()->success("Entry $i: created aim_fact " . $fact->id() . '.');
+      $created++;
+    }
+
+    $this->io()->note("Created $created of " . count($entries) . ' fact(s).');
+  }
+
+  /**
+   * Parses aim:remember's shared state/category/asserted fields.
+   *
+   * @param array $fields
+   *   Raw state/category/asserted values, as given on the command line or
+   *   decoded from a --file entry.
+   *
+   * @return array
+   *   [$state, $category, $asserted], typed as AimMemoryManager::remember()
+   *   expects them.
+   *
+   * @throws \InvalidArgumentException
+   *   If state or asserted cannot be parsed.
+   */
+  private function parseRememberFields(array $fields): array {
+    $state = NULL;
+    if (($fields['state'] ?? NULL) !== NULL) {
+      $state = filter_var($fields['state'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+      if ($state === NULL) {
+        throw new \InvalidArgumentException('Invalid state "' . $fields['state'] . '", expected true or false.');
+      }
+    }
+
+    $category = [];
+    if (!empty($fields['category'])) {
+      $category = is_array($fields['category']) ? $fields['category'] : explode(',', $fields['category']);
+      $category = array_map('trim', $category);
+    }
+
+    $asserted = NULL;
+    if (($fields['asserted'] ?? NULL) !== NULL) {
+      $asserted = strtotime($fields['asserted']);
+      if ($asserted === FALSE) {
+        throw new \InvalidArgumentException('Invalid asserted "' . $fields['asserted'] . '", expected a date strtotime() can parse.');
+      }
+    }
+
+    return [$state, $category, $asserted];
   }
 
   /**

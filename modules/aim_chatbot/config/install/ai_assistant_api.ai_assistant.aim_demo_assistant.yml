@@ -16,8 +16,8 @@ specific_error_messages:
   AiQuotaException: ''
   AiSetupFailureException: ''
   AiRequestErrorException: ''
-llm_provider: anthropic
-llm_model: claude-haiku-4-5-20251001
+llm_provider: amazeeio
+llm_model: claude-4-5-haiku
 llm_configuration:
   max_tokens: 4096
   temperature: 0.0

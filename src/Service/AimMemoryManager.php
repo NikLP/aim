@@ -446,6 +446,12 @@ final class AimMemoryManager {
    *   Provenance tag for this fact.
    * @param bool|null $state
    *   Optional boolean flag value. NULL for facts with no boolean shape.
+   * @param string[] $category
+   *   Category term names to resolve against the aim_category vocabulary.
+   *   A name with no matching term is skipped, not created.
+   * @param int|null $asserted
+   *   When this fact became true in reality, as a Unix timestamp, if known
+   *   and different from now. NULL means "same as created".
    *
    * @return \Drupal\aim\Entity\AimFact
    *   The created fact.
@@ -454,7 +460,7 @@ final class AimMemoryManager {
    *   If scope is invalid, scope=user and subject does not resolve to a real
    *   account, or the text fails a guardrail check.
    */
-  public function remember(string $text, string $scope, ?string $subject, ?string $source, ?bool $state): AimFact {
+  public function remember(string $text, string $scope, ?string $subject, ?string $source, ?bool $state, array $category = [], ?int $asserted = NULL): AimFact {
     if (!in_array($scope, self::ALLOWED_SCOPES, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', self::ALLOWED_SCOPES));
     }
@@ -490,12 +496,50 @@ final class AimMemoryManager {
       $values['state'] = $state;
     }
 
+    if (!empty($category)) {
+      $values['category'] = $this->resolveCategoryTerms($category);
+    }
+
+    if ($asserted !== NULL) {
+      $values['asserted'] = $asserted;
+    }
+
     /** @var \Drupal\aim\Entity\AimFact $entity */
     $entity = $this->entityTypeManager->getStorage('aim_fact')->create($values);
     $entity->save();
     $this->enqueueForConsolidation((int) $entity->id());
 
     return $entity;
+  }
+
+  /**
+   * Resolves category names against the aim_category vocabulary.
+   *
+   * Admin-curated, not model-invented (CLAUDE.md's "Ideas raised" section):
+   * a name with no matching term is silently skipped rather than creating
+   * one on the fly, same posture as resolveAccount() not fabricating an
+   * account.
+   *
+   * @param string[] $names
+   *   Category term names to resolve.
+   *
+   * @return int[]
+   *   The matching term IDs. Names with no match are omitted.
+   */
+  protected function resolveCategoryTerms(array $names): array {
+    $storage = $this->entityTypeManager->getStorage('taxonomy_term');
+    $tids = [];
+    foreach ($names as $name) {
+      $name = trim($name);
+      if ($name === '') {
+        continue;
+      }
+      $terms = $storage->loadByProperties(['vid' => 'aim_category', 'name' => $name]);
+      if ($terms) {
+        $tids[] = (int) reset($terms)->id();
+      }
+    }
+    return $tids;
   }
 
   /**

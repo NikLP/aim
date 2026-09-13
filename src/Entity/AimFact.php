@@ -93,6 +93,18 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface {
       ->setSetting('target_type', 'aim_fact')
       ->setCardinality(BaseFieldDefinition::CARDINALITY_UNLIMITED);
 
+    $fields['category'] = BaseFieldDefinition::create('entity_reference')
+      ->setLabel(t('Category'))
+      ->setDescription(t('Optional classification tag(s) from the aim_category vocabulary. Admin-curated, not model-invented.'))
+      ->setSetting('target_type', 'taxonomy_term')
+      ->setSetting('handler', 'default:taxonomy_term')
+      ->setSetting('handler_settings', ['target_bundles' => ['aim_category' => 'aim_category']])
+      ->setCardinality(BaseFieldDefinition::CARDINALITY_UNLIMITED);
+
+    $fields['asserted'] = BaseFieldDefinition::create('timestamp')
+      ->setLabel(t('Asserted'))
+      ->setDescription(t('When this fact became true in reality, if known and different from when it was recorded. Empty means "same as created" - only set this when a caller explicitly knows an earlier real-world date (e.g. "I moved three months ago").'));
+
     $fields += static::ownerBaseFieldDefinitions($entity_type);
     $fields['uid']
       ->setLabel(t('Extracted by'))

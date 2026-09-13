@@ -1,0 +1,9 @@
+name: 'AIM Tool'
+type: module
+description: 'Exposes AIM memory as Tool API plugins.'
+package: AIM
+core_version_requirement: ^11
+dependencies:
+  - aim:aim
+  - tool:tool
+  - mcp_server_tool_bridge:mcp_server_tool_bridge

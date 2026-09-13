@@ -5,6 +5,7 @@ package: AIM
 core_version_requirement: ^11
 dependencies:
   - drupal:options
+  - drupal:taxonomy
   - ai:ai
   - ai:ai_search
   - ai_vdb_provider_mariadb:ai_vdb_provider_mariadb

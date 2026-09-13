@@ -2,8 +2,8 @@
 
 **Status: PoC working end to end.** A real `aim_fact` entity, indexed through
 Search API's AI Search backend into a MariaDB `VECTOR` column, with real
-embeddings generated via amazee.ai and a real semantic query returning the
-right result. A working extraction prototype (`drush aim:extract`) turns raw
+embeddings generated locally via Ollama and a real semantic query returning
+the right result. A working extraction prototype (`drush aim:extract`) turns raw
 text into classified, scoped facts via a real chat provider call, and a
 direct `drush aim:remember`/`drush aim:recall` pair lets an agent that has
 already done its own reasoning write and query facts with no extra chat
@@ -186,10 +186,11 @@ map).
 ## Build order
 
 1. **PoC.** Prove the schema and vector search work end to end. Done -
-   entity, index, and a real embedding provider (amazee.ai) are wired up and
-   returning correct semantic search results. The zero-API-key path (local
-   Ollama for embeddings) is still the plan for a fully self-hosted/sovereign
-   setup; amazee is what's configured right now.
+   entity, index, and a real embedding provider are wired up and returning
+   correct semantic search results. The zero-API-key path (local Ollama for
+   embeddings) is what's configured now - switched from amazee.ai
+   2026-09-10, confirmed ~15x faster recall as a side effect (see
+   CLAUDE.md's "Benchmarking" section).
 2. Extraction: turn a real interaction into candidate facts automatically,
    instead of writing them by hand. Prototype working - `drush aim:extract
    <file>` sends text to a real chat provider and creates classified,

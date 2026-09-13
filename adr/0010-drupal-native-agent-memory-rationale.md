@@ -127,6 +127,20 @@ scores shows the whole space uses incompatible judge models, token budgets,
 and competitor re-implementations - none of these numbers are comparable to
 each other, let alone to a number `aim` might produce.
 
+**2026-09-11 confirming instance:** Mem0's README now headlines a "New
+Memory Algorithm (April 2026)" - LoCoMo 71.4 to 92.5, LongMemEval 67.8 to
+94.4 - attributed to dropping per-pair LLM ADD/UPDATE/DELETE/NONE decisions
+for single-pass additive extraction plus entity linking and BM25 fusion
+(read directly from `mem0ai/mem0` @ `a488e19`, not taken from marketing
+copy - see [ADR-0012](0012-fact-relation-graph.md)). The README's own
+fine print: "Scores reflect Mem0's managed platform, which includes
+proprietary optimizations not available in the open-source SDK;
+open-source users should expect directionally similar gains but not
+identical numbers." That is the vendor conceding, in their own words, the
+exact point this section already makes - a number attached to "Mem0"
+is not one number, and the OSS code anyone can actually read is not the
+thing the benchmark was run against.
+
 **Parity targets - concrete and checkable, replacing the vaguer
 "architecturally kin to Mem0/Zep" framing used elsewhere in this document:**
 
@@ -197,6 +211,18 @@ for:
 
 None of this requires new infrastructure classes. It requires an entity/bundle
 schema and the extraction/consolidation/decay pipeline as a plugin system.
+
+**2026-09-11 external validation of the "no separate graph DB" row:**
+Mem0 itself deleted its Neo4j-backed Graph Memory feature (`graph_memory.ts`,
+`graphs/tools.ts`, `graphs/utils.ts`, and their test suites - confirmed via
+`git log`/`git show` on `mem0ai/mem0` @ `a488e19`, not a marketing claim) in
+the same April 2026 rewrite that introduced entity linking, replacing a
+dedicated graph database with a second plain vector-store collection of
+extracted entities pointing back at the facts that mention them. A team with
+that much more resourcing than `aim` converged on the same call this row
+already made - a lightweight entity/reference structure over a general
+document store beats standing up a separate graph engine. See
+[ADR-0012](0012-fact-relation-graph.md) for the retrieval-side mechanism.
 
 ### Scope model - four categories, mapped to Mem0's dimensions
 

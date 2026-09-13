@@ -1,0 +1,8 @@
+store aim memory:
+  title: 'Store aim memory facts'
+  description: 'Create facts through the aim_remember Tool API/MCP tool.'
+  restrict access: true
+read aim memory:
+  title: 'Read aim memory facts'
+  description: 'Search facts through the aim_recall Tool API/MCP tool.'
+  restrict access: true

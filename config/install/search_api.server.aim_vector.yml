@@ -9,7 +9,7 @@ name: 'AIM Vector Search'
 description: ''
 backend: search_api_ai_search
 backend_config:
-  chat_model: anthropic__claude-sonnet-5
+  chat_model: amazeeio__claude-5-sonnet
   database: mariadb
   database_settings:
     database_name: ''

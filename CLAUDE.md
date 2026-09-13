@@ -25,12 +25,30 @@ scope.
 
 Environment: DDEV, `drupal11` type, PHP 8.4, MariaDB 11.8, docroot `web/`.
 
-**Enabled:** `aim`, `aim_chatbot`, `ai_agents`, `ai_assistant_api`,
-`ai_chatbot`, `ai_search`, `ai_provider_anthropic`, `ai_provider_amazeeio`,
+**Enabled:** `aim`, `aim_chatbot`, `aim_tool`, `tool`, `mcp_server`,
+`mcp_server_tool_bridge`, `ai_agents`, `ai_assistant_api`, `ai_chatbot`,
+`ai_search`, `ai_provider_anthropic`, `ai_provider_amazeeio`,
 `ai_provider_ollama`, `ai_vdb_provider_mariadb`, `search_api`, `views`,
 `queue_ui`.
 **Composer-present but not enabled:** `eca`/`aim_eca` (don't enable without
 being asked), `ai_context` (CCC).
+**Gotcha:** `mcp_server_tool_bridge`'s Composer package name is
+self-doubled (`drupal/mcp_server_tool_bridge-mcp_server_tool_bridge`) due
+to a real drupal.org packaging bug for this project - the plain
+`drupal/mcp_server_tool_bridge` name resolves to an empty metapackage stub
+with no installable code. See ADR-0013's build addendum before assuming
+the plain name is broken beyond repair or re-deriving this.
+
+**Trust CLAUDE.md's module lists as intent, verify before relying on
+them.** Found 2026-09-12: `core.extension` config had `ai_agents` recorded
+as installed while its files were absent from the codebase entirely and
+missing from composer.json/composer.lock - broken silently for an unknown
+period despite this file listing it as enabled, discovered only because
+enabling an unrelated module (`aim_tool`) tripped a dependency-graph
+validation error. Fixed via `composer require drupal/ai_agents`. If a
+`drush en`/`drush cr` fails referencing a module this file says is already
+enabled, check `ddev drush pm:list` and the module's actual directory
+before assuming the failure is about what you just changed.
 
 **PoC deviations from [ADR-0001](adr/0001-storage-and-scope-model.md)/
 [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md) (temporary,
@@ -82,15 +100,27 @@ Not one "AI" - check this before assuming a step needs a paid API call:
 | Embedding generation (every write and query) | Small embedding model | Cheap, local-friendly (Ollama) |
 
 **Current site config:** site-wide default chat provider is
-`anthropic`/`claude-sonnet-5` (`ai.settings`); `search_api.server.aim_vector`
+`amazeeio`/`claude-5-sonnet` (`ai.settings`), switched from
+`anthropic`/`claude-sonnet-5` on 2026-09-11 - amazee's endpoint is
+currently free, Anthropic's Console API key is metered, and this module
+had no cost visibility into what was hitting it. Same swap applied to
+`ai_assistant_api.ai_assistant.aim_demo_assistant` (`llm_provider`/
+`llm_model`, shipped in `aim_chatbot`'s `config/install` - that entity
+does NOT follow the `ai.settings` default, it pins its own provider/model,
+see Chatbot section) and to `search_api.server.aim_vector`
+`backend_config.chat_model` (cost-neutral either way - confirmed by
+reading `ai_search`'s `EmbeddingBase`/`ContextualEmbeddingStrategy`, this
+value only feeds `textChunker->setModel()` for chunk token-sizing, no
+`->chat()` call is ever made from it). `search_api.server.aim_vector`
 `backend_config.embeddings_engine` is `ollama__nomic-embed-text:latest`
 (768-dim, switched from `amazeeio__mistral-embed`/1024-dim on 2026-09-10 -
 see "Local Ollama" below) - Anthropic has no embeddings API at all, don't
 try to point `embeddings_engine` at it. `AimCommands`' `--provider`/
 `--model` options default to `NULL` and resolve the site-wide default via
 `AimMemoryManager::getDefaultChatProvider()` rather than a hardcoded PHP
-default, so they follow whatever the site default is set to (chat stays on
-`anthropic` - the swap only touched embeddings).
+default, so they follow whatever the site default is set to (this is why
+the `ai.settings` change alone was enough to move `aim:extract`/
+`aim:consolidate`, no code change needed).
 
 **Local Ollama** (`ai_provider_ollama`, host_name/port config): points at
 the *host's* Ollama install (`http://host.docker.internal:11434`), not a
@@ -220,8 +250,21 @@ remembering - no extraction LLM round-trip. See
 [ADR-0006](adr/0006-agent-native-write-path.md) for why this exists
 alongside `extract()`.
 
-- `drush aim:remember <text> [--scope] [--subject] [--source] [--state]` -
-  validates scope, creates the fact directly, prints its ID.
+- `drush aim:remember <text> [--scope] [--subject] [--source] [--state]
+  [--category] [--asserted]` - validates scope, creates the fact directly,
+  prints its ID. `--category` resolves comma-separated term names against
+  the `aim_category` vocabulary (admin-curated - a name with no matching
+  term is skipped, never auto-created). The vocabulary itself ships in
+  `config/install/taxonomy.vocabulary.aim_category.yml` (created
+  programmatically 2026-09-11, not hand-typed, per this file's own "never
+  hand-type a config entity" gotcha) - a fresh install gets it
+  automatically; terms are deliberately not seeded, add real ones via
+  `/admin/structure/taxonomy/manage/aim_category/add` as they emerge.
+  `--asserted`
+  sets when the fact became true in reality if different from today (any
+  `strtotime()`-parseable string); empty means "same as created" - see
+  CLAUDE.md's "Ideas raised" section, formerly "Bi-temporal fact validity,"
+  for why a single field was judged enough.
 - `drush aim:recall <text> [--scope] [--subject] [--subject-uid] [--limit]
   [--format]` - real semantic query against `aim_vector_index`.
   `--format=json` for a parsing caller.
@@ -380,16 +423,22 @@ and why. Current shape:
 - `ai_agent`'s "tools" are the same `#[FunctionCall]`/
   `plugin.manager.ai.function_calls` type CCC's own tools use, not a
   bespoke `ai_agents`-only mechanism.
-- Abstention correctness is unverified: `AimRecall::execute()` (the
-  `aim_chatbot:recall` tool) only special-cases the zero-rows case ("No
-  relevant facts found.") - there's no similarity-score threshold, so any
-  non-empty result set, even one where the best match is a poor one, still
-  gets formatted as "Relevant facts:" and handed to the model. A visitor's
-  off-topic question could get a confidently-worded answer built from
-  irrelevant facts instead of an honest "don't know." Flagged from the
-  2026-09-10 competitive review, not yet reproduced with a real query. Fix
-  candidate: a minimum-score cutoff before formatting output, not just the
-  existing empty check.
+- `AimRecall::execute()` (the `aim_chatbot:recall` tool) still has no
+  similarity-score threshold - any non-empty result set, even one where
+  the best match is a poor one, gets formatted as "Relevant facts:" and
+  handed to the model as-is, only the zero-rows case gets a special "No
+  relevant facts found." **Tested end to end 2026-09-11** (real
+  `/api/deepchat` calls against `aim_demo_assistant`, `amazeeio__
+  claude-5-sonnet`) against the same 50-fact benchmark: a negation
+  question ("has NeuralPulse acquired DataStream Tech?") answered
+  correctly despite several unrelated facts in the retrieved set's low-
+  score tail, and a genuinely unanswerable question (NeuralPulse's stock
+  ticker, not in the corpus at all) got an honest "I don't have that on
+  record" instead of a fabricated answer - the model's own judgment
+  covered the gap this time. Not proof the gap is safe to leave: this is
+  one capable model on a small, clean corpus, not a guarantee across
+  models or scale. A minimum-score cutoff before formatting output is
+  still the structural fix, not yet built.
 
 **CCC (`ai_context`), not enabled on this site.** No Guardrails-equivalent
 - its governance is Content Moderation for its own curated
@@ -400,6 +449,18 @@ exposes tools (done), CCC holds curated policy about when to call them
 CCC content source. See ADR-0008.
 
 ## ECA integration (`aim_eca`, not enabled)
+
+**Deprioritized 2026-09-12, not deleted.** A real project,
+`eca_tool` (drupal.org), bridges ECA directly to Tool API - once mature it
+would let an ECA model call `aim_remember`/`aim_recall` (see the "Tool
+API + MCP exposure" section above) as a plain action with the same
+scope/subject flexibility, making `FactWrite`/`FactQuery` below largely
+redundant (`FactState` would not be replaced - it's an ECA *condition*,
+a plugin type Tool API doesn't have). `eca_tool` is dev-only today (no
+tagged release, same composer shape as the other pre-1.0 pieces in this
+stack), and Nik is talking to Jürgen Haas (`eca` maintainer, well
+regarded) about it directly - revisit this section once that lands rather
+than investing further in `aim_eca`'s bespoke plugins now.
 
 Submodule, zero dependency from `aim` core. `eca`/`aim_eca` are
 composer-present but not enabled - don't enable without being asked.
@@ -455,24 +516,26 @@ authorship on re-import is accepted, not a problem to solve.
 
 ## Ideas raised, not designed
 
-- **Typed/categorical facts via taxonomy**, not a generic value_type/value
-  pair. A true on/off flag is the existing `state` boolean field; a small
-  curated set of values (contact preference, a "traits" tag) wants a
-  taxonomy term reference instead, avoiding the free-text drift `subject`
-  had before [ADR-0007](adr/0007-user-scope-requires-real-account.md). One
-  `entity_reference` field (`category`) spanning several vocabularies, one
-  `aim_fact` row per tag if more than one applies. Don't build
-  speculatively - wait for a real recurring category worth curating.
 - **Fact verification as a user-facing feature.** The draft-to-trusted
   review step could double as a mobile "here's what I remember about you,
   confirm or correct" aide-memoire, not just an admin moderation queue.
 - **Fact-to-fact relations.** `related` (built, see
   [ADR-0005](adr/0005-consolidation-algorithm.md)) only records
   consolidation's supersede edge. An *authored* graph (a human or
-  extraction step deliberately linking facts) is still unbuilt. A graph
-  *view* is a separate presentational layer Drupal has nothing built-in
-  for - don't build until there's a real reason to browse facts as a graph
-  rather than query them.
+  extraction step deliberately linking facts) is still unbuilt, and so is
+  any multi-hop traversal at retrieval time - `recall()` is one flat
+  vector query with no traversal, doing exactly what it's built to do.
+  Confirmed 2026-09-11 against the 50-fact benchmark that this is a real
+  gap, not a theoretical one: a 3-hop query half-answered and a 4-hop
+  query returned nothing relevant. Best-guess design (typed relation
+  entity vs. reusing `related`, bounded BFS, hop/fan-out limits) and the
+  risks it would carry (latency, storage, authoring cost, guardrails on
+  authored edges, bad-seed amplification) are written up in
+  [ADR-0012](adr/0012-fact-relation-graph.md) - a proposal and estimate,
+  not an accepted design. It also compounds with the chatbot's unverified
+  abstention behavior below: a caller could get a confidently-worded
+  wrong answer built from a coincidental keyword match, not just an
+  honest "don't know."
 - **Scheduled TTL / staleness-driven review**, distinct from consolidation's
   `expires`. A real scheduled job (Queue API + dedicated crontab, not
   `hook_cron`) that acts on fact age is still unbuilt. "Force into review
@@ -510,13 +573,15 @@ authorship on re-import is accepted, not a problem to solve.
   `aim_fact` is single-bundle today, and ADR-0002's deferred Content
   Moderation revisioning would likely give a proper audit trail for free
   once built, making a bespoke event type duplicate work.
-- **Bi-temporal fact validity.** `aim_fact` has `created`/`expires`, but
-  neither is independently assertable as "when this became true in
-  reality" versus "when the system learned it." A fact reported late (a
-  user says today "I moved three months ago") has no field for the
-  real-world date separate from today's write timestamp. Zep-style
-  two-axis timestamps are the model to borrow from if this becomes a real
-  problem; not designed.
+- **Bi-temporal fact validity - BUILT 2026-09-11, deliberately partial.**
+  `aim_fact` gained an `asserted` timestamp (valid-time start only, defaults
+  to `created`). Full bi-temporal (Zep-style: independent valid-time *and*
+  transaction-time, each with a start and an end) was considered and
+  rejected - the harder half (valid-time end, independent of when the
+  system learned a fact stopped being true) is rarer, harder to elicit, and
+  already approximated well enough by `expires` getting set when
+  consolidation finds a contradiction. Revisit only if a real case shows
+  that approximation failing.
 - **Source-boundary policy per site archetype.** Ties to ADR-0010's
   still-undesigned "speckit-for-Drupal" idea (its open question 8): each
   discovery-skill archetype (commerce, support, ...) should declare its own
@@ -531,13 +596,26 @@ authorship on re-import is accepted, not a problem to solve.
   pass every existing check. Matters once ingesting raw source material
   (see the media ingestion idea below) becomes real; plain user-typed text
   carries a much smaller version of this risk today.
-- **Taxonomy field, revisited.** The original caution above ("wait for a
-  real recurring category") assumed the field would be admin-curation
-  metadata only. It's more concretely motivated if it also does routing
-  work - which discovery-skill archetype/source-policy/guardrail set
-  governs a fact - rather than just being a browsable tag. Worth building
-  once the archetype/info-pack design (previous bullet) is real, not
-  before.
+- **Taxonomy field - BUILT 2026-09-11, curation half only.** `aim_fact`
+  gained a `category` field (entity_reference, unlimited cardinality,
+  vocabulary `aim_category`) - the plain admin-curation use case from the
+  original idea. The routing half (which discovery-skill archetype/
+  source-policy/guardrail set governs a fact) stays a separate, later
+  concern, deliberately not folded into this field - see "Source-boundary
+  policy per site archetype" below, still undesigned.
+- **Fast-path lookup for typed facts, bypassing `recall()`'s vector
+  search.** `state` (boolean, built) and `category` (taxonomy, built) are
+  both exact-match facts (scope+subject), not fuzzy semantic ones - but
+  nothing queries them that way today. A boolean check still pays
+  `recall()`'s full embed-query-then-vector-search cost (33-540ms
+  depending on embeddings provider, see "Benchmarking"), the wrong tool for
+  an exact match. Missing piece: a second retrieval method (e.g.
+  `AimMemoryManager::getState($scope, $subject)`) doing a direct indexed
+  `WHERE` query against `aim_fact`, optionally behind a Cache API layer
+  (keyed scope+subject, invalidated on save) for a genuine page-load hot
+  path (e.g. "should this user see the marketing banner"). Originally
+  motivated by a 2026-09-09 question about a "warm state cache for
+  booleans." Not designed, no ADR yet - see TODO.md.
 - **Graduated-detail retrieval (OpenViking-style L0/L1/L2).** Store a short
   one-line abstract plus fuller detail tiers, fetch only the level a query
   needs, to cut retrieved-context token cost. Relevant to the
@@ -545,6 +623,44 @@ authorship on re-import is accepted, not a problem to solve.
   retrieval volume ever makes that a real cost. Source: an unverified
   third-party summary, not independently confirmed - treat as a candidate
   mechanism, not a validated one.
+- **Hybrid keyword+vector search.** `recall()` is vector-only today - a
+  query for an exact name/ID that happens to embed far from its stored
+  phrasing can miss, the class of error pure cosine similarity is worst
+  at. mem0's April 2026 rewrite (see
+  [ADR-0012](adr/0012-fact-relation-graph.md)) stores a lemmatized-text
+  field alongside every embedding and fuses BM25 keyword scoring with
+  vector similarity at query time - cited there as one input to
+  `mem0ai/mem0` @ `a488e19` (`feat(oss): port v3 pipeline with hybrid
+  search, entity extraction, and additive scoring`, PR #4805). Not
+  designed here: would need confirming whether `ai_vdb_provider_mariadb`
+  can carry a parallel text index alongside the `VECTOR` column, or
+  whether MariaDB's own full-text index type could serve the keyword half.
+- **Tool API + MCP exposure - BUILT 2026-09-12.** The CLI adapter
+  (`aim:remember`/`aim:recall`) needs a drush/DDEV shell, and
+  `aim_chatbot`'s tools are locked to `scope: site` - neither is what a
+  generic Tool/MCP-speaking agent expects. `aim_tool` module
+  (`modules/aim_tool/`) ships `#[Tool]` plugins `aim_remember`/
+  `aim_recall` wrapping `AimMemoryManager` directly, not locked to
+  `scope: site`, gated on two split permissions (`store aim memory` /
+  `read aim memory`, not the admin UI's single `administer aim memory`),
+  tested live including the permission split. `mcp_server_tool_bridge`
+  exposes both over MCP via config-only `mcp_tool_config` entities -
+  confirmed live via `plugin.manager.mcp_server.tool`. `aim_remember` also
+  takes an optional `facts` list for saving several facts in one call/one
+  bootstrap (mirrors `aim:remember --file`'s reasoning: an MCP call is its
+  own HTTP request too). Two real caveats: `mcp_server_tool_bridge`'s real
+  Composer package is published under a self-doubled name due to a
+  drupal.org packaging bug (see this file's Enabled-modules gotcha above);
+  and that same bridge's schema converter doesn't describe nested List/Map
+  inputs in the JSON Schema it hands an MCP client at all (confirmed by
+  inspecting `facts`'s actual generated schema - `{"type": "array"}`, no
+  `items`) - worked around via an explicit prose shape in `facts`'s own
+  description, not fixed upstream. Full detail, the working composer
+  incantation, and the cross-project evidence from `annopm`/Annotations
+  that shaped this design in
+  [ADR-0013](adr/0013-mcp-tool-exposure.md)'s build addendum. Still open:
+  external MCP client authentication - today only a caller with an
+  existing Drupal session can reach it.
 - **Media/source ingestion for re-analysis.** Agreed shape if this is ever
   built (2026-09-10): reference existing Media entities rather than `aim`
   owning its own copy, private file scheme (not public) for anything

@@ -42,9 +42,10 @@ this list as exhaustive.
 - [ ] #3 - local model choice + hardware sizing for the sovereign tier -
       not researched.
 - [ ] #4 - queue-runner cadence - untuned default ("every 1-5 min").
-- [ ] #5 - retrieval latency at realistic scale: benchmark at thousands of
-      facts, and run against local Ollama embeddings to confirm the
-      network-hop theory.
+- [ ] #5 - retrieval latency at realistic scale: still not benchmarked at
+      thousands of facts. Local-Ollama half done and confirmed 2026-09-10
+      (`recall()` 33-35ms vs. 450-540ms hosted, ~15x faster, network-hop
+      theory confirmed) - see CLAUDE.md's "Benchmarking" section.
 - [ ] #7 - product framing (own venture vs. folded into an existing pitch) -
       explicitly out of that ADR's own scope, still open.
 - [ ] #8 - "speckit-for-Drupal" per-archetype question sets - no design work
@@ -62,21 +63,22 @@ questions" section)
 - [ ] Add a `related_reason` field on `aim_fact` (provenance-on-invalidation,
       ADR-0010 parity target #6 /
       [ADR-0005](adr/0005-consolidation-algorithm.md)).
-- [ ] Add the `asserted` field (bi-temporal fix - resolved in design
-      2026-09-10 per ADR-0010 open question 7, not yet built). Rationale:
-      covers valid-time *start* only (a late-reported fact's real-world
-      date), not valid-time end - the existing `expires`/consolidation
-      mechanism already approximates that case well enough, and there's no
-      real example yet demanding more. Defaults to `created` when a caller
-      doesn't specify.
-- [ ] Add the `category` field (taxonomy, "classification of stuff" -
-      confirmed 2026-09-10, not yet built). Proposed naming pending
-      confirmation: field `category` (entity_reference, unlimited
-      cardinality, optional), vocabulary machine name `aim_category` /
-      label "AIM Category", no seeded terms - admin adds real ones as
-      categories emerge. The provenance/routing half of the original idea
-      (which archetype/source-policy governs a fact) stays a separate,
-      later field per the 2026-09-10 discussion, not folded into this one.
+- [x] Add the `asserted` field - BUILT 2026-09-11 (installed live via
+      `installFieldStorageDefinition()`, no data loss on the 81 existing
+      facts). Covers valid-time *start* only, defaults to `created`. See
+      CLAUDE.md's "Ideas raised" section for why valid-time end wasn't
+      built too.
+- [x] Add the `category` field - BUILT 2026-09-11 (entity_reference,
+      unlimited cardinality, vocabulary `aim_category`, wired into
+      `drush aim:remember --category`). Installed live, no data loss. The
+      `aim_category` vocabulary itself is also built (created
+      programmatically, not by hand, so the machine name is exact; shipped
+      in `config/install/taxonomy.vocabulary.aim_category.yml`; `aim.info.yml`
+      gained the `drupal:taxonomy` dependency it needed). **Still open:**
+      no terms exist yet - add real ones via
+      `/admin/structure/taxonomy/manage/aim_category/add` as categories
+      emerge; the field resolves names to existing terms only, never
+      auto-creates one.
 - [ ] Extraction-input guardrailing, distinct from the existing output-side
       candidate-fact guardrails.
 - [ ] Cache query embeddings via Drupal's Cache API, keyed on (query text,
@@ -90,6 +92,18 @@ questions" section)
 - [ ] Instrument `recall()` to log embed-time vs. DB-search-time separately,
       before further latency work - confirms the split rather than
       inferring it from one aggregate number.
+- [ ] Fast-path lookup for typed facts (`state`, `category`), bypassing
+      `recall()`'s vector search entirely. Both fields are exact-match
+      (scope+subject), not fuzzy semantic - but everything, including a
+      plain boolean check, currently pays `recall()`'s full
+      embed-query-then-vector-search cost (33-540ms, see "Benchmarking").
+      Needs a second retrieval method (e.g.
+      `AimMemoryManager::getState($scope, $subject)`) doing a direct
+      indexed `WHERE` query against `aim_fact`, optionally behind a Cache
+      API layer (keyed scope+subject, invalidated on save) for a true
+      page-load hot path (e.g. "should this user see the marketing
+      banner"). Originally motivated by a 2026-09-09 question about a "warm
+      state cache for booleans" - not designed, no ADR yet.
 - [ ] Fix abstention correctness in `aim_chatbot:recall`
       (`AimRecall::execute()`) - no similarity-score threshold today, only
       a zero-rows check, so a poor top match still gets formatted as
