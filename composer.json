@@ -1,0 +1,28 @@
+{
+    "name": "drupal/aim",
+    "type": "drupal-module",
+    "description": "Drupal-native AI agent memory infrastructure: governed, Guardrail-checked, extracted-and-consolidated, vector-searchable memory for AI agents.",
+    "require": {
+        "php": "^8.3",
+        "drupal/core": "^11",
+        "drupal/ai": "^1.4",
+        "drupal/ai_vdb_provider_mariadb": "^1.0",
+        "drupal/search_api": "^1.0",
+        "drupal/ai_agents": "^1.3",
+        "drupal/tool": "^1.0.0-beta8",
+        "drupal/mcp_server_tool_bridge-mcp_server_tool_bridge": "1.x-dev"
+    },
+    "suggest": {
+        "drupal/eca": "Enables aim_eca's FactWrite/FactQuery/FactState plugins for ECA-driven memory writes and queries; deprioritized in favor of the separate eca_tool project, see CLAUDE.md.",
+        "drupal/ai_context": "Integration point for CCC to call aim's Tool API tools as curated policy; aim exposes no code path that requires it directly, see ADR-0008.",
+        "drupal/queue_ui": "Adds an admin UI button to manually run the aim_consolidate queue worker without a shell, see CLAUDE.md's Consolidation section."
+    },
+    "autoload": {
+        "psr-4": {
+            "Drupal\\aim\\": "src/",
+            "Drupal\\aim_chatbot\\": "modules/aim_chatbot/src/",
+            "Drupal\\aim_tool\\": "modules/aim_tool/src/",
+            "Drupal\\aim_eca\\": "modules/aim_eca/src/"
+        }
+    }
+}

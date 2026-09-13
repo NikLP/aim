@@ -289,6 +289,23 @@ Schema `items` key would be more reliable and isn't available yet. Worth
 a drupal.org issue against `mcp_server_tool_bridge` if this becomes a
 recurring problem for other nested-input tools, not filed here.
 
+**Addendum, 2026-09-13: fixed upstream, no issue needed.** Checked before
+filing the drupal.org issue floated above: `mcp_server_tool_bridge`'s
+`1.x` branch had already deleted `convertInputDefinitionToSchema()`
+entirely (commit `569be5d`, issue #3613896, merged 2026-09-11, as a side
+effect of a broader refactor to delegate schema generation to `drupal/
+tool`'s `ToolDefinitionSerializer`/`ContextDefinitionNormalizer`, which
+does recurse into `getItemDefinition()`/`getPropertyDefinitions()`) - just
+not yet in a tagged release. Moved this project's Composer constraint
+from `1.0.0-beta1` to `1.x-dev` rather than filing a duplicate fix; see
+CLAUDE.md's Enabled-modules gotcha. Confirmed live: `tool_api__aim_remember`'s
+`facts` property now carries real `items.properties` for text/scope/
+subject/source. Picked up a new hard dependency on core's `serialization`
+module in the process (enabled). Re-pin to a real tag once
+`mcp_server_tool_bridge` cuts one past beta1; the prose-shape workaround
+in `facts`'s description can stay (harmless belt-and-suspenders) or be
+trimmed once the dependency is stable on a tagged release.
+
 **Unrelated discovery made while enabling `aim_tool`, fixed in passing:**
 `drush en tool aim_tool` initially failed with "The module ai_agents does
 not exist" - `core.extension` config had `ai_agents` recorded as

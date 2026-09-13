@@ -5,5 +5,5 @@ package: AIM
 core_version_requirement: ^11
 dependencies:
   - aim:aim
-  - tool:tool
+  - tool:tool (>=1.0.0-beta8)
   - mcp_server_tool_bridge:mcp_server_tool_bridge

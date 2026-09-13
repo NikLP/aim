@@ -10,4 +10,4 @@ dependencies:
   - ai:ai_search
   - ai_vdb_provider_mariadb:ai_vdb_provider_mariadb
   - search_api:search_api
-  - views:views
+  - drupal:views

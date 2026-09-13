@@ -29,7 +29,8 @@ Environment: DDEV, `drupal11` type, PHP 8.4, MariaDB 11.8, docroot `web/`.
 `mcp_server_tool_bridge`, `ai_agents`, `ai_assistant_api`, `ai_chatbot`,
 `ai_search`, `ai_provider_anthropic`, `ai_provider_amazeeio`,
 `ai_provider_ollama`, `ai_vdb_provider_mariadb`, `search_api`, `views`,
-`queue_ui`.
+`queue_ui`, `serialization` (core - see `mcp_server_tool_bridge` gotcha
+below, enabled 2026-09-13, not previously required).
 **Composer-present but not enabled:** `eca`/`aim_eca` (don't enable without
 being asked), `ai_context` (CCC).
 **Gotcha:** `mcp_server_tool_bridge`'s Composer package name is
@@ -38,6 +39,80 @@ to a real drupal.org packaging bug for this project - the plain
 `drupal/mcp_server_tool_bridge` name resolves to an empty metapackage stub
 with no installable code. See ADR-0013's build addendum before assuming
 the plain name is broken beyond repair or re-deriving this.
+**Gotcha, fixed 2026-09-13:** pinned at `1.0.0-beta1` (only tagged
+release), `McpToolConfigDeriver::convertInputDefinitionToSchema()` mapped
+Tool API's list/map inputs straight to bare `{"type": "array"}`/
+`{"type": "object"}` with no recursion into `getItemDefinition()`/
+`getPropertyDefinitions()` - confirmed live via `aim_remember`'s `facts`
+input (a list of maps), which produced no `items`/`properties` at all, no
+way for an MCP client to know the nested shape. Traced upstream: the
+`1.x` branch had already deleted that method entirely (commit `569be5d`,
+issue #3613896, merged 2026-09-11, unreleased) in favor of delegating to
+`drupal/tool`'s `ToolDefinitionSerializer`/`ContextDefinitionNormalizer`,
+which already recurses correctly. No MR needed - moved the Composer
+constraint to `1.x-dev` instead of patching a method that no longer
+exists on the target branch. Re-pin to a real tag once one ships past
+beta1. This pulled in a new hard dependency on core's `serialization`
+module (not declared by beta1) - schema generation throws
+`LogicException` without it enabled.
+
+**Custom module dependency audit, 2026-09-13.** First pass on this
+wrongly concluded `aim` didn't need its own `composer.json`, reasoning
+only from this site's build (root `composer.json` already covers
+everything actually installed here). That missed the real point: `aim`
+is its own git repo *because* it is meant to ship as an independent
+drupal.org project eventually, not just live conveniently inside this
+site shell - see this file's Project snapshot section. A future site
+running `composer require drupal/aim` gets none of `aim`'s real Drupal
+package dependencies unless `aim` declares them itself; the site's root
+`composer.json` is only this site's own manifest, not something a
+downstream consumer of a published `drupal/aim` ever sees.
+
+Added `web/modules/custom/aim/composer.json` (one file covering `aim` +
+`aim_chatbot` + `aim_tool` + `aim_eca`, since they all live in this one
+repo/project - mirrors how real multi-submodule contrib projects package):
+`require` holds `drupal/ai`, `drupal/ai_vdb_provider_mariadb`,
+`drupal/search_api`, `drupal/ai_agents`, `drupal/tool
+(^1.0.0-beta8)`, and `drupal/mcp_server_tool_bridge-mcp_server_tool_bridge`
+pinned to `1.x-dev` - deliberate choice (Nik's call, 2026-09-13, over the
+safer stable-`^1.0` alternative) to ship the nested-schema fix by default
+rather than wait for a tagged release; re-pin to a real tag once one
+ships past beta1. Note for whoever revisits this: a `-dev`-suffixed
+constraint string implies its own stability flag, so this does *not*
+force a consuming site into `minimum-stability: dev` site-wide - only
+this one requirement is affected, same as how this project's own root
+`composer.json` picked it up earlier without touching its
+`minimum-stability: stable`. AI *provider* modules
+(`ai_provider_anthropic`/`amazeeio`/`ollama`) are deliberately excluded -
+`aim` only calls the generic `ai.provider` service, provider choice is a
+site config decision, not aim's dependency. `drupal/eca`,
+`drupal/ai_context`, `drupal/queue_ui` are `suggest`, not `require` -
+optional, not needed for `aim`'s own code to run. Composer package name
+for the bridge dependency uses the self-doubled name from this file's
+gotcha above, not the semantically-correct plain name - the plain name is
+still the broken empty-stub package upstream; revisit both this and the
+`1.x-dev` pin together once drupal.org's packaging bug and a real tagged
+release both land.
+
+Drupal's own `.info.yml` `dependencies` key (which supports version
+floors, e.g. `tool:tool (>=1.0.0-beta8)`) is the *complementary*
+mechanism, not a substitute - it governs Drupal's own enable/disable
+dependency checks between already-installed modules, while
+`composer.json` governs what Composer pulls in for a fresh install.
+`aim_tool.info.yml` now floors `tool:tool` at `(>=1.0.0-beta8)` to match
+`mcp_server_tool_bridge.info.yml`'s own floor, since both consume the
+same `ListInputDefinition`/`MapInputDefinition` API - `mcp_server_tool_bridge`
+itself can't get an info.yml floor from `aim_tool` the same way yet: a
+`1.x-dev` checkout carries no `version:` in its own `.info.yml`, so there
+is nothing to compare against until a real tag ships past beta1 (the
+`composer.json` pin above is the only lever available for that one until
+then). Also fixed in passing: `aim.info.yml` declared `views:views`,
+copied from the `project:module` pattern used elsewhere in this file -
+Views is core, real convention (checked against core's own
+`views_ui.info.yml`) is `drupal:views`. Checked every other custom
+module's declared `dependencies:` against its actual
+`use Drupal\*`/service/entity-storage calls (`aim`, `aim_chatbot`,
+`aim_eca`) - no other mismatch found.
 
 **Trust CLAUDE.md's module lists as intent, verify before relying on
 them.** Found 2026-09-12: `core.extension` config had `ai_agents` recorded
@@ -648,16 +723,15 @@ authorship on re-import is accepted, not a problem to solve.
   confirmed live via `plugin.manager.mcp_server.tool`. `aim_remember` also
   takes an optional `facts` list for saving several facts in one call/one
   bootstrap (mirrors `aim:remember --file`'s reasoning: an MCP call is its
-  own HTTP request too). Two real caveats: `mcp_server_tool_bridge`'s real
+  own HTTP request too). Real caveat: `mcp_server_tool_bridge`'s real
   Composer package is published under a self-doubled name due to a
-  drupal.org packaging bug (see this file's Enabled-modules gotcha above);
-  and that same bridge's schema converter doesn't describe nested List/Map
-  inputs in the JSON Schema it hands an MCP client at all (confirmed by
-  inspecting `facts`'s actual generated schema - `{"type": "array"}`, no
-  `items`) - worked around via an explicit prose shape in `facts`'s own
-  description, not fixed upstream. Full detail, the working composer
-  incantation, and the cross-project evidence from `annopm`/Annotations
-  that shaped this design in
+  drupal.org packaging bug (see this file's Enabled-modules gotcha above).
+  The bridge's schema converter not describing nested List/Map inputs
+  (`facts` generating bare `{"type": "array"}`, no `items`) was real on
+  `1.0.0-beta1` but is fixed on `1.x-dev` - see this file's Enabled-modules
+  gotcha, 2026-09-13. Full detail, the working composer incantation, and
+  the cross-project evidence from `annopm`/Annotations that shaped this
+  design in
   [ADR-0013](adr/0013-mcp-tool-exposure.md)'s build addendum. Still open:
   external MCP client authentication - today only a caller with an
   existing Drupal session can reach it.
