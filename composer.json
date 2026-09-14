@@ -15,7 +15,10 @@
     "suggest": {
         "drupal/eca": "Enables aim_eca's FactWrite/FactQuery/FactState plugins for ECA-driven memory writes and queries; deprioritized in favor of the separate eca_tool project, see CLAUDE.md.",
         "drupal/ai_context": "Integration point for CCC to call aim's Tool API tools as curated policy; aim exposes no code path that requires it directly, see ADR-0008.",
-        "drupal/queue_ui": "Adds an admin UI button to manually run the aim_consolidate queue worker without a shell, see CLAUDE.md's Consolidation section."
+        "drupal/queue_ui": "Adds an admin UI button to manually run the aim_consolidate queue worker without a shell, see CLAUDE.md's Consolidation section.",
+        "drupal/simple_oauth": "Required by aim_tool_oauth to let a remote MCP client (no Drupal session) authenticate as an OAuth2 client, see CLAUDE.md's MCP OAuth section.",
+        "e0ipso/simple_oauth_21": "Required by aim_tool_oauth for RFC 9728 discovery metadata and dynamic client registration (not on drupal.org, this is its real Packagist name).",
+        "drupal/mcp_server_oauth-mcp_server_oauth": "Required by aim_tool_oauth to enforce OAuth2 scopes on aim_remember/aim_recall; self-doubled Composer name, same drupal.org packaging bug as mcp_server_tool_bridge."
     },
     "autoload": {
         "psr-4": {

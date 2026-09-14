@@ -25,12 +25,17 @@ scope.
 
 Environment: DDEV, `drupal11` type, PHP 8.4, MariaDB 11.8, docroot `web/`.
 
-**Enabled:** `aim`, `aim_chatbot`, `aim_tool`, `tool`, `mcp_server`,
-`mcp_server_tool_bridge`, `ai_agents`, `ai_assistant_api`, `ai_chatbot`,
-`ai_search`, `ai_provider_anthropic`, `ai_provider_amazeeio`,
-`ai_provider_ollama`, `ai_vdb_provider_mariadb`, `search_api`, `views`,
-`queue_ui`, `serialization` (core - see `mcp_server_tool_bridge` gotcha
-below, enabled 2026-09-13, not previously required).
+**Enabled:** `aim`, `aim_chatbot`, `aim_tool`, `aim_tool_oauth`, `tool`,
+`mcp_server`, `mcp_server_tool_bridge`, `mcp_server_oauth`, `simple_oauth`,
+`simple_oauth_21`, `simple_oauth_server_metadata`,
+`simple_oauth_client_registration`, `simple_oauth_pkce`, `consumers`,
+`ai_agents`, `ai_assistant_api`, `ai_chatbot`, `ai_search`,
+`ai_provider_anthropic`, `ai_provider_amazeeio`, `ai_provider_ollama`,
+`ai_vdb_provider_mariadb`, `search_api`, `views`, `queue_ui`,
+`serialization` (core - see `mcp_server_tool_bridge` gotcha below,
+enabled 2026-09-13, not previously required). See "MCP OAuth" below for
+the OAuth block (`mcp_server_oauth` through `consumers`), added
+2026-09-13.
 **Composer-present but not enabled:** `eca`/`aim_eca` (don't enable without
 being asked), `ai_context` (CCC).
 **Gotcha:** `mcp_server_tool_bridge`'s Composer package name is
@@ -38,7 +43,8 @@ self-doubled (`drupal/mcp_server_tool_bridge-mcp_server_tool_bridge`) due
 to a real drupal.org packaging bug for this project - the plain
 `drupal/mcp_server_tool_bridge` name resolves to an empty metapackage stub
 with no installable code. See ADR-0013's build addendum before assuming
-the plain name is broken beyond repair or re-deriving this.
+the plain name is broken beyond repair or re-deriving this. Same bug hit
+`mcp_server_oauth` too, see "MCP OAuth" below.
 **Gotcha, fixed 2026-09-13:** pinned at `1.0.0-beta1` (only tagged
 release), `McpToolConfigDeriver::convertInputDefinitionToSchema()` mapped
 Tool API's list/map inputs straight to bare `{"type": "array"}`/
@@ -566,6 +572,191 @@ governance, no retrieval, not exportable. Reaching for it instead of
 `FactWrite` is the same mistake as writing a fact for something already
 available from context.
 
+## MCP OAuth
+
+Built 2026-09-13 ([ADR-0013](adr/0013-mcp-tool-exposure.md)'s OAuth
+addendum has full detail). Closes the gap `aim_tool`/`mcp_server_tool_bridge`
+left open: a remote MCP client with no Drupal session (Claude.ai/Claude
+Desktop connector, or any other headless caller) can now authenticate to
+`aim_remember`/`aim_recall` via OAuth2 instead of needing a logged-in
+browser session. Existing cookie/session access is untouched - `oauth2`
+was appended to `mcp_server.handle`'s `_auth` route option, not swapped
+in.
+
+**Dependency chain**, real package names (not drupal.org's usual pattern
+throughout): `drupal/simple_oauth` (the OAuth2 authorization server) +
+`e0ipso/simple_oauth_21` (OAuth 2.1 submodules: PKCE, RFC 9728 discovery
+metadata, dynamic client registration - **Packagist-only under the
+`e0ipso/` vendor namespace, not a drupal.org project** - `drupal/
+simple_oauth_21` does not exist) + `drupal/mcp_server_oauth-mcp_server_oauth`
+(self-doubled Composer name, same drupal.org packaging bug as
+`mcp_server_tool_bridge`, see this file's Enabled-modules gotcha).
+
+**`aim_tool_oauth` submodule** (`modules/aim_tool_oauth/`), new, optional,
+`suggest` not `require` in `aim`'s `composer.json` - `mcp_server_oauth`
+needed no `aim`-specific PHP (it gates any `mcp_tool_config` entity
+generically off its own third-party settings), so this submodule exists
+only to make the OAuth setup reproducible on a fresh install rather than
+a manual one-off: `config/install` ships two `oauth2_scope` entities
+(`aim:remember`, `aim:recall`, grant types `authorization_code` +
+`refresh_token`), and `hook_install()`/`hook_uninstall()` set/clear the
+`mcp_server_oauth` third-party settings (`authentication_mode: required`,
+matching `scopes`) directly on `aim_tool`'s existing `aim_remember`/
+`aim_recall` `mcp_tool_config` entities - this can't ship as a second
+`config/install` file for those entities, that would collide with
+`aim_tool`'s own copy of the same config name.
+
+**Gotchas:**
+
+- An `oauth2_scope` with no `granularity_id` set (the entity default, and
+  what both `aim:remember`/`aim:recall` had at first) crashes
+  `Oauth2ScopeProvider::getPermissions()` - it unconditionally
+  `assert()`s `$scope->getGranularity()` is non-null, which fails outright
+  the moment a real client (tested live: Claude.ai's connector) completes
+  the OAuth flow. Surfaces client-side as a generic "AIM returned an
+  error when connecting," not anything scope- or permission-shaped - check
+  `drush watchdog:show` for a burst of
+  `AssertionError: assert($granularity instanceof ScopeGranularityInterface)`
+  at the same timestamp as the failed callback before assuming it's
+  about which account authorized. Fix: set the `permission` granularity
+  plugin on the scope, pointed at the real permission it should map to
+  (`granularity_id: permission`, `granularity_configuration: {permission:
+  'store aim memory'}` for `aim:remember`, `'read aim memory'` for
+  `aim:recall`) - not a workaround, the correct binding between the OAuth
+  scope and the Drupal permission `aim_tool` already checks. See
+  ADR-0013's OAuth addendum.
+- The OAuth admin form's "Required scopes" selector only offers scopes
+  some enabled `mcp_tool_config` already carries in its own third-party
+  settings - on a site with none configured yet, the selector renders
+  empty with no free-text fallback, so the very first scope cannot be
+  introduced through the UI. Seed it via `drush config:set
+  <config_name> third_party_settings.mcp_server_oauth.scopes.0
+  '<scope>'` (or code, as `aim_tool_oauth_install()` does) before the UI
+  has anything to offer.
+- Enabling a module whose `config/install` matches an already-existing
+  config name throws `PreExistingConfigException` outright - Drupal does
+  not silently skip it. Hit this after hand-creating the `oauth2_scope`
+  entities to check their shape, then trying to enable `aim_tool_oauth`;
+  fix was deleting the hand-made entities first.
+- `simple-oauth:generate-keys` needs a path outside the docroot - used
+  `/var/www/html/keys` (i.e. this site shell's own `keys/` at repo root,
+  sibling to `web/`), which a pre-existing `/keys/*` `.gitignore` entry
+  already covered. `simple_oauth.settings` `public_key`/`private_key`
+  point at the generated pair.
+- DDEV's local hostname is not reachable from a cloud-hosted MCP client
+  (Claude.ai's connector runs in Anthropic's infrastructure, not this
+  machine), and DDEV's self-signed cert would fail a real client's HTTPS
+  check regardless - `ddev share --provider=cloudflared` (real CA-signed
+  tunnel) is the fix. **Tested end to end 2026-09-13/14** against a real
+  Claude.ai connector, both `/.well-known/oauth-protected-resource` and
+  `/.well-known/oauth-authorization-server`, dynamic client registration,
+  and the full OAuth consent flow, with two real bugs found and fixed
+  along the way (this file's `registration_endpoint`/granularity gotchas
+  above).
+- `ddev share`'s quick tunnel gets a **new random `trycloudflare.com`
+  hostname every restart** - the Claude.ai connector's URL needs
+  re-entering each time. A named tunnel (persistent hostname) needs a
+  Cloudflare account with the target domain added as a zone there -
+  `cloudflared tunnel login`'s zone picker is a hard gate, required even
+  if DNS itself would stay self-hosted (i.e. even the "just add one
+  manual CNAME on my own DNS" path still needs a Cloudflare zone to
+  create the named tunnel object in the first place). **Not available on
+  this project's domain (`niklp.com`)** - its DNS is self-hosted on Nik's
+  own Linode VPS and staying there, and Cloudflare's free plan has no
+  CNAME-only/partial zone option (confirmed via Cloudflare's own docs -
+  that's Business/Enterprise-plan only), so full nameserver delegation is
+  the only way to get a zone into a free Cloudflare account, ruled out.
+  **Solved 2026-09-14 with Tailscale Funnel instead - no Cloudflare
+  account/zone involved at all.** Gives a stable public URL under the
+  tailnet's own domain (`https://amaria.snake-amberjack.ts.net/` at time
+  of writing - hostname won't match on a different machine/tailnet),
+  persists across restarts (tailscaled's own serve/funnel config, not a
+  foreground process to babysit like `ddev share`), and needed zero DNS
+  changes since it lives under Tailscale's domain, not `niklp.com`.
+  Confirmed via Tailscale's own docs first: Funnel has no custom-domain
+  support at all (`ts.net` only), which is *why* it sidesteps the whole
+  Cloudflare-zone problem - not a workaround, a genuinely different
+  tradeoff (persistent hostname, zero domain cost, but not a
+  `niklp.com`-branded URL). One-time gotcha: Funnel must be enabled
+  per-tailnet first - `tailscale funnel --bg <port>` prints an
+  enablement link (`https://login.tailscale.com/f/funnel?node=<id>`) and
+  hangs indefinitely until that's clicked through in a browser, not a
+  stuck process.
+
+  **Real mistake made and fixed, same session: what Funnel should
+  actually point at.** First pointed Funnel at DDEV's per-project
+  "direct access" port (`32768`, what `ddev describe`'s `web:80 ->
+  127.0.0.1:NNNNN` line and `ddev share` both use) on the assumption it
+  was a stable per-project value worth pinning via `.ddev/config.yaml`'s
+  `router_http_port`. Both halves of that were wrong: that port is
+  Docker's own ephemeral container-publish assignment - confirmed it
+  changed on every `ddev restart` across this session (`32768` ->
+  `32773` -> `32781`), nothing DDEV exposes a pin for. And
+  `router_http_port` isn't a per-project setting at all - it's the
+  *global* port `ddev-router` listens on for every project's normal
+  Host-based routing (default `80`, shared across the whole DDEV
+  installation), so setting it to `32768` didn't pin anything, it
+  **broke the router's real port 80** for every project until reverted
+  (caught via `docker ps --filter name=ddev-router` showing the `80`
+  binding gone, and `/mcp` starting to 404 with ddev-router's own "no
+  route found" page instead of reaching Drupal). The actually-stable
+  target: `ddev-router`'s real port `80` (confirmed unchanged across
+  every restart this session, since it's shared infrastructure, not
+  per-project) plus `.ddev/config.yaml`'s `additional_fqdns` (a
+  first-class DDEV mechanism for teaching the router to route a real
+  external hostname to this project, previously unused, `[]` by
+  default) set to the Funnel hostname - `tailscale funnel --bg 80` then
+  forwards the incoming `Host: amaria.snake-amberjack.ts.net` header
+  as-is, and the router matches it via `additional_fqdns` instead of
+  needing a Host rewrite. Verified genuinely stable, not just
+  plausible: re-ran `ddev restart` twice after this fix with zero
+  changes to Funnel's own config, `/mcp` kept resolving correctly both
+  times.
+
+  Re-verified the full OAuth chain (discovery metadata,
+  `registration_endpoint`, unauthenticated `/mcp` returning 401) through
+  the new hostname - all held up unchanged, confirming the earlier fixes
+  are tunnel-independent. `ddev share`'s cloudflared quick tunnel is no
+  longer running - this is a straight replacement, not a fallback. Self-
+  hosted-via-the-Linode-VPS and ngrok's paid tier remain real alternatives
+  if a `niklp.com`-branded URL is ever wanted instead - not pursued, see
+  TODO.md.
+
+  **Real bug hit and fixed 2026-09-14 (later session), third one in this
+  chain: every OAuth discovery URL came back `http://`, not `https://`.**
+  Surfaced client-side via a real Claude.ai connector registration attempt
+  as "Couldn't register with Drupal AIM's sign-in service" (opaque `ofid_*`
+  reference, no scope/permission detail like the earlier granularity bug -
+  confirmed instead by curling `/.well-known/oauth-authorization-server`
+  directly and finding `registration_endpoint` (and every other endpoint)
+  schemed `http://` while `issuer`/`resource` stayed `https://`). Root
+  cause: the DDEV router image had moved to
+  `ddev/ddev-traefik-router` (Traefik, replacing the older nginx-proxy
+  router this file's earlier Funnel section was written against) sometime
+  between the 2026-09-13/14 build session and this one - Traefik sets
+  `X-Forwarded-Proto` per-entrypoint, not per-original-client-scheme, and
+  Funnel's target (`http://127.0.0.1:80`, the plain-HTTP entrypoint) meant
+  every request looked like plain HTTP to Drupal from the router inward,
+  regardless of Funnel having terminated real TLS on the public side.
+  Confirmed by comparing against `https://aim.ddev.site` (TLS terminated
+  at the router's 443 entrypoint) generating correct `https://` URLs the
+  whole time - only the Funnel path was affected. Fix: repoint Funnel at
+  the router's HTTPS entrypoint instead of its HTTP one -
+  `tailscale funnel --bg https+insecure://127.0.0.1:443` (the
+  `https+insecure` scheme accepts the router's self-signed/mkcert cert;
+  `tailscale funnel reset` first if an old plain-HTTP target is still
+  configured). No Drupal-side change needed - `reverse_proxy`/
+  `reverse_proxy_addresses` in `settings.php` stay unset, same as always.
+  Verified via a real `POST /oauth/register` through the Funnel URL
+  returning a genuine `client_id`, not just the discovery metadata
+  looking right. **Caveat:** this Funnel target survives `ddev restart`
+  (port 443 is as stable as port 80 was) but is process/session state in
+  `tailscaled`, not `.ddev/config.yaml` - a host reboot or `tailscale`
+  service restart will drop it back to no funnel configured at all, not
+  silently back to the broken `http://127.0.0.1:80` target. If a connector
+  registration ever fails again, check `tailscale funnel status` for the
+  proxy target scheme/port before re-diagnosing the OAuth chain itself.
+
 ## Admin UI
 
 `/admin/content/aim-facts` (View `views.view.aim_facts`, gated on
@@ -732,9 +923,9 @@ authorship on re-import is accepted, not a problem to solve.
   gotcha, 2026-09-13. Full detail, the working composer incantation, and
   the cross-project evidence from `annopm`/Annotations that shaped this
   design in
-  [ADR-0013](adr/0013-mcp-tool-exposure.md)'s build addendum. Still open:
-  external MCP client authentication - today only a caller with an
-  existing Drupal session can reach it.
+  [ADR-0013](adr/0013-mcp-tool-exposure.md)'s build addendum. External MCP
+  client authentication (this bullet's old "still open" item) is now
+  built - see "MCP OAuth" below and ADR-0013's 2026-09-13 addendum.
 - **Media/source ingestion for re-analysis.** Agreed shape if this is ever
   built (2026-09-10): reference existing Media entities rather than `aim`
   owning its own copy, private file scheme (not public) for anything

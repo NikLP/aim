@@ -7,6 +7,20 @@ open items already on record in the ADRs and [CLAUDE.md](CLAUDE.md).
 Expect entries folded in from other threads independently - don't treat
 this list as exhaustive.
 
+## MCP connector persona/capability parity (raised 2026-09-14)
+
+- [ ] Decide whether the Claude.ai/Claude Desktop MCP connector
+      (`aim_tool` + `mcp_server_oauth`) should get its own persona/
+      behavioral guidance, or stay a plain tool-augmented assistant.
+      Currently it shares the exact same `AimMemoryManager` calls and
+      guardrails as `aim_chatbot`'s Deepchat widget, with no capability
+      gap - if anything the connector is *less* restricted (any scope:
+      user/role/site/case) than the widget's hardcoded `scope: site`
+      lock. The widget has a persona (`system_prompt`) and no-login
+      public access; the connector has neither. A provisional note is
+      parked in `mcp_server.settings:server_instructions` itself -
+      resolve there too once this is decided.
+
 ## From the OpenKB competitor review (this thread)
 
 - [ ] Close [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s

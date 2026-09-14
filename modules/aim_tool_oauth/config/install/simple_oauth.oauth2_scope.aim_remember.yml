@@ -1,0 +1,16 @@
+langcode: en
+status: true
+dependencies: {  }
+id: aim_remember
+name: 'aim:remember'
+description: 'Write access to aim memory (save facts via aim_remember).'
+grant_types:
+  authorization_code:
+    status: true
+  refresh_token:
+    status: true
+umbrella: false
+parent: null
+granularity_id: permission
+granularity_configuration:
+  permission: 'store aim memory'

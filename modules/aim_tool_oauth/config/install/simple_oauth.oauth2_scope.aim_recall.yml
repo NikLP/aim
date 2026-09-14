@@ -1,0 +1,16 @@
+langcode: en
+status: true
+dependencies: {  }
+id: aim_recall
+name: 'aim:recall'
+description: 'Read access to aim memory (semantic search via aim_recall).'
+grant_types:
+  authorization_code:
+    status: true
+  refresh_token:
+    status: true
+umbrella: false
+parent: null
+granularity_id: permission
+granularity_configuration:
+  permission: 'read aim memory'

@@ -180,17 +180,8 @@ of it from scratch (its own ADR-010, ADR-016).
 
 ## Open questions
 
-- **Exact MCP client authentication mechanism - the one thing left before
-  this is safe to point a real external client at.** `mcp_server`'s
-  `access mcp server` permission is real and gates the route, but nothing
-  yet supplies a way for a non-session (headless) caller to prove who they
-  are and receive it - see the auth finding in "Cross-project evidence"
-  above. `mcp_server`'s OAuth2 companion project is the leading candidate
-  per the annopm precedent, but not yet evaluated against this site. Until
-  this is settled, only a caller with an existing Drupal session (a
-  logged-in browser holding `store`/`read aim memory`) can actually reach
-  `aim_remember`/`aim_recall` over MCP - fine for continued local testing,
-  not yet a real external-agent story.
+- ~~Exact MCP client authentication mechanism~~ - built 2026-09-13, see
+  the OAuth addendum at the end of this file.
 - Whether `mcp_tools_ai`'s auto-derivation is worth adding later, and
   whether it should replace or sit alongside `aim_chatbot`'s existing
   FunctionCall tools.
@@ -319,3 +310,112 @@ claiming otherwise. Fixed by `composer require drupal/ai_agents`
 (resolved cleanly to 1.3.5); CLAUDE.md's module lists should be treated as
 descriptive of intent, not proof of current on-disk state, until this
 kind of drift is checked for directly.
+
+## Addendum (built 2026-09-13): OAuth2 for remote MCP clients
+
+Closes this ADR's last open question. Real dependency chain, found by
+reading `mcp_server`'s own `.ai/kenkeep` auth notes (core ships no
+auth-aware subscribers, only `WWW-Authenticate` header construction that
+matches a companion project's error codes) rather than guessed:
+`drupal/simple_oauth` (mature, the actual OAuth2 authorization server) +
+`e0ipso/simple_oauth_21` (OAuth 2.1 submodules: PKCE, RFC 9728 server
+metadata, dynamic client registration - **not a drupal.org project**,
+Packagist-only under the `e0ipso/` vendor namespace, so `drupal/
+simple_oauth_21` does not exist and will 404) + `drupal/
+mcp_server_oauth-mcp_server_oauth` (same self-doubled-name packaging bug
+as `mcp_server_tool_bridge`, confirmed via `ddev composer show -a` on both
+the plain and doubled names before requiring - the plain `drupal/
+mcp_server_oauth` is again an empty metapackage stub).
+
+`mcp_server_oauth` needed zero `aim`-specific PHP: it gates any
+`mcp_tool_config` entity generically by reading `mcp_server_oauth`
+third-party settings (`authentication_mode`, `scopes`) already on the
+entity, and appends `oauth2` to `mcp_server.handle`'s `_auth` route option
+*additively* - existing cookie/session access is untouched. Built a new
+optional submodule, `aim_tool_oauth`, rather than folding this into
+`aim_tool` core - the standalone-project framing (`aim` is headed for
+drupal.org, see CLAUDE.md's dependency-audit entry) means a bare
+`composer require drupal/aim` should not force every consumer into
+running an OAuth2 authorization server just to get local/session-based
+tool access. Shape: `config/install` ships two new `oauth2_scope`
+entities (`aim:remember`, `aim:recall`, grant types `authorization_code`
+and `refresh_token`, i.e. a human authorizing an interactive client, not
+`client_credentials`), and `hook_install()`/`hook_uninstall()` set/clear
+the `mcp_server_oauth` third-party settings on `aim_tool`'s existing
+`aim_remember`/`aim_recall` `mcp_tool_config` entities directly - that
+part *can't* ship as a competing `config/install` file (a second module
+shipping `config/install/mcp_server_tool_bridge.mcp_tool_config.aim_remember.yml`
+would collide with `aim_tool`'s own), so it goes through code instead,
+mirroring `aim.install`'s existing precedent for touching another
+module's entity from `hook_install()`.
+
+**Real gotcha hit while building this, worth not re-deriving:** the
+OAuth admin form's "Required scopes" selector is populated *only* from
+scopes some enabled `mcp_tool_config` already carries in its own
+third-party settings (`OAuthScopeDiscoveryService::getScopesSupported()`).
+On a site with zero scopes configured anywhere, the selector renders
+empty with no free-text fallback, so the very first scope on a site
+cannot be introduced through the UI at all. `mcp_server_oauth`'s own
+kenkeep docs name this directly ("seed the first OAuth scope outside the
+UI") and give the fix: write the third-party setting via `drush
+config:set`/config import/code first, then the UI has something to offer.
+This is exactly why `aim_tool_oauth`'s `hook_install()` sets the scopes
+in PHP rather than expecting a site builder to click through the form
+first.
+
+**Second real gotcha:** creating the `oauth2_scope` config entities by
+hand first (to verify the shape before writing `config/install`) and
+*then* enabling `aim_tool_oauth` throws `PreExistingConfigException` -
+Drupal's config installer refuses to install a module whose
+`config/install` collides with already-existing config of the same name,
+it does not silently skip. Delete the hand-created entities before
+enabling the module that's supposed to own them.
+
+Keys: `simple-oauth:generate-keys` needs a path outside the docroot -
+used `/var/www/html/keys` (sibling to `web/`, i.e. the site shell's own
+`keys/` at repo root), already covered by a pre-existing `/keys/*`
+`.gitignore` entry at the site-shell level (predates this session - the
+path was anticipated before it was built). `simple_oauth.settings`
+`public_key`/`private_key` point at the generated pair; private key file
+permissions came out `0600` from the generator itself, no extra step
+needed.
+
+**Third real gotcha, this one a genuine `simple_oauth` crash, not just a
+config quirk:** creating an `oauth2_scope` entity with no
+`granularity_id` (the entity's default - both `aim:remember`/`aim:recall`
+were created this way, matching `mcp_server_oauth`'s own docs, which never
+mention granularity at all) works fine for issuing a token, but
+`Oauth2ScopeProvider::getPermissions()` unconditionally calls
+`$scope->getGranularity()` and `assert()`s the result is a
+`ScopeGranularityInterface` - which is `NULL` for a granularity-less
+scope, so the assert fails outright with assertions enabled (this DDEV
+environment has them on) or would fatal one line later
+(`$granularity->getPermissions()` on `NULL`) with them off. Hit this live:
+Claude.ai's connector completed dynamic client registration and the
+OAuth consent screen cleanly, then failed with a generic "AIM returned an
+error when connecting" - the real cause was 12 of these assertion errors
+in `dblog` at the exact same timestamp as the callback, not anything
+about which Drupal account was used to authorize (a first guess, ruled
+out - `administrator` holds every permission anyway, per this file's own
+gotcha). Fix: give both scopes the `permission` granularity plugin
+(`plugin.manager.scope_granularity`, the only two options are
+`permission` and `role`), pointed at the exact permissions `aim_tool`
+already gates on - `granularity_id: permission`,
+`granularity_configuration: {permission: 'store aim memory'}` for
+`aim:remember`, `{permission: 'read aim memory'}` for `aim:recall`. This
+isn't a workaround grafted on; it's the correct mapping - the OAuth scope
+now resolves to the exact same Drupal permission the tool itself checks,
+rather than being a same-named but disconnected label. `aim_tool_oauth`'s
+`config/install` YAML updated to match, re-fetched from a real save per
+this file's own config-entity convention.
+
+**Verified live 2026-09-13:** `/.well-known/oauth-protected-resource` and
+`/.well-known/oauth-authorization-server` both resolve with
+`aim:remember`/`aim:recall` listed in `scopes_supported` and a real
+`registration_endpoint` for dynamic client registration.
+`mcp_server.handle`'s route confirmed carrying `_auth: [cookie, oauth2]`.
+Not yet tested: an actual external client (Claude.ai/Claude Desktop
+connector) completing the flow - DDEV's local hostname is not reachable
+from Anthropic's cloud, and DDEV's self-signed cert would fail a real
+connector's HTTPS check regardless. `ddev share` (real CA-signed tunnel)
+is the identified next step for that test, not yet run.

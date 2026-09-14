@@ -1,0 +1,52 @@
+<?php
+
+/**
+ * @file
+ * Install hooks for the AIM Tool OAuth module.
+ */
+
+declare(strict_types=1);
+
+use Drupal\Core\Config\Entity\ConfigEntityInterface;
+
+/**
+ * Implements hook_install().
+ *
+ * The mcp_server_oauth module gates a mcp_tool_config entity through its own
+ * third-party settings, not through config this module can ship under
+ * aim_tool's existing config/install files without a filename collision -
+ * so the settings are applied here instead, against the entities aim_tool
+ * already owns.
+ */
+function aim_tool_oauth_install(): void {
+  $storage = \Drupal::entityTypeManager()->getStorage('mcp_tool_config');
+  $scopes = [
+    'aim_remember' => 'aim:remember',
+    'aim_recall' => 'aim:recall',
+  ];
+  foreach ($scopes as $tool_config_id => $scope) {
+    $tool_config = $storage->load($tool_config_id);
+    if (!$tool_config instanceof ConfigEntityInterface) {
+      continue;
+    }
+    $tool_config->setThirdPartySetting('mcp_server_oauth', 'authentication_mode', 'required');
+    $tool_config->setThirdPartySetting('mcp_server_oauth', 'scopes', [$scope]);
+    $tool_config->save();
+  }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function aim_tool_oauth_uninstall(): void {
+  $storage = \Drupal::entityTypeManager()->getStorage('mcp_tool_config');
+  foreach (['aim_remember', 'aim_recall'] as $tool_config_id) {
+    $tool_config = $storage->load($tool_config_id);
+    if (!$tool_config instanceof ConfigEntityInterface) {
+      continue;
+    }
+    $tool_config->unsetThirdPartySetting('mcp_server_oauth', 'authentication_mode');
+    $tool_config->unsetThirdPartySetting('mcp_server_oauth', 'scopes');
+    $tool_config->save();
+  }
+}
