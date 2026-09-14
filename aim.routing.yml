@@ -1,0 +1,15 @@
+aim.admin_config:
+  path: '/admin/config/aim'
+  defaults:
+    _controller: '\Drupal\system\Controller\SystemController::systemAdminMenuBlockPage'
+    _title: 'AIM'
+  requirements:
+    _permission: 'administer aim memory'
+
+aim.settings:
+  path: '/admin/config/aim/settings'
+  defaults:
+    _form: '\Drupal\aim\Form\AimSettingsForm'
+    _title: 'AIM settings'
+  requirements:
+    _permission: 'administer aim memory'

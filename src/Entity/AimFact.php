@@ -32,6 +32,7 @@ use Drupal\views\EntityViewsData;
     'id' => 'id',
     'uuid' => 'uuid',
     'langcode' => 'langcode',
+    'bundle' => 'scope',
     'owner' => 'uid',
   ],
   admin_permission: 'administer aim memory',
@@ -48,16 +49,11 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface {
   public static function baseFieldDefinitions(EntityTypeInterface $entity_type): array {
     $fields = parent::baseFieldDefinitions($entity_type);
 
-    $fields['scope'] = BaseFieldDefinition::create('list_string')
+    $fields['scope'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Scope'))
-      ->setDescription(t('Which of the four memory bundles this fact belongs to.'))
+      ->setDescription(t('Which memory bundle this fact belongs to.'))
       ->setRequired(TRUE)
-      ->setSetting('allowed_values', [
-        'user' => 'User',
-        'role' => 'Role',
-        'site' => 'Site',
-        'case' => 'Case',
-      ]);
+      ->setSetting('max_length', 32);
 
     $fields['subject'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Subject'))

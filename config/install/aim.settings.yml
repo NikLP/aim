@@ -1,0 +1,41 @@
+auto_threshold: 0.09
+ambiguous_threshold: 0.45
+extraction_prompt: |
+  Extract every discrete, atomic fact worth remembering long-term from the text below.
+  Each fact must be one short, self-contained sentence.
+  Do not invent facts the text does not support. If nothing is worth remembering, return an empty facts array.
+
+  For each fact, classify its scope:
+  - "user": specific to one named person.
+  - "role": true for everyone holding a particular role.
+  - "site": about the site or organization itself, not one person.
+  - "case": tied to a specific support case or tracked issue.
+
+  Also give a short "subject"; for:
+  - "user" scope, the person's name or identifier
+  - "role", the role name
+  - "case", a case identifier
+  - "site", leave it empty
+
+  Text:
+  """
+  {text}
+  """
+consolidation_prompt: |
+  Two memory facts about the same scope and subject were flagged as possibly related.
+  Decide what to do with the candidate fact relative to the existing one.
+
+  Existing fact: "{kept_text}"
+  Candidate fact: "{candidate_text}"
+
+  Choose one decision:
+  - "ADD": the two facts are genuinely different and both should be   kept as-is.
+  - "UPDATE": the candidate refines, corrects, or supersedes the existing fact
+  (e.g. a changed preference). Provide a single merged statement in merged_text
+  that replaces the existing fact's text.
+  - "NOOP": the candidate simply restates the existing fact with no new information.
+  The existing fact stands unchanged and the candidate is redundant.
+  - "DELETE": the candidate fact should not exist as a memory at all
+  (e.g. nonsensical or clearly erroneous). Use sparingly.
+
+  For any decision other than UPDATE, set merged_text to the existing fact's text unchanged.

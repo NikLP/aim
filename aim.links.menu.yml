@@ -1,0 +1,13 @@
+aim.admin_config:
+  title: 'AIM'
+  description: 'Configure AIM memory settings.'
+  parent: system.admin_config
+  route_name: aim.admin_config
+  weight: 0
+
+aim.settings:
+  title: 'Settings'
+  description: 'Consolidation thresholds and the extraction/consolidation prompts.'
+  parent: aim.admin_config
+  route_name: aim.settings
+  weight: 0

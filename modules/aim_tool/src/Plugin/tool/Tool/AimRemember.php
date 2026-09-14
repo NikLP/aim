@@ -122,6 +122,12 @@ use Drupal\tool\TypedData\MapInputDefinition;
       description: new TranslatableMarkup('Per-fact outcome, one line each. Only set for a facts batch call.'),
       required: FALSE,
     ),
+    'case_id' => new ContextDefinition(
+      data_type: 'string',
+      label: new TranslatableMarkup('Case ID'),
+      description: new TranslatableMarkup('For scope=case: the case ID this fact was saved under - the one just given, or a newly minted one if none was given. Pass it as subject on later calls to add to the same case. Only set for a single-fact call.'),
+      required: FALSE,
+    ),
   ],
 )]
 final class AimRemember extends ToolBase {
@@ -146,6 +152,16 @@ final class AimRemember extends ToolBase {
       return ExecutableResult::failure(
         new TranslatableMarkup('Could not save fact: @message', ['@message' => $fact['error']]),
         NULL,
+      );
+    }
+
+    if ($fact['bundle'] === 'case') {
+      return ExecutableResult::success(
+        new TranslatableMarkup('Created aim_fact @id. Case ID: @case_id - pass this as subject on later calls to add to the same case.', [
+          '@id' => $fact['id'],
+          '@case_id' => $fact['subject'],
+        ]),
+        ['fact_id' => $fact['id'], 'case_id' => $fact['subject']],
       );
     }
 
@@ -183,7 +199,11 @@ final class AimRemember extends ToolBase {
         continue;
       }
 
-      $lines[] = "Entry $i: created aim_fact {$fact['id']}.";
+      $line = "Entry $i: created aim_fact {$fact['id']}.";
+      if ($fact['bundle'] === 'case') {
+        $line .= " Case ID: {$fact['subject']}.";
+      }
+      $lines[] = $line;
       $created++;
     }
 
@@ -204,7 +224,8 @@ final class AimRemember extends ToolBase {
    *   entry.
    *
    * @return array
-   *   ['id' => int] on success, or ['error' => string] on failure.
+   *   ['id' => int, 'bundle' => string, 'subject' => string] on success, or
+   *   ['error' => string] on failure.
    */
   private function rememberOne(array $fields): array {
     $scope = $fields['scope'] ?? 'site';
@@ -226,7 +247,11 @@ final class AimRemember extends ToolBase {
       return ['error' => $e->getMessage()];
     }
 
-    return ['id' => (int) $fact->id()];
+    return [
+      'id' => (int) $fact->id(),
+      'bundle' => $fact->bundle(),
+      'subject' => $fact->get('subject')->value,
+    ];
   }
 
   /**

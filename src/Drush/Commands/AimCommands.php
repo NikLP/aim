@@ -130,8 +130,8 @@ final class AimCommands extends DrushCommands {
 
     $rows = array_map(static fn (AimFact $fact): array => [
       $fact->id(),
-      $fact->get('scope')->value,
-      $fact->get('scope')->value === 'user' ? $fact->get('subject_uid')->target_id : $fact->get('subject')->value,
+      $fact->bundle(),
+      $fact->bundle() === 'user' ? $fact->get('subject_uid')->target_id : $fact->get('subject')->value,
       $fact->get('text')->value,
     ], $result['created']);
 
@@ -225,7 +225,11 @@ final class AimCommands extends DrushCommands {
       return;
     }
 
-    $this->io()->success('Created aim_fact ' . $fact->id() . '.');
+    $message = 'Created aim_fact ' . $fact->id() . '.';
+    if ($fact->bundle() === 'case') {
+      $message .= ' Case ID: ' . $fact->get('subject')->value . ' - pass this as --subject to add more facts to this case.';
+    }
+    $this->io()->success($message);
   }
 
   /**
@@ -277,7 +281,11 @@ final class AimCommands extends DrushCommands {
         continue;
       }
 
-      $this->io()->success("Entry $i: created aim_fact " . $fact->id() . '.');
+      $entry_message = "Entry $i: created aim_fact " . $fact->id() . '.';
+      if ($fact->bundle() === 'case') {
+        $entry_message .= ' Case ID: ' . $fact->get('subject')->value . '.';
+      }
+      $this->io()->success($entry_message);
       $created++;
     }
 
@@ -414,10 +422,12 @@ final class AimCommands extends DrushCommands {
    * happens when the model explicitly says the candidate should not exist
    * as a memory at all.
    *
-   * The two threshold defaults (\Drupal\aim\Service\AimMemoryManager::
-   * DEFAULT_AUTO_THRESHOLD / DEFAULT_AMBIGUOUS_THRESHOLD) were picked
-   * empirically against this site's real fact data, not carried over from
-   * Mem0's or Hindsight's own models. Recalibrated 2026-09-09 against
+   * The two thresholds default to the live aim.settings config
+   * (/admin/config/aim/settings), not a hardcoded value - --auto-threshold/
+   * --ambiguous-threshold below only override that for one invocation. The
+   * shipped defaults were picked empirically against this site's real fact
+   * data, not carried over from Mem0's or Hindsight's own models.
+   * Recalibrated 2026-09-09 against
    * amazeeio__mistral-embed (a genuine near-duplicate pair scored ~0.02, a
    * distinct fact about the same subject or an unrelated fact both scored
    * ~0.17-0.27) - the original 0.35/0.65 pair was calibrated against
@@ -437,8 +447,8 @@ final class AimCommands extends DrushCommands {
    * @option scope Restrict the sweep to one scope: user, role, site, case.
    * @option provider The AI provider plugin ID to use for ambiguous cases.
    * @option model The chat model ID to use for ambiguous cases.
-   * @option auto-threshold Score at or below which a neighbor is retired automatically, no LLM call.
-   * @option ambiguous-threshold Score at or below which an ambiguous neighbor gets a classification call. Above this, facts are left alone.
+   * @option auto-threshold Score at or below which a neighbor is retired automatically, no LLM call. Defaults to the live aim.settings value.
+   * @option ambiguous-threshold Score at or below which an ambiguous neighbor gets a classification call. Above this, facts are left alone. Defaults to the live aim.settings value.
    * @option dry-run Print decisions without saving anything.
    *
    * @usage drush aim:consolidate --dry-run
@@ -450,8 +460,8 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'scope', description: 'Restrict the sweep to one scope: user, role, site, case.')]
   #[CLI\Option(name: 'provider', description: 'The AI provider plugin ID to use for ambiguous cases.')]
   #[CLI\Option(name: 'model', description: 'The chat model ID to use for ambiguous cases.')]
-  #[CLI\Option(name: 'auto-threshold', description: 'Score at or below which a neighbor is retired automatically, no LLM call.')]
-  #[CLI\Option(name: 'ambiguous-threshold', description: 'Score at or below which an ambiguous neighbor gets a classification call.')]
+  #[CLI\Option(name: 'auto-threshold', description: 'Score at or below which a neighbor is retired automatically, no LLM call. Defaults to the live aim.settings value.')]
+  #[CLI\Option(name: 'ambiguous-threshold', description: 'Score at or below which an ambiguous neighbor gets a classification call. Defaults to the live aim.settings value.')]
   #[CLI\Option(name: 'dry-run', description: 'Print decisions without saving anything.')]
   #[CLI\Usage(name: 'drush aim:consolidate --dry-run', description: 'Preview consolidation decisions across every scope without changing anything.')]
   public function consolidate(
@@ -459,8 +469,8 @@ final class AimCommands extends DrushCommands {
       'scope' => NULL,
       'provider' => NULL,
       'model' => NULL,
-      'auto-threshold' => AimMemoryManager::DEFAULT_AUTO_THRESHOLD,
-      'ambiguous-threshold' => AimMemoryManager::DEFAULT_AMBIGUOUS_THRESHOLD,
+      'auto-threshold' => NULL,
+      'ambiguous-threshold' => NULL,
       'dry-run' => FALSE,
     ],
   ): void {
@@ -470,13 +480,19 @@ final class AimCommands extends DrushCommands {
     }
     [$provider_id, $model_id] = $provider;
 
+    // NULL (the default) follows the live aim.settings value
+    // (/admin/config/aim/settings) rather than a hardcoded default, same
+    // posture as resolveChatProvider() following ai.settings.
+    $auto_threshold = $options['auto-threshold'] !== NULL ? (float) $options['auto-threshold'] : $this->memoryManager->getAutoThreshold();
+    $ambiguous_threshold = $options['ambiguous-threshold'] !== NULL ? (float) $options['ambiguous-threshold'] : $this->memoryManager->getAmbiguousThreshold();
+
     try {
       $result = $this->memoryManager->consolidate(
         $options['scope'] ?: NULL,
         $provider_id,
         $model_id,
-        (float) $options['auto-threshold'],
-        (float) $options['ambiguous-threshold'],
+        $auto_threshold,
+        $ambiguous_threshold,
         !empty($options['dry-run']),
       );
     }
@@ -543,8 +559,9 @@ final class AimCommands extends DrushCommands {
     ],
   ): void {
     $scope = $options['scope'];
-    if (!in_array($scope, ['user', 'role', 'site', 'case'], TRUE)) {
-      $this->io()->error('Invalid --scope "' . $scope . '", expected one of: user, role, site, case.');
+    $allowed = $this->memoryManager->allowedScopes();
+    if (!in_array($scope, $allowed, TRUE)) {
+      $this->io()->error('Invalid --scope "' . $scope . '", expected one of: ' . implode(', ', $allowed) . '.');
       return;
     }
 

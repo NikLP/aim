@@ -1,0 +1,28 @@
+<?php
+
+/**
+ * @file
+ * Hook implementations for the AIM module.
+ */
+
+declare(strict_types=1);
+
+/**
+ * Implements hook_entity_bundle_info().
+ *
+ * The four aim_fact scopes (ADR-0001) are code-defined bundles, not config
+ * entities like node types - a site or contrib module can register an
+ * additional scope purely by implementing hook_entity_bundle_info_alter()
+ * against 'aim_fact', no admin UI step required. See CLAUDE.md's scope
+ * bundle conversion notes.
+ */
+function aim_entity_bundle_info(): array {
+  return [
+    'aim_fact' => [
+      'user' => ['label' => t('User')],
+      'role' => ['label' => t('Role')],
+      'site' => ['label' => t('Site')],
+      'case' => ['label' => t('Case')],
+    ],
+  ];
+}

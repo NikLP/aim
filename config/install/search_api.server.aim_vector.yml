@@ -15,10 +15,10 @@ backend_config:
     database_name: ''
     collection: aim_facts
     metric: cosine_similarity
-  embeddings_engine: amazeeio__mistral-embed
+  embeddings_engine: ollama__nomic-embed-text:latest
   embeddings_engine_configuration:
     set_dimensions: true
-    dimensions: 1024
+    dimensions: 768
   embedding_strategy: contextual_chunks
   embedding_strategy_configuration:
     chunk_size: '500'

@@ -17,3 +17,6 @@ Architecture Decision Records for the `aim` module.
 | [0011](0011-extraction-explicit-subject-uid.md) | Extraction never guesses scope=user account matches; requires explicit `--subject-uid` | Accepted |
 | [0012](0012-fact-relation-graph.md) | Fact-to-fact relation graph and multi-hop retrieval | Proposed - exploratory estimate, not built |
 | [0013](0013-mcp-tool-exposure.md) | MCP tool exposure via Tool API (`tool`/`mcp_server`/`mcp_server_tool_bridge`) | Proposed - exploratory, not built |
+| [0014](0014-usecase-archetype-starter-kits.md) | Use-case archetype starter kits via Recipes | Proposed - exploratory estimate, not built |
+| [0015](0015-immediate-consolidation-considered-deferred.md) | Immediate post-write consolidation via kernel.terminate | Proposed - designed and prototyped, deliberately deferred |
+| [0016](0016-document-ingestion-ui.md) | Document ingestion via a Drupal form: three modes, one shared core | Mode 1 accepted (build now); Mode 2 blocked on ADR-0002; Mode 3 out of scope |

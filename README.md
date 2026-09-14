@@ -210,9 +210,12 @@ map).
    session, that has already decided what's worth remembering and just
    needs a direct write/query path with no extra chat call. For a human
    admin rather than an agent or a terminal: `/admin/content/aim-facts`
-   lists every remembered fact, and `drupal/queue_ui`
+   lists every remembered fact, `drupal/queue_ui`
    (`/admin/config/system/queue-ui`) gives a manual "Run" button for the
-   consolidation queue - see CLAUDE.md's "Admin UI" section.
+   consolidation queue, and `/admin/config/aim/settings` (Administration >
+   Configuration > AIM > Settings) is where the consolidation thresholds
+   and the extraction/consolidation prompts are tuned, no code deploy
+   needed - see CLAUDE.md's "Admin UI" and "Admin settings" sections.
 3. Wire an unattended `drupal/ai` provider for autonomous, cron-driven
    operation, plus the rest of the governance layer (Content Moderation,
    draft-to-trusted) that the PoC is deliberately skipping for now.

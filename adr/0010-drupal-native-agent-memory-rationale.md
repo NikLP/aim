@@ -672,7 +672,9 @@ this session against `drupal-code-query`'s MCP tools.
 8. **Speckit-for-Drupal's actual question sets** - no design work done on
    what a spec-gathering Skill asks, in what order, per site archetype
    (commerce, brochure, LMS, ...). Real scope of work, not a byproduct of the
-   storage/extraction plumbing.
+   storage/extraction plumbing. **Design landed 2026-09-14:** see
+   [0014](0014-usecase-archetype-starter-kits.md) (proposal only, not yet
+   built).
 9. **Recipe-apply safety gate** - "needs a dry-run/review step before
    applying an AI-generated Recipe" is stated as a requirement above. Design
    landed: see [0009](0009-recipe-apply-safety-gate.md) (design only, not

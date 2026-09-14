@@ -3,6 +3,7 @@ type: module
 description: 'AI Memory (WIP)'
 package: AIM
 core_version_requirement: ^11
+configure: aim.settings
 dependencies:
   - drupal:options
   - drupal:taxonomy

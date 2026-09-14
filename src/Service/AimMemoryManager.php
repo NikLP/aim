@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Drupal\aim\Service;
 
 use Drupal\Component\Datetime\TimeInterface;
+use Drupal\Component\Uuid\UuidInterface;
 use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\Dto\StructuredOutputSchema;
 use Drupal\ai\Guardrail\AiGuardrailRepository;
 use Drupal\ai\Guardrail\Result\StopResult;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Session\AccountInterface;
@@ -32,11 +35,6 @@ use Drupal\search_api\Query\ResultSetInterface;
 final class AimMemoryManager {
 
   /**
-   * The scope values aim_fact's field definition allows.
-   */
-  protected const ALLOWED_SCOPES = ['user', 'role', 'site', 'case'];
-
-  /**
    * The AI Guardrail Set applied to every candidate fact before it is saved.
    *
    * See CLAUDE.md decision 7 and config/install/ai.ai_guardrail_set.
@@ -55,12 +53,16 @@ final class AimMemoryManager {
   protected const CONSOLIDATE_QUEUE_ID = 'aim_consolidate';
 
   /**
-   * Score at or below which a neighbor is retired automatically, no LLM call.
+   * Shipped default for aim.settings' auto_threshold, and a fallback.
    *
-   * Public and shared between the CLI sweep's option default and the queue
-   * worker, so the two can't drift out of sync the way AimCommands'
-   * hardcoded provider/model defaults already did twice earlier this
-   * project. Empirically set against ollama__nomic-embed-text:latest (see
+   * The live, admin-editable value is aim.settings:auto_threshold
+   * (/admin/config/aim/settings) - see getAutoThreshold(). This constant is
+   * only the value config/install ships on a fresh install, and the
+   * fallback if that config is ever missing entirely. Public and shared
+   * between the CLI sweep's option default and the queue worker, so the two
+   * can't drift out of sync the way AimCommands' hardcoded provider/model
+   * defaults already did twice earlier this project. Empirically set
+   * against ollama__nomic-embed-text:latest (see
    * CLAUDE.md's "Consolidation" section) - recalibrated 2026-09-10 from an
    * earlier 0.05/0.20 pair that was calibrated against amazeeio's
    * mistral-embed and never re-checked after the site's embeddings_engine
@@ -81,9 +83,10 @@ final class AimMemoryManager {
   public const DEFAULT_AUTO_THRESHOLD = 0.09;
 
   /**
-   * Score at or below which an ambiguous neighbor gets a classification call.
+   * Shipped default for aim.settings' ambiguous_threshold, and a fallback.
    *
-   * See DEFAULT_AUTO_THRESHOLD. Set to cover the observed
+   * See DEFAULT_AUTO_THRESHOLD - same relationship to the live config value,
+   * read via getAmbiguousThreshold(). Set to cover the observed
    * distinct-but-topically-related band (0.29-0.41) for an LLM judgment
    * call, while still excluding clearly unrelated pairs (0.67+).
    */
@@ -138,6 +141,21 @@ final class AimMemoryManager {
    * @param \Drupal\Core\Queue\QueueFactory $queueFactory
    *   The queue factory, used to enqueue newly-written facts for async
    *   consolidation.
+   * @param \Drupal\Core\Entity\EntityTypeBundleInfoInterface $bundleInfo
+   *   The entity type bundle info service, used to validate scope against
+   *   aim_fact's code-defined bundles (see aim.module's
+   *   hook_entity_bundle_info()) instead of a hardcoded list, so a module
+   *   registering an additional scope via hook_entity_bundle_info_alter()
+   *   passes validation here automatically.
+   * @param \Drupal\Component\Uuid\UuidInterface $uuid
+   *   The UUID service, used to mint a new case ID for a scope=case fact
+   *   with no caller-supplied subject, so every caller (MCP client, drush,
+   *   a future ECA action) gets the same format for free instead of each
+   *   needing to invent and agree on its own.
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
+   *   The config factory, used to read aim.settings' admin-editable
+   *   consolidation thresholds and extraction/consolidation prompts (see
+   *   /admin/config/aim/settings, Drupal\aim\Form\AimSettingsForm).
    */
   public function __construct(
     protected AiProviderPluginManager $aiProvider,
@@ -146,7 +164,49 @@ final class AimMemoryManager {
     protected TimeInterface $time,
     protected AiGuardrailRepository $guardrailRepository,
     protected QueueFactory $queueFactory,
+    protected EntityTypeBundleInfoInterface $bundleInfo,
+    protected UuidInterface $uuid,
+    protected ConfigFactoryInterface $configFactory,
   ) {}
+
+  /**
+   * Returns the scope values aim_fact's declared bundles allow.
+   *
+   * @return string[]
+   *   The bundle machine names currently registered for aim_fact.
+   */
+  public function allowedScopes(): array {
+    return array_keys($this->bundleInfo->getBundleInfo('aim_fact'));
+  }
+
+  /**
+   * Returns the live auto-merge threshold from aim.settings.
+   *
+   * Falls back to DEFAULT_AUTO_THRESHOLD only if the config value is
+   * missing (e.g. aim.settings was deleted outside of a normal uninstall) -
+   * config/install ships a real value, so this should not normally be hit.
+   *
+   * @return float
+   *   Score at or below which a neighbor is retired automatically.
+   */
+  public function getAutoThreshold(): float {
+    $value = $this->configFactory->get('aim.settings')->get('auto_threshold');
+    return $value !== NULL ? (float) $value : self::DEFAULT_AUTO_THRESHOLD;
+  }
+
+  /**
+   * Returns the live ambiguous threshold from aim.settings.
+   *
+   * See getAutoThreshold() - same fallback behavior.
+   *
+   * @return float
+   *   Score at or below which an ambiguous neighbor gets a classification
+   *   call.
+   */
+  public function getAmbiguousThreshold(): float {
+    $value = $this->configFactory->get('aim.settings')->get('ambiguous_threshold');
+    return $value !== NULL ? (float) $value : self::DEFAULT_AMBIGUOUS_THRESHOLD;
+  }
 
   /**
    * Enqueues a fact for async consolidation against its nearest neighbor.
@@ -370,8 +430,9 @@ final class AimMemoryManager {
    *   If scope is invalid, or scope=user and $subjectUids is empty.
    */
   public function generateBenchmarkFacts(string $scope, int $count, string $runTag, array $subjectUids = []): array {
-    if (!in_array($scope, self::ALLOWED_SCOPES, TRUE)) {
-      throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', self::ALLOWED_SCOPES));
+    $allowed = $this->allowedScopes();
+    if (!in_array($scope, $allowed, TRUE)) {
+      throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
     }
     if ($scope === 'user' && empty($subjectUids)) {
       throw new \InvalidArgumentException('scope=user needs at least one real account ID in $subjectUids.');
@@ -441,7 +502,9 @@ final class AimMemoryManager {
    *   One of user, role, site, case.
    * @param string|null $subject
    *   Who or what the fact is about. For scope=user, a uid or username of a
-   *   real account on this site. Ignored for site scope.
+   *   real account on this site. Ignored for site scope. For scope=case, an
+   *   existing case ID to continue - omit to start a new case, which mints
+   *   one and stamps it onto the created fact.
    * @param string|null $source
    *   Provenance tag for this fact.
    * @param bool|null $state
@@ -461,8 +524,9 @@ final class AimMemoryManager {
    *   account, or the text fails a guardrail check.
    */
   public function remember(string $text, string $scope, ?string $subject, ?string $source, ?bool $state, array $category = [], ?int $asserted = NULL): AimFact {
-    if (!in_array($scope, self::ALLOWED_SCOPES, TRUE)) {
-      throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', self::ALLOWED_SCOPES));
+    $allowed = $this->allowedScopes();
+    if (!in_array($scope, $allowed, TRUE)) {
+      throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
     }
 
     $this->runGuardrails($text);
@@ -487,6 +551,14 @@ final class AimMemoryManager {
       }
       $values['subject_uid'] = $account->id();
       $values['subject'] = '';
+    }
+    elseif ($scope === 'case' && empty($subject)) {
+      // No subject given for a new case-scoped fact: mint one here so
+      // every caller (MCP client, drush, a future ECA action) gets the
+      // same format for free instead of needing to agree on one. subject
+      // is the only field this touches - source stays whatever provenance
+      // the caller already passes, untouched by this.
+      $values['subject'] = 'case-' . substr($this->uuid->generate(), 0, 8);
     }
     else {
       $values['subject'] = $subject ?? '';
@@ -691,8 +763,8 @@ final class AimMemoryManager {
       $rows[] = [
         'id' => $fact->id(),
         'score' => $result->getScore(),
-        'scope' => $fact->get('scope')->value,
-        'subject' => $fact->get('scope')->value === 'user' ? $fact->get('subject_uid')->target_id : $fact->get('subject')->value,
+        'scope' => $fact->bundle(),
+        'subject' => $fact->bundle() === 'user' ? $fact->get('subject_uid')->target_id : $fact->get('subject')->value,
         'text' => $fact->get('text')->value,
         'source' => $fact->get('source')->value,
         'state' => $fact->get('state')->value,
@@ -943,7 +1015,7 @@ final class AimMemoryManager {
    *   A [neighbor fact, score] pair, or NULL if no eligible neighbor exists.
    */
   protected function findNearestNeighbor(IndexInterface $index, AimFact $fact, array $handled): ?array {
-    $scope = $fact->get('scope')->value;
+    $scope = $fact->bundle();
     $is_user_scope = $scope === 'user';
 
     $query = $index->query()->keys($fact->get('text')->value);
@@ -985,6 +1057,11 @@ final class AimMemoryManager {
   /**
    * Asks the chat provider to classify a candidate against a kept fact.
    *
+   * The instruction prompt is aim.settings:consolidation_prompt
+   * (admin-editable at /admin/config/aim/settings), not hardcoded - only
+   * the requested output shape below (the decision/merged_text schema)
+   * stays code-defined, since it's parsed by PHP downstream.
+   *
    * @param \Drupal\aim\Entity\AimFact $kept
    *   The established fact being compared against.
    * @param \Drupal\aim\Entity\AimFact $candidate
@@ -999,32 +1076,10 @@ final class AimMemoryManager {
    *   DELETE, NOOP. merged_text is only meaningful for UPDATE.
    */
   protected function classifyPair(AimFact $kept, AimFact $candidate, string $providerId, string $modelId): array {
-    $kept_text = $kept->get('text')->value;
-    $candidate_text = $candidate->get('text')->value;
-
-    $prompt = <<<PROMPT
-      Two memory facts about the same scope and subject were flagged as
-      possibly related. Decide what to do with the candidate fact relative
-      to the existing one.
-
-      Existing fact: "$kept_text"
-      Candidate fact: "$candidate_text"
-
-      Choose one decision:
-      - "ADD": the two facts are genuinely different and both should be
-        kept as-is.
-      - "UPDATE": the candidate refines, corrects, or supersedes the
-        existing fact (e.g. a changed preference). Provide a single merged
-        statement in merged_text that replaces the existing fact's text.
-      - "NOOP": the candidate simply restates the existing fact with no
-        new information. The existing fact stands unchanged and the
-        candidate is redundant.
-      - "DELETE": the candidate fact should not exist as a memory at all
-        (e.g. nonsensical or clearly erroneous). Use sparingly.
-
-      For any decision other than UPDATE, set merged_text to the existing
-      fact's text unchanged.
-      PROMPT;
+    $prompt = strtr($this->configFactory->get('aim.settings')->get('consolidation_prompt'), [
+      '{kept_text}' => $kept->get('text')->value,
+      '{candidate_text}' => $candidate->get('text')->value,
+    ]);
 
     $schema = new StructuredOutputSchema(
       name: 'aim_consolidation_decision',
@@ -1062,6 +1117,11 @@ final class AimMemoryManager {
   /**
    * Calls the configured chat provider and returns structured facts.
    *
+   * The instruction prompt is aim.settings:extraction_prompt (admin-
+   * editable at /admin/config/aim/settings), not hardcoded - only the
+   * requested output shape below (the facts/scope/subject/text schema)
+   * stays code-defined, since it's parsed by PHP downstream.
+   *
    * @param string $text
    *   The source text to extract facts from.
    * @param string $providerId
@@ -1073,27 +1133,9 @@ final class AimMemoryManager {
    *   A list of ['scope' => ..., 'subject' => ..., 'text' => ...] arrays.
    */
   public function extractFacts(string $text, string $providerId, string $modelId): array {
-    $prompt = <<<PROMPT
-      Extract every discrete, atomic fact worth remembering long-term from
-      the text below. Each fact must be one short, self-contained sentence.
-      Do not invent facts the text does not support. If nothing is worth
-      remembering, return an empty facts array.
-
-      For each fact, classify its scope:
-      - "user": specific to one named person.
-      - "role": true for everyone holding a particular role.
-      - "site": about the site or organization itself, not one person.
-      - "case": tied to a specific support case or tracked issue.
-
-      Also give a short "subject": for "user" scope, the person's name or
-      identifier; for "role", the role name; for "case", a case identifier;
-      for "site", leave it empty.
-
-      Text:
-      """
-      $text
-      """
-      PROMPT;
+    $prompt = strtr($this->configFactory->get('aim.settings')->get('extraction_prompt'), [
+      '{text}' => $text,
+    ]);
 
     $schema = new StructuredOutputSchema(
       name: 'aim_extracted_facts',

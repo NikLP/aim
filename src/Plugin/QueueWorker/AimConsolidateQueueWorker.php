@@ -99,8 +99,8 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
       $fact,
       $provider['provider_id'],
       $provider['model_id'],
-      AimMemoryManager::DEFAULT_AUTO_THRESHOLD,
-      AimMemoryManager::DEFAULT_AMBIGUOUS_THRESHOLD,
+      $this->memoryManager->getAutoThreshold(),
+      $this->memoryManager->getAmbiguousThreshold(),
     );
   }
 

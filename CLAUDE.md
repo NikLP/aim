@@ -131,12 +131,13 @@ validation error. Fixed via `composer require drupal/ai_agents`. If a
 enabled, check `ddev drush pm:list` and the module's actual directory
 before assuming the failure is about what you just changed.
 
-**PoC deviations from [ADR-0001](adr/0001-storage-and-scope-model.md)/
-[ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md) (temporary,
-not abandoned):** one flat `scope` list field instead of four bundles; no
-Content Moderation / draft-to-trusted gate - every fact is live the moment
-it's saved. Guardrails itself is *not* part of this deviation - see below,
-it's live today. Re-introduce both before any non-PoC data goes in.
+**PoC deviation from [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)
+(temporary, not abandoned):** no Content Moderation / draft-to-trusted gate -
+every fact is live the moment it's saved. Guardrails itself is *not* part of
+this deviation - see below, it's live today. Re-introduce before any non-PoC
+data goes in. The scope-bundle deviation from
+[ADR-0001](adr/0001-storage-and-scope-model.md) is resolved - see "Scope as
+bundles" below.
 
 No Drupal module competes with `aim`'s actual scope (governed,
 Guardrail-checked, extracted-and-consolidated, vector-searchable memory) -
@@ -185,11 +186,8 @@ Not one "AI" - check this before assuming a step needs a paid API call:
 `anthropic`/`claude-sonnet-5` on 2026-09-11 - amazee's endpoint is
 currently free, Anthropic's Console API key is metered, and this module
 had no cost visibility into what was hitting it. Same swap applied to
-`ai_assistant_api.ai_assistant.aim_demo_assistant` (`llm_provider`/
-`llm_model`, shipped in `aim_chatbot`'s `config/install` - that entity
-does NOT follow the `ai.settings` default, it pins its own provider/model,
-see Chatbot section) and to `search_api.server.aim_vector`
-`backend_config.chat_model` (cost-neutral either way - confirmed by
+`search_api.server.aim_vector` `backend_config.chat_model` (cost-neutral
+either way - confirmed by
 reading `ai_search`'s `EmbeddingBase`/`ContextualEmbeddingStrategy`, this
 value only feeds `textChunker->setModel()` for chunk token-sizing, no
 `->chat()` call is ever made from it). `search_api.server.aim_vector`
@@ -202,6 +200,9 @@ try to point `embeddings_engine` at it. `AimCommands`' `--provider`/
 default, so they follow whatever the site default is set to (this is why
 the `ai.settings` change alone was enough to move `aim:extract`/
 `aim:consolidate`, no code change needed).
+`ai_assistant_api.ai_assistant.aim_demo_assistant`'s `llm_provider`/
+`llm_model` follow the site default the same way, as of 2026-09-14 - see
+Chatbot section.
 
 **Local Ollama** (`ai_provider_ollama`, host_name/port config): points at
 the *host's* Ollama install (`http://host.docker.internal:11434`), not a
@@ -281,6 +282,108 @@ worker's own `reindex()` call handle it. `aim_facts` has a real MariaDB
   `\Drupal::config($name)->getRawData()` after a real save and use that
   (module/`uuid`/`_core` stripped).
 
+## Scope as bundles
+
+Built 2026-09-14, closing ADR-0001's flat-field PoC deviation. `aim_fact`'s
+four scopes (user/role/site/case) are now real, code-defined bundles -
+`entity_keys.bundle` on `AimFact`'s `#[ContentEntityType]` attribute, with
+`aim.module`'s `hook_entity_bundle_info()` declaring the four bundle labels.
+No `bundle_entity_type` (no config entity like node types) - a site or
+contrib module can register a fifth scope purely by implementing
+`hook_entity_bundle_info_alter()` against `aim_fact`, no admin UI step
+required. `AimMemoryManager::allowedScopes()` (public) replaced the old
+hardcoded `ALLOWED_SCOPES` constant, reading
+`entity_type.bundle.info`'s `getBundleInfo('aim_fact')` instead - every
+scope-validation call site (`remember()`, `generateBenchmarkFacts()`,
+`AimCommands::benchmark()`) now honors a bundle registered this way
+automatically, without code changes.
+
+**Deliberate design choice: the bundle key field is still named `scope`**,
+not renamed to `type`. Checked core's own precedent before assuming `type`
+was "the" convention (it isn't): node uses `type`, media uses `bundle`
+literally, comment uses `comment_type`, taxonomy_term uses `vid` - four
+core entities, four different literal names, all domain-specific rather
+than a fixed generic word. `scope` fits that same pattern. Bundle fields
+are never auto-created by Drupal for a `bundle_entity_type`-less entity
+either way - they must be explicitly defined in `baseFieldDefinitions()`
+same as any other field, so there was a real name choice to make here.
+Keeping the name `scope` meant every
+existing `'scope' => $value` in a `create()` values array, every
+`$query->addCondition('scope', ...)`/`->condition('scope', ...)`, the
+Views field ID, and `search_api.index.aim_vector_index.yml`'s
+`field_settings.scope` (`property_path: scope`) all kept working completely
+unchanged - only reads of the value now go through `$fact->bundle()`
+instead of `$fact->get('scope')->value` (idiomatic, and the field itself
+dropped its old `list_string`/`allowed_values` shape in favor of a plain
+required `string`, since bundle validity is governed by
+`hook_entity_bundle_info()` now, not a field setting). This is why the
+"would restricting search_api's `datasource_settings` by bundle help"
+question (raised the same day) resolved to "no, not as a blanket policy" -
+`recall()`'s existing `addCondition('scope', $scope)`, only added `if
+(!empty($scope))`, already gives ADR-0001's "composable at retrieval"
+behavior (a no-scope query searches every bundle in one call) without an
+index restriction, and the field being real-not-fake meant a rename wasn't
+forced either.
+
+The only file needing an actual formatter change was
+`views.view.aim_facts.yml`'s `scope` column: its `type: list_default`
+formatter required an `AllowedValuesInterface` field and would have broken
+against the new plain `string` field, so it moved to `type: string`
+(matching `subject`/`source`'s own formatter) - everything else in that
+View (no scope filter existed, `filters: {}`) needed no change.
+`aim_tool`'s `aim_remember`/`aim_recall` Tool plugins and `aim_chatbot`'s
+locked-`scope=site` FunctionCall plugins needed zero changes - both only
+ever pass `scope` through as a string to `AimMemoryManager`, never touch
+`$fact->get('scope')` directly. `aim_eca`'s `FactWrite`/`FactQuery`/
+`FactState` were deliberately left unconverted, per this file's ECA
+integration section (`eca_tool` may make the whole submodule redundant).
+
+No migration needed (PoC, no real data - see "Schema/config changes during
+early development" below) - a straight `drush pmu`/`drush en` cycle of
+`aim` re-provisions the entity type fresh. Real gotchas hit doing that
+reinstall, none specific to bundles but all reproducible and worth not
+rediscovering:
+
+- **A `drush en modA modB modC` batch does not roll back per-module on a
+  later failure.** Drupal appears to flag every requested module Enabled in
+  `core.extension` up front, then installs each module's config +
+  `hook_install()` in dependency order one at a time. If an early module's
+  `hook_install()` throws (as `aim`'s did here, see next point), later
+  modules in the same batch are left `Enabled` per `drush pm:list` while
+  their own config was never imported and `hook_install()` never ran - a
+  genuinely broken half-installed state, not something a repeat of the
+  same batch command fixes (it just says "Already installed" for the
+  stuck modules). Fix: uninstall exactly the stuck modules (not the ones
+  that installed cleanly) and re-enable them on their own.
+- **`drush pmu` does not reliably remove all of a module's own
+  `config/install` entities**, reproduced twice (`aim`'s own 5 configs,
+  `aim_chatbot`'s 2) across separate uninstall cycles in the same session.
+  The orphaned config then throws `PreExistingConfigException` on the next
+  install attempt, naming the exact leftover config names - fix is
+  deleting those specific entities directly (`drush config:delete`), not
+  fighting the exception or assuming the uninstall itself needs retrying.
+- **`config/install/search_api.server.aim_vector.yml` was stale**,
+  unrelated to bundles but only surfaced by actually reinstalling `aim` for
+  the first time since the 2026-09-10 embeddings switch documented in this
+  file's AI dependency map: it still shipped the pre-switch
+  `amazeeio__mistral-embed`/1024-dim settings, not the live
+  `ollama__nomic-embed-text:latest`/768-dim config. A straight reinstall
+  would have silently reverted the site's embeddings engine with no error
+  (the collection table would just get rebuilt at the wrong dimension).
+  Fixed the file to match the documented live state. Lesson: a config/
+  install file drifts silently the moment live config is changed via the
+  UI/`drush config:set` without a matching re-export - re-verify any
+  config/install file against documented live state before trusting a
+  reinstall to reproduce it, the same posture this file's other config
+  gotchas already take.
+- `aim.install`'s `aim_install()` re-save (to force the collection table's
+  attribute-column ALTER, see "Vector search" above) can itself collide
+  with a stray `aim_facts` table left over from a prior failed attempt in
+  the same debugging session, throwing the same non-idempotent
+  `createCollection()` error this file's Vector search gotchas already
+  describe. Same fix applies: `DROP TABLE aim_facts` and re-save once,
+  cleanly, not on top of a half-finished attempt.
+
 ## Guardrails
 
 Live today, not part of the governance deferral
@@ -353,6 +456,21 @@ alongside `extract()`.
 Both live on `AimCommands`, backed by `AimMemoryManager` (also used by
 `aim_eca` and the chatbot).
 
+**Case IDs are minted server-side, not by convention.** Built 2026-09-14,
+following on from "Scope as bundles" above. `remember()` with `scope=case`
+and no `subject` mints one (`case-<8 hex chars>`, from Drupal's own `uuid`
+service, truncated) and stamps it onto the created fact rather than
+requiring every caller to invent and agree on a subject-naming format
+themselves - `aim:remember`'s success message and `aim_tool`'s
+`aim_remember` (`case_id` output) both surface the resolved ID so the
+caller can pass it back as `subject` on later calls to add to the same
+case. Passing `subject` explicitly (an existing case ID) always wins -
+minting only happens when it's omitted. Deliberately narrow: `subject` is
+the only field this touches, `source` is untouched and still means
+whatever provenance the caller already passes - keeping the two apart was
+the whole point of this design, see the case-scope-as-session-id notes
+this superseded.
+
 **Gotcha:** drush runs as anonymous by default, and `ai_search`'s backend
 drops any match anonymous can't view - silently, no error. `recall()`
 account-switches to uid 1 for the query duration (`account_switcher`
@@ -372,11 +490,24 @@ two directions. Don't remember what's already available from context.
 [--ambiguous-threshold] [--dry-run]` - on-demand sweep. Algorithm, schema,
 and thresholds in
 [ADR-0005](adr/0005-consolidation-algorithm.md). **Current threshold
-defaults:** `AimMemoryManager::DEFAULT_AUTO_THRESHOLD = 0.09`,
-`DEFAULT_AMBIGUOUS_THRESHOLD = 0.45` - recalibrated 2026-09-10 against
-`ollama__nomic-embed-text:latest` (previously 0.05/0.20, tuned for
-`mistral-embed`, went stale the moment `embeddings_engine` switched - see
-AI dependency map above).
+defaults:** `auto_threshold: 0.09`, `ambiguous_threshold: 0.45` -
+recalibrated 2026-09-10 against `ollama__nomic-embed-text:latest`
+(previously 0.05/0.20, tuned for `mistral-embed`, went stale the moment
+`embeddings_engine` switched - see AI dependency map above).
+
+**Built 2026-09-14: admin-editable, not just a code constant.** Both
+thresholds live in `aim.settings` config, editable at
+`/admin/config/aim/settings` ("Consolidation thresholds" group) - see
+"Admin settings" below. `AimMemoryManager::DEFAULT_AUTO_THRESHOLD`/
+`DEFAULT_AMBIGUOUS_THRESHOLD` still exist as the value `config/install`
+ships on a fresh install and the in-code fallback if `aim.settings` is
+ever missing, read via the new `getAutoThreshold()`/
+`getAmbiguousThreshold()` methods - nothing reads the constants directly
+at runtime anymore (`AimConsolidateQueueWorker` and `AimCommands`'
+`aim:consolidate` both switched to the getters, the CLI's
+`--auto-threshold`/`--ambiguous-threshold` options now default to `NULL`
+and fall through to the live config value, same pattern
+`resolveChatProvider()` already used for provider/model).
 
 First pass set auto-threshold to 0.12 from two known duplicate pairs
 (0.059/0.082). Caught too loose by live testing the same day: "Nik likes
@@ -488,6 +619,35 @@ and why. Current shape:
   only the `ai_agent` entity's `system_prompt` governs. Block placement is
   `bottom-right` (`placement: toolbar` silently fails to render on this
   theme - a real, previously-hit bug, don't revert to it).
+- **`llm_provider`/`llm_model` follow the site default, not a pinned
+  value - flipped 2026-09-14.** Previously pinned to `amazeeio`/
+  `claude-4-5-haiku` explicitly (a second place that had to be
+  hand-updated on every provider swap, alongside `ai.settings` itself and
+  `search_api.server.aim_vector`'s `chat_model`, and the exact kind of
+  drift this file's other config gotchas warn about). Now
+  `llm_provider: '__default__'` (`llm_model` empty) -
+  `AiAssistantApiRunner::getProviderAndModel()` special-cases
+  `'__default__'` and resolves via `AiProviderPluginManager
+  ::getDefaultProviderForOperationType('chat')`, which reads
+  `ai.settings`'s `default_providers.chat` fresh on every call (no cache
+  layer of its own) - confirmed by reading
+  `web/modules/contrib/ai/src/AiProviderPluginManager.php`. This covers
+  the agent path too, not just a plain assistant: `AgentRunner::
+  runAsAgent()` only receives whatever `getProviderAndModel()` already
+  resolved, and the `ai_agent` config entity itself carries no separate
+  provider/model of its own. Net effect: changing the site-wide default
+  chat provider/model in the UI (`/admin/config/ai/settings`) now
+  propagates to the demo assistant immediately, no code or config change
+  needed - same self-following behavior `AimCommands`' `--provider`/
+  `--model` already had (see AI dependency map above). **Does not
+  extend to `search_api.server.aim_vector`'s `backend_config.chat_model`**
+  - checked `SearchApiAiSearchBackend`'s settings form
+  (`ai_search/src/Plugin/search_api/backend/SearchApiAiSearchBackend.php`),
+  it has no `__default__`/site-default option, just a plain tokenizer-model
+  dropdown with its own hardcoded gpt-3.5-shaped fallback - and it isn't
+  really the same setting either way, per the AI dependency map above
+  (token counting for chunk sizing, no `->chat()` call). That field still
+  needs a manual update on any future chat-provider swap.
 
 **Gotchas:**
 
@@ -768,6 +928,54 @@ its route at the WRONG path (resolves into whatever tab set already claims
 that root, e.g. `/admin/content`) - use `menu.type: normal` for a plain
 admin menu link instead.
 
+## Admin settings
+
+Built 2026-09-14. `/admin/config/aim/settings` (`AimSettingsForm`, a plain
+`ConfigFormBase`, gated on `administer aim memory`) - two collapsible
+`details` groups: "Consolidation thresholds" (`auto_threshold`,
+`ambiguous_threshold` - open by default) and "Prompts" (`extraction_prompt`,
+`consolidation_prompt` - collapsed by default, long text). Backed by
+`aim.settings` config, `config/schema/aim.schema.yml` +
+`config/install/aim.settings.yml` (the shipped defaults - same values
+`AimMemoryManager::DEFAULT_AUTO_THRESHOLD`/`DEFAULT_AMBIGUOUS_THRESHOLD`
+and the old hardcoded prompt heredocs used to hold). `AimMemoryManager`
+gained a `ConfigFactoryInterface` constructor argument to read it (a
+`drush cr` is needed on any site that already had the container built
+before this landed - see this file's existing "stale container cache"
+Chatbot gotcha, same failure shape).
+
+**Route/menu shape**, reused instead of custom-built: `aim.admin_config`
+(`/admin/config/aim`) uses core's own
+`\Drupal\system\Controller\SystemController::systemAdminMenuBlockPage` as
+its controller - the exact same reusable "list my child menu links as
+blocks" controller core itself stacks a dozen `#[Route]` attributes onto
+for `/admin/config/development`, `/admin/config/media`, etc. (confirmed by
+reading `SystemController.php`, not assumed). This is why `aim.links.menu.yml`
+only needed two links (`aim.admin_config` parented to `system.admin_config`,
+`aim.settings` parented to `aim.admin_config`) and zero custom PHP for the
+category page itself - only the actual settings form needed a real
+controller.
+
+**Prompts are config, not `ai_agents`.** `extractFacts()`/`classifyPair()`
+build their `ChatInput` directly (one-shot structured-output calls, no
+tool-calling loop) rather than going through `ai_agents`' `AgentRunner` the
+way `aim_chatbot`'s agent does - so their prompts live as plain
+`aim.settings` string fields, not an `ai_agent` config entity's
+`system_prompt`. Each prompt is `strtr()`'d against a placeholder token at
+call time: `{text}` for `extraction_prompt`, `{kept_text}`/
+`{candidate_text}` for `consolidation_prompt`. The requested *output shape*
+(the `facts`/`scope`/`subject`/`text` schema, the `decision`/`merged_text`
+schema) stays hardcoded in `AimMemoryManager` as a `StructuredOutputSchema`,
+deliberately not admin-editable like the instruction prose is, since the
+schema is parsed by PHP downstream and isn't safe to hand to a text field.
+`AimSettingsForm::validateForm()` rejects a save that drops a required
+placeholder, so a `strtr()` no-op replacement can't happen silently.
+
+Deliberately narrow scope: `GUARDRAIL_SET_ID`/`CONSOLIDATE_QUEUE_ID` (still
+class constants on `AimMemoryManager`) were left out of this form - they're
+structural wiring (which guardrail set, which queue), not values a site
+admin tunes, unlike the numeric thresholds and prompt text.
+
 ## Default content export
 
 `vendor/bin/dr content:export aim_fact <id>` (not
@@ -887,12 +1095,17 @@ authorship on re-import is accepted, not a problem to solve.
   already approximated well enough by `expires` getting set when
   consolidation finds a contradiction. Revisit only if a real case shows
   that approximation failing.
-- **Source-boundary policy per site archetype.** Ties to ADR-0010's
-  still-undesigned "speckit-for-Drupal" idea (its open question 8): each
-  discovery-skill archetype (commerce, support, ...) should declare its own
-  allowed-source boundaries as config, likely as its own Guardrail set (the
-  same mechanism `aim_write_guardrails` is already one instance of), not a
-  single global policy.
+- **Source-boundary policy per site archetype - design landed
+  2026-09-14, not built.** Ties to ADR-0010's "speckit-for-Drupal" idea
+  (its open question 8): each discovery-skill archetype (commerce,
+  support, ...) should declare its own allowed-source boundaries as
+  config, likely as its own Guardrail set (the same mechanism
+  `aim_write_guardrails` is already one instance of), not a single global
+  policy. Folded into a fuller proposal covering the whole starter-kit
+  shape (discovery-Skill variant + Guardrail set + starter categories +
+  optional Recipe) in
+  [ADR-0014](adr/0014-usecase-archetype-starter-kits.md) - a proposal and
+  estimate, not an accepted design.
 - **Extraction-input guardrailing, distinct from candidate-fact
   guardrailing.** Guardrails today only filters the *output* of extraction
   (candidate fact text, via `runGuardrails()`). Nothing filters the *input*
@@ -972,6 +1185,25 @@ authorship on re-import is accepted, not a problem to solve.
   Still gated behind the separate, still-open "does aim ever store source
   material at all" question under Extraction above - this only settles the
   *shape*, not whether it happens.
+- **Read-only markdown/Obsidian export - not a storage swap.** Raised
+  2026-09-14, prompted by a question about whether `aim` should look into
+  file-based storage the way an agent's own memory (e.g. this session's
+  `~/.claude/.../memory/*.md` files) does. The right precedent already
+  exists one repo over: `annotations_export` (`dotdev`'s `annotations`
+  suite) doesn't store annotations as files - entities stay canonical -
+  it ships `drush ann:ex --format=obsidian` as a one-way, read-only
+  projection to markdown/an Obsidian vault, for human browsing and
+  external consumption. The equivalent for `aim` (an `aim_export`
+  submodule, or a drush command on `aim` core) would be additive only -
+  no conflict with ADR-0001's storage decision, since the database stays
+  the source of truth and nothing reads the export back in. `related`/
+  `expires` would map naturally onto Obsidian `[[wikilinks]]`, the same
+  way `annotations_export`'s `--ref-depth` does for entity-reference
+  fields. Real uses: dovetails with "fact verification as a user-facing
+  feature" above (a human-readable "here's what's remembered" view), and
+  portability into another agent's own file-based memory convention. Not
+  designed: filtering flags (scope/subject/category), and whether it
+  warrants its own submodule or stays a single drush command.
 
 ## Dev process and rules
 

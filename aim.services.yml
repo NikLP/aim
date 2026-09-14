@@ -8,3 +8,6 @@ services:
       - '@datetime.time'
       - '@Drupal\ai\Guardrail\AiGuardrailRepository'
       - '@queue'
+      - '@entity_type.bundle.info'
+      - '@uuid'
+      - '@config.factory'
