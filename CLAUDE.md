@@ -384,6 +384,38 @@ rediscovering:
   describe. Same fix applies: `DROP TABLE aim_facts` and re-save once,
   cleanly, not on top of a half-finished attempt.
 
+**`subject`/`subject_uid` as per-bundle fields - tried and reverted,
+2026-09-14.** Briefly moved both out of `baseFieldDefinitions()` into
+`AimFact::bundleFieldDefinitions()` (`subject_uid` only on `user`,
+`subject` only on `role`/`case`), prompted by a design question (why
+carry a dead field on a bundle that doesn't use it). Reverted the same
+day: the split broke two unrelated core/contrib consumers that both
+assume a field list built from `getBaseFieldDefinitions()`/
+`getFieldStorageDefinitions()` is the whole story and never walk
+`bundleFieldDefinitions()` - `ai_vdb_provider_mariadb`'s
+`AiVdbProviderClientBase::isMultiple()` (threw `Table
+'aim_facts__subject' doesn't exist` against real role/case consolidation
+queries) and, separately, core's own `Drupal\views\EntityViewsData`
+(silently degraded `views.view.aim_facts`'s `subject`/`subject_uid`
+columns to `Broken` field handlers, throwing `Undefined array key
+"element_type"` warnings on every render). Each is patchable in
+isolation (a `hook_entity_field_storage_info()` implementation fixed the
+first; a `hook_views_data_alter()` implementation fixed the second), but
+the pattern generalizes badly - `aim` is headed for drupal.org (see
+Project snapshot), so every future contrib/core integration point
+(export, REST, a different Views display, anything else that assumes
+"all fields are base fields") is a fresh chance to rediscover the same
+bug class. The cleanliness win (no unused field on a bundle that doesn't
+need it) wasn't worth an open-ended maintenance tax against a purely
+cosmetic problem - `AimMemoryManager::subjectValue()`'s abstraction
+already hid the two-fields-in-one-column reality from every call site
+regardless of whether they're base or bundle fields, so reverting cost
+nothing on the read side. Back to two always-present base fields, both
+`git checkout`-reverted to their pre-split shape (`subject` and
+`subject_uid` both defined in `baseFieldDefinitions()`, unused on a given
+bundle rather than absent). **Don't re-attempt this split** without a
+concrete reason beyond schema tidiness.
+
 ## Guardrails
 
 Live today, not part of the governance deferral
@@ -928,6 +960,20 @@ its route at the WRONG path (resolves into whatever tab set already claims
 that root, e.g. `/admin/content`) - use `menu.type: normal` for a plain
 admin menu link instead.
 
+**`uid` ("Extracted by") column added 2026-09-15.** Noticed while
+investigating a batch of `scope=user` facts that all showed
+`subject_uid=admin`: the View already surfaced `subject_uid` (who the fact
+is *about*) but never `uid` (`aim_fact`'s real `EntityOwnerTrait` field,
+who/what wrote it - defaults to the current user at save time, same as any
+core entity's "Authored by"). For `scope=site`, `subject` is unused
+entirely, so `uid` is the only "who said this" signal available at all.
+Added via the View entity's own `->save()` (a `drush scr` one-off script),
+not hand-typed, per this file's "never hand-type dependencies/cache_metadata"
+gotcha above - worth it here too: the recompute also dropped a stale
+`options` module dependency the file had carried since `scope`/`subject`
+moved off `list_string` (see "Scope as bundles"), never cleaned up until
+now.
+
 ## Admin settings
 
 Built 2026-09-14. `/admin/config/aim/settings` (`AimSettingsForm`, a plain
@@ -1204,6 +1250,113 @@ authorship on re-import is accepted, not a problem to solve.
   portability into another agent's own file-based memory convention. Not
   designed: filtering flags (scope/subject/category), and whether it
   warrants its own submodule or stays a single drush command.
+- **Scope-aware fact-ingress form - conditional fields, not a wizard.**
+  Raised 2026-09-15, prompted by noticing a batch of `scope=user` facts
+  all resolved to one real account (`admin`) with no UI to pick a
+  different one - see "Admin UI"'s `uid` column note above, added the same
+  day, for the investigation that surfaced this. Not yet built - concrete
+  handoff below, not just the shape, so this can be picked up cold.
+
+  **Route/menu:** `/admin/content/aim-facts/add` (route `aim.fact_add`), a
+  plain `menu.type: normal` entry in `aim.links.menu.yml` parented under
+  `system.admin_content` - a separate menu entry sibling to the existing
+  "AIM facts" listing link, not a local-action "Add" button on the View
+  (Nik's call, 2026-09-15). Matches this module's only two existing
+  menu-link precedents (`aim.admin_config`/`aim.settings`, both `normal`)
+  and sidesteps this file's own `menu.type: 'default tab'` placement
+  gotcha (Admin UI section) rather than risking it a second time.
+
+  **Permission:** gate on `administer aim memory` (already exists in
+  `aim` core, already gates the View and Settings form it sits beside) -
+  not `aim_tool`'s `store aim memory`, a different module's permission for
+  the Tool/MCP surface, wrong boundary for a form living in `aim` core. A
+  non-admin "trusted writer" surface later would need a new split
+  permission on `aim` core itself (mirroring `aim_tool`'s pattern), not
+  borrowing `aim_tool`'s - not needed for v1.
+
+  **Form class:** a plain `FormBase` (`src/Form/AimFactAddForm.php`),
+  **not** a generic entity add-form for `aim_fact`. The one real
+  implementation risk worth flagging loudly: every other write path
+  (`aim:remember`, `AimRemember`'s Tool/MCP call, `aim_eca`'s `FactWrite`)
+  goes through `AimMemoryManager::remember()`, which runs guardrails and
+  enqueues for consolidation (see "Guardrails"/"Consolidation" above) - a
+  default `ContentEntityForm::save()` would silently skip both. The form
+  must call `remember()`, exactly like every other caller, never
+  `$entity->save()` directly.
+
+  **Fields**, `#states`-driven off a `scope` select (default `site`,
+  options from `allowedScopes()`):
+  - `scope=user`: an `entity_autocomplete` (`target_type: user`),
+    required, **default value pre-filled to the current user** - a
+    visible default the person can change, better UX here than the
+    invisible current-user fallback `AimRemember` does API-side (see the
+    default-subject-centralization note below - doing it visibly in this
+    form's default value sidesteps needing that fix first, though it's
+    still worth doing for the other callers).
+  - `scope=role`: plain textfield, matching today's actual behavior -
+    `remember()` never validates a role name against real `user_role`
+    entities for `scope=role`, so a select-from-real-roles widget would be
+    a behavior upgrade, not parity; fine as a later nice-to-have, not v1.
+  - `scope=case`: optional textfield, described as "existing case ID -
+    leave blank to mint a new one" (mirrors `remember()`'s own minting,
+    see "Case IDs are minted server-side").
+  - `scope=site`: no extra field.
+  - Always shown: `text` (required textarea), `source` (optional
+    textfield), `state` (optional tri-state boolean select, matching
+    `remember()`'s `?bool $state`), `category` (optional tags-style
+    `entity_autocomplete` against `aim_category`, comma-separated names
+    through the same `resolveCategoryTerms()` that already skips a
+    no-match name), `asserted` (optional textfield, same
+    `strtotime()`-parseable freeform text `aim:remember --asserted`
+    already accepts).
+
+  **Explicitly out of scope for v1:** any "link this fact to another
+  fact" field - raised in the same 2026-09-15 discussion (would this need
+  a new field, or can it reuse `related`?) and answered there: `related`
+  is a plain untyped `entity_reference` to `aim_fact` today (unlimited
+  cardinality, no edge-type/reason of its own), reserved for
+  consolidation's mechanical supersede edge - reusing it for an authored
+  "this fact's reason is that fact" link would make the two kinds of edge
+  indistinguishable in the same flat list. That's the separate,
+  still-undesigned question [ADR-0012](adr/0012-fact-relation-graph.md)
+  and the "Fact-to-fact relations" idea below already cover (typed
+  relation entity vs. reusing `related`, an edge-type/reason value, or
+  both) - don't let it grow inside this form's first cut.
+
+  Building this would also expose a real gap found in passing:
+  `AimRemember`'s Tool plugin already defaults `subject` to the calling
+  account for `scope=user` when none is given
+  (`modules/aim_tool/src/Plugin/tool/Tool/AimRemember.php`), but
+  `AimMemoryManager::remember()` and `drush aim:remember` do not - only
+  the MCP path gets that convenience today. A form needing the same
+  default would be the second real occurrence of that logic, worth
+  centralizing on `remember()` itself before a third one appears,
+  independent of whether scopes ever become a plugin type (next).
+- **Scopes as a plugin type - considered 2026-09-15, not adopted.** Raised
+  in the same discussion as the ingress form above, prompted by wanting
+  `aim` to support pluggable per-site archetypes (ties to
+  [ADR-0014](adr/0014-usecase-archetype-starter-kits.md)). Sketch: an
+  `#[AimScope]` attribute plugin type, same pattern as `#[Tool]`/
+  `#[FunctionCall]` already in this codebase, one class per scope owning
+  its own default-subject resolution, guardrail set, and ingress-form
+  widget spec, discovered instead of the `if ($scope === 'user')` branches
+  currently scattered across `AimMemoryManager`, `AimRemember`,
+  `AimCommands`, and `aim_eca`. Real benefit: a site or contrib archetype
+  adds a fifth scope with real attached behavior in one class, not just a
+  bundle label via `hook_entity_bundle_info_alter()` (today's
+  extensibility point - a bundle only, no behavior). Real cost: scope
+  stays a Drupal bundle underneath either way (the entity system needs
+  that), so a plugin type would sit alongside the bundle system, not
+  replace it - some duplication unless one derives from the other - and
+  today's actual per-scope behavior is thin (one `if` for subject
+  defaulting), so building the plugin type now would mostly be ceremony.
+  Decision: don't build it yet - build the ingress form's conditional
+  fields and the `remember()` default-subject fix above as plain code
+  first, the same shape scope-specific logic already takes. Once that
+  logic is duplicated a third time (the ingress form's widget-per-scope
+  would be the second, a future chat surface or archetype the third),
+  that's the trigger to extract an `#[AimScope]` plugin type - by then the
+  real interface will be known instead of guessed now.
 
 ## Dev process and rules
 

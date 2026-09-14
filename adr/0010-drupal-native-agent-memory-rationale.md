@@ -8,9 +8,8 @@ decisions. The binding architectural calls made here were subsequently split
 out into ADR-0001 through ADR-0009 in this directory, which supersede this
 document wherever they overlap - see [0000-index.md](0000-index.md). This
 one is retained for the market comparison, risk analysis, and original
-context those are downstream of. Distinct venture; not a feature of, or
-dependency on, the `annotations` suite. Where that suite is referenced below
-it's for architectural kinship only.
+context those are downstream of.
+
 **Updated same day:** folded in a verified read of `ai_vdb_provider_mariadb`'s
 actual source (embedding/insert mechanics), the concrete Tool API/MCP write
 path, a full AI-dependency map distinguishing reasoning calls from embedding

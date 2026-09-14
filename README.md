@@ -192,6 +192,66 @@ embedding-API credit (one call per fact, or per chunk under the
 scale, a real line item once volume grows (see CLAUDE.md's AI dependency
 map).
 
+## Setting up MCP OAuth (remote clients with no Drupal session)
+
+Cookie/session access to `/mcp` already works with zero extra setup once
+`aim_tool`/`mcp_server_tool_bridge` are enabled - this is only needed for a
+headless caller with no logged-in browser session (Claude.ai's connector,
+Claude Desktop, or any other remote MCP client).
+
+1. **Enable the OAuth stack**: `simple_oauth`, `simple_oauth_21`
+   (Packagist-only, `e0ipso/simple_oauth_21` - not a drupal.org project),
+   `simple_oauth_server_metadata`, `simple_oauth_client_registration`,
+   `simple_oauth_pkce`, `consumers`, `mcp_server_oauth` (Composer name
+   `drupal/mcp_server_oauth-mcp_server_oauth`, same self-doubled-package
+   drupal.org bug as `mcp_server_tool_bridge`), then `aim_tool_oauth`.
+2. **Generate a key pair outside the docroot**:
+   `vendor/bin/drush simple-oauth:generate-keys <path>`, e.g. `keys/` at
+   this site's repo root, sibling to `web/` (already gitignored).
+   `simple_oauth.settings`'s `public_key`/`private_key` need to point at
+   the generated pair.
+3. **Confirm `aim_tool_oauth`'s shipped config took**: two `oauth2_scope`
+   entities (`aim:remember`, `aim:recall`) with `granularity_id:
+   permission` already set, pointed at the `store aim memory`/`read aim
+   memory` permissions. A scope with no granularity crashes
+   `Oauth2ScopeProvider::getPermissions()` the moment a real client
+   completes the flow - surfaces client-side as a generic "couldn't
+   connect", not a scope/permission error. If this ever regresses, check
+   `drush watchdog:show` for `AssertionError:
+   assert($granularity instanceof ScopeGranularityInterface)`.
+4. **Expose the site over real HTTPS to the client** - DDEV's local
+   hostname and self-signed cert can't be reached or trusted by a
+   cloud-hosted connector. This site uses Tailscale Funnel:
+   `tailscale funnel --bg https+insecure://127.0.0.1:443` (must target the
+   router's **HTTPS** entrypoint, not the HTTP one - only that entrypoint
+   sets the right `X-Forwarded-Proto`) plus `.ddev/config.yaml`'s
+   `additional_fqdns` set to the Funnel hostname. See CLAUDE.md's "MCP
+   OAuth" section for the full history if this needs redoing on a
+   different tailnet/machine.
+5. **Register and connect a real client**: confirm
+   `/.well-known/oauth-protected-resource` and
+   `/.well-known/oauth-authorization-server` both resolve, every endpoint
+   in the metadata (including `registration_endpoint`) comes back
+   `https://`, and a real `POST /oauth/register` returns a genuine
+   `client_id` - not just that the discovery metadata looks right.
+
+**Gotchas:**
+
+- The OAuth admin form's "Required scopes" selector only offers scopes an
+  already-enabled `mcp_tool_config` carries - empty with no free-text
+  fallback on a site with none configured yet. `aim_tool_oauth_install()`
+  seeds this in code so the UI has something to offer from the start.
+- Enabling a module whose `config/install` matches an existing config name
+  throws `PreExistingConfigException` outright - don't hand-create
+  `oauth2_scope` entities to inspect their shape before enabling
+  `aim_tool_oauth`.
+- The Funnel target is `tailscaled` process/session state, not
+  `.ddev/config.yaml` - a host reboot or `tailscale` service restart drops
+  it entirely (not back to a broken target, just gone, not silently back
+  to the pre-fix `http://` target). Check `tailscale funnel status` before
+  re-diagnosing the OAuth chain if a connector registration ever fails
+  again.
+
 ## Build order
 
 1. **PoC.** Prove the schema and vector search work end to end. Done -
