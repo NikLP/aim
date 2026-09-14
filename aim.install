@@ -23,3 +23,41 @@ function aim_install(): void {
     $index->save();
   }
 }
+
+/**
+ * Implements hook_uninstall().
+ *
+ * drush pmu does not reliably remove every config/install entity on its
+ * own (reproduced twice against this exact config set - see CLAUDE.md's
+ * "Scope as bundles" gotchas), leaving orphans that throw
+ * PreExistingConfigException on the next install. Delete everything this
+ * module ships explicitly instead of relying on dependency-based cleanup.
+ */
+function aim_uninstall(): void {
+  $entity_type_manager = \Drupal::entityTypeManager();
+  $entities = [
+    'ai_guardrail' => ['aim_max_length', 'aim_no_markup'],
+    'ai_guardrail_set' => ['aim_write_guardrails'],
+    'search_api_index' => ['aim_vector_index'],
+    'search_api_server' => ['aim_vector'],
+    'taxonomy_vocabulary' => ['aim_category'],
+    'view' => ['aim_facts'],
+  ];
+  foreach ($entities as $entity_type_id => $ids) {
+    $storage = $entity_type_manager->getStorage($entity_type_id);
+    foreach ($storage->loadMultiple($ids) as $entity) {
+      $entity->delete();
+    }
+  }
+
+  $config_factory = \Drupal::configFactory();
+  foreach (['aim.settings', 'ai_search.index.aim_vector_index'] as $name) {
+    $config_factory->getEditable($name)->delete();
+  }
+
+  // createCollection() is not idempotent (see CLAUDE.md's "Vector search"
+  // gotchas) - drop the collection table outright rather than leaving a
+  // stray table for the next install's createCollection() to collide
+  // with. Safe if the search_api_index delete above already dropped it.
+  \Drupal::database()->schema()->dropTable('aim_facts');
+}

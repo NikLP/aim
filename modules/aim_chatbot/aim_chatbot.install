@@ -1,0 +1,32 @@
+<?php
+
+/**
+ * @file
+ * Install hooks for the AIM Chatbot module.
+ */
+
+declare(strict_types=1);
+
+/**
+ * Implements hook_uninstall().
+ *
+ * drush pmu does not reliably remove every config/install entity on its
+ * own (reproduced twice against this exact config set - see CLAUDE.md's
+ * "Scope as bundles" gotchas), leaving orphans that throw
+ * PreExistingConfigException on the next install. Delete everything this
+ * module ships explicitly instead of relying on dependency-based cleanup.
+ */
+function aim_chatbot_uninstall(): void {
+  $entity_type_manager = \Drupal::entityTypeManager();
+  $entities = [
+    'ai_agent' => ['aim_chatbot'],
+    'ai_assistant' => ['aim_demo_assistant'],
+    'block' => ['olivero_aimdemochat'],
+  ];
+  foreach ($entities as $entity_type_id => $ids) {
+    $storage = $entity_type_manager->getStorage($entity_type_id);
+    foreach ($storage->loadMultiple($ids) as $entity) {
+      $entity->delete();
+    }
+  }
+}

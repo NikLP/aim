@@ -1,0 +1,24 @@
+<?php
+
+/**
+ * @file
+ * Install hooks for the AIM Tool module.
+ */
+
+declare(strict_types=1);
+
+/**
+ * Implements hook_uninstall().
+ *
+ * drush pmu does not reliably remove every config/install entity on its
+ * own (reproduced twice against aim's/aim_chatbot's own config - see
+ * CLAUDE.md's "Scope as bundles" gotchas), leaving orphans that throw
+ * PreExistingConfigException on the next install. Delete everything this
+ * module ships explicitly instead of relying on dependency-based cleanup.
+ */
+function aim_tool_uninstall(): void {
+  $storage = \Drupal::entityTypeManager()->getStorage('mcp_tool_config');
+  foreach ($storage->loadMultiple(['aim_remember', 'aim_recall']) as $entity) {
+    $entity->delete();
+  }
+}
