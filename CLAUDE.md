@@ -808,6 +808,45 @@ authorship on re-import is accepted, not a problem to solve.
   status" on staleness is really [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
   Content Moderation gate arriving early - don't build a smaller ad hoc
   `review_status` field that Content Moderation would just replace later.
+- **Per-fact volatility hint for staleness thresholds.** Raised in another
+  session 2026-09-14: let a fact declare its own expected shelf-life at
+  write time (e.g. `stable`/`seasonal`/`volatile`) so the still-unbuilt
+  scheduled staleness review above isn't one-size-fits-all - a `stable`
+  fact ("Nik's employer") and a `volatile` one ("Nik's current mood")
+  shouldn't age out on the same clock. Would live as a field alongside
+  `asserted` (see bi-temporal validity below), populated by the writer
+  (extraction model, `aim:remember` caller, or ECA's `FactWrite`) rather
+  than inferred. Not designed: the actual threshold-per-tier mapping,
+  whether a missing hint defaults to the most conservative tier or the
+  least, and whether consolidation's own similarity thresholds should
+  also vary by tier.
+- **Manual review queue for contradicting facts, not auto-resolve.** Raised
+  in the same 2026-09-14 session as the volatility-hint idea above: when a
+  new fact semantically conflicts with an existing one (same subject,
+  overlapping content, different claim), don't silently pick a winner -
+  flag both and let a human decide "still true / no longer true / both
+  true at different times." Proposed as a Content Moderation state machine
+  on facts (`unverified` -> `confirmed`/`superseded`/`conflicting`), with
+  `conflicting` facts kept, not deleted, so the contradiction stays
+  visible rather than the older fact quietly vanishing - consistent with
+  how `related`/`expires` already avoid hard deletes on supersede.
+  Workload kept proportional by design: sample-review a percentage of new
+  facts, or force review only when contradiction-detection actually
+  fires, not a gate on every single write.
+
+  Real tension with current design, not yet reconciled: consolidation's
+  ambiguous band ([ADR-0005](adr/0005-consolidation-algorithm.md),
+  thresholds above) already auto-resolves this case today via
+  `classifyPair()`'s LLM verdict, setting `expires` on the older fact with
+  no human step - this idea would replace that auto-resolve with a human
+  decision specifically for contradictions, presumably leaving
+  true-duplicate auto-merging (below the auto-threshold) alone. Also
+  overlaps [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
+  still-deferred Content Moderation gate, but is narrower than that ADR's
+  current "nothing LLM-extracted is auto-trusted" blanket framing - a
+  dedicated `conflicting` state and proportional (sampled/triggered)
+  review are more specific than what ADR-0002 currently commits to.
+  Reconcile both overlaps when ADR-0002 actually gets built, not before.
 - **Pre-extraction summarization as a dedup lever** (an AI pass summarizes
   a conversation before extraction runs), complementary to consolidation,
   not a substitute - only catches duplication *within* one session.

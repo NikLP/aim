@@ -1,11 +1,20 @@
-# aim - Drupal-native AI agent memory infrastructure
+# aim - Drupal AI memory infrastructure
+
+This module is currently under heavy development. Your feedback at any level is
+appreciated and welcomed.
+
+As such, some claims in the file you're reading may be out of date or quite
+possibly incorrect.
+
+The config that ships here is almost certain not to work on your setup. The
+details below outline that and how to replicate somewhat, but YMMV.
 
 **Status: PoC working end to end.** A real `aim_fact` entity, indexed through
 Search API's AI Search backend into a MariaDB `VECTOR` column, with real
 embeddings generated locally via Ollama and a real semantic query returning
 the right result. A working extraction prototype (`drush aim:extract`) turns raw
 text into classified, scoped facts via a real chat provider call, and a
-direct `drush aim:remember`/`drush aim:recall` pair lets an agent that has
+direct `aim:remember`/`aim:recall` pair lets an agent that has
 already done its own reasoning write and query facts with no extra chat
 call.
 See [CLAUDE.md](CLAUDE.md) for the current build state and
@@ -23,10 +32,10 @@ same way they wanted in-house CMSs once web publishing got cheap. This project
 asks whether that's buildable in Drupal now, cheaply enough to be worth having
 ready, rather than waiting for the market and buying in later.
 
-This is a **distinct venture**, not a feature of any other suite. It shares an
-architectural idea with sibling projects (structured, permission-gated,
-per-content or per-user context) but is a different product for a different
-buyer.
+It is assumed that you won't use this module for managing classified
+information - *using an AI agent that is not sovereign (local) can expose
+your data*. This module is a PoC with the view that it will be used with a local
+reasoning model in future.
 
 ## Why Drupal, why SQL
 
