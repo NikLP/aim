@@ -5,7 +5,6 @@ dependencies:
     - system.menu.admin
   module:
     - aim
-    - options
     - user
 id: aim_facts
 label: 'AIM facts'
@@ -140,6 +139,26 @@ display:
           type: string
           settings:
             link_to_entity: false
+        uid:
+          id: uid
+          table: aim_fact
+          field: uid
+          entity_type: aim_fact
+          entity_field: uid
+          plugin_id: field
+          label: 'Extracted by'
+          exclude: false
+          alter:
+            alter_text: false
+          element_class: ''
+          element_default_classes: true
+          empty: ''
+          hide_empty: false
+          empty_zero: false
+          hide_alter_empty: true
+          type: entity_reference_label
+          settings:
+            link: false
         state:
           id: state
           table: aim_fact
@@ -232,6 +251,7 @@ display:
             subject_uid: subject_uid
             text: text
             source: source
+            uid: uid
             state: state
             expires: expires
           default: id
@@ -272,6 +292,13 @@ display:
               empty_column: false
               responsive: ''
             source:
+              sortable: false
+              default_sort_order: asc
+              align: ''
+              separator: ''
+              empty_column: false
+              responsive: priority-low
+            uid:
               sortable: false
               default_sort_order: asc
               align: ''
