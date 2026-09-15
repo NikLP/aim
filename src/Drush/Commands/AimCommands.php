@@ -56,7 +56,7 @@ final class AimCommands extends DrushCommands {
    * @option provider The AI provider plugin ID to use.
    * @option model The chat model ID to use.
    * @option source Provenance tag stored on every created fact.
-   * @option subject-uid A uid or username of a real account to attach any scope=user candidate to. Omit to skip all scope=user candidates (see ADR-0011).
+   * @option subject-uid A uid of a real account to attach any scope=user candidate to. Omit to skip all scope=user candidates (see ADR-0011).
    * @option index Reindex the vector index immediately after saving.
    *
    * @usage drush aim:extract notes.txt
@@ -71,7 +71,7 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'provider', description: 'The AI provider plugin ID to use.')]
   #[CLI\Option(name: 'model', description: 'The chat model ID to use.')]
   #[CLI\Option(name: 'source', description: 'Provenance tag stored on every created fact.')]
-  #[CLI\Option(name: 'subject-uid', description: 'A uid or username of a real account to attach any scope=user candidate to. Omit to skip all scope=user candidates.')]
+  #[CLI\Option(name: 'subject-uid', description: 'A uid of a real account to attach any scope=user candidate to. Omit to skip all scope=user candidates.')]
   #[CLI\Option(name: 'index', description: 'Reindex the vector index immediately after saving.')]
   #[CLI\Usage(name: 'drush aim:extract notes.txt', description: 'Extract facts from notes.txt using the default provider and model.')]
   public function extract(
@@ -167,7 +167,7 @@ final class AimCommands extends DrushCommands {
    * @aliases aim-remember
    *
    * @option scope One of user, role, site, case.
-   * @option subject Who or what the fact is about. For scope=user, a uid or username of a real account on this site. Empty for site scope.
+   * @option subject Who or what the fact is about. For scope=user, a uid of a real account on this site. Empty for site scope.
    * @option source Provenance tag for this fact.
    * @option state Optional boolean flag value: true or false. Omit for facts with no boolean shape.
    * @option category Comma-separated term name(s) from the aim_category vocabulary. A name with no matching term is skipped.
@@ -175,7 +175,7 @@ final class AimCommands extends DrushCommands {
    * @option file Path to a JSON file: an array of fact objects (same fields as the options above, plus "text"), saved in one bootstrap instead of $text/the other options.
    *
    * @usage drush aim:remember "Prefers email over phone." --scope=user --subject=42
-   *   Save a plain prose fact about a user, by uid or username.
+   *   Save a plain prose fact about a user, by uid.
    * @usage drush aim:remember "Opted out of marketing email." --scope=user --subject=42 --state=true
    *   Save a fact that is itself a boolean flag.
    * @usage drush aim:remember "Moved to Manchester." --scope=user --subject=42 --asserted="3 months ago"
@@ -186,13 +186,13 @@ final class AimCommands extends DrushCommands {
   #[CLI\Command(name: 'aim:remember', aliases: ['aim-remember'])]
   #[CLI\Argument(name: 'text', description: 'The fact text, one short statement. Omit when using --file.')]
   #[CLI\Option(name: 'scope', description: 'One of user, role, site, case.')]
-  #[CLI\Option(name: 'subject', description: 'Who or what the fact is about. For scope=user, a uid or username of a real account.')]
+  #[CLI\Option(name: 'subject', description: 'Who or what the fact is about. For scope=user, a uid of a real account.')]
   #[CLI\Option(name: 'source', description: 'Provenance tag for this fact.')]
   #[CLI\Option(name: 'state', description: 'Optional boolean flag value: true or false. Omit for facts with no boolean shape.')]
   #[CLI\Option(name: 'category', description: 'Comma-separated term name(s) from the aim_category vocabulary.')]
   #[CLI\Option(name: 'asserted', description: 'When this fact became true in reality, if different from now.')]
   #[CLI\Option(name: 'file', description: 'Path to a JSON file of fact objects, saved in one bootstrap instead of $text/the other options.')]
-  #[CLI\Usage(name: 'drush aim:remember "Prefers email over phone." --scope=user --subject=42', description: 'Save a plain prose fact about a user, by uid or username.')]
+  #[CLI\Usage(name: 'drush aim:remember "Prefers email over phone." --scope=user --subject=42', description: 'Save a plain prose fact about a user, by uid.')]
   #[CLI\Usage(name: 'drush aim:remember --file=facts.json', description: 'Save every fact in facts.json in one bootstrap.')]
   public function remember(
     ?string $text = NULL,

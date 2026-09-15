@@ -289,6 +289,11 @@ final class AimMemoryManager {
   /**
    * Resolves a uid or username to a real user account.
    *
+   * Read paths only (recall(), aim_eca's FactQuery/FactState): a wrong
+   * match here just returns a wrong query result, not a permanent
+   * misattributed write. See resolveAccountByUid() for the stricter
+   * uid-only resolution write paths use instead.
+   *
    * @param string $value
    *   A numeric uid, or an account name.
    *
@@ -303,6 +308,34 @@ final class AimMemoryManager {
     }
     $accounts = $storage->loadByProperties(['name' => $value]);
     $account = reset($accounts);
+    return $account instanceof AccountInterface ? $account : NULL;
+  }
+
+  /**
+   * Resolves a uid to a real user account, for write paths only.
+   *
+   * Unlike resolveAccount(), this never falls back to matching a freeform
+   * username string: an exact match on a typo'd string can silently
+   * collide with a different real account's actual username, permanently
+   * attaching a written fact to the wrong person. The two legitimate
+   * sources of a write-path subject_uid value are the current
+   * authenticated user (already uid-formatted by every caller that does
+   * this) and a widget-selected value (an entity_reference autocomplete
+   * never emits freeform text), so requiring a literal uid costs nothing
+   * real. Used by remember() and createFactsFromCandidates().
+   *
+   * @param string $value
+   *   A numeric uid.
+   *
+   * @return \Drupal\Core\Session\AccountInterface|null
+   *   The matching account, or NULL if $value is not numeric or does not
+   *   match a real account.
+   */
+  public function resolveAccountByUid(string $value): ?AccountInterface {
+    if (!ctype_digit($value)) {
+      return NULL;
+    }
+    $account = $this->entityTypeManager->getStorage('user')->load((int) $value);
     return $account instanceof AccountInterface ? $account : NULL;
   }
 
@@ -501,8 +534,8 @@ final class AimMemoryManager {
    * @param string $scope
    *   One of user, role, site, case.
    * @param string|null $subject
-   *   Who or what the fact is about. For scope=user, a uid or username of a
-   *   real account on this site. Ignored for site scope. For scope=case, an
+   *   Who or what the fact is about. For scope=user, a uid of a real
+   *   account on this site. Ignored for site scope. For scope=case, an
    *   existing case ID to continue - omit to start a new case, which mints
    *   one and stamps it onto the created fact.
    * @param string|null $source
@@ -543,9 +576,9 @@ final class AimMemoryManager {
       // merely happens to hold a uid - that drift is exactly what let "1"
       // and "Nik" address the same person without ever matching.
       if (empty($subject)) {
-        throw new \InvalidArgumentException('subject is required for scope=user: a uid or username of a real account on this site.');
+        throw new \InvalidArgumentException('subject is required for scope=user: a uid of a real account on this site.');
       }
-      $account = $this->resolveAccount($subject);
+      $account = $this->resolveAccountByUid($subject);
       if (!$account) {
         throw new \InvalidArgumentException('No user account found for subject "' . $subject . '". A user-scope fact must be about a real account.');
       }
@@ -622,8 +655,8 @@ final class AimMemoryManager {
    * @param string $source
    *   Provenance tag stored on every created fact.
    * @param string|null $subjectUid
-   *   A uid or username of a real account to attach to any candidate the
-   *   model classifies as scope=user. See ADR-0011: extraction never
+   *   A uid of a real account to attach to any candidate the model
+   *   classifies as scope=user. See ADR-0011: extraction never
    *   resolves scope=user against the model's own freeform subject text -
    *   a document naming someone is no guarantee that person has an account
    *   on this site. NULL means no such account was supplied, so every
@@ -646,7 +679,7 @@ final class AimMemoryManager {
 
     $subjectAccount = NULL;
     if (!empty($subjectUid)) {
-      $subjectAccount = $this->resolveAccount($subjectUid);
+      $subjectAccount = $this->resolveAccountByUid($subjectUid);
       if (!$subjectAccount) {
         throw new \InvalidArgumentException('No user account found for subject-uid "' . $subjectUid . '". A user-scope fact must be about a real account.');
       }

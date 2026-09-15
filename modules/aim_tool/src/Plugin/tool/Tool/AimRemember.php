@@ -64,7 +64,7 @@ use Drupal\tool\TypedData\MapInputDefinition;
     'subject' => new InputDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Subject'),
-      description: new TranslatableMarkup('Who or what the fact is about. For scope=user, a uid or username of a real account; omit to default to the calling account. Not used for scope=site.'),
+      description: new TranslatableMarkup('Who or what the fact is about. For scope=user, a uid of a real account; omit to default to the calling account. Not used for scope=site.'),
       required: FALSE,
     ),
     'source' => new InputDefinition(
@@ -96,7 +96,7 @@ use Drupal\tool\TypedData\MapInputDefinition;
           'subject' => new InputDefinition(
             data_type: 'string',
             label: new TranslatableMarkup('Subject'),
-            description: new TranslatableMarkup('Who or what the fact is about. For scope=user, a uid or username of a real account; omit to default to the calling account.'),
+            description: new TranslatableMarkup('Who or what the fact is about. For scope=user, a uid of a real account; omit to default to the calling account.'),
             required: FALSE,
           ),
           'source' => new InputDefinition(

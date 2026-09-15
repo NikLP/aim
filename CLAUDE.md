@@ -444,7 +444,7 @@ transcript recording - the `source` field is a short provenance pointer,
 never the raw dialogue. Don't add a field/table storing full transcripts
 without this being explicitly revisited first.
 
-`--subject-uid` (uid or username) attaches every model-classified
+`--subject-uid` (uid only, see below) attaches every model-classified
 `scope=user` candidate to that one real account; without it every
 `scope=user` candidate is skipped (with a warning), unconditionally -
 extraction never attempts to match the model's own freeform subject text
@@ -453,6 +453,30 @@ against the accounts table. See
 scope requires a real account at all, and
 [ADR-0011](adr/0011-extraction-explicit-subject-uid.md) for why the match
 can't be model-guessed.
+
+**`resolveAccount()` tightened to uid-only for write paths, 2026-09-15.**
+`AimMemoryManager::resolveAccount()` accepts either a numeric uid or an
+exact username-string match (`loadByProperties(['name' => $value])`) - not
+fuzzy, but still a real risk: an exact match on a typo'd string can
+silently attach a fact to the wrong real account if the typo happens to
+collide with someone else's actual username. A new
+`resolveAccountByUid()` (uid only, no username fallback) replaced it on
+every write path - `remember()`'s `subject` for `scope=user` (so
+`aim:remember --subject` and `aim_tool`'s `aim_remember` too, both call
+`remember()`/share its docs) and `createFactsFromCandidates()`'s
+`$subjectUid` (`aim:extract --subject-uid` above). `resolveAccount()`
+itself is untouched and still dual-format, since it also backs read paths
+(`recall()`'s `--subject-uid` filter, `aim_eca`'s `FactQuery`/
+`FactState`) where a wrong match only returns a wrong query result, not a
+permanent misattributed write - a materially different risk. The two
+legitimate sources of a write-path subject_uid value stay: the current
+authenticated user (already how `AimRemember`'s MCP-tool default works)
+and a widget-selected value (the still-unbuilt fact-ingress form's
+`entity_reference` autocomplete, see "Ideas raised", never emits freeform
+text either). `aim_eca`'s `FactWrite` still calls the dual-format
+`resolveAccount()` for its own `scope=user` subject - not touched here,
+narrower scope than this decision covered; revisit if `aim_eca` is ever
+un-deprioritized.
 
 **Skill:** `.claude/skills/aim-discovery/` ("the grill") - a structured
 discovery interview that distills each topic into a summary and runs it
