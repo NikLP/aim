@@ -492,6 +492,26 @@ undesigned ideas elsewhere in this file ("Scopes as a plugin type,"
 natural home for them once either gets built, neither is a prerequisite
 of this change.
 
+**Add/edit/delete/collection routes added 2026-09-15 (later same day),
+not part of the original conversion above - required, not optional.**
+Core's `EntityController::addPage()` unconditionally builds an "Add a new
+@entity_type" fallback link for a `bundle_entity_type`'s own add-form,
+even when bundles already exist and the link is never rendered - it calls
+`Link::createFromRoute(...)->toString()` eagerly, which throws
+`RouteNotFoundException` if that route doesn't exist. This crashed
+`entity.aim_fact.add_page` outright (a 500, not a graceful degrade) the
+first time it was actually visited as a real HTTP request post-conversion
+- every earlier "verified live" note in this section used
+`Url::fromRoute()` directly with an explicit bundle argument, which never
+exercises this code path. `AimScope` gained a minimal `AimScopeForm`
+(`src/Form/AimScopeForm.php`, id + label fields only, matching
+`config_export`) plus `add-form`/`edit-form`/`delete-form`/`collection`
+links and `route_provider.html`, at `/admin/config/aim/scopes` (menu link
+under `aim.admin_config`, local action "Add AIM scope"). This also
+completes the "add a scope through the admin UI with no code" claim made
+above - that was aspirational until this fix, not actually true (no
+add-form existed at all before this).
+
 **Mechanics:** no real data yet (PoC - see "Schema/config changes during
 early development" below), so this landed without a migration: the new
 entity type was installed live via
@@ -1196,26 +1216,87 @@ register at all; `DefaultHtmlRouteProvider::getCanonicalRoute()` checks
 `hasViewBuilderClass()`), `handlers.route_provider.html`
 (`DefaultHtmlRouteProvider::class`), and four `links`: `add-page`
 (`/admin/content/aim-facts/add`), `add-form`
-(`/admin/content/aim-facts/add/{scope}`), `canonical`
+(`/admin/content/aim-facts/add/{aim_scope}`), `canonical`
 (`/admin/content/aim-facts/{aim_fact}`), `edit-form`
-(`/admin/content/aim-facts/{aim_fact}/edit`). The `{scope}` parameter name
-in `add-form` is not arbitrary - core's `EntityController::addPage()`
-builds each bundle's add link using the entity type's bundle key
-(`scope` here, since `aim_fact` has no `bundle_entity_type`) as the route
-parameter name, confirmed by reading
-`DefaultHtmlRouteProvider::getAddFormRoute()` and `EntityController::addPage()`
-before choosing this over the earlier custom-form plan's own path
-scheme. Access was originally gated by `administer aim memory` alone (the
-default `EntityAccessControlHandler` granting every operation to a holder
-of the entity type's `admin_permission`) - superseded by per-scope
-permissions below, `administer aim memory` now works purely as the
-existing bypass every check already `orIf`s against. Verified live: all
-four routes resolve
-(`entity.aim_fact.add_page`/`add_form`/`canonical`/`edit_form`), and the
-add-form correctly runs through `remember()`'s underlying save path
-(guardrails + consolidation enqueue both fire, see "Guardrails" above) -
-not a hand-rolled `FormBase` with its own `$entity->save()` that would
-have silently skipped both, the exact risk the superseded plan flagged.
+(`/admin/content/aim-facts/{aim_fact}/edit`). Access was originally gated
+by `administer aim memory` alone (the default `EntityAccessControlHandler`
+granting every operation to a holder of the entity type's
+`admin_permission`) - superseded by per-scope permissions below,
+`administer aim memory` now works purely as the existing bypass every
+check already `orIf`s against.
+
+**`add-form`'s route parameter, corrected 2026-09-15 (later session):
+`{aim_scope}`, not `{scope}`.** The original build (above) used `{scope}`
+on the reasoning that `aim_fact` had no `bundle_entity_type` at build
+time - true when this paragraph was first written, but "Scope as a config
+entity" landed `bundle_entity_type: 'aim_scope'` the same day, and this
+link was never revisited against it. The two don't compose: once
+`bundle_entity_type` is set,
+`DefaultHtmlRouteProvider::getAddFormRoute()` hardcodes its
+`_entity_create_access` requirement and parameter-upcasting config
+against a placeholder literally named after the bundle entity type ID
+(`{aim_scope}`, same as `node`'s `{node_type}`/`media`'s `{media_type}`)
+regardless of what the link path itself calls it - a path using `{scope}`
+silently broke bundle upcasting and produced
+`MissingMandatoryParametersException` the moment `EntityController::
+addPage()` tried to build a real link to it (`{aim_scope}` in the access
+requirement referred to a route variable that didn't exist). Never
+caught earlier because every prior "verified live" check in this file
+called `Url::fromRoute('entity.aim_fact.add_form', ['scope' => 'site'])`
+directly, which resolves the route by its literal path variable name and
+never exercises `EntityController::addPage()`'s bundle-link-building
+code at all - only a real end-to-end request through the bundle picker
+surfaces this class of mismatch. `getEntityFromRouteMatch()`
+(`EntityForm`) has the same requirement on the read side: it looks up the
+bundle via `$route_match->getRawParameter($bundle_entity_type_id)`, so a
+mismatched placeholder name would have also silently produced a
+bundle-less entity even if the route itself had resolved.
+
+**A second, more basic bug found in the same pass: the rendered add form
+had zero fields.** None of `AimFact`'s base fields set
+`->setDisplayConfigurable('form', TRUE)`, which a base field needs to
+appear in `ContentEntityForm`'s auto-generated default form display at
+all - without it, a real GET to `/admin/content/aim-facts/add/site`
+rendered only the CSRF/build-id plumbing and the Save button, nothing
+else, confirmed by curling the live route (`drush php:eval`/kernel
+sub-requests hit unrelated session/CSRF quirks trying to reproduce this -
+a real cookie-jar `curl` session, per this file's existing Chatbot
+gotcha about testing HTTP-only behavior, was what actually surfaced it).
+Fixed by adding `setDisplayConfigurable('form', TRUE)` +
+`setDisplayOptions('form', ['weight' => N])` to `subject`, `subject_uid`,
+`text`, `source`, `category`, `asserted` - each field type's own default
+widget is used (no `type` forced, except `category`'s
+`entity_reference_autocomplete_tags` and `asserted`'s
+`datetime_timestamp`, since a plain `entity_reference`/`timestamp` field
+has more than one plausible default). **`state` deliberately excluded**:
+it's a nullable tri-state (true/false/empty, see its own description),
+but core's only widget for a plain boolean field is a checkbox, which can
+only ever write true or false - making it form-configurable would mean
+every fact created through this form gets a real boolean value even when
+it has no boolean shape at all, silently changing the field's meaning for
+UI-created facts vs. every other write path. Still settable via
+`aim:remember --state`/the MCP tool; a real tri-state widget is unbuilt,
+see "Ideas raised".
+
+Verified live end to end after both fixes (real `curl` session, not
+`drush php:eval`): all four bundles list correctly on
+`/admin/content/aim-facts/add`, `/admin/content/aim-facts/add/site`
+renders every configurable field and the bundle is correctly locked (no
+re-pickable scope field), and a real POST creates a fact with the correct
+scope and runs through `remember()`'s underlying save path (guardrails +
+consolidation enqueue both fire, see "Guardrails" above) - not a
+hand-rolled `FormBase` with its own `$entity->save()` that would have
+silently skipped both, the exact risk the original plan flagged.
+
+**Discoverability, added 2026-09-15 (later session):**
+`aim.links.action.yml` puts an "Add AIM fact" local action on
+`/admin/content/aim-facts` (`view.aim_facts.page_1`) pointing at
+`entity.aim_fact.add_page` - same pattern as core's own "Add content"
+button on `/admin/content` (`node.links.action.yml`), just scoped to
+this view instead of the generic one, since `aim_fact` isn't a node. A
+matching "Add AIM scope" local action was added on
+`entity.aim_scope.collection` (see "Scope as a config entity" above for
+why that route exists at all now).
 
 **Per-scope view/create permissions and access handler, built 2026-09-15.**
 Closes the gap the entity forms above left open: with only

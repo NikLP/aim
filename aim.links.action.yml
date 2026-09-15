@@ -1,0 +1,11 @@
+aim.add_fact:
+  route_name: entity.aim_fact.add_page
+  title: 'Add AIM fact'
+  appears_on:
+    - view.aim_facts.page_1
+
+aim.add_scope:
+  route_name: entity.aim_scope.add_form
+  title: 'Add AIM scope'
+  appears_on:
+    - entity.aim_scope.collection

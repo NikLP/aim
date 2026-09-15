@@ -7,7 +7,10 @@ namespace Drupal\aim\Entity;
 use Drupal\Core\Config\Entity\ConfigEntityBundleBase;
 use Drupal\Core\Config\Entity\ConfigEntityListBuilder;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
+use Drupal\Core\Entity\EntityDeleteForm;
+use Drupal\Core\Entity\Routing\DefaultHtmlRouteProvider;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\aim\Form\AimScopeForm;
 
 /**
  * Defines the AIM scope config entity.
@@ -19,12 +22,18 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
  * category of one - the same reasoning core applies to taxonomy_vocabulary
  * over a hypothetical taxonomy_term_type.
  *
- * Deliberately no links (in particular, no field_ui_base_route) -
- * config-entity-ness and Field UI exposure are independently controllable,
- * and per-bundle fields on aim_fact were tried and reverted once already
- * (see CLAUDE.md's "Scope as bundles" section). Payload is id/label only,
- * matching what hook_entity_bundle_info() already provided before this - a
- * known, accepted thinness, not an oversight.
+ * Still deliberately no field_ui_base_route on aim_fact - config-entity-ness
+ * and Field UI exposure are independently controllable, and per-bundle
+ * fields on aim_fact were tried and reverted once already (see CLAUDE.md's
+ * "Scope as bundles" section). Payload is id/label only, matching what
+ * hook_entity_bundle_info() already provided before this - a known,
+ * accepted thinness, not an oversight.
+ *
+ * Add/edit/delete/collection links added 2026-09-15, not part of the
+ * original conversion - required to keep entity.aim_fact.add_page from
+ * crashing, see AimScopeForm's docblock. This also completes the "a scope
+ * can be added through the admin UI with no code" claim CLAUDE.md already
+ * made about this conversion.
  */
 #[ConfigEntityType(
   id: 'aim_scope',
@@ -40,6 +49,20 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
   ],
   handlers: [
     'list_builder' => ConfigEntityListBuilder::class,
+    'form' => [
+      'add' => AimScopeForm::class,
+      'edit' => AimScopeForm::class,
+      'delete' => EntityDeleteForm::class,
+    ],
+    'route_provider' => [
+      'html' => DefaultHtmlRouteProvider::class,
+    ],
+  ],
+  links: [
+    'add-form' => '/admin/config/aim/scopes/add',
+    'edit-form' => '/admin/config/aim/scopes/{aim_scope}/edit',
+    'delete-form' => '/admin/config/aim/scopes/{aim_scope}/delete',
+    'collection' => '/admin/config/aim/scopes',
   ],
   admin_permission: 'administer aim memory',
   bundle_of: 'aim_fact',

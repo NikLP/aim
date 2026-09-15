@@ -11,3 +11,10 @@ aim.settings:
   parent: aim.admin_config
   route_name: aim.settings
   weight: 0
+
+entity.aim_scope.collection:
+  title: 'AIM Scopes'
+  description: 'Manage the scopes that facts can be saved under.'
+  parent: aim.admin_config
+  route_name: entity.aim_scope.collection
+  weight: 1
