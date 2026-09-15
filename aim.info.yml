@@ -1,6 +1,6 @@
 name: AIM
 type: module
-description: 'AI Memory (WIP)'
+description: 'AI Memory'
 package: AIM
 core_version_requirement: ^11
 configure: aim.settings

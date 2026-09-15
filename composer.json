@@ -1,7 +1,7 @@
 {
     "name": "drupal/aim",
     "type": "drupal-module",
-    "description": "Drupal-native AI agent memory infrastructure: governed, Guardrail-checked, extracted-and-consolidated, vector-searchable memory for AI agents.",
+    "description": "AI memory infrastructure: governed, guardrail-checked, extracted-and-consolidated, vector-searchable memory.",
     "require": {
         "php": "^8.3",
         "drupal/core": "^11",

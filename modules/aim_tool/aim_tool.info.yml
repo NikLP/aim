@@ -1,6 +1,6 @@
 name: 'AIM Tool'
 type: module
-description: 'Exposes AIM memory as Tool API plugins.'
+description: 'Exposes AIM memory via ToolAPI.'
 package: AIM
 core_version_requirement: ^11
 dependencies:

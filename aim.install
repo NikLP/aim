@@ -19,6 +19,7 @@ function aim_install(): void {
   // index already exists, so the collection table and its attribute columns
   // actually get created on a fresh install. See CLAUDE.md.
   $index = \Drupal::entityTypeManager()->getStorage('search_api_index')->load('aim_vector_index');
+
   if ($index instanceof IndexInterface) {
     $index->save();
   }
@@ -35,6 +36,7 @@ function aim_install(): void {
  */
 function aim_uninstall(): void {
   $entity_type_manager = \Drupal::entityTypeManager();
+
   $entities = [
     'ai_guardrail' => ['aim_max_length', 'aim_no_markup'],
     'ai_guardrail_set' => ['aim_write_guardrails'],
@@ -43,6 +45,7 @@ function aim_uninstall(): void {
     'taxonomy_vocabulary' => ['aim_category'],
     'view' => ['aim_facts'],
   ];
+
   foreach ($entities as $entity_type_id => $ids) {
     $storage = $entity_type_manager->getStorage($entity_type_id);
     foreach ($storage->loadMultiple($ids) as $entity) {
