@@ -285,15 +285,18 @@ worker's own `reindex()` call handle it. `aim_facts` has a real MariaDB
 ## Scope as bundles
 
 Built 2026-09-14, closing ADR-0001's flat-field PoC deviation. `aim_fact`'s
-four scopes (user/role/site/case) are now real, code-defined bundles -
-`entity_keys.bundle` on `AimFact`'s `#[ContentEntityType]` attribute, with
-`AimHooks::entityBundleInfo()` (`src/Hook/AimHooks.php` - moved out of a
-procedural `hook_entity_bundle_info()` in `aim.module` 2026-09-15, see
-"Guardrails") declaring the four bundle labels.
-No `bundle_entity_type` (no config entity like node types) - a site or
-contrib module can register a fifth scope purely by implementing
-`hook_entity_bundle_info_alter()` against `aim_fact`, no admin UI step
-required. `AimMemoryManager::allowedScopes()` (public) replaced the old
+four scopes (user/role/site/case) became real bundles -
+`entity_keys.bundle` on `AimFact`'s `#[ContentEntityType]` attribute.
+**Bundle source superseded 2026-09-15** - see "Scope as a config entity"
+below: bundles were code-defined via `hook_entity_bundle_info()` at first,
+now come from real `aim_scope` config entities via
+`bundle_entity_type`. Everything else in this section (the `scope` field
+name choice, `AimMemoryManager::allowedScopes()`'s
+`entity_type.bundle.info` read, the reinstall gotchas, the reverted
+`subject`/`subject_uid` per-bundle-field experiment below) is unaffected -
+`getBundleInfo('aim_fact')` returns the identical shape either way, so no
+call site needed to change.
+`AimMemoryManager::allowedScopes()` (public) replaced the old
 hardcoded `ALLOWED_SCOPES` constant, reading
 `entity_type.bundle.info`'s `getBundleInfo('aim_fact')` instead - every
 scope-validation call site (`remember()`, `generateBenchmarkFacts()`,
@@ -417,6 +420,101 @@ nothing on the read side. Back to two always-present base fields, both
 `subject_uid` both defined in `baseFieldDefinitions()`, unused on a given
 bundle rather than absent). **Don't re-attempt this split** without a
 concrete reason beyond schema tidiness.
+
+## Scope as a config entity
+
+Built 2026-09-15, superseding the code-only-bundle half of "Scope as
+bundles" above. `aim_fact`'s four scopes are now real `aim_scope`
+config entities (`src/Entity/AimScope.php`), not a
+`hook_entity_bundle_info()` implementation - `AimFact`'s
+`#[ContentEntityType]` attribute gained `bundle_entity_type:
+'aim_scope'`, matching `node_type`/this codebase's own
+`annotation_type` (`web/modules/contrib/annotations`) shape exactly.
+`AimHooks::entityBundleInfo()` was deleted outright, not left alongside -
+Drupal derives `entity_type.bundle.info`'s `getBundleInfo('aim_fact')`
+from the installed `aim_scope` entities automatically the moment
+`bundle_entity_type` is set (confirmed live: `getBundleInfo('aim_fact')`
+returns the identical `[$id => ['label' => ...]]` shape as before, one
+entry per entity, with no code reading either the hook or the entities
+directly).
+
+**Named `aim_scope`, not `aim_scope_type` (built as `aim_scope_type`
+first, renamed same day before anything else depended on it).** The
+`{bundle}_type` pattern (`node_type`, `annotation_type`) fits when the
+bundle field is literally named `type` - here it's named `scope` (a
+deliberate choice, see "Scope as bundles" above), and each entity
+instance *is* a scope, not a category of one, so `aim_scope_type` was
+redundant in the same way core avoids `taxonomy_term_type` in favor of
+`taxonomy_vocabulary`. No functional difference either way, purely
+naming - flagged here so a future session doesn't rebuild the `_type`
+suffix from `node_type` pattern-matching alone.
+
+**Real payoff:** `BundlePermissionHandlerTrait::generatePermissions()`
+now applies directly - `AimPermissions` was rewritten to use it (same
+shape as this codebase's own `AnnotationsPermissions`,
+`web/modules/contrib/annotations/src/AnnotationsPermissions.php`) instead
+of the hand-rolled loop the code-only-bundle version needed, so deleting
+a scope now cleans up its `view`/`create` permission grants
+automatically via the entity's config-dependency tracking - confirmed
+live the generated permission list is byte-identical
+(`view {scope} aim facts` / `create {scope} aim facts`) to the old
+hand-rolled version. `AimScope` gained `getViewPermission()`/
+`getCreatePermission()` (mirroring `AnnotationType`'s
+`getEditPermission()` etc.) for `AimPermissions::buildPermissions()` to
+call - `AimFactAccessControlHandler`'s own permission-string checks were
+untouched, they already built the same strings inline and didn't need to
+change. A site or contrib module can still add a fifth scope with zero
+PHP - `config/install/aim_scope.<id>.yml`, the same way a contrib
+module ships a `node_type` today - so the "register a scope with no UI
+step" property survives the conversion; a scope can now *also* be added
+by a site builder through the admin UI with no code at all, which the
+code-only-bundle version never allowed.
+
+**Explicit guardrail, verified live, do not add:**
+`links.field_ui_base_route` was deliberately left off `AimFact`'s
+`#[ContentEntityType]` attribute. `bundle_entity_type` and Field UI's
+"Manage fields" tab are independently controlled - the latter only
+appears if `field_ui_base_route` is explicitly wired, confirmed via
+`$entityType->hasLinkTemplate('field_ui_base_route')` returning `FALSE`
+after this build. Leaving it unset keeps per-bundle fields off the table
+entirely, which is the point: dedicated per-field tables are the exact
+mechanism that broke `ai_vdb_provider_mariadb`/`EntityViewsData` in the
+already-reverted `subject`/`subject_uid` per-bundle-field experiment
+above - taking config-entity-ness without taking Field UI exposure avoids
+reopening that.
+
+**Payload is `id` + `label` only** (`config_export: ['id', 'label']`),
+functionally identical to what `hook_entity_bundle_info()` already
+provided - a known, accepted thinness, not an oversight. Real per-scope
+settings (a guardrail-set override, an ingress-widget spec) are still
+undesigned ideas elsewhere in this file ("Scopes as a plugin type,"
+"Source-boundary policy per site archetype") - `aim_scope` is the
+natural home for them once either gets built, neither is a prerequisite
+of this change.
+
+**Mechanics:** no real data yet (PoC - see "Schema/config changes during
+early development" below), so this landed without a migration: the new
+entity type was installed live via
+`\Drupal::entityDefinitionUpdateManager()->installEntityType()` (no
+`drush entity:updates` command in this Drush version - use
+`installEntityType()`/`updateEntityType()` directly via `php:eval`/`scr`
+instead) and the four scope entities created and immediately re-exported
+via a real `->save()` + `\Drupal::config($name)->getRawData()` fetch
+(`uuid`/`_core` stripped), never hand-typed - same discipline as every
+other config file this file warns about. Config names are
+`aim.aim_scope.{user,role,site,case}.yml.`
+`aim.install`'s `aim_uninstall()` cleanup array gained
+`'aim_scope' => ['user', 'role', 'site', 'case']`, same pattern
+already used for every other entity type this module ships.
+
+Verified live end to end after the conversion: `getBundleInfo('aim_fact')`
+and `allowedScopes()` both return the same four scopes;
+`drush aim:remember --scope=not-a-real-scope` still rejects with the same
+error message; a real `aim_fact` save/`drush aim:recall` round-trip still
+works; `entity.aim_fact.add_page`/`add_form` routes still resolve per
+scope; a test role granted only `create site aim facts` still gets
+`ALLOW` on `createAccess('site', ...)` and `DENY` on
+`createAccess('user', ...)` through the rewritten `AimPermissions`.
 
 ## Guardrails
 
@@ -1520,7 +1618,14 @@ authorship on re-import is accepted, not a problem to solve.
 - **Scopes as a plugin type - considered 2026-09-15, not adopted.** Raised
   in the same discussion as the ingress form above, prompted by wanting
   `aim` to support pluggable per-site archetypes (ties to
-  [ADR-0014](adr/0014-usecase-archetype-starter-kits.md)). Sketch: an
+  [ADR-0014](adr/0014-usecase-archetype-starter-kits.md)). **Naming
+  collision, not yet resolved:** the sketch below predates "Scope as a
+  config entity" above, which took the class name `AimScope` for the
+  config entity. If this plugin-type idea is ever built, the plugin
+  attribute needs a different name (`#[AimScopePlugin]` or similar) - the
+  two are genuinely different mechanisms (a config entity bundle vs. a
+  discovered code plugin) that would otherwise collide on the same
+  symbol. Sketch: an
   `#[AimScope]` attribute plugin type, same pattern as `#[Tool]`/
   `#[FunctionCall]` already in this codebase, one class per scope owning
   its own default-subject resolution, guardrail set, and ingress-form
@@ -1528,8 +1633,9 @@ authorship on re-import is accepted, not a problem to solve.
   currently scattered across `AimMemoryManager`, `AimRemember`,
   `AimCommands`, and `aim_eca`. Real benefit: a site or contrib archetype
   adds a fifth scope with real attached behavior in one class, not just a
-  bundle label via `hook_entity_bundle_info_alter()` (today's
-  extensibility point - a bundle only, no behavior). Real cost: scope
+  bundle label via a new `aim_scope` config entity (today's
+  extensibility point, see "Scope as a config entity" - a bundle only, no
+  behavior). Real cost: scope
   stays a Drupal bundle underneath either way (the entity system needs
   that), so a plugin type would sit alongside the bundle system, not
   replace it - some duplication unless one derives from the other - and

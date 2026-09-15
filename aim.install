@@ -40,6 +40,7 @@ function aim_uninstall(): void {
   $entities = [
     'ai_guardrail' => ['aim_max_length', 'aim_no_markup'],
     'ai_guardrail_set' => ['aim_write_guardrails'],
+    'aim_scope' => ['user', 'role', 'site', 'case'],
     'search_api_index' => ['aim_vector_index'],
     'search_api_server' => ['aim_vector'],
     'taxonomy_vocabulary' => ['aim_category'],

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\aim\Hook;
 
 use Drupal\Core\Hook\Attribute\Hook;
-use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
 
@@ -13,8 +12,6 @@ use Drupal\aim\Service\AimMemoryManager;
  * Hook implementations for the aim module.
  */
 class AimHooks {
-
-  use StringTranslationTrait;
 
   public function __construct(
     private readonly AimMemoryManager $memoryManager,
@@ -54,25 +51,6 @@ class AimHooks {
       return;
     }
     $this->memoryManager->enqueueForConsolidation((int) $entity->id());
-  }
-
-  /**
-   * Implements hook_entity_bundle_info().
-   *
-   * The four aim_fact scopes are code-defined bundles, not config entities
-   * like node types - modules can register an additional scope by
-   * implementing hook_entity_bundle_info_alter() against 'aim_fact'.
-   */
-  #[Hook('entity_bundle_info')]
-  public function entityBundleInfo(): array {
-    return [
-      'aim_fact' => [
-        'user' => ['label' => $this->t('User')],
-        'role' => ['label' => $this->t('Role')],
-        'site' => ['label' => $this->t('Site')],
-        'case' => ['label' => $this->t('Case')],
-      ],
-    ];
   }
 
 }

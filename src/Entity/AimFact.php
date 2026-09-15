@@ -47,6 +47,7 @@ use Drupal\views\EntityViewsData;
     'bundle' => 'scope',
     'owner' => 'uid',
   ],
+  bundle_entity_type: 'aim_scope',
   links: [
     'add-page' => '/admin/content/aim-facts/add',
     'add-form' => '/admin/content/aim-facts/add/{scope}',

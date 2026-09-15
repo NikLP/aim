@@ -144,10 +144,10 @@ final class AimMemoryManager {
    *   consolidation.
    * @param \Drupal\Core\Entity\EntityTypeBundleInfoInterface $bundleInfo
    *   The entity type bundle info service, used to validate scope against
-   *   aim_fact's code-defined bundles (see AimHooks::entityBundleInfo(),
-   *   src/Hook/AimHooks.php) instead of a hardcoded list, so a module
-   *   registering an additional scope via hook_entity_bundle_info_alter()
-   *   passes validation here automatically.
+   *   aim_fact's real aim_scope bundles (see
+   *   \Drupal\aim\Entity\AimScope) instead of a hardcoded list, so a
+   *   fifth scope added via a new aim_scope config entity passes
+   *   validation here automatically, no code change needed.
    * @param \Drupal\Component\Uuid\UuidInterface $uuid
    *   The UUID service, used to mint a new case ID for a scope=case fact
    *   with no caller-supplied subject, so every caller (MCP client, drush,

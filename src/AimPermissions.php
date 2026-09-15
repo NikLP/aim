@@ -4,22 +4,25 @@ declare(strict_types=1);
 
 namespace Drupal\aim;
 
-use Drupal\Core\DependencyInjection\AutowireTrait;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
-use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
+use Drupal\Core\Entity\BundlePermissionHandlerTrait;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\aim\Entity\AimScope;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * Provides dynamic per-scope permissions for aim_fact bundles.
+ * Provides dynamic per-scope permissions for installed AimScope entities.
  *
- * Called as a permission_callbacks entry in aim.permissions.yml. aim_fact's
- * four scopes (user/role/site/case) are code-defined bundles from
- * hook_entity_bundle_info(), not config entities like node types, so
- * \Drupal\Core\Entity\BundlePermissionHandlerTrait can't be reused as-is -
- * it hard-requires a real config entity per bundle to record as a
- * dependency on the generated permission. There is nothing to clean up
- * here instead: these bundles cannot be deleted via the UI, so a stale
- * permission string is not a real risk the way it is for node types.
+ * Called as a permission_callbacks entry in aim.permissions.yml.
+ * aim_fact's four scopes are real aim_scope config entities (see
+ * CLAUDE.md's "Scope as a config entity" section), so
+ * BundlePermissionHandlerTrait::generatePermissions() can be used directly,
+ * same as node's NodePermissions and this codebase's own
+ * AnnotationsPermissions - each generated permission carries its
+ * AimScope as a config dependency, so deleting a scope removes the grant
+ * from every role automatically instead of leaving a stale permission
+ * string behind.
  *
  * Generates two permissions per scope:
  *
@@ -28,12 +31,21 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
  */
 class AimPermissions implements ContainerInjectionInterface {
 
-  use AutowireTrait;
+  use BundlePermissionHandlerTrait;
   use StringTranslationTrait;
 
   public function __construct(
-    protected EntityTypeBundleInfoInterface $entityTypeBundleInfo,
+    protected EntityTypeManagerInterface $entityTypeManager,
   ) {}
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container): static {
+    return new static(
+      $container->get('entity_type.manager'),
+    );
+  }
 
   /**
    * Returns per-scope view/create permissions.
@@ -44,17 +56,36 @@ class AimPermissions implements ContainerInjectionInterface {
    * @see \Drupal\user\PermissionHandlerInterface::getPermissions()
    */
   public function permissions(): array {
-    $permissions = [];
-    foreach ($this->entityTypeBundleInfo->getBundleInfo('aim_fact') as $scope => $info) {
-      $params = ['%label' => $info['label']];
-      $permissions["view $scope aim facts"] = [
-        'title' => $this->t('%label: view AIM facts', $params),
-      ];
-      $permissions["create $scope aim facts"] = [
-        'title' => $this->t('%label: create AIM facts', $params),
-      ];
+    if (!$this->entityTypeManager->hasDefinition('aim_scope')) {
+      return [];
     }
-    return $permissions;
+
+    return $this->generatePermissions(
+      $this->entityTypeManager->getStorage('aim_scope')->loadMultiple(),
+      [$this, 'buildPermissions'],
+    );
+  }
+
+  /**
+   * Returns a list of permissions for a given scope.
+   *
+   * @param \Drupal\aim\Entity\AimScope $scope
+   *   The scope.
+   *
+   * @return array
+   *   An associative array of permission names and definitions.
+   */
+  protected function buildPermissions(AimScope $scope): array {
+    $params = ['%label' => $scope->label()];
+
+    return [
+      $scope->getViewPermission() => [
+        'title' => $this->t('%label: view AIM facts', $params),
+      ],
+      $scope->getCreatePermission() => [
+        'title' => $this->t('%label: create AIM facts', $params),
+      ],
+    ];
   }
 
 }

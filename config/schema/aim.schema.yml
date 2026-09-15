@@ -14,3 +14,14 @@ aim.settings:
     consolidation_prompt:
       type: text
       label: 'Consolidation prompt'
+
+aim.aim_scope.*:
+  type: config_entity
+  label: 'AIM scope'
+  mapping:
+    id:
+      type: string
+      label: 'Machine name'
+    label:
+      type: label
+      label: 'Label'
