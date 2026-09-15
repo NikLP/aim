@@ -13,6 +13,7 @@ use Drupal\ai\Guardrail\Result\StopResult;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Queue\QueueFactory;
@@ -287,6 +288,41 @@ final class AimMemoryManager {
   }
 
   /**
+   * Saves an aim_fact entity, unwrapping a guardrail rejection.
+   *
+   * Guardrails now run inside save() itself, via hook_aim_fact_presave()
+   * (aim.module) rather than an explicit runGuardrails() call beforehand -
+   * but SqlContentEntityStorage::save() catches any \Exception thrown from
+   * a presave hook and rethrows it as EntityStorageException (same
+   * message, different class - see
+   * \Drupal\Core\Entity\Sql\SqlContentEntityStorage::save()). Left
+   * unhandled, that would silently break every existing
+   * catch (\InvalidArgumentException) call site this module already has
+   * (AimCommands, aim_tool's AimRemember, aim_chatbot's AimRemember,
+   * createFactsFromCandidates() below) - decision 7 in CLAUDE.md documents
+   * a guardrail stop as "the same exception every caller already catches".
+   * This restores that contract in one place, for every write path, rather
+   * than each caller unwrapping it themselves.
+   *
+   * @param \Drupal\aim\Entity\AimFact $entity
+   *   The entity to save.
+   *
+   * @throws \InvalidArgumentException
+   *   If a guardrail rejected the entity's text.
+   */
+  public function saveFact(AimFact $entity): void {
+    try {
+      $entity->save();
+    }
+    catch (EntityStorageException $e) {
+      if ($e->getPrevious() instanceof \InvalidArgumentException) {
+        throw $e->getPrevious();
+      }
+      throw $e;
+    }
+  }
+
+  /**
    * Resolves a uid or username to a real user account.
    *
    * Read paths only (recall(), aim_eca's FactQuery/FactState): a wrong
@@ -441,10 +477,13 @@ final class AimMemoryManager {
    * queuing thousands of facts for LLM-mediated consolidation would turn a
    * latency benchmark into an uncontrolled reasoning-call bill the moment
    * aim_consolidate's crontab entry next runs (CLAUDE.md's "Consolidation"
-   * section). The only real cost this leaves is one embedding-API call per
-   * fact, at reindex() time. Every created fact is tagged $runTag as its
-   * source so deleteBenchmarkFacts() can find and remove exactly this run's
-   * data afterward.
+   * section). Both checks now run universally via hook_aim_fact_presave()/
+   * hook_aim_fact_insert() (aim.module), so this sets the aim_skip_hooks
+   * flag on every created entity to keep the same bypass. The only real
+   * cost this leaves is one embedding-API call per fact, at reindex() time.
+   * Every created fact is tagged $runTag as its source so
+   * deleteBenchmarkFacts() can find and remove exactly this run's data
+   * afterward.
    *
    * @param string $scope
    *   One of user, role, site, case.
@@ -486,6 +525,7 @@ final class AimMemoryManager {
         'text' => $text,
         'source' => $runTag,
         'subject' => '',
+        'aim_skip_hooks' => TRUE,
       ];
       if ($scope === 'user') {
         $values['subject_uid'] = $subjectUids[$i % count($subjectUids)];
@@ -562,8 +602,6 @@ final class AimMemoryManager {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
     }
 
-    $this->runGuardrails($text);
-
     $values = [
       'scope' => $scope,
       'text' => $text,
@@ -611,8 +649,7 @@ final class AimMemoryManager {
 
     /** @var \Drupal\aim\Entity\AimFact $entity */
     $entity = $this->entityTypeManager->getStorage('aim_fact')->create($values);
-    $entity->save();
-    $this->enqueueForConsolidation((int) $entity->id());
+    $this->saveFact($entity);
 
     return $entity;
   }
@@ -686,17 +723,6 @@ final class AimMemoryManager {
     }
 
     foreach ($facts as $fact) {
-      try {
-        $this->runGuardrails($fact['text']);
-      }
-      catch (\InvalidArgumentException) {
-        // Every candidate is checked independently: one rejected fact
-        // should not abort the rest of an extraction batch, the same
-        // posture already taken for an unresolvable user-scope subject.
-        $blocked++;
-        continue;
-      }
-
       $values = [
         'text' => $fact['text'],
         'source' => $source,
@@ -722,8 +748,21 @@ final class AimMemoryManager {
       }
 
       $entity = $storage->create($values);
-      $entity->save();
-      $this->enqueueForConsolidation((int) $entity->id());
+      try {
+        // Guardrail check runs inside save() now, via hook_aim_fact_presave()
+        // - still per-candidate, since a rejected save throws before the
+        // loop's next iteration. One rejected fact should not abort the
+        // rest of an extraction batch, the same posture already taken for
+        // an unresolvable user-scope subject above. saveFact() unwraps the
+        // EntityStorageException SqlContentEntityStorage::save() wraps a
+        // presave hook's exception in, back to the \InvalidArgumentException
+        // this catch expects - see saveFact()'s own docblock.
+        $this->saveFact($entity);
+      }
+      catch (\InvalidArgumentException) {
+        $blocked++;
+        continue;
+      }
       $created[] = $entity;
     }
 

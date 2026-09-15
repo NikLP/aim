@@ -287,7 +287,9 @@ worker's own `reindex()` call handle it. `aim_facts` has a real MariaDB
 Built 2026-09-14, closing ADR-0001's flat-field PoC deviation. `aim_fact`'s
 four scopes (user/role/site/case) are now real, code-defined bundles -
 `entity_keys.bundle` on `AimFact`'s `#[ContentEntityType]` attribute, with
-`aim.module`'s `hook_entity_bundle_info()` declaring the four bundle labels.
+`AimHooks::entityBundleInfo()` (`src/Hook/AimHooks.php` - moved out of a
+procedural `hook_entity_bundle_info()` in `aim.module` 2026-09-15, see
+"Guardrails") declaring the four bundle labels.
 No `bundle_entity_type` (no config entity like node types) - a site or
 contrib module can register a fifth scope purely by implementing
 `hook_entity_bundle_info_alter()` against `aim_fact`, no admin UI step
@@ -425,13 +427,95 @@ Live today, not part of the governance deferral
 blocks `<script>`-shaped markup), `stop_threshold: 1.0`. Neither plugin
 calls `->chat()` - zero LLM cost.
 
-Wired in via `AimMemoryManager::runGuardrails()` (public), called from
-`remember()`, `createFactsFromCandidates()`, `aim_eca`'s `FactWrite`, and
-consolidation's UPDATE path. A stop throws `\InvalidArgumentException`
-(same exception every caller already catches for scope validation).
-`createFactsFromCandidates()` catches per-candidate so one rejected fact
-doesn't abort a batch. If the guardrail set is ever removed from a site,
+Wired in via `AimMemoryManager::runGuardrails()` (public, still used
+directly by consolidation's UPDATE path - see below) and, as of
+2026-09-15, `AimHooks::factPresave()` (`src/Hook/AimHooks.php`), which
+calls it on every `aim_fact` save regardless of path. A stop throws
+`\InvalidArgumentException` (same exception every caller already catches
+for scope validation). If the guardrail set is ever removed from a site,
 checking is silently skipped rather than blocking every write.
+
+**Guardrails + consolidation enqueue moved to entity hooks, 2026-09-15.**
+`remember()`, `createFactsFromCandidates()`, and `aim_eca`'s `FactWrite`
+used to call `runGuardrails()` and `enqueueForConsolidation()` explicitly,
+each remembering to do both. Now `AimHooks::factPresave()` (runs
+`runGuardrails()` against the `text` field, can throw to abort the save)
+and `AimHooks::factInsert()` (runs `enqueueForConsolidation()`) -
+universal for every save path, including the new entity add/edit forms
+below, default content import, and anything future, not just the callers
+that remembered to call both explicitly. All three original call sites
+had their explicit calls stripped. Consolidation's UPDATE path
+(`decideAndApply()`) is deliberately untouched - it calls
+`runGuardrails()` *before* deciding whether to save at all, to downgrade
+the decision to a synthetic BLOCKED outcome even in dry-run mode when
+nothing gets saved; that can't move into a presave hook, which only fires
+on an actual save.
+
+**Hooks live in a class, not `aim.module` - built this way from the
+start, not migrated.** `src/Hook/AimHooks.php` (`#[Hook('aim_fact_presave')]`/
+`#[Hook('aim_fact_insert')]`/`#[Hook('entity_bundle_info')]`, the last one
+moved here too for consistency rather than leaving one procedural hook
+behind on its own) uses core's OOP hook system (`\Drupal\Core\Hook\Attribute\Hook`,
+stable since Drupal 11.1, confirmed available and exercised live on this
+site's Drupal 11.4.6) instead of a `.module` file - `aim.module` itself
+was deleted, nothing else needed it. Real precedent copied directly: the
+`annotations` module (`dotdev` suite, a sibling project) has its own
+`AnnotationsHooks` class, same shape. `AimHooks`' constructor
+type-hints `AimMemoryManager` directly rather than pulling it via
+`\Drupal::service('aim.memory_manager')` - Hook-attributed classes are
+auto-registered as autowired services (per the attribute's own docblock),
+so constructor DI works here the same as everywhere else in this
+codebase.
+
+**Real gotcha hit and fixed the same session: autowiring `AimMemoryManager`
+failed outright** (`drush cr` error: "no such service exists... maybe
+alias this class to the existing 'aim.memory_manager' service").
+Symfony's autowiring matches a constructor's type-hint against a service
+ID equal to the fully-qualified class name - `aim.memory_manager`
+(`aim.services.yml`) is a manually-defined service under a symbolic ID
+with explicit constructor arguments, not that FQCN, so nothing satisfied
+`AimHooks`' `AimMemoryManager $memoryManager` parameter. Fixed with a
+one-line class alias in `aim.services.yml`
+(`Drupal\aim\Service\AimMemoryManager: alias: aim.memory_manager`) -
+same fix `annotations.services.yml` already uses for its own
+`AnnotationStorageService`/`AnnotationsHooks` pair, confirmed by reading
+it before applying this. No manual `aim.hooks` service entry was needed
+on top of the alias - autowiring alone resolved `AimHooks` once the alias
+existed, unlike `annotations.services.yml`'s belt-and-braces manual entry
+(that module's `annotations.hooks` service, defined explicitly alongside
+its own alias - not required here, and not added, to keep this to the
+minimal fix). Every write path re-verified live after this fix
+(guardrail-rejected `remember()`, a batch with one blocked candidate,
+`generateBenchmarkFacts()`'s bypass, all four entity routes) - identical
+behavior to the procedural version.
+
+**Real bug hit and fixed the same session: guardrail rejections stopped
+matching `catch (\InvalidArgumentException)`.**
+`\Drupal\Core\Entity\Sql\SqlContentEntityStorage::save()` catches any
+`\Exception` thrown by a presave hook and rethrows it as
+`EntityStorageException($e->getMessage(), $e->getCode(), $e)` - same
+message, different class. With guardrails now running inside `save()`
+instead of before it, every existing `catch (\InvalidArgumentException)`
+around a fact write (`AimCommands`, `aim_tool`'s `AimRemember`,
+`aim_chatbot`'s `AimRemember`, `createFactsFromCandidates()`'s
+per-candidate catch) would have silently stopped catching guardrail
+rejections, surfacing an uncaught `EntityStorageException` instead - a
+real regression only caught by testing the rejection path live via
+`drush php:eval`, not by `phpcs`/`drush cr` alone. Fixed with
+`AimMemoryManager::saveFact()` (public): saves the entity and, if
+`EntityStorageException::getPrevious()` is an `\InvalidArgumentException`,
+rethrows that original exception instead - restores the "same exception
+every caller already catches" contract in one place. `remember()`,
+`createFactsFromCandidates()`, and `aim_eca`'s `FactWrite` all call
+`saveFact()` now instead of `$entity->save()` directly. Verified live:
+a guardrail-rejected `remember()` call, a batch with one blocked
+candidate (batch continues, `blocked` count increments), and
+`generateBenchmarkFacts()`'s bypass (see below) all behave exactly as
+before.
+
+`createFactsFromCandidates()` still catches per-candidate so one rejected
+fact doesn't abort a batch - the catch now wraps `saveFact($entity)`
+instead of a standalone pre-check.
 
 ## Extraction
 
@@ -621,14 +705,21 @@ synthetic facts from a small template/word-pool generator (not
 reindexes, and times a batch of `recall()` calls at each requested
 fact-count checkpoint.
 
-Deliberately bypasses `remember()`'s guardrail check and the consolidation
-queue: synthetic text needs neither, and queuing thousands of facts for
+Deliberately bypasses the guardrail check and the consolidation queue:
+synthetic text needs neither, and queuing thousands of facts for
 LLM-mediated consolidation would turn a latency benchmark into an
 uncontrolled reasoning-call bill the moment `aim_consolidate`'s crontab next
 runs. Cost is predictable - one embedding-API call per generated fact, at
 `reindex()` time, nothing else. Every generated fact is tagged
 `source=<run tag>` so `aim:benchmark-cleanup` (or `--cleanup` on the same
-invocation) can remove exactly that run's data.
+invocation) can remove exactly that run's data. Since the 2026-09-15 move
+of guardrails/enqueue into entity hooks (see "Guardrails" above), this
+bypass now works by setting `aim_skip_hooks` (a plain, non-field property
+on the created `AimFact`, not a real field) on every generated entity's
+values array - `AimHooks::factPresave()`/`factInsert()` both check it
+first and return early. Verified live 2026-09-15: the
+consolidation queue's item count is unchanged before/after a
+`generateBenchmarkFacts()` call.
 
 **First real numbers (5 then 15 site-scope facts,
 `amazeeio__mistral-embed`):** `recall()` averaged 450-540ms. At this scale
@@ -998,6 +1089,34 @@ gotcha above - worth it here too: the recompute also dropped a stale
 moved off `list_string` (see "Scope as bundles"), never cleaned up until
 now.
 
+**Entity add/edit forms - built 2026-09-15, replaces the unbuilt
+custom-`FormBase` ingress-form plan below entirely.** `AimFact`'s
+`#[ContentEntityType]` attribute gained `handlers.form.default`
+(`ContentEntityForm::class`, no overrides needed), `handlers.view_builder`
+(`EntityViewBuilder::class` - required for the canonical route to
+register at all; `DefaultHtmlRouteProvider::getCanonicalRoute()` checks
+`hasViewBuilderClass()`), `handlers.route_provider.html`
+(`DefaultHtmlRouteProvider::class`), and four `links`: `add-page`
+(`/admin/content/aim-facts/add`), `add-form`
+(`/admin/content/aim-facts/add/{scope}`), `canonical`
+(`/admin/content/aim-facts/{aim_fact}`), `edit-form`
+(`/admin/content/aim-facts/{aim_fact}/edit`). The `{scope}` parameter name
+in `add-form` is not arbitrary - core's `EntityController::addPage()`
+builds each bundle's add link using the entity type's bundle key
+(`scope` here, since `aim_fact` has no `bundle_entity_type`) as the route
+parameter name, confirmed by reading
+`DefaultHtmlRouteProvider::getAddFormRoute()` and `EntityController::addPage()`
+before choosing this over the earlier custom-form plan's own path
+scheme. Access is gated by the existing `administer aim memory`
+`admin_permission` alone - no custom access handler needed, since the
+default `EntityAccessControlHandler` already grants every operation to a
+user holding it. Verified live: all four routes resolve
+(`entity.aim_fact.add_page`/`add_form`/`canonical`/`edit_form`), and the
+add-form correctly runs through `remember()`'s underlying save path
+(guardrails + consolidation enqueue both fire, see "Guardrails" above) -
+not a hand-rolled `FormBase` with its own `$entity->save()` that would
+have silently skipped both, the exact risk the superseded plan flagged.
+
 ## Admin settings
 
 Built 2026-09-14. `/admin/config/aim/settings` (`AimSettingsForm`, a plain
@@ -1275,41 +1394,39 @@ authorship on re-import is accepted, not a problem to solve.
   designed: filtering flags (scope/subject/category), and whether it
   warrants its own submodule or stays a single drush command.
 - **Scope-aware fact-ingress form - conditional fields, not a wizard.**
-  Raised 2026-09-15, prompted by noticing a batch of `scope=user` facts
-  all resolved to one real account (`admin`) with no UI to pick a
-  different one - see "Admin UI"'s `uid` column note above, added the same
-  day, for the investigation that surfaced this. Not yet built - concrete
-  handoff below, not just the shape, so this can be picked up cold.
+  **Superseded 2026-09-15** by the plain entity add/edit forms built the
+  same day - see "Admin UI"'s "Entity add/edit forms" entry above. That
+  form gets every bundle's fields from the standard entity form (no
+  `#states`-driven conditional fields, no default-subject prefill for
+  `scope=user`), so the concrete handoff below is kept as a real, still-
+  unbuilt enhancement on top of what exists now (a `hook_form_alter()`
+  against `aim_fact_user_edit_form`/`aim_fact_user_add_form` etc., not a
+  bespoke `FormBase` as originally planned - that approach's own real risk
+  (bypassing `remember()`'s guardrail/enqueue calls) is moot now that both
+  run via entity hooks regardless of which form saves the entity, see
+  "Guardrails"). Original framing, raised 2026-09-15 prompted by noticing
+  a batch of `scope=user` facts all resolved to one real account
+  (`admin`) with no UI to pick a different one - see "Admin UI"'s `uid`
+  column note above, added the same day, for the investigation that
+  surfaced this - kept below unedited except for this note.
 
-  **Route/menu:** `/admin/content/aim-facts/add` (route `aim.fact_add`), a
-  plain `menu.type: normal` entry in `aim.links.menu.yml` parented under
-  `system.admin_content` - a separate menu entry sibling to the existing
-  "AIM facts" listing link, not a local-action "Add" button on the View
-  (Nik's call, 2026-09-15). Matches this module's only two existing
-  menu-link precedents (`aim.admin_config`/`aim.settings`, both `normal`)
-  and sidesteps this file's own `menu.type: 'default tab'` placement
-  gotcha (Admin UI section) rather than risking it a second time.
-
-  **Permission:** gate on `administer aim memory` (already exists in
-  `aim` core, already gates the View and Settings form it sits beside) -
-  not `aim_tool`'s `store aim memory`, a different module's permission for
-  the Tool/MCP surface, wrong boundary for a form living in `aim` core. A
-  non-admin "trusted writer" surface later would need a new split
-  permission on `aim` core itself (mirroring `aim_tool`'s pattern), not
-  borrowing `aim_tool`'s - not needed for v1.
-
-  **Form class:** a plain `FormBase` (`src/Form/AimFactAddForm.php`),
-  **not** a generic entity add-form for `aim_fact`. The one real
-  implementation risk worth flagging loudly: every other write path
-  (`aim:remember`, `AimRemember`'s Tool/MCP call, `aim_eca`'s `FactWrite`)
-  goes through `AimMemoryManager::remember()`, which runs guardrails and
-  enqueues for consolidation (see "Guardrails"/"Consolidation" above) - a
-  default `ContentEntityForm::save()` would silently skip both. The form
-  must call `remember()`, exactly like every other caller, never
-  `$entity->save()` directly.
+  **Route/menu and Form class below are stale** - both describe the
+  original custom-`FormBase` plan, and now conflict with what actually
+  exists: `/admin/content/aim-facts/add` is the real
+  `entity.aim_fact.add_page` route (see "Admin UI" above), permission is
+  still `administer aim memory` (that part held up), and each bundle gets
+  its own `ContentEntityForm`-backed route
+  (`entity.aim_fact.add_form`/`edit_form`, parametrized by `{scope}`) -
+  not one shared `FormBase`. A `hook_form_alter()` targeting a specific
+  bundle's form ID would already be scoped to that one bundle, so the
+  `#states`-driven single-form design below (written for one shared form
+  across all four scopes) would need rethinking, not direct reuse, before
+  building - listed here for the underlying UX gap it identifies (no
+  default-subject prefill, no case-ID hint, etc.), not as a ready spec.
 
   **Fields**, `#states`-driven off a `scope` select (default `site`,
-  options from `allowedScopes()`):
+  options from `allowedScopes()`) - **written for the superseded
+  single-shared-form plan, see the note above:**
   - `scope=user`: an `entity_autocomplete` (`target_type: user`),
     required, **default value pre-filled to the current user** - a
     visible default the person can change, better UX here than the

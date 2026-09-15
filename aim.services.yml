@@ -11,3 +11,10 @@ services:
       - '@entity_type.bundle.info'
       - '@uuid'
       - '@config.factory'
+
+  # Class alias so autowired consumers (the auto-registered AimHooks
+  # service, src/Hook/AimHooks.php) can type-hint AimMemoryManager
+  # directly, same pattern the annotations module (dotdev suite) uses for
+  # its own AnnotationStorageService.
+  Drupal\aim\Service\AimMemoryManager:
+    alias: aim.memory_manager

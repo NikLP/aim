@@ -151,12 +151,6 @@ final class FactWrite extends ConfigurableActionBase {
       throw new \InvalidArgumentException('The fact text is empty.');
     }
 
-    // Same guardrail check drush aim:remember and the chatbot's aim_remember
-    // action run before creating a fact (CLAUDE.md decision 7) - a value an
-    // ECA model hands this action is proposed content the same way an
-    // extracted or chatbot-written fact is, not inherently more trusted.
-    \Drupal::service('aim.memory_manager')->runGuardrails($text);
-
     $subject = $this->tokenService->replaceClear($this->configuration['subject']);
 
     $source = $this->tokenService->replaceClear($this->configuration['source']);
@@ -200,9 +194,18 @@ final class FactWrite extends ConfigurableActionBase {
       $values['state'] = FALSE;
     }
 
+    // The guardrail check (CLAUDE.md decision 7 - a value an ECA model
+    // hands this action is proposed content the same way an extracted or
+    // chatbot-written fact is, not inherently more trusted) and the
+    // consolidation enqueue both run automatically now, via
+    // AimHooks::factPresave()/factInsert() (aim core's
+    // src/Hook/AimHooks.php), the same as every other write path.
+    // saveFact() (not a plain $fact->save()) keeps a guardrail rejection
+    // surfacing as \InvalidArgumentException, not the EntityStorageException
+    // the storage layer would otherwise wrap it in - see
+    // AimMemoryManager::saveFact()'s own docblock.
     $fact = $this->entityTypeManager->getStorage('aim_fact')->create($values);
-    $fact->save();
-    \Drupal::service('aim.memory_manager')->enqueueForConsolidation((int) $fact->id());
+    \Drupal::service('aim.memory_manager')->saveFact($fact);
 
     if ($this->configuration['token_name'] !== '') {
       $this->tokenService->addTokenData($this->configuration['token_name'], $fact);

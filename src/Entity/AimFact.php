@@ -6,7 +6,10 @@ namespace Drupal\aim\Entity;
 
 use Drupal\Core\Entity\Attribute\ContentEntityType;
 use Drupal\Core\Entity\ContentEntityBase;
+use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Entity\EntityViewBuilder;
+use Drupal\Core\Entity\Routing\DefaultHtmlRouteProvider;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -27,6 +30,13 @@ use Drupal\views\EntityViewsData;
   label_collection: new TranslatableMarkup('AIM facts'),
   handlers: [
     'views_data' => EntityViewsData::class,
+    'view_builder' => EntityViewBuilder::class,
+    'form' => [
+      'default' => ContentEntityForm::class,
+    ],
+    'route_provider' => [
+      'html' => DefaultHtmlRouteProvider::class,
+    ],
   ],
   entity_keys: [
     'id' => 'id',
@@ -34,6 +44,12 @@ use Drupal\views\EntityViewsData;
     'langcode' => 'langcode',
     'bundle' => 'scope',
     'owner' => 'uid',
+  ],
+  links: [
+    'add-page' => '/admin/content/aim-facts/add',
+    'add-form' => '/admin/content/aim-facts/add/{scope}',
+    'canonical' => '/admin/content/aim-facts/{aim_fact}',
+    'edit-form' => '/admin/content/aim-facts/{aim_fact}/edit',
   ],
   admin_permission: 'administer aim memory',
   base_table: 'aim_fact',
