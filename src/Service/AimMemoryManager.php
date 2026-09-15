@@ -144,8 +144,8 @@ final class AimMemoryManager {
    *   consolidation.
    * @param \Drupal\Core\Entity\EntityTypeBundleInfoInterface $bundleInfo
    *   The entity type bundle info service, used to validate scope against
-   *   aim_fact's code-defined bundles (see aim.module's
-   *   hook_entity_bundle_info()) instead of a hardcoded list, so a module
+   *   aim_fact's code-defined bundles (see AimHooks::entityBundleInfo(),
+   *   src/Hook/AimHooks.php) instead of a hardcoded list, so a module
    *   registering an additional scope via hook_entity_bundle_info_alter()
    *   passes validation here automatically.
    * @param \Drupal\Component\Uuid\UuidInterface $uuid
@@ -290,11 +290,11 @@ final class AimMemoryManager {
   /**
    * Saves an aim_fact entity, unwrapping a guardrail rejection.
    *
-   * Guardrails now run inside save() itself, via hook_aim_fact_presave()
-   * (aim.module) rather than an explicit runGuardrails() call beforehand -
-   * but SqlContentEntityStorage::save() catches any \Exception thrown from
-   * a presave hook and rethrows it as EntityStorageException (same
-   * message, different class - see
+   * Guardrails now run inside save() itself, via AimHooks::factPresave()
+   * (src/Hook/AimHooks.php) rather than an explicit runGuardrails() call
+   * beforehand - but SqlContentEntityStorage::save() catches any
+   * \Exception thrown from a presave hook and rethrows it as
+   * EntityStorageException (same message, different class - see
    * \Drupal\Core\Entity\Sql\SqlContentEntityStorage::save()). Left
    * unhandled, that would silently break every existing
    * catch (\InvalidArgumentException) call site this module already has
@@ -477,8 +477,8 @@ final class AimMemoryManager {
    * queuing thousands of facts for LLM-mediated consolidation would turn a
    * latency benchmark into an uncontrolled reasoning-call bill the moment
    * aim_consolidate's crontab entry next runs (CLAUDE.md's "Consolidation"
-   * section). Both checks now run universally via hook_aim_fact_presave()/
-   * hook_aim_fact_insert() (aim.module), so this sets the aim_skip_hooks
+   * section). Both checks now run universally via AimHooks::factPresave()/
+   * factInsert() (src/Hook/AimHooks.php), so this sets the aim_skip_hooks
    * flag on every created entity to keep the same bypass. The only real
    * cost this leaves is one embedding-API call per fact, at reindex() time.
    * Every created fact is tagged $runTag as its source so
