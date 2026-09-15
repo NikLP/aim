@@ -13,6 +13,7 @@ use Drupal\Core\Entity\Routing\DefaultHtmlRouteProvider;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\aim\AimFactAccessControlHandler;
 use Drupal\user\EntityOwnerInterface;
 use Drupal\user\EntityOwnerTrait;
 use Drupal\views\EntityViewsData;
@@ -31,6 +32,7 @@ use Drupal\views\EntityViewsData;
   handlers: [
     'views_data' => EntityViewsData::class,
     'view_builder' => EntityViewBuilder::class,
+    'access' => AimFactAccessControlHandler::class,
     'form' => [
       'default' => ContentEntityForm::class,
     ],

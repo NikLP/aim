@@ -1107,15 +1107,59 @@ builds each bundle's add link using the entity type's bundle key
 parameter name, confirmed by reading
 `DefaultHtmlRouteProvider::getAddFormRoute()` and `EntityController::addPage()`
 before choosing this over the earlier custom-form plan's own path
-scheme. Access is gated by the existing `administer aim memory`
-`admin_permission` alone - no custom access handler needed, since the
-default `EntityAccessControlHandler` already grants every operation to a
-user holding it. Verified live: all four routes resolve
+scheme. Access was originally gated by `administer aim memory` alone (the
+default `EntityAccessControlHandler` granting every operation to a holder
+of the entity type's `admin_permission`) - superseded by per-scope
+permissions below, `administer aim memory` now works purely as the
+existing bypass every check already `orIf`s against. Verified live: all
+four routes resolve
 (`entity.aim_fact.add_page`/`add_form`/`canonical`/`edit_form`), and the
 add-form correctly runs through `remember()`'s underlying save path
 (guardrails + consolidation enqueue both fire, see "Guardrails" above) -
 not a hand-rolled `FormBase` with its own `$entity->save()` that would
 have silently skipped both, the exact risk the superseded plan flagged.
+
+**Per-scope view/create permissions and access handler, built 2026-09-15.**
+Closes the gap the entity forms above left open: with only
+`administer aim memory` gating anything, any user allowed to create facts
+at all could create/view every scope, including `user`. No generic
+"auto per-bundle permission" mechanism exists in this Drupal core version
+for a code-only bundle - checked the real precedent first
+(`node`'s `NodePermissions`, `annotations`' own `AnnotationsPermissions`),
+both built on `BundlePermissionHandlerTrait::generatePermissions()`, which
+hard-requires a real config-entity bundle (`getConfigDependencyKey()`/
+`getConfigDependencyName()` on each one, to auto-clean the permission if
+the bundle is later deleted). `aim_fact`'s four scopes are code-defined
+bundles from `hook_entity_bundle_info()` (see "Scope as bundles" above),
+not config entities, so that trait doesn't apply as-is - written instead
+as a small equivalent, `AimPermissions` (`src/AimPermissions.php`,
+`permission_callbacks` in `aim.permissions.yml`, `AutowireTrait` +
+`ContainerInjectionInterface` same as `NodePermissions`'s current shape),
+looping `entity_type.bundle.info`'s `getBundleInfo('aim_fact')` directly
+and emitting `view {scope} aim facts` / `create {scope} aim facts` with no
+dependency tracking - nothing to clean up, these bundles can't be deleted
+via the UI.
+
+Permissions alone did nothing without an access handler change -
+confirmed by reading `EntityAccessControlHandler::checkAccess()`/
+`checkCreateAccess()` directly, both only ever check the flat
+`admin_permission` and stop, regardless of what other permissions exist.
+`AimFactAccessControlHandler` (`src/AimFactAccessControlHandler.php`,
+wired via `handlers.access` on `AimFact`'s `#[ContentEntityType]`
+attribute) overrides `checkAccess()` for `view` and `checkCreateAccess()`
+to check the new per-scope permission `orIf` `administer aim memory` as
+bypass - `update`/`delete` deliberately left on `administer aim memory`
+only, not asked to be scoped. Real payoff verified live, not just
+inferred: the entity-form bundle-picker's add-page route already requires
+`_entity_create_access: aim_fact:{scope}` per bundle
+(`DefaultHtmlRouteProvider::getAddFormRoute()`, since `aim_fact` has no
+`bundle_entity_type` the bundle key itself - `scope` - is used as the
+route parameter directly) - confirmed via `drush php:eval` that a test
+account with only `create site aim facts` gets `ALLOW` on
+`createAccess('site', ...)` and `DENY` on `createAccess('user', ...)`, and
+correspondingly `view`/`create` on real `aim_fact` entities of each
+scope, with zero changes needed to `EntityController::addPage()` itself -
+it already filters bundles by `createAccess()` per bundle.
 
 ## Admin settings
 

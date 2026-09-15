@@ -2,3 +2,6 @@ administer aim memory:
   title: 'Administer AIM facts'
   description: 'Create, edit, and delete memory facts.'
   restrict access: true
+
+permission_callbacks:
+  - \Drupal\aim\AimPermissions::permissions
