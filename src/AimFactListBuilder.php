@@ -23,13 +23,16 @@ class AimFactListBuilder extends EntityListBuilder {
    * Core's own default operations only cover edit/delete. aim_fact has a
    * separate read-only canonical route (unlike e.g. media, where canonical
    * and edit-form are the same page), so a "View" operation is added ahead
-   * of them. Mirrors the parent method's own func_get_args() forward-compat
-   * shape ($cacheability is not yet a declared parameter in this Drupal
-   * version) rather than declaring it directly.
+   * of them. Declares $cacheability directly (2026-09-18, CLAUDE.md's
+   * "Code review" deferred-bugs list, item 10 - phpstan-drupal's
+   * drupal.entityListBuilderMissingCacheabilityParameter,
+   * https://www.drupal.org/node/3533080) rather than reading it off
+   * func_get_args() - the parent method's own signature already declares
+   * it as an optional parameter in this Drupal version, so the
+   * forward-compat workaround was no longer needed.
    */
-  protected function getDefaultOperations(EntityInterface $entity) {
-    $args = func_get_args();
-    $cacheability = $args[1] ?? new CacheableMetadata();
+  protected function getDefaultOperations(EntityInterface $entity, ?CacheableMetadata $cacheability = NULL) {
+    $cacheability ??= new CacheableMetadata();
 
     $operations = parent::getDefaultOperations($entity, $cacheability);
 

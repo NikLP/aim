@@ -4,6 +4,9 @@ dependencies:
   module:
     - ai_search
     - ai_vdb_provider_mariadb
+  enforced:
+    module:
+      - aim
 id: aim_vector
 name: 'AIM Vector Search'
 description: ''

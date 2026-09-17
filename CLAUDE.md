@@ -39,28 +39,53 @@ the OAuth block (`mcp_server_oauth` through `consumers`), added
 **Composer-present but not enabled:** `eca` (no `aim` code uses it any
 more - the `aim_eca` submodule was removed 2026-09-17, see "ECA
 integration" below), `ai_context` (CCC).
-**Gotcha:** `mcp_server_tool_bridge`'s Composer package name is
-self-doubled (`drupal/mcp_server_tool_bridge-mcp_server_tool_bridge`) due
-to a real drupal.org packaging bug for this project - the plain
-`drupal/mcp_server_tool_bridge` name resolves to an empty metapackage stub
-with no installable code. See ADR-0013's build addendum before assuming
-the plain name is broken beyond repair or re-deriving this. Same bug hit
-`mcp_server_oauth` too, see "MCP OAuth" below.
-**Gotcha, fixed 2026-09-13:** pinned at `1.0.0-beta1` (only tagged
-release), `McpToolConfigDeriver::convertInputDefinitionToSchema()` mapped
-Tool API's list/map inputs straight to bare `{"type": "array"}`/
+**Gotcha, fixed 2026-09-17:** `mcp_server_tool_bridge`'s Composer package
+name was self-doubled (`drupal/mcp_server_tool_bridge-mcp_server_tool_bridge`)
+due to a real drupal.org packaging bug for this project - the plain
+`drupal/mcp_server_tool_bridge` name used to resolve to an empty
+metapackage stub with no installable code. Same bug hit `mcp_server_oauth`
+too. drupal.org repackaged both projects under their real plain names with
+real tagged releases (`drupal/mcp_server_tool_bridge:^1.0@beta` ->
+`1.0.0-beta2`, `drupal/mcp_server_oauth:^1.0@alpha` -> `1.0.0-alpha1`) -
+root `composer.json` and `aim`'s own `composer.json` both moved off the
+old self-doubled names and the `1.x-dev` pin (see the next gotcha and
+"Custom module dependency audit" below). Swap done via a real
+`ddev composer require`/`remove` cycle, not a hand-edit: the old
+self-doubled packages' installed directories
+(`web/modules/contrib/mcp_server_tool_bridge-mcp_server_tool_bridge`,
+`web/modules/contrib/mcp_server_oauth-mcp_server_oauth`) had to be
+explicitly `composer remove`d, not just dropped from `require` - Composer
+installs a package under a directory name derived from its own package
+name, so the old and new packages briefly coexisted on disk as two
+different directories each shipping a same-named `.info.yml`
+(`mcp_server_tool_bridge.info.yml` in both), a real duplicate-module-
+discovery risk if left in place. ADR-0013's build addendum still has the
+original bug's detail; this note is the fix, not a replacement for it.
+**Gotcha, fixed 2026-09-13, then regressed and re-fixed 2026-09-17:**
+`McpToolConfigDeriver::convertInputDefinitionToSchema()` on `1.0.0-beta1`
+mapped Tool API's list/map inputs straight to bare `{"type": "array"}`/
 `{"type": "object"}` with no recursion into `getItemDefinition()`/
 `getPropertyDefinitions()` - confirmed live via `aim_remember`'s `facts`
 input (a list of maps), which produced no `items`/`properties` at all, no
-way for an MCP client to know the nested shape. Traced upstream: the
-`1.x` branch had already deleted that method entirely (commit `569be5d`,
-issue #3613896, merged 2026-09-11, unreleased) in favor of delegating to
-`drupal/tool`'s `ToolDefinitionSerializer`/`ContextDefinitionNormalizer`,
-which already recurses correctly. No MR needed - moved the Composer
-constraint to `1.x-dev` instead of patching a method that no longer
-exists on the target branch. Re-pin to a real tag once one ships past
-beta1. This pulled in a new hard dependency on core's `serialization`
-module (not declared by beta1) - schema generation throws
+way for an MCP client to know the nested shape. First fixed 2026-09-13 by
+moving the Composer constraint to `1.x-dev`, the only place the fix
+existed at the time (issue #3613896, commit `569be5d`, unreleased). That
+`1.x-dev` pin is exactly what 2026-09-17's re-pin to a real tag (previous
+gotcha) would have regressed: `^1.0@beta` alone resolves to `1.0.0-beta1`
+- the same pre-fix code, now just correctly named - since `1.0.0-beta2`
+(confirmed live by reading its `McpToolConfigDeriver`: it deletes the
+hand-rolled converter entirely and delegates to `drupal/tool`'s real
+`ToolDefinitionSerializer::normalizeInputSchema()`, which already
+recurses correctly) requires `drupal/mcp_server ^2.0.0-beta3`, one
+version ahead of what `mcp_server`'s own `^2.0@beta` constraint had
+locked (`2.0.0-beta2`). Fixed by explicitly requiring both
+`drupal/mcp_server_tool_bridge:^1.0.0-beta2` and
+`drupal/mcp_server:^2.0.0-beta3` together in one `composer require` (a
+plain, non-`-W` partial update resolved cleanly, confirmed via
+`--dry-run` first - no cascade into unrelated packages). Verified live
+post-upgrade: `aim_remember`'s MCP schema for `facts` now has real
+`items.properties` per field. This pulled in a hard dependency on core's
+`serialization` module (not declared by beta1) - schema generation throws
 `LogicException` without it enabled.
 
 **Custom module dependency audit, 2026-09-13.** First pass on this
@@ -82,26 +107,21 @@ multi-submodule contrib projects package; `license: GPL-2.0-or-later`
 added 2026-09-17, drupal.org requires it):
 `require` holds `drupal/ai`, `drupal/ai_vdb_provider_mariadb`,
 `drupal/search_api`, `drupal/ai_agents`, `drupal/tool
-(^1.0.0-beta8)`, and `drupal/mcp_server_tool_bridge-mcp_server_tool_bridge`
-pinned to `1.x-dev` - deliberate choice (Nik's call, 2026-09-13, over the
-safer stable-`^1.0` alternative) to ship the nested-schema fix by default
-rather than wait for a tagged release; re-pin to a real tag once one
-ships past beta1. Note for whoever revisits this: a `-dev`-suffixed
-constraint string implies its own stability flag, so this does *not*
-force a consuming site into `minimum-stability: dev` site-wide - only
-this one requirement is affected, same as how this project's own root
-`composer.json` picked it up earlier without touching its
-`minimum-stability: stable`. AI *provider* modules
-(`ai_provider_anthropic`/`amazeeio`/`ollama`) are deliberately excluded -
-`aim` only calls the generic `ai.provider` service, provider choice is a
-site config decision, not aim's dependency. `drupal/ai_context`,
-`drupal/queue_ui` are `suggest`, not `require` -
-optional, not needed for `aim`'s own code to run. Composer package name
-for the bridge dependency uses the self-doubled name from this file's
-gotcha above, not the semantically-correct plain name - the plain name is
-still the broken empty-stub package upstream; revisit both this and the
-`1.x-dev` pin together once drupal.org's packaging bug and a real tagged
-release both land.
+(^1.0.0-beta8)`, and `drupal/mcp_server_tool_bridge`. Originally pinned
+to the self-doubled `drupal/mcp_server_tool_bridge-mcp_server_tool_bridge`
+name at `1.x-dev` (Nik's call, 2026-09-13, over the safer stable-`^1.0`
+alternative) to ship the nested-schema fix by default rather than wait
+for a tagged release past beta1 - both the self-doubled name and the
+`1.x-dev` pin are gone as of 2026-09-17: drupal.org fixed the packaging
+bug and shipped `1.0.0-beta2` with the fix included, so this now reads
+`^1.0.0-beta2` under the real plain name, no dev-stability requirement
+needed. See this file's Enabled-modules gotcha above for the fix detail
+and the info.yml/directory-collision risk hit doing the swap. AI
+*provider* modules (`ai_provider_anthropic`/`amazeeio`/`ollama`) are
+deliberately excluded - `aim` only calls the generic `ai.provider`
+service, provider choice is a site config decision, not aim's
+dependency. `drupal/ai_context`, `drupal/queue_ui` are `suggest`, not
+`require` - optional, not needed for `aim`'s own code to run.
 
 Drupal's own `.info.yml` `dependencies` key (which supports version
 floors, e.g. `tool:tool (>=1.0.0-beta8)`) is the *complementary*
@@ -110,12 +130,16 @@ dependency checks between already-installed modules, while
 `composer.json` governs what Composer pulls in for a fresh install.
 `aim_tool.info.yml` now floors `tool:tool` at `(>=1.0.0-beta8)` to match
 `mcp_server_tool_bridge.info.yml`'s own floor, since both consume the
-same `ListInputDefinition`/`MapInputDefinition` API - `mcp_server_tool_bridge`
-itself can't get an info.yml floor from `aim_tool` the same way yet: a
-`1.x-dev` checkout carries no `version:` in its own `.info.yml`, so there
-is nothing to compare against until a real tag ships past beta1 (the
-`composer.json` pin above is the only lever available for that one until
-then). Also fixed in passing: `aim.info.yml` declared `views:views`,
+same `ListInputDefinition`/`MapInputDefinition` API. This paragraph
+originally noted `mcp_server_tool_bridge` couldn't get an info.yml floor
+the same way while pinned to `1.x-dev` (a dev checkout carries no
+`version:` of its own to be floored against) - moot either way, since
+`aim_tool.info.yml` doesn't declare `mcp_server_tool_bridge` as a
+dependency at all (dropped 2026-09-17, see "Tool API + MCP exposure"
+under "Ideas raised"); the real tag now shipping (`1.0.0-beta2`, see the
+Enabled-modules gotcha above) does carry a real `version:`, for whoever
+next needs to float a floor against it. Also fixed in passing:
+`aim.info.yml` declared `views:views`,
 copied from the `project:module` pattern used elsewhere in this file -
 Views is core, real convention (checked against core's own
 `views_ui.info.yml`) is `drupal:views`. Checked every other custom
@@ -1088,9 +1112,34 @@ throughout): `drupal/simple_oauth` (the OAuth2 authorization server) +
 `e0ipso/simple_oauth_21` (OAuth 2.1 submodules: PKCE, RFC 9728 discovery
 metadata, dynamic client registration - **Packagist-only under the
 `e0ipso/` vendor namespace, not a drupal.org project** - `drupal/
-simple_oauth_21` does not exist) + `drupal/mcp_server_oauth-mcp_server_oauth`
-(self-doubled Composer name, same drupal.org packaging bug as
-`mcp_server_tool_bridge`, see this file's Enabled-modules gotcha).
+simple_oauth_21` does not exist) + `drupal/mcp_server_oauth` (was
+self-doubled as `drupal/mcp_server_oauth-mcp_server_oauth` until
+drupal.org fixed the packaging bug 2026-09-17, same as
+`mcp_server_tool_bridge`, see this file's Enabled-modules gotcha - now a
+plain `^1.0@alpha`, resolving to the real tagged `1.0.0-alpha1`).
+
+**New gotcha found fixing the above, 2026-09-17:** `mcp_server_oauth`
+`1.0.0-alpha1`'s own `composer.json` requires `drupal/
+simple_oauth_client_registration` and `drupal/simple_oauth_server_metadata`
+as if they were separate drupal.org Composer packages - they aren't.
+Both are Drupal module machine names bundled *inside* the
+`e0ipso/simple_oauth_21` package already required above (confirmed live:
+neither name resolves via `composer show -a`, not even as unavailable -
+they simply don't exist as Composer packages). A plain `composer require
+drupal/mcp_server_oauth:^1.0@alpha` fails outright on this until worked
+around. Fix: a root `composer.json` `"provide"` block
+(`"drupal/simple_oauth_client_registration": "1.13.0",
+"drupal/simple_oauth_server_metadata": "1.13.0"`, version matching
+`e0ipso/simple_oauth_21`'s own installed version) declaring that the
+project already satisfies those virtual package names - the standard
+Composer mechanism for exactly this shape of bug (a dependency naming a
+sibling submodule as if it shipped separately). Root `composer.json` only
+- `aim`'s own `composer.json` still just `suggest`s `drupal/mcp_server_oauth`
+plain, no `provide` block added there, since a `provide` is a
+site-level workaround for an upstream bug, not something a redistributable
+module should carry; a future site pulling in `drupal/mcp_server_oauth`
+from `aim`'s suggestion will need this same `provide` entry until
+drupal.org fixes the phantom requirement upstream too.
 
 **`aim_tool_oauth` submodule** (`modules/aim_tool_oauth/`), new, optional,
 `suggest` not `require` in `aim`'s `composer.json` - `mcp_server_oauth`
@@ -1771,23 +1820,29 @@ authorship on re-import is accepted, not a problem to solve.
   provider is auto-added as a dependency (`ConfigInstaller::
   getMissingDependencies()`). `aim_tool_uninstall()` guards on
   `hasDefinition('mcp_tool_config')` accordingly. The root
-  `composer.json` still `require`s the bridge (the deliberate `1.x-dev`
-  pin, see Project snapshot) - now inconsistent with the info.yml;
-  revisit together with that pin. Both Tool plugins also get
+  `composer.json` still `require`s the bridge (a real `^1.0.0-beta2` pin
+  as of 2026-09-17, see Project snapshot - previously the deliberate
+  `1.x-dev` pin flagged here as inconsistent with the info.yml; that
+  inconsistency was about the *version*, not the dependency itself, and
+  is now moot the same way, since the info.yml never depended on the
+  bridge at all, only Composer does, and Composer now needs no dev
+  pin to get the same behavior). Both Tool plugins also get
   `AimMemoryManager` injected via an overridden `create()` now (ToolBase's
   constructor is final, its `create()` is not - same pattern
   `aim_chatbot`'s plugins use) instead of a `\Drupal::service()` call at
   execution time. `aim_remember` also
   takes an optional `facts` list for saving several facts in one call/one
   bootstrap (mirrors `aim:remember --file`'s reasoning: an MCP call is its
-  own HTTP request too). Real caveat: `mcp_server_tool_bridge`'s real
-  Composer package is published under a self-doubled name due to a
-  drupal.org packaging bug (see this file's Enabled-modules gotcha above).
-  The bridge's schema converter not describing nested List/Map inputs
-  (`facts` generating bare `{"type": "array"}`, no `items`) was real on
-  `1.0.0-beta1` but is fixed on `1.x-dev` - see this file's Enabled-modules
-  gotcha, 2026-09-13. Full detail, the working composer incantation, and
-  the cross-project evidence from `annopm`/Annotations that shaped this
+  own HTTP request too). `mcp_server_tool_bridge`'s Composer package was
+  published under a self-doubled name due to a drupal.org packaging bug,
+  and the schema converter didn't describe nested List/Map inputs
+  (`facts` generating bare `{"type": "array"}`, no `items`) on
+  `1.0.0-beta1` - both fixed as of 2026-09-17 (real tagged `1.0.0-beta2`
+  under the plain name, delegating to `drupal/tool`'s own recursing
+  serializer) - see this file's Enabled-modules gotcha above for the
+  full fix detail. Full detail on the original bug, the working composer
+  incantation, and the cross-project evidence from `annopm`/Annotations
+  that shaped this
   design in
   [ADR-0013](adr/0013-mcp-tool-exposure.md)'s build addendum. External MCP
   client authentication (this bullet's old "still open" item) is now
@@ -2006,32 +2061,200 @@ injects `AimMemoryManager` via `create()`; `AimMemoryManager` is no longer
 `final`; `drupal:options` dropped; `composer.json` gained `license`;
 `aim_eca` removed.
 
-**Deferred, deliberately - a separate bugs/access pass:** (1) guardrails
-as an entity validation `Constraint` instead of a presave exception - today
-a guardrail rejection on the entity add/edit form is an uncaught
-`EntityStorageException`, a 500, not a field error; (2) `executeAsAdmin()`
-switching to uid 1 for every caller, so `aim_tool`'s `aim_recall` with any
-`subject_uid` (uid *or username*) lets a `read aim memory` holder read
-every other user's `scope=user` facts, and `aim_remember` never checks
-`create {scope} aim facts` - the per-scope permissions only bind the
-admin UI; (3) the `user` bundle's add form leaves `subject_uid` optional
-(ADR-0007 not enforced at the entity layer - a
-`core.base_field_override.aim_fact.user.subject_uid.yml` with
-`required: true` plus an entity-level constraint is the idiom, not the
-reverted per-bundle-field experiment); (4) `getDefaultChatProvider():
-array` wrapping a `?array`; (5) presave re-running guardrails on untouched
-text when consolidation retires a fact; (6) unguarded
-`getOriginalObject()` nulls in `recall()`/`findNearestNeighbor()`; (7)
-`AimScope` delete with no content guard (`NodeTypeDeleteConfirm` is the
-precedent); (8) `block.block.olivero_aimdemochat.yml` belonging in
-`config/optional` (theme dependency); (9) shipped config with
-`dependencies: {}` needing `enforced: module: [aim]` so uninstall cleans
-it up without the hand-written `hook_uninstall()` loops; (10)
-`AimFactListBuilder::getDefaultOperations()`'s signature per CR 3533080.
-Also deferred, not a bug: splitting `AimMemoryManager` (five concerns,
-1200+ lines) into writer/recall/consolidator/extractor/benchmark services
-behind interfaces - worth doing before drupal.org, not worth doing in the
-same pass as the access fixes. Tests: none yet, planned next.
+**Deferred bugs/access pass - all ten items built and verified live,
+2026-09-18.** The ten items below were the deferred list from this
+section as originally written; all are now fixed, each verified against
+the real site (120+ real facts already in the store at the time, not a
+fresh install) rather than only read. Still deferred, not a bug:
+splitting `AimMemoryManager` (five concerns, 1200+ lines) into writer/
+recall/consolidator/extractor/benchmark services behind interfaces -
+worth doing before drupal.org, not worth doing in the same pass as
+these. Tests: none yet, planned next.
+
+1. **Guardrails are now a real entity validation `Constraint`**
+   (`AimGuardrails`, `src/Plugin/Validation/Constraint/`), not a presave
+   exception. Wired via `->addConstraint('AimGuardrails')` on `aim_fact`'s
+   `text` field (`AimFact::baseFieldDefinitions()`). `AimHooks::
+   factPresave()` is deleted outright - `ContentEntityForm::validateForm()`
+   already calls `$entity->validate()` before every submit and renders a
+   violation as a normal field error, so a guardrail rejection on
+   `/admin/content/aim-facts/add/site` is a field error now, not an
+   uncaught `EntityStorageException` (a 500) - verified live via a real
+   cookie-jar `curl` POST of `<script>`-shaped text, HTTP 200 with the
+   guardrail's own message in a `messages__content` div, not a stack
+   trace. `AimMemoryManager::saveFact()` (used by `remember()`/
+   `createFactsFromCandidates()`, which have no form of their own calling
+   `validate()` for them) now calls `$entity->validate()` itself and
+   throws `\InvalidArgumentException` on any violation - the old
+   `EntityStorageException`-unwrapping hack this method existed for is
+   gone, since nothing throws from inside `save()` any more. A
+   `RewriteInputResult` guardrail's rewrite is applied by the validator
+   mutating the `FieldItemListInterface` in place - this survives for a
+   `saveFact()` caller (single `$entity` object, validate-then-save) but
+   not for the entity form (`ContentEntityForm::submitForm()` rebuilds a
+   fresh entity from raw form input, independent of the one
+   `validateForm()` validated) - moot today since both shipped guardrails
+   are Stop-only, no `RewriteInputResult` guardrail exists yet, but worth
+   knowing before adding one.
+
+   This also resolves item 5 below as a side effect, not a separate fix:
+   `ContentEntityBase::save()` never calls `validate()` on its own
+   (`preSave()` only enforces it if `validationRequired` is explicitly set,
+   which nothing here does) - constraints only run when something
+   explicitly calls `->validate()`, so `decideAndApply()`'s plain
+   `$kept->save()`/`$candidate->save()` calls no longer trigger the
+   guardrail constraint at all, let alone re-run it on untouched text.
+
+2. **`executeAsAdmin()` only elevates to uid 1 for an anonymous caller now**
+   (drush/cron) - a real authenticated caller (`aim_tool`'s Tool API/MCP
+   plugins, an interactive admin) runs the query as themselves, so
+   `SearchApiAiSearchBackend`'s own per-result `$entity->access('view',
+   $account)` check applies `AimFactAccessControlHandler`'s real per-scope
+   permission - no new filtering code needed, the existing admin-UI access
+   control now also governs Tool API/MCP reads. Needed a new
+   `AccountProxyInterface $currentUser` constructor argument (`@current_user`
+   in `aim.services.yml`). `AimMemoryManager::checkCreateAccess()` (new,
+   wraps the access handler's `createAccess()`) is called from `aim_tool`'s
+   `AimRemember::rememberOne()` before every save, so `create {scope} aim
+   facts` now binds Tool API writes too, not just the admin UI - `aim_recall`
+   needed no equivalent code change, per-result access from the
+   `executeAsAdmin()` fix already covers it. Verified live in two clean
+   drush processes (permission-cache staleness makes a single-process
+   before/after test unreliable): a test account with only `read aim
+   memory` got 0 `scope=user` rows back, including its own; the same
+   account with `view user aim facts` added got the real rows. Drush/cron
+   behavior (recall, consolidation's neighbor search) is unchanged, still
+   anonymous by default, still elevates.
+
+   Real behavior change worth knowing: a caller with only the flat
+   `read aim memory` permission can no longer recall their own
+   `scope=user` facts via `aim_recall` unless also granted `view user aim
+   facts` - matches how the rest of the module already treats scope
+   permissions (scope-wide, no "my own data" exception anywhere else
+   either), but is a tightening from the previous behavior.
+
+3. **ADR-0007 now enforced at the entity layer**, not just in
+   `remember()`'s own code path. `config/install/core.base_field_override.
+   aim_fact.user.subject_uid.yml` sets `required: true` on the `user`
+   bundle only (created live via `BaseFieldOverride::
+   createFromBaseFieldDefinition()` + a real save, per this file's "never
+   hand-type" discipline, not hand-typed). No separate custom constraint
+   class was needed: a required field automatically gets a `NotBlank`-type
+   constraint (`DataDefinition::getConstraints()`), and `entity_reference`
+   fields already carry core's `ValidReference` constraint (confirmed by
+   reading both), so `required: true` alone gives both "must be set" and
+   "must resolve to a real account" once something calls `validate()` -
+   which item 1's `saveFact()`/entity-form changes now do on every real
+   write path. Verified live: a `scope=user` fact created with no
+   `subject_uid` at all is rejected ("This value should not be null"); one
+   with a real account saves fine; other bundles (no override) are
+   unaffected.
+
+4. **`getDefaultChatProvider(): array` is now `getDefaultChatProvider():
+   ?array`**, matching what `AiProviderPluginManager::
+   getDefaultProviderForOperationType()` actually returns. Verified live:
+   cleared `ai.settings`' `default_providers.chat`, called the method
+   directly - returns `NULL` instead of a `TypeError` - then restored the
+   original config. `AimConsolidateQueueWorker`'s `SuspendQueueException`
+   branch (added 2026-09-17) was unreachable before this fix; drained the
+   real queue (29 items) after the fix to confirm the worker still
+   completes cleanly with a real provider configured.
+
+5. Resolved by item 1 above, not a separate change - see item 1's second
+   paragraph.
+
+6. **`getOriginalObject()` calls in `recall()`/`findNearestNeighbor()` are
+   now guarded** against both a `NULL` return and a thrown
+   `SearchApiException` (the real failure mode per `Item::
+   getOriginalObject()`'s own body: it throws, rather than returning null,
+   when `$load` is true (the default, and what both call sites use) and
+   the underlying entity can no longer be loaded - a stale index entry
+   pointing at an `aim_fact` deleted since the last reindex, e.g. by
+   consolidation's own DELETE decision or a direct admin delete). Both
+   sites now `catch (SearchApiException)` and skip the row instead of
+   letting one stale entry fail the whole call.
+
+7. **`AimScope` deletion now refuses if any `aim_fact` of that scope still
+   exists** - `AimScopeDeleteForm` (`src/Form/AimScopeDeleteForm.php`,
+   wired via `handlers.form.delete`) replaces the plain `EntityDeleteForm`,
+   same precedent as core's own `NodeTypeDeleteConfirm`. Verified live: a
+   real request to `/admin/config/aim/scopes/user/delete` (77 real
+   `scope=user` facts on this site) shows the fact count and no confirm
+   button, exactly like a node type with content.
+
+8. **`block.block.olivero_aimdemochat.yml` moved to `config/optional`**
+   (was `config/install`) - it depends on `theme: olivero`, and Drupal
+   only installs optional config whose dependencies are already met, so a
+   site without Olivero enabled no longer gets an `UnmetDependenciesException`
+   enabling `aim_chatbot`. The live site's already-installed block entity
+   is unaffected by the file's source directory changing (confirmed live)
+   - this only changes what a future fresh install does.
+
+9. **Shipped config that had no real dependency on its owning module now
+   declares one**, mostly via `dependencies.enforced.module`, so
+   `ConfigManager::uninstall()`'s own dependency-graph cleanup deletes it
+   without help: `ai.ai_guardrail.aim_max_length`/`aim_no_markup`,
+   `taxonomy.vocabulary.aim_category`, `search_api.server.aim_vector`
+   (`aim`); `ai_assistant_api.ai_assistant.aim_demo_assistant`,
+   `block.block.olivero_aimdemochat` (`aim_chatbot`);
+   `mcp_server_tool_bridge.mcp_tool_config.aim_recall`/`aim_remember`
+   (`aim_tool`); `simple_oauth.oauth2_scope.aim_recall`/`aim_remember`
+   (`aim_tool_oauth`). `ai.ai_guardrail_set.aim_write_guardrails`,
+   `search_api.index.aim_vector_index`, `views.view.aim_facts`, and every
+   `aim.aim_scope.*` needed no enforced dependency - each already has a
+   real one (the guardrail set depends on the two guardrails; a config
+   entity automatically depends on the module providing its own entity
+   type, which covers every `aim_scope`; the other two were already
+   correctly computed). `aim.settings` needs no explicit deletion either -
+   `ConfigManager::uninstall()` unconditionally deletes any simple config
+   prefixed by the uninstalling module's own name, and `aim.settings`
+   already matches `aim.`. Verified non-destructively (not a real
+   uninstall against this site's 120+ real facts): `\Drupal::service(
+   'config.manager')->getConfigEntitiesToChangeOnDependencyRemoval(
+   'module', [$module], FALSE)` - the exact read-only method
+   `ConfigManager::uninstall()` itself calls before deleting anything -
+   listed every expected entity in its `delete` array for `aim`,
+   `aim_chatbot`, `aim_tool`, and `aim_tool_oauth`, confirmed by applying
+   the same `dependencies.enforced` values to the live config first (same
+   discipline as any other config change - the shipped `config/install`
+   YAML now matches what was verified live).
+
+   `aim_uninstall()` shrank to exactly what CLAUDE.md's own prior "the
+   hooks shrink to..." framing predicted: the `ai_search.index.
+   aim_vector_index` simple-config delete (still needed - `ai_search`'s
+   own simple config, not a config entity, invisible to the dependency
+   graph entirely) and the `aim_facts` table drop (a real DB table, not
+   config at all). `modules/aim_chatbot/aim_chatbot.install` and
+   `modules/aim_tool/aim_tool.install` are deleted outright - both only
+   ever existed for a `hook_uninstall()` that is now fully redundant.
+   `aim_tool_oauth_uninstall()` kept the part that genuinely can't move to
+   a config dependency (unsetting the `mcp_server_oauth` third-party
+   settings it applied to `aim_tool`'s own `mcp_tool_config` entities in
+   `hook_install()` - a mutation of another module's config this module
+   ships no file for) and dropped its own `oauth2_scope` deletion loop.
+
+   Not verified against a real uninstall cycle (would have destroyed this
+   site's real data) - if a future reinstall ever throws
+   `PreExistingConfigException` despite this, check which entity's
+   `dependencies` the live config actually carries
+   (`\Drupal::config($name)->getRawData()`) before assuming the mechanism
+   itself is unreliable again.
+
+10. **`AimFactListBuilder::getDefaultOperations()` now declares
+    `?CacheableMetadata $cacheability = NULL` directly** instead of reading
+    it off `func_get_args()`, per phpstan-drupal's
+    `drupal.entityListBuilderMissingCacheabilityParameter` (CR 3533080).
+    Core's own parent method in this Drupal version still has the second
+    parameter commented out and reads it via `func_get_args()` internally
+    - confirmed this still works calling `parent::getDefaultOperations(
+    $entity, $cacheability)` with two real arguments, since `func_get_args()`
+    reflects what was actually passed at the call site regardless of the
+    parent's own declared signature. Verified live: the admin facts
+    listing's View/Edit/Delete dropbutton still renders correctly.
+
+`phpcs --standard=Drupal,DrupalPractice` and `phpstan analyse` (this
+file's own lint commands) both pass clean against the whole module after
+all ten fixes.
 
 ## Dev process and rules
 

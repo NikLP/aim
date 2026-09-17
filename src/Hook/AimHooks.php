@@ -10,6 +10,17 @@ use Drupal\aim\Service\AimMemoryManager;
 
 /**
  * Hook implementations for the aim module.
+ *
+ * A factPresave() implementation used to run aim's write guardrails
+ * (decision 7) here - removed 2026-09-18 in favor of a real field-level
+ * validation Constraint (AimGuardrails, on aim_fact's text field) plus
+ * AimMemoryManager::saveFact() explicitly calling validate() for a
+ * programmatic writer. See AimGuardrailsConstraint's own docblock for
+ * why: a presave exception surfaced as an uncaught EntityStorageException
+ * (a 500) on the entity add/edit form, since ContentEntityForm::save()
+ * does not catch it - a Constraint gets rendered as a normal field error
+ * by ContentEntityForm::validateForm() instead, which already calls
+ * $entity->validate() before every submit.
  */
 class AimHooks {
 
@@ -18,46 +29,16 @@ class AimHooks {
   ) {}
 
   /**
-   * Implements hook_ENTITY_TYPE_presave() for aim_fact.
-   *
-   * Runs runGuardrails() (decision 7) for every fact save, on every path
-   * that creates or updates one - remember(), createFactsFromCandidates(),
-   * the entity add/edit forms, default content import, anything future -
-   * not just the callers that used to remember to call it directly (see
-   * CLAUDE.md's Guardrails section). Throws to abort the save, the same
-   * \InvalidArgumentException every caller already catches. A rewriting
-   * guardrail (RewriteInputResult) changes what gets stored, so the
-   * returned text is written back onto the entity.
-   *
-   * An entity flagged setSyncing(TRUE) opts out - core's own "being
-   * synchronized, skip side effects" flag, used by generateBenchmarkFacts()
-   * (synthetic benchmark text needs neither this nor the consolidation
-   * enqueue in factInsert() below, see CLAUDE.md's Benchmarking section).
-   * Core's migrate destinations (EntityContentBase and friends) set the
-   * same flag on every entity they save, so a fact written by a migration
-   * also skips guardrails here AND the consolidation enqueue below - a
-   * migrated corpus is stored exactly as given and never consolidated
-   * unless drush aim:consolidate is run over it afterward. Deliberate for a
-   * bulk sync, but not a free choice; see CLAUDE.md's Benchmarking section.
-   */
-  #[Hook('aim_fact_presave')]
-  public function factPresave(AimFact $entity): void {
-    if ($entity->isSyncing()) {
-      return;
-    }
-    $text = $entity->get('text')->value ?? '';
-    $checked = $this->memoryManager->runGuardrails($text);
-    if ($checked !== $text) {
-      $entity->set('text', $checked);
-    }
-  }
-
-  /**
    * Implements hook_ENTITY_TYPE_insert() for aim_fact.
    *
    * Enqueues every newly created fact for consolidation (decision 4),
-   * universal for every save path - see factPresave() above for why, and
-   * for the isSyncing() opt-out.
+   * universal for every save path. An entity flagged setSyncing(TRUE)
+   * opts out - core's own "being synchronized, skip side effects" flag,
+   * used by generateBenchmarkFacts() (synthetic benchmark text needs no
+   * consolidation, see CLAUDE.md's Benchmarking section) and set by core's
+   * migrate destinations on every entity they save, so a migrated fact
+   * also skips this - deliberate for a bulk sync, but not a free choice;
+   * see CLAUDE.md's Benchmarking section.
    */
   #[Hook('aim_fact_insert')]
   public function factInsert(AimFact $entity): void {

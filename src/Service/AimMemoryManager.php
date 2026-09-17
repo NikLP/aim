@@ -15,17 +15,19 @@ use Drupal\ai\Guardrail\Result\RewriteInputResult;
 use Drupal\ai\Guardrail\Result\StopResult;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
+use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Session\AccountSwitcherInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\search_api\IndexInterface;
 use Drupal\search_api\Query\QueryInterface as SearchApiQueryInterface;
 use Drupal\search_api\Query\ResultSetInterface;
+use Drupal\search_api\SearchApiException;
 
 /**
  * Read/write access to aim's memory store.
@@ -160,6 +162,11 @@ class AimMemoryManager {
    *   The config factory, used to read aim.settings' admin-editable
    *   consolidation thresholds and extraction/consolidation prompts (see
    *   /admin/config/aim/settings, Drupal\aim\Form\AimSettingsForm).
+   * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
+   *   The current user, used by executeAsAdmin() to tell a real
+   *   authenticated caller (Tool API/MCP, an interactive admin) apart from
+   *   an anonymous one (drush, cron) - only the latter needs the uid-1
+   *   elevation that method exists for.
    */
   public function __construct(
     protected AiProviderPluginManager $aiProvider,
@@ -171,6 +178,7 @@ class AimMemoryManager {
     protected EntityTypeBundleInfoInterface $bundleInfo,
     protected UuidInterface $uuid,
     protected ConfigFactoryInterface $configFactory,
+    protected AccountProxyInterface $currentUser,
   ) {}
 
   /**
@@ -318,38 +326,69 @@ class AimMemoryManager {
   }
 
   /**
-   * Saves an aim_fact entity, unwrapping a guardrail rejection.
+   * Saves an aim_fact entity, validating first.
    *
-   * Guardrails now run inside save() itself, via AimHooks::factPresave()
-   * (src/Hook/AimHooks.php) rather than an explicit runGuardrails() call
-   * beforehand - but SqlContentEntityStorage::save() catches any
-   * \Exception thrown from a presave hook and rethrows it as
-   * EntityStorageException (same message, different class - see
-   * \Drupal\Core\Entity\Sql\SqlContentEntityStorage::save()). Left
-   * unhandled, that would silently break every existing
-   * catch (\InvalidArgumentException) call site this module already has
-   * (AimCommands, aim_tool's AimRemember, aim_chatbot's AimRemember,
-   * createFactsFromCandidates() below) - decision 7 in CLAUDE.md documents
-   * a guardrail stop as "the same exception every caller already catches".
-   * This restores that contract in one place, for every write path, rather
-   * than each caller unwrapping it themselves.
+   * Guardrails (decision 7) run as a real field-level Constraint
+   * (AimGuardrails, on the text field - see
+   * src/Plugin/Validation/Constraint/) rather than a presave hook. The
+   * entity add/edit form already calls $entity->validate() itself
+   * (ContentEntityForm::validateForm()) and renders a violation as a
+   * normal field error - but a programmatic writer with no form of its
+   * own (remember(), createFactsFromCandidates()) has nothing calling
+   * validate() for it, so this method does that explicitly before saving,
+   * the same "programmatic writers call validate() before save()"
+   * discipline the form gets for free. A guardrail rejection (or any
+   * other entity constraint violation) throws \InvalidArgumentException,
+   * the same exception every caller already catches - previously this
+   * method existed to unwrap that exception back out of the
+   * EntityStorageException a presave-hook exception got wrapped in; with
+   * nothing left throwing from inside save() itself, that unwrapping is
+   * gone too.
+   *
+   * generateBenchmarkFacts() deliberately bypasses this entirely by
+   * calling $entity->save() directly instead of going through saveFact() -
+   * synthetic benchmark text needs no validation, see its own docblock.
    *
    * @param \Drupal\aim\Entity\AimFact $entity
    *   The entity to save.
    *
    * @throws \InvalidArgumentException
-   *   If a guardrail rejected the entity's text.
+   *   If a guardrail, or any other entity constraint, rejects the entity.
    */
   public function saveFact(AimFact $entity): void {
-    try {
-      $entity->save();
-    }
-    catch (EntityStorageException $e) {
-      if ($e->getPrevious() instanceof \InvalidArgumentException) {
-        throw $e->getPrevious();
+    $violations = $entity->validate();
+    if (count($violations) > 0) {
+      $messages = [];
+      foreach ($violations as $violation) {
+        $messages[] = (string) $violation->getMessage();
       }
-      throw $e;
+      throw new \InvalidArgumentException(implode(' ', $messages));
     }
+    $entity->save();
+  }
+
+  /**
+   * Checks whether an account may create a fact of the given scope.
+   *
+   * Wraps AimFactAccessControlHandler's per-scope create-access check
+   * ("create {scope} aim facts", with "administer aim memory" as bypass)
+   * for a caller outside a normal entity form context. Added so aim_tool's
+   * aim_remember Tool plugin can check it too - previously that plugin
+   * only checked the flat "store aim memory" permission and never this
+   * per-scope one, so the per-scope permissions bound the admin UI only,
+   * not Tool API/MCP writes.
+   *
+   * @param string $scope
+   *   The scope to check create access for.
+   * @param \Drupal\Core\Session\AccountInterface $account
+   *   The account to check.
+   *
+   * @return \Drupal\Core\Access\AccessResultInterface
+   *   The access result.
+   */
+  public function checkCreateAccess(string $scope, AccountInterface $account): AccessResultInterface {
+    return $this->entityTypeManager->getAccessControlHandler('aim_fact')
+      ->createAccess($scope, $account, [], TRUE);
   }
 
   /**
@@ -439,22 +478,35 @@ class AimMemoryManager {
    * hand-edited twice already this project when the site's working
    * provider changed.
    *
-   * @return array
-   *   An array with keys 'provider_id' and 'model_id', or empty if no
+   * @return array|null
+   *   An array with keys 'provider_id' and 'model_id', or NULL if no
    *   default chat provider is configured.
    */
-  public function getDefaultChatProvider(): array {
+  public function getDefaultChatProvider(): ?array {
     return $this->aiProvider->getDefaultProviderForOperationType('chat');
   }
 
   /**
-   * Runs a search_api query as user 1, since some callers have no user.
+   * Runs a search_api query, elevating to user 1 only for an anonymous caller.
    *
    * Drush (and cron) runs as the anonymous user by default, which has no
    * view access to aim_fact, so the AI Search backend's per-result entity
-   * access check would silently drop every match. Run the query as user 1
-   * instead of bypassing access outright, so this stays subject to whatever
-   * real permission eventually governs aim_fact (CLAUDE.md decision 3).
+   * access check would silently drop every match - elevating to user 1 for
+   * that case keeps drush/cron paths (recall(), consolidation's neighbor
+   * search) working as before.
+   *
+   * A real authenticated caller (aim_tool's Tool API/MCP plugins, an
+   * interactive admin) already has an account of its own to query as -
+   * elevating it to user 1 too would bypass the per-scope view permissions
+   * AimFactAccessControlHandler enforces, exactly the gap CLAUDE.md's
+   * "Code review" deferred-bugs list flagged: a caller holding only the
+   * flat "read aim memory" permission could see every other user's
+   * scope=user facts, since uid 1 (via administer aim memory) always sees
+   * everything regardless of the per-scope checks. Running the query as
+   * the caller instead lets ai_search's own per-result
+   * $entity->access('view', $account) check (SearchApiAiSearchBackend::
+   * checkEntityAccess()) apply the real per-scope permission, the same one
+   * the admin UI already relies on - no new filtering logic needed here.
    *
    * @param \Drupal\search_api\Query\QueryInterface $query
    *   The query to execute.
@@ -463,6 +515,10 @@ class AimMemoryManager {
    *   The query results.
    */
   public function executeAsAdmin(SearchApiQueryInterface $query): ResultSetInterface {
+    if (!$this->currentUser->isAnonymous()) {
+      return $query->execute();
+    }
+
     $admin = $this->entityTypeManager->getStorage('user')->load(1);
     if (!$admin instanceof AccountInterface) {
       throw new \RuntimeException('User 1 does not exist, no account to run this query as.');
@@ -862,15 +918,31 @@ class AimMemoryManager {
 
     $rows = [];
     foreach ($results as $result) {
-      $fact = $result->getOriginalObject()->getValue();
+      try {
+        $original = $result->getOriginalObject();
+      }
+      catch (SearchApiException) {
+        // A stale index entry pointing at an aim_fact that no longer
+        // exists (deleted directly, or by consolidation's DELETE
+        // decision) and hasn't been reindexed away yet - skip it rather
+        // than let one stale row fail the whole recall() call.
+        continue;
+      }
+      if ($original === NULL) {
+        continue;
+      }
+      $fact = $original->getValue();
       // `expires` is not an indexed attribute, so a retired fact still
       // matches the vector query; filter it out here instead.
+
       if (!$fact->get('expires')->isEmpty()) {
         continue;
       }
+
       if ($filter_account && (int) $fact->get('subject_uid')->target_id !== (int) $filter_account->id()) {
         continue;
       }
+
       $rows[] = [
         'id' => $fact->id(),
         'score' => $result->getScore(),
@@ -880,6 +952,7 @@ class AimMemoryManager {
         'source' => $fact->get('source')->value,
         'state' => $fact->get('state')->value,
       ];
+
       if (count($rows) >= $limit) {
         break;
       }
@@ -1144,24 +1217,41 @@ class AimMemoryManager {
 
     $results = $this->executeAsAdmin($query);
     foreach ($results as $result) {
-      $candidate = $result->getOriginalObject()->getValue();
+      try {
+        $original = $result->getOriginalObject();
+      }
+      catch (SearchApiException) {
+        // Same stale-index-entry case recall() guards against above - a
+        // neighbor candidate that was deleted since being indexed.
+        continue;
+      }
+
+      if ($original === NULL) {
+        continue;
+      }
+
+      $candidate = $original->getValue();
       if ((int) $candidate->id() === (int) $fact->id() || isset($handled[$candidate->id()])) {
         continue;
       }
+
       // The vector index does not know about `expires` (it is not an
       // indexed attribute), so an already-retired fact would otherwise
       // keep resurfacing as a neighbor on every future run.
       if (!$candidate->get('expires')->isEmpty()) {
         continue;
       }
+
       if ($is_user_scope) {
         $candidate_subject_uid = $candidate->get('subject_uid')->target_id;
         if ($subject_uid === NULL || $candidate_subject_uid === NULL || (int) $candidate_subject_uid !== (int) $subject_uid) {
           continue;
         }
       }
+
       return [$candidate, (float) $result->getScore()];
     }
+
     return NULL;
   }
 

@@ -28,40 +28,46 @@ function aim_install(): void {
 /**
  * Implements hook_uninstall().
  *
- * Drush pmu does not reliably remove every config/install entity on its
- * own (reproduced twice against this exact config set - see CLAUDE.md's
- * "Scope as bundles" gotchas), leaving orphans that throw
- * PreExistingConfigException on the next install. Delete everything this
- * module ships explicitly instead of relying on dependency-based cleanup.
+ * Used to hand-delete every config entity this module ships (ai_guardrail,
+ * ai_guardrail_set, aim_scope, search_api_index, search_api_server,
+ * taxonomy_vocabulary, view) on the belief that drush pmu's own
+ * dependency-based cleanup was unreliable (see CLAUDE.md's "Scope as
+ * bundles" gotchas). Re-examined 2026-09-18 (CLAUDE.md's "Code review"
+ * deferred-bugs list, item 9): the real cause was that several of those
+ * config files shipped with dependencies: {} and no real dependency on
+ * `aim` at all, so ConfigManager::uninstall()'s own dependency-graph
+ * cleanup had nothing to act on - not that the mechanism itself is
+ * unreliable. Every one of those config files now declares (or, for the
+ * ones with a genuine functional dependency already, already had) a
+ * dependency on `aim`, either real (search_api.index.aim_vector_index,
+ * views.view.aim_facts, and every aim_scope entity - a config entity
+ * automatically depends on the module providing its own entity type) or
+ * `dependencies.enforced.module: [aim]` where no real one exists
+ * (ai.ai_guardrail.*, taxonomy.vocabulary.aim_category,
+ * search_api.server.aim_vector) - confirmed live via
+ * \Drupal::service('config.manager')
+ * ->getConfigEntitiesToChangeOnDependencyRemoval('module', ['aim'], FALSE),
+ * a read-only simulation of exactly what this hook's caller runs, which
+ * now lists every one of those entities (ai_write_guardrails cascades
+ * automatically through its own real dependency on the two guardrails, no
+ * enforced needed there). `aim.settings` needs no explicit deletion
+ * either: ConfigManager::uninstall() unconditionally deletes any simple
+ * config whose name is prefixed by the uninstalling module's own name
+ * ($name . '.'), and "aim.settings" already matches "aim.".
+ *
+ * What's left genuinely can't be handled by config dependencies:
+ * ai_search.index.aim_vector_index is ai_search's own simple config (not
+ * a config entity - no uuid, so it is invisible to the dependency graph
+ * entirely, see CLAUDE.md's "Vector search" section), and the aim_facts
+ * collection table is a real database table, not config at all.
  */
 function aim_uninstall(): void {
-  $entity_type_manager = \Drupal::entityTypeManager();
-
-  $entities = [
-    'ai_guardrail' => ['aim_max_length', 'aim_no_markup'],
-    'ai_guardrail_set' => ['aim_write_guardrails'],
-    'aim_scope' => ['user', 'role', 'site', 'case'],
-    'search_api_index' => ['aim_vector_index'],
-    'search_api_server' => ['aim_vector'],
-    'taxonomy_vocabulary' => ['aim_category'],
-    'view' => ['aim_facts'],
-  ];
-
-  foreach ($entities as $entity_type_id => $ids) {
-    $storage = $entity_type_manager->getStorage($entity_type_id);
-    foreach ($storage->loadMultiple($ids) as $entity) {
-      $entity->delete();
-    }
-  }
-
-  $config_factory = \Drupal::configFactory();
-  foreach (['aim.settings', 'ai_search.index.aim_vector_index'] as $name) {
-    $config_factory->getEditable($name)->delete();
-  }
+  \Drupal::configFactory()->getEditable('ai_search.index.aim_vector_index')->delete();
 
   // createCollection() is not idempotent (see CLAUDE.md's "Vector search"
   // gotchas) - drop the collection table outright rather than leaving a
   // stray table for the next install's createCollection() to collide
-  // with. Safe if the search_api_index delete above already dropped it.
+  // with. Safe if the search_api_index delete (now handled by the config
+  // dependency cascade above, not this hook) already dropped it.
   \Drupal::database()->schema()->dropTable('aim_facts');
 }

@@ -1,6 +1,9 @@
 langcode: en
 status: true
-dependencies: {  }
+dependencies:
+  enforced:
+    module:
+      - aim_tool_oauth
 id: aim_remember
 name: 'aim:remember'
 description: 'Write access to aim memory (save facts via aim_remember).'

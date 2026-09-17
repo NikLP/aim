@@ -1,6 +1,9 @@
 langcode: en
 status: true
-dependencies: {  }
+dependencies:
+  enforced:
+    module:
+      - aim
 id: aim_max_length
 label: 'AIM: maximum fact length'
 description: 'Rejects candidate fact text longer than a short atomic statement should reasonably be.'

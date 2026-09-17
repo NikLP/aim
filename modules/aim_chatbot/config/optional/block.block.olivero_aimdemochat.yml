@@ -5,6 +5,9 @@ dependencies:
     - ai_chatbot
   theme:
     - olivero
+  enforced:
+    module:
+      - aim_chatbot
 id: olivero_aimdemochat
 theme: olivero
 region: content

@@ -1,6 +1,9 @@
 langcode: en
 status: true
-dependencies: {  }
+dependencies:
+  enforced:
+    module:
+      - aim_tool_oauth
 id: aim_recall
 name: 'aim:recall'
 description: 'Read access to aim memory (semantic search via aim_recall).'

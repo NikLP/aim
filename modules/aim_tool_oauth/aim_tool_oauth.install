@@ -38,17 +38,22 @@ function aim_tool_oauth_install(): void {
 /**
  * Implements hook_uninstall().
  *
- * Unsets the third-party settings this module applied to aim_tool's
- * entities, then deletes this module's own oauth2_scope entities - drush
- * pmu does not reliably remove config/install entities on its own (see
- * CLAUDE.md's "Scope as bundles" gotchas for aim's/aim_chatbot's own
- * reproduction of this), leaving orphans that throw
- * PreExistingConfigException on the next install.
+ * Unsets the third-party settings this module applied (in hook_install())
+ * to aim_tool's own mcp_tool_config entities - a mutation of another
+ * module's config this module owns no file for (see hook_install()'s own
+ * docblock for why), so it can only be undone in code, not via a config
+ * dependency. This module's own oauth2_scope entities need no explicit
+ * deletion here any more (2026-09-18, CLAUDE.md's "Code review"
+ * deferred-bugs list, item 9): both now ship with
+ * dependencies.enforced.module: [aim_tool_oauth], so
+ * ConfigManager::uninstall()'s own dependency-graph cleanup deletes them
+ * on its own - confirmed live via
+ * \Drupal::service('config.manager')
+ * ->getConfigEntitiesToChangeOnDependencyRemoval('module',
+ * ['aim_tool_oauth'], FALSE).
  */
 function aim_tool_oauth_uninstall(): void {
-  $entity_type_manager = \Drupal::entityTypeManager();
-
-  $storage = $entity_type_manager->getStorage('mcp_tool_config');
+  $storage = \Drupal::entityTypeManager()->getStorage('mcp_tool_config');
   foreach (['aim_remember', 'aim_recall'] as $tool_config_id) {
     $tool_config = $storage->load($tool_config_id);
     if (!$tool_config instanceof ConfigEntityInterface) {
@@ -57,10 +62,5 @@ function aim_tool_oauth_uninstall(): void {
     $tool_config->unsetThirdPartySetting('mcp_server_oauth', 'authentication_mode');
     $tool_config->unsetThirdPartySetting('mcp_server_oauth', 'scopes');
     $tool_config->save();
-  }
-
-  $scope_storage = $entity_type_manager->getStorage('oauth2_scope');
-  foreach ($scope_storage->loadMultiple(['aim_remember', 'aim_recall']) as $scope) {
-    $scope->delete();
   }
 }

@@ -7,9 +7,9 @@ namespace Drupal\aim\Entity;
 use Drupal\Core\Config\Entity\ConfigEntityBundleBase;
 use Drupal\Core\Config\Entity\ConfigEntityListBuilder;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
-use Drupal\Core\Entity\EntityDeleteForm;
 use Drupal\Core\Entity\Routing\DefaultHtmlRouteProvider;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\aim\Form\AimScopeDeleteForm;
 use Drupal\aim\Form\AimScopeForm;
 
 /**
@@ -52,7 +52,7 @@ use Drupal\aim\Form\AimScopeForm;
     'form' => [
       'add' => AimScopeForm::class,
       'edit' => AimScopeForm::class,
-      'delete' => EntityDeleteForm::class,
+      'delete' => AimScopeDeleteForm::class,
     ],
     'route_provider' => [
       'html' => DefaultHtmlRouteProvider::class,

@@ -33,6 +33,13 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * transport instead of a shell. See ADR-0013 for why this is a separate
  * plugin from the chatbot's rather than a shared one.
  *
+ * "store aim memory" only gates use of this tool at all - rememberOne()
+ * additionally checks the real per-scope "create {scope} aim facts"
+ * permission for the candidate's actual scope (AimMemoryManager::
+ * checkCreateAccess()), so the same permission the admin UI's entity add
+ * form enforces per bundle also binds this write path, not just the flat
+ * permission below.
+ *
  * Pass facts instead of text/scope/subject/source to save several facts in
  * one call - one MCP round trip and one Drupal bootstrap for the whole
  * batch, mirroring aim:remember's own --file option and for the same
@@ -249,6 +256,17 @@ final class AimRemember extends ToolBase {
     $subject = $fields['subject'] ?? NULL;
     if ($scope === 'user' && empty($subject)) {
       $subject = (string) $this->currentUser->id();
+    }
+
+    // checkAccess() below only checks the flat "store aim memory"
+    // permission, gating use of this tool at all - it does not know the
+    // per-candidate scope (especially for a facts batch, where each entry
+    // can have its own). Check the real per-scope "create {scope} aim
+    // facts" permission here too (AimFactAccessControlHandler, "administer
+    // aim memory" as bypass), the same one the admin UI's entity add form
+    // already enforces per bundle.
+    if (!$this->memoryManager->checkCreateAccess($scope, $this->currentUser)->isAllowed()) {
+      return ['error' => 'No permission to create ' . $scope . '-scope facts.'];
     }
 
     try {

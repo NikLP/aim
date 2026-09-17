@@ -1,6 +1,9 @@
 langcode: en
 status: true
-dependencies: {  }
+dependencies:
+  enforced:
+    module:
+      - aim_chatbot
 id: aim_demo_assistant
 label: 'AIM Memory Demo'
 description: 'Demo assistant that can remember and recall site-scoped facts via aim.'

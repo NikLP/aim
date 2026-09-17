@@ -11,6 +11,7 @@ services:
       - '@entity_type.bundle.info'
       - '@uuid'
       - '@config.factory'
+      - '@current_user'
 
   # Class alias so autowired consumers (the auto-registered AimHooks
   # service, src/Hook/AimHooks.php) can type-hint AimMemoryManager

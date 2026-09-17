@@ -208,8 +208,17 @@ Claude Desktop, or any other remote MCP client).
    (Packagist-only, `e0ipso/simple_oauth_21` - not a drupal.org project),
    `simple_oauth_server_metadata`, `simple_oauth_client_registration`,
    `simple_oauth_pkce`, `consumers`, `mcp_server_oauth` (Composer name
-   `drupal/mcp_server_oauth-mcp_server_oauth`, same self-doubled-package
-   drupal.org bug as `mcp_server_tool_bridge`), then `aim_tool_oauth`.
+   `drupal/mcp_server_oauth`, `^1.0@alpha` - drupal.org fixed its
+   self-doubled-package bug 2026-09-17, same one `mcp_server_tool_bridge`
+   had), then `aim_tool_oauth`. **Composer gotcha:** `mcp_server_oauth`
+   1.0.0-alpha1 declares a dependency on `drupal/simple_oauth_client_registration`
+   and `drupal/simple_oauth_server_metadata` as if they were separate
+   drupal.org Composer packages - they aren't, both are Drupal module
+   names bundled inside `e0ipso/simple_oauth_21` above. A plain
+   `composer require drupal/mcp_server_oauth` fails until the consuming
+   site's own `composer.json` adds a `"provide"` block naming both
+   (version matching whatever `e0ipso/simple_oauth_21` resolves to) - see
+   CLAUDE.md's MCP OAuth section for the exact block.
 2. **Generate a key pair outside the docroot**:
    `vendor/bin/drush simple-oauth:generate-keys <path>`, e.g. `keys/` at
    this site's repo root, sibling to `web/` (already gitignored).

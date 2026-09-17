@@ -102,6 +102,12 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
       ->setLabel(t('Text'))
       ->setDescription(t('The fact itself, as one short statement.'))
       ->setRequired(TRUE)
+      // Runs every candidate fact through aim's write guardrails
+      // as a real field-level constraint rather than a
+      // presave hook, so a rejection surfaces as a normal field error on
+      // the entity add/edit form instead of an uncaught exception. See
+      // AimGuardrailsConstraint's own docblock.
+      ->addConstraint('AimGuardrails')
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['weight' => 0]);
 
