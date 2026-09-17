@@ -13,3 +13,11 @@ aim.settings:
     _title: 'AIM settings'
   requirements:
     _permission: 'administer aim memory'
+
+aim.user_scope_access:
+  path: '/admin/config/aim/user-scope-access'
+  defaults:
+    _form: '\Drupal\aim\Form\AimUserScopeAccessForm'
+    _title: 'User-scope visibility'
+  requirements:
+    _permission: 'administer aim memory'

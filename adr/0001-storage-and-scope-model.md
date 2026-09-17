@@ -1,7 +1,8 @@
 # ADR-0001: Storage and scope model
 
-**Status:** Accepted; scope model has a documented, temporary PoC deviation.
-**Date:** 2026-09-08 (storage), ongoing (scope model deviation)
+**Status:** Accepted. Scope model's PoC deviation was resolved 2026-09-15
+(real bundles now exist, see the addendum at the end).
+**Date:** 2026-09-08 (storage), 2026-09-15 (scope model deviation resolved)
 
 ## Context
 
@@ -33,14 +34,12 @@ inside Drupal rather than bolting on a dedicated vector service.
 composable at retrieval the way Mem0 composes `user_id`/`agent_id`/
 `run_id`.
 
-**Scope model (PoC deviation, deliberate and temporary):** `aim_fact`
-ships with one flat `scope` list field (user/role/site/case) instead of
-four bundles, to keep the first slice small. This is a cheap-to-reverse
-choice, not a redesign: no update hooks exist yet (see ADR-0002 and
-CLAUDE.md's "Schema/config changes during early development"), so
-reinstalling to bundle-per-scope is inexpensive *only* until real data
-exists worth preserving - at which point it becomes a real migration, not
-a reinstall.
+**Scope model (PoC deviation, resolved 2026-09-15):** `aim_fact` shipped
+with one flat `scope` list field (user/role/site/case) instead of four
+bundles, to keep the first slice small. This paragraph is now historical;
+see the addendum at the end for the actual conversion, done while it was
+still cheap (no update hooks existed yet, so the reinstall this paragraph
+anticipated stayed a reinstall, never became a migration).
 
 ## Consequences
 
@@ -66,7 +65,32 @@ a reinstall.
   reaches the tens of thousands, where InnoDB buffer-pool pressure -
   competing with a live site's own working set for memory-resident index
   space - is the more realistic future pressure point than raw disk.
-- The flat-`scope`-field deviation means today's `aim_fact` cannot express
-  per-scope retention/visibility rules independently; every scope shares
-  one set of field definitions and one access-control surface. Revisit
-  before any non-PoC data goes in.
+- Resolved by the 2026-09-15 bundle conversion (see addendum): scopes are
+  now real `aim_scope` bundles with their own per-bundle `view`/`create`
+  permissions (`BundlePermissionHandlerTrait`), not one shared
+  access-control surface. Per-scope *field* definitions remain
+  deliberately unbuilt - see DEVELOPING.md's "Scope/bundle model" for why
+  `subject`/`subject_uid` as per-bundle fields was tried and reverted.
+
+## Addendum (2026-09-15): scope model deviation resolved, real bundles built
+
+Built in two steps, not one. `aim_fact`'s `scope` field was first
+converted to bundles via `hook_entity_bundle_info()` (2026-09-14), then
+the bundle source itself was converted a second time to a real
+`aim_scope` config entity (`bundle_entity_type` on `AimFact`,
+2026-09-15) - `id`/`label` only, no `field_ui_base_route`. Base fields
+(`scope`, `subject`, `subject_uid`, `text`, etc.) don't duplicate storage
+per bundle, so the conversion cost was a wide-but-mechanical refactor
+(every `->get('scope')->value` read became `->bundle()`) rather than a
+schema migration - the "cheap-to-reverse choice" framing above held.
+
+Real payoff: `AimPermissions` now generates `view {scope} aim facts`/
+`create {scope} aim facts` per bundle via
+`BundlePermissionHandlerTrait`, replacing a hand-rolled permission loop.
+Deleting a scope now cleans up its own permission grants automatically
+via config-dependency tracking. A site or contrib module can still add a
+fifth scope with zero PHP (`config/install/aim.aim_scope.<id>.yml`), or
+now also through the admin UI - the conversion only added the second
+option. Full mechanism and gotchas (the reverted per-bundle-field
+attempt, the `field_ui_base_route` guardrail) in DEVELOPING.md's
+"Scope/bundle model".

@@ -18,3 +18,10 @@ entity.aim_scope.collection:
   parent: aim.admin_config
   route_name: entity.aim_scope.collection
   weight: 1
+
+aim.user_scope_access:
+  title: 'User-scope visibility'
+  description: 'Configure which roles may view another role''s scope=user facts.'
+  parent: aim.admin_config
+  route_name: aim.user_scope_access
+  weight: 2

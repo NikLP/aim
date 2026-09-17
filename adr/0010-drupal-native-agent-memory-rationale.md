@@ -642,18 +642,17 @@ this session against `drupal-code-query`'s MCP tools.
    whichever model/API is doing extraction, unmeasured so far.
 5. **Retrieval latency at realistic scale** - asserted safe above by
    reasoning about SQL query cost, not benchmarked against an actual graph
-   of meaningful size. **Partially answered 2026-09-10:** a benchmark
-   harness now exists (`drush aim:benchmark`, `aim`'s own repo - see its
-   CLAUDE.md "Benchmarking" section), and a first small-scale run (5 then 15
-   site-scope facts) measured `recall()` averaging 450-540ms - well above
-   this document's "single-digit-to-low-double-digit ms" assertion, but that
-   assertion was reasoning about the SQL/HNSW layer alone. The real cause:
-   `recall()` has to embed the query text via the hosted embeddings provider
-   before it can search at all, and that network round trip, not the SQL
-   query, is what the measurement actually caught. Still open: whether
-   recall time grows with corpus size (only tested at trivial scale so far),
-   and whether a local (Ollama) embedding model removes the bottleneck as
-   the mechanism above suggests it should - not yet tried.
+   of meaningful size. **Partially answered.** A benchmark harness exists
+   (`drush aim:benchmark`, see DEVELOPING.md's "aim:benchmark" section). A
+   first small-scale run (2026-09-10, 5 then 15 site-scope facts) measured
+   `recall()` averaging 450-540ms hosted (`mistral-embed`) - well above
+   this document's "single-digit-to-low-double-digit ms" assertion, but
+   that assertion was reasoning about the SQL/HNSW layer alone; the real
+   cost is embedding the query text over the network before search can
+   even start. **Confirmed 2026-09-10:** local Ollama embeddings cut that
+   to 33-35ms, ~15x faster, closing the network-hop theory. Still open:
+   whether recall time grows with corpus size - only tested at trivial
+   scale (tens of facts) so far, not thousands.
 6. **Relationship to `ai_agents`/`ai_search`** - build this as a module that
    composes with them (they do tool-calling/indexing, this does memory), or
    fully standalone? **Answered for the chatbot surface, 2026-09-10 (`aim`'s

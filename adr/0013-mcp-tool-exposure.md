@@ -1,13 +1,14 @@
 # ADR-0013: MCP tool exposure via Tool API (`tool`/`mcp_server`/`mcp_server_tool_bridge`)
 
-**Status:** Built and MCP-exposed, 2026-09-12. `aim_tool` module
-(`AimRemember`/`AimRecall`) is live, tested, permission-split, and
-discoverable by `mcp_server` over the bridge. Only the client
-authentication question (who is allowed to call the `/mcp` route at all)
-remains open - see the "Built 2026-09-12" addendum at the end for the
-full path, including a real drupal.org packaging bug that briefly looked
-like a dead end.
-**Date:** 2026-09-12
+**Status:** Built and MCP-exposed, 2026-09-12; client authentication
+(OAuth2) built 2026-09-13. `aim_tool` module (`AimRemember`/`AimRecall`)
+is live, tested, permission-split, and discoverable by `mcp_server` over
+the bridge; `aim_tool_oauth` gates the `/mcp` route for remote callers
+with no Drupal session. Nothing in this ADR's own scope remains open -
+see the two "Addendum (built ...)" sections at the end for both build
+paths, including a real drupal.org packaging bug that briefly looked like
+a dead end and three real `simple_oauth`/`mcp_server_oauth` gotchas.
+**Date:** 2026-09-12 (Tool API/MCP), 2026-09-13 (OAuth2)
 
 ## Context
 
@@ -160,11 +161,11 @@ of it from scratch (its own ADR-010, ADR-016).
 
 ## Consequences / risks
 
-- **Auth is the load-bearing unresolved piece.** `mcp_server`'s `access
-  mcp server` permission exists, but what actually sits in front of it -
-  a real login flow, an API-key module, something else - hasn't been
-  chosen or verified. Nothing here should write real memory until that's
-  settled.
+- ~~Auth is the load-bearing unresolved piece.~~ Resolved 2026-09-13:
+  `aim_tool_oauth` (`simple_oauth` + `simple_oauth_21` +
+  `mcp_server_oauth`) sits in front of `mcp_server`'s `access mcp server`
+  permission for a remote caller with no Drupal session - see the OAuth
+  addendum at the end.
 - **Composer surface.** Three new dependencies, all pre-1.0 (`tool` and
   `mcp_server_tool_bridge` are still beta) - a real maintenance trade a
   PoC absorbs more easily than a production site would.
@@ -414,8 +415,13 @@ this file's own config-entity convention.
 `aim:remember`/`aim:recall` listed in `scopes_supported` and a real
 `registration_endpoint` for dynamic client registration.
 `mcp_server.handle`'s route confirmed carrying `_auth: [cookie, oauth2]`.
-Not yet tested: an actual external client (Claude.ai/Claude Desktop
-connector) completing the flow - DDEV's local hostname is not reachable
-from Anthropic's cloud, and DDEV's self-signed cert would fail a real
-connector's HTTPS check regardless. `ddev share` (real CA-signed tunnel)
-is the identified next step for that test, not yet run.
+
+**Verified end to end 2026-09-13/14, real external client:** a
+Claude.ai/Claude Desktop connector completed dynamic client registration,
+OAuth consent, and a live `aim_remember`/`aim_recall` call, over a
+Tailscale Funnel tunnel (not `ddev share` - see the reasoning in
+[aim_tool_oauth/DEVELOPING.md](../modules/aim_tool_oauth/DEVELOPING.md)).
+Two more real bugs surfaced and were fixed getting there (a stale
+persisted `registration_endpoint`, and Funnel initially targeting the
+router's plain-HTTP entrypoint instead of its HTTPS one) - full runbook
+and gotchas live in that submodule's DEVELOPING.md, not duplicated here.

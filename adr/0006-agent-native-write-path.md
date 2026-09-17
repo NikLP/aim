@@ -63,3 +63,66 @@ matching, not something to import.
 - This same account-switch gotcha and fix generalizes to any `search_api`
   query against an access-controlled entity run from drush/cron context,
   not just this command.
+
+## Addendum (2026-09-18): the uid-1 account-switch was itself wrong, reversed to `search_api_bypass_access`
+
+The Consequences section above rejected `search_api_bypass_access` in
+favor of account-switching to uid 1, on the reasoning that it was "a
+genuine improvement over a blanket bypass." Reassessed and reversed:
+that framing was wrong, not just imperfect, for exactly this call site.
+
+**Uid 1 was never a real guarantee, only a coincidence.** Confirmed by
+reading Drupal core directly (not assumed): `\Drupal\Core\Session\
+PermissionChecker::hasPermission()` has no special-cased uid-1 bypass -
+it evaluates uid 1's roles/permissions exactly like any other account, so
+whether uid 1 is actually privileged depends entirely on which role a
+given site happened to assign it (typically `administrator` on a
+standard/minimal install, but nothing in core requires this). Separately,
+core's `\Drupal\user\Entity\User` carries no storage-layer protection
+against uid 1 being deleted - the only guard is a UI form check in the
+account cancellation form, which a direct `$user->delete()` or
+`drush user:cancel --delete 1` bypasses outright. The code this addendum
+replaces (`AimMemoryManager::executeAsAdmin()`, since renamed
+`executeSearchQuery()`) already tacitly admitted this by throwing
+`\RuntimeException('User 1 does not exist, no account to run this query
+as.')` - a defensive check for a failure mode the design could not
+actually prevent, not a hardening of it.
+
+**The "bad default to leave in committed code" framing didn't
+distinguish two different situations.** `search_api_bypass_access` is a
+real problem left carelessly in a request path a real, identifiable user
+is viewing - that's the shape the original rejection had in mind. It is
+not the shape of this call site: `recall()`/`findNearestNeighbor()`
+invoked from `drush`/cron have no real "viewer" to check access on
+behalf of at all, and the caller already holds raw database credentials
+(drush connects with full DB access) - gating `search_api`'s result set
+behind `$entity->access('view', $account)` in that context is not a real
+security boundary to begin with, since the same actor can trivially route
+around it with `drush sql:query`. Uid-1 impersonation didn't add real
+protection over a bypass here; it added a false sense of one, plus a
+fragility (a `RuntimeException`, or silently wrong results if uid 1
+lacked the assumed permissions) that a bypass doesn't have.
+
+**Fix:** `executeSearchQuery()` now sets `search_api_bypass_access` on
+the query directly for an anonymous caller, and does nothing extra for an
+authenticated one (already run as the real caller, unrelated to this
+addendum - see CLAUDE.md's "Code review, 2026-09-17" item 2). No account
+switching, no uid 1 dependency, no `AccountSwitcherInterface` left
+injected into `AimMemoryManager`. ADR-0002's deferred governance layer
+(a real `aim_fact`-specific permission plus a dedicated non-superuser
+service account for CLI tooling) remains the correct long-term answer for
+a *human operator* deliberately running `drush aim:recall` and wanting
+"see everything" to mean something more accountable than "whatever uid 1
+happens to be allowed" - that part of the original Consequences entry
+still holds. What's reversed is narrower: for the *system-process* half
+of this call site (no real viewer at all), bypass was the correct choice
+from the start, not the "bad default" it was rejected as.
+
+Verified live: an anonymous `drush aim:recall` invocation still returns
+real `scope=user` results (impossible under real per-scope access
+checking, confirming bypass is genuinely active); a real authenticated
+non-admin account with no `view user aim facts` permission still gets
+zero `scope=user` rows back (confirming the authenticated branch is
+unaffected and still access-checked, not bypassed). See CLAUDE.md's
+"CLI agent adapter" and "Consolidation" sections for the corresponding
+gotcha-text updates.

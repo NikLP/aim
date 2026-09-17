@@ -26,6 +26,18 @@ aim.settings:
     consolidation_prompt:
       type: string
       label: 'Consolidation prompt'
+    user_scope_shared_role_fallback:
+      type: boolean
+      label: 'Allow user-scope visibility when viewer and subject share a role'
+    user_scope_role_visibility:
+      type: sequence
+      label: 'User-scope role visibility matrix, keyed by viewer role ID'
+      sequence:
+        type: sequence
+        label: 'Subject role IDs visible to this viewer role'
+        sequence:
+          type: string
+          label: 'Role ID'
 
 aim.aim_scope.*:
   type: config_entity

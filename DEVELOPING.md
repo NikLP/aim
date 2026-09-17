@@ -1,0 +1,480 @@
+# AIM - Developer Reference
+
+Developer-focused reference: commands, API, runbooks, and gotchas worth
+not rediscovering. For the pitch and requirements see
+[README.md](README.md); for architecture decisions and operating rules
+see [CLAUDE.md](CLAUDE.md).
+
+This covers the `aim` core module only. Each submodule carries its own
+README.md/CLAUDE.md/DEVELOPING.md:
+[aim_chatbot](modules/aim_chatbot/DEVELOPING.md),
+[aim_tool](modules/aim_tool/DEVELOPING.md),
+[aim_tool_oauth](modules/aim_tool_oauth/DEVELOPING.md).
+
+---
+
+## Drush commands
+
+### `aim:remember` - CLI agent adapter
+
+For a caller (Claude Code, or any agent) that already decided what's
+worth remembering - no extraction LLM round-trip. See
+[ADR-0006](adr/0006-agent-native-write-path.md) for why this exists
+alongside `extract()`.
+
+```bash
+drush aim:remember <text> [--scope] [--subject] [--source] [--state] [--category] [--asserted]
+```
+
+- Validates scope, creates the fact directly, prints its ID.
+- `--category` resolves comma-separated term names against the
+  `aim_category` vocabulary (admin-curated - a name with no matching term
+  is skipped, never auto-created).
+- `--asserted` sets when the fact became true in reality if different
+  from today (any `strtotime()`-parseable string); empty means "same as
+  created".
+- `scope=case` with no `--subject` mints a case ID server-side
+  (`case-<8 hex chars>`, from Drupal's `uuid` service) and stamps it onto
+  the fact - the success message (and `aim_tool`'s `aim_remember`
+  `case_id` output) surfaces the resolved ID so later calls can pass it
+  back as `--subject` to append to the same case. Passing `--subject`
+  explicitly always wins over minting.
+- `scope=user` requires a real account (`--subject` resolved via
+  `resolveAccountByUid()`, uid only - no username fallback on write paths,
+  to avoid a typo'd username silently misattributing a fact). See
+  [ADR-0007](adr/0007-user-scope-requires-real-account.md).
+
+### `aim:recall` - semantic query
+
+```bash
+drush aim:recall <text> [--scope] [--subject] [--subject-uid] [--limit] [--format]
+```
+
+Real semantic query against `aim_vector_index`. `--format=json` for a
+parsing caller. **`score` is a cosine *distance*, not a similarity** -
+0.0 for an identical embedding, larger the less similar; lower is a
+better match. The table column is labeled `Distance`; the JSON key stays
+`score` to match search_api's own naming.
+
+Both commands live on `AimCommands`, backed by `AimMemoryManager` (also
+used by `aim_tool` and the chatbot).
+
+### `aim:extract` - LLM-driven extraction
+
+```bash
+drush aim:extract <file> [--provider] [--model] [--source] [--index] [--subject-uid]
+```
+
+Sends the file to a chat provider with a structured-JSON-schema request,
+creates one `AimFact` per returned item (scope/subject classified by the
+model). The source file itself is never stored - only the extracted
+facts persist. **Standing constraint:** no conversation/transcript
+recording - `source` is a short provenance pointer, never the raw
+dialogue.
+
+The structured-output schema's `scope` enum is built from
+`allowedScopes()` at call time, so a scope added as an `aim_scope` config
+entity is extractable with no code change.
+
+`--subject-uid` (uid only) attaches every model-classified `scope=user`
+candidate to that one real account; without it every `scope=user`
+candidate is skipped (with a warning) - extraction never attempts to
+match the model's own freeform subject text against the accounts table.
+See [ADR-0011](adr/0011-extraction-explicit-subject-uid.md) for why the
+match can't be model-guessed.
+
+**Skill:** `.claude/skills/aim-discovery/` ("the grill") - a structured
+discovery interview that distills each topic into a summary and runs it
+through `aim:extract`, mostly `scope: site`.
+
+**Skill:** `.claude/skills/aim-memory/` - reach for `aim:remember`/
+`aim:recall` continuously through a session, framed as one capability
+with two directions.
+
+### `aim:consolidate` - dedup/merge sweep
+
+```bash
+drush aim:consolidate [--scope] [--provider] [--model] [--auto-threshold] [--ambiguous-threshold] [--dry-run]
+```
+
+On-demand sweep. Algorithm, schema, and thresholds in
+[ADR-0005](adr/0005-consolidation-algorithm.md). Current defaults:
+`auto_threshold: 0.09`, `ambiguous_threshold: 0.45`, calibrated against
+`ollama__nomic-embed-text:latest` - both live in `aim.settings`, editable
+at `/admin/config/aim/settings` ("Consolidation thresholds"), not just a
+code constant. **Retune if the embeddings model changes** - a threshold
+tuned for one model's distance distribution can silently auto-merge
+genuinely distinct facts under another (hit live: 0.12 auto-merged two
+related-but-distinct facts under this embedding model; pulled back to
+0.09).
+
+**Automated path:** `AimConsolidateQueueWorker` (plugin ID
+`aim_consolidate`) - `remember()`/`createFactsFromCandidates()` enqueue
+each new fact right after save. Carries no `cron` key, so
+`hook_cron`/`drush cron` never touches it - drain via:
+
+```crontab
+* * * * * ddev exec drush queue:run aim_consolidate
+```
+
+`processItem()` reindexes before consolidating (`index_directly` is off
+by default, so a just-written fact isn't searchable yet without this).
+Throws `SuspendQueueException` if no default chat provider is configured
+- the runner releases the item and stops draining rather than failing
+every remaining item one by one.
+
+Manual trigger without a terminal: `drupal/queue_ui` at
+`/admin/config/system/queue-ui` (per-queue "Run" button - deliberately
+not a `cron` key, see [ADR-0003](adr/0003-async-processing-dedicated-crontab.md)).
+
+**Known gap:** the vector index doesn't know `expires` exists (not an
+indexed attribute) - `recall()`/`findNearestNeighbor()` filter
+already-superseded facts out in PHP. `scope: user` neighbor matching
+over-fetches (5x the limit) and post-filters on `subject_uid` in PHP for
+the same reason (`subject_uid` isn't an indexed attribute either) - the
+fix is indexing it as a search_api attribute, not yet built.
+
+### `aim:benchmark` - retrieval latency
+
+```bash
+drush aim:benchmark [--scope] [--checkpoints] [--queries] [--cleanup]
+drush aim:benchmark-cleanup <tag>
+```
+
+Generates synthetic facts (a template/word-pool generator, not
+`devel_generate`), reindexes, and times batches of `recall()` calls at
+each checkpoint. Deliberately bypasses Guardrails and the consolidation
+queue via `setSyncing(TRUE)` (core's `SynchronizableInterface` flag -
+`AimHooks`/the guardrail constraint both check `isSyncing()` first).
+Every generated fact is tagged `source=<run tag>` for cleanup.
+
+**Numbers so far:** hosted embeddings (`amazeeio__mistral-embed`),
+`recall()` averaged 450-540ms, dominated by the query-embedding network
+round trip. Local Ollama (`nomic-embed-text`), same checkpoints: 33-35ms,
+~15x faster - confirms the network-hop theory rather than the SQL/HNSW
+layer being the cost. Not yet run at thousands-of-facts scale.
+
+**Recommended next fix, not built:** cache query embeddings via Drupal's
+Cache API, keyed on (query text, embeddings model ID) - deterministic
+mapping, no invalidation needed. Complementary to local Ollama, not a
+substitute - caching helps repeat queries, a local model helps every
+query.
+
+---
+
+## Developer API
+
+### `AimMemoryManager` (`aim.memory_manager`, aliased from its FQCN for
+autowiring)
+
+Central service backing every write/read path. Key public methods:
+
+- `remember(string $text, ?string $scope, ?string $subject, ?string
+  $source, ?bool $state, ...): AimFact` - validated direct write.
+- `recall(string $text, ?string $scope, ...): array` - semantic query.
+- `allowedScopes(): array` - reads `entity_type.bundle.info`'s
+  `getBundleInfo('aim_fact')`, i.e. installed `aim_scope` entities. Every
+  scope-validation call site uses this - a new scope needs zero code
+  changes.
+- `saveFact(AimFact $entity): void` - `validate()` then `save()`, throws
+  `\InvalidArgumentException` on any violation (including a Guardrails
+  rejection - Guardrails runs as a real entity validation `Constraint`
+  on the `text` field, not a presave hook, so `ContentEntityForm`'s own
+  `validateForm()` picks it up as an ordinary field error too).
+- `checkCreateAccess(string $scope, AccountInterface $account): bool` -
+  wraps the access handler's `createAccess()`; `aim_tool` calls this
+  before every Tool API/MCP write.
+- `getAutoThreshold()`/`getAmbiguousThreshold()` - live `aim.settings`
+  values, not the class constants (those are only the shipped defaults
+  and in-code fallback).
+- `getDefaultChatProvider(): ?array` - resolves the site-wide default via
+  `AiProviderPluginManager`; `NULL` if none configured. `AimCommands`'
+  `--provider`/`--model` options default to `NULL` and fall through to
+  this, so they follow whatever the site default is.
+
+### Guardrails (`aim_write_guardrails` set)
+
+`aim_max_length` (`input_length_limit`, 2000 chars) and `aim_no_markup`
+(`regexp_guardrail`, blocks `<script>`-shaped markup), `stop_threshold:
+1.0`. Neither calls `->chat()` - zero LLM cost. Wired via
+`AimGuardrails` (`src/Plugin/Validation/Constraint/`), added to
+`aim_fact`'s `text` field in `baseFieldDefinitions()`. Mirrors `drupal/
+ai`'s own `GuardrailsEventSubscriber::applyPreGenerateGuardrails()` -
+`PassResult` skipped, `StopResult` scores aggregated against the set's
+stop threshold, `RewriteInputResult` replaces the text in place so later
+guardrails see the rewrite. There's no public "apply this set to
+arbitrary text" API in `drupal/ai`, so this is a deliberate copy of the
+subscriber's logic, not an API call - re-check against the subscriber on
+every `drupal/ai` update.
+
+A `RewriteInputResult` guardrail's rewrite survives a `saveFact()` caller
+(single entity, validate-then-save) but not the entity form
+(`ContentEntityForm::submitForm()` rebuilds a fresh entity from raw form
+input, independent of what `validateForm()` validated) - moot today since
+both shipped guardrails are Stop-only, worth knowing before adding one
+that rewrites.
+
+### Scope/bundle model
+
+`aim_fact`'s bundle key field is named `scope`, deliberately not `type` -
+core has no single convention here (node uses `type`, media uses
+`bundle`, comment uses `comment_type`, taxonomy_term uses `vid`), so
+`scope` is a legitimate domain-specific choice like the others. Bundles
+are real `aim_scope` config entities (`bundle_entity_type` on `AimFact`'s
+`#[ContentEntityType]` attribute) - `getBundleInfo('aim_fact')` derives
+automatically, no `hook_entity_bundle_info()` needed. A site or contrib
+module adds a fifth scope with zero PHP via
+`config/install/aim_scope.<id>.yml`.
+
+`links.field_ui_base_route` is deliberately unset - `bundle_entity_type`
+and Field UI's "Manage fields" tab are independently gated, and leaving
+this off keeps per-bundle fields entirely off the table. This matters
+because dedicated per-field tables are exactly what breaks the next
+point.
+
+**Don't move `subject`/`subject_uid` into per-bundle fields
+(`bundleFieldDefinitions()`).** Tried and reverted: it broke
+`ai_vdb_provider_mariadb`'s `AiVdbProviderClientBase::isMultiple()`
+(assumes every field is a base field, throws `Table
+'aim_facts__subject' doesn't exist`) and core's `EntityViewsData`
+(degrades the Views columns to `Broken` handlers). Both are patchable in
+isolation, but the pattern - "every contrib/core integration point that
+assumes all fields are base fields" - generalizes badly for a module
+headed to drupal.org. Both fields stay always-present base fields, unused
+on bundles that don't need them. Don't re-attempt without a concrete
+reason beyond schema tidiness.
+
+`AimScope` deletion refuses if any `aim_fact` of that scope still exists
+(`AimScopeDeleteForm`, same precedent as core's `NodeTypeDeleteConfirm`).
+
+### Vector search
+
+Server `aim_vector` (backend `search_api_ai_search`, VDB provider
+`mariadb`), index `aim_vector_index` over `entity:aim_fact`, collection
+table `aim_facts` (real MariaDB 11.7+ HNSW `VECTOR INDEX`, not a
+brute-force scan). `text` indexed as `main_content`; `scope`/`subject`/
+`source` as `attributes`. `index_directly` is off by default - index via
+`drush search-api:index aim_vector_index`, or let the consolidation queue
+worker's `reindex()` call handle it.
+
+**Gotchas:**
+
+- Per-field indexing role (main content vs. attribute) lives in
+  `ai_search.index.<index_id>` simple config, not the index entity -
+  skip a field there and it's silently ignored at embedding time.
+- The collection table only gets its attribute columns on index
+  *update*, not *create* - a freshly created index entity needs a second
+  `->save()` (`aim.install`'s `hook_install()` does this automatically).
+  `createCollection()` is not idempotent - rerunning it against an
+  existing table throws; fix is `DROP TABLE aim_facts` and re-save.
+- `drush search-api:clear aim_vector_index` can drop and reprovision
+  `aim_facts` down to just the base columns, silently losing `scope`/
+  `source`/`subject`/`text` - the next `search-api:index` then fails
+  `Unknown column 'scope'`. Fix is the same index entity `->save()`
+  above, not running `search-api:clear` again. After a `DROP TABLE`-and-
+  reindex cycle, reindex directly and skip `search-api:clear` entirely.
+
+### `checkViewAccess()`/anonymous drush callers
+
+`recall()` (via `AimMemoryManager::executeSearchQuery()`) sets
+`search_api_bypass_access` for an anonymous caller (drush/cron) instead
+of elevating to any particular account - a drush/cron caller has no real
+"viewer" to check access on behalf of, and already holds raw DB
+credentials, so the access check was never a real security boundary at
+that call site. See [ADR-0006](adr/0006-agent-native-write-path.md)'s
+addendum for the full reasoning (an earlier uid-1-elevation approach was
+reworked away from - uid 1 has no core guarantee of existing or holding
+any particular role). A real authenticated caller (Tool API/MCP, an
+interactive admin) runs the query as themselves, so
+`AimFactAccessControlHandler`'s real per-scope permission applies
+per-result - a caller with only the flat `read aim memory` permission
+cannot recall their own `scope=user` facts via `aim_recall` unless also
+granted `view user aim facts`.
+
+### User-scope role visibility
+
+`AimUserScopeVisibility` (`src/Access/AimUserScopeVisibility.php`) adds a
+narrower, additive grant path beyond the flat `view user aim facts`
+permission: a `user_scope_role_visibility` matrix in `aim.settings`
+(viewer role => visible subject roles), editable at
+`/admin/config/aim/user-scope-access`, plus a
+`user_scope_shared_role_fallback` boolean (default `TRUE`) granting
+access when viewer and subject share any real role (excluding the
+implicit `authenticated` role both accounts always carry). Only ever
+returns allowed or neutral, never forbidden, so
+`AimFactAccessControlHandler` ORs it against the flat permission without
+risk of it revoking a grant it knows nothing about. Not a discovered
+plugin type - a single hardcoded `bundle() === 'user'` branch in the
+access handler; `case`-scope access control is deferred (no `aim_case`
+entity yet, Nik's call) - extract a plugin type only once a second scope
+needs its own rule.
+
+---
+
+## AI provider configuration
+
+Not one "AI" - three different cost profiles:
+
+| Step | Needs | Cost |
+| --- | --- | --- |
+| Discovery, extraction, conflict/merge decisions, Recipe generation | Reasoning-grade LLM | Expensive |
+| Consolidation - similarity-threshold cases | Vector math only | Free |
+| Embedding generation (every write and query) | Small embedding model | Cheap, local-friendly (Ollama) |
+
+Site-wide default chat provider/model live in `ai.settings`
+(`default_providers.chat`) - `AimCommands`' `--provider`/`--model`
+options, `ai_assistant_api.ai_assistant.aim_demo_assistant`'s
+`llm_provider: '__default__'`, and `search_api.server.aim_vector`'s
+`backend_config.chat_model` (chunk token-sizing only, no `->chat()` call
+- cost-neutral either way) all follow it. `embeddings_engine` has no
+`__default__` equivalent - it's a plain provider/model ID on
+`search_api.server.aim_vector`'s `backend_config`, needs a manual update
+on any embeddings swap. Anthropic has no embeddings API - never point
+`embeddings_engine` at it.
+
+**Local Ollama** (`ai_provider_ollama`): points at the *host's* Ollama
+install (`http://host.docker.internal:11434`), not a container-local one
+- don't run a second Ollama daemon in its own DDEV addon container
+alongside this, it won't share the host's model cache. Host-side
+prerequisite: `OLLAMA_HOST=0.0.0.0:11434` on the host's Ollama service
+(Ollama defaults to `127.0.0.1`-only, unreachable from the DDEV network).
+
+A Claude Pro/Max subscription cannot power an unattended `drupal/ai`
+provider (Anthropic prohibits subscription OAuth for third-party
+integrations) - needs a real Console API key, or stays on Ollama.
+
+**Gotchas:**
+
+- Anthropic's structured-output mode requires `additionalProperties:
+  false` on *every* object level of a JSON schema (already handled in
+  `extractFacts()`/`classifyPair()`).
+- Test provider behavior through Drupal's `ai.provider` service, not a
+  direct third-party API call with an extracted key - the two paths can
+  give contradictory answers (a direct amazee.ai `/v1/models` call once
+  gave a misleading 401 while the real `$provider->embeddings(...)` call
+  worked with the same key).
+- An embeddings provider/model swap invalidates every existing vector
+  (different embedding space, possibly different dimension) - full
+  reindex required, not incremental. See "Setting up vector search"
+  below.
+
+---
+
+## Submodules
+
+Chatbot integration, Tool API + MCP exposure, and MCP OAuth setup are
+each documented in their own submodule now:
+
+- [aim_chatbot/DEVELOPING.md](modules/aim_chatbot/DEVELOPING.md) - `ai_agents`
+  FunctionCall tools, the demo assistant/chat block, deepchat gotchas.
+- [aim_tool/DEVELOPING.md](modules/aim_tool/DEVELOPING.md) - Tool API
+  plugins, `mcp_server_tool_bridge` exposure and version constraints.
+- [aim_tool_oauth/DEVELOPING.md](modules/aim_tool_oauth/DEVELOPING.md) -
+  the full MCP OAuth setup runbook (dependency chain, composer gotcha,
+  key generation, HTTPS exposure via Tailscale Funnel).
+
+---
+
+## Setting up vector search (fresh install, or after a provider change)
+
+`config/install` ships the *structure* of the vector search server/index
+- field mappings, backend wiring, collection-table schema - but not a
+working AI provider. The shipped `chat_model`/`embeddings_engine` are
+this site's working choice at last export time, referencing a specific
+provider/model/key a fresh site won't have. Run this after enabling
+`aim`, or whenever `drush aim:recall` starts erroring on the embeddings
+call:
+
+1. **Enable and configure a real AI provider module** for chat and
+   embeddings (`ai_provider_anthropic`/`amazeeio`/`ollama` - Ollama is
+   the only local/sovereign option). Anthropic has no embeddings API.
+2. **Store the provider's API key as a `key` entity** (Configuration >
+   System > Keys, or `drush key:`).
+3. **Check available models through Drupal's own provider service**, not
+   the third-party API directly (see "Test provider behavior through
+   Drupal's `ai.provider` service" above):
+
+   ```bash
+   drush php:eval "print_r(\Drupal::service('ai.provider')->createInstance('<provider_id>')->getConfiguredModels('chat'));"
+   ```
+
+   Swap `'chat'` for `'embeddings'` for the embeddings side.
+4. **Point `search_api.server.aim_vector`'s `backend_config` at the real
+   IDs** (`<provider_id>__<model_id>` form):
+
+   ```bash
+   drush config:set search_api.server.aim_vector backend_config.chat_model '<provider>__<model>'
+   drush config:set search_api.server.aim_vector backend_config.embeddings_engine '<provider>__<model>'
+   ```
+
+5. **If the new embeddings model's dimension differs from the current
+   one**, verify with a real call (`$provider->embeddings(new
+   EmbeddingsInput('test'), '<model>', [])`, count the array), update
+   `embeddings_engine_configuration.dimensions`, and `DROP TABLE
+   aim_facts` before step 6 - `VECTOR` columns are fixed-width.
+6. **Re-save the index entity** to force the collection table's
+   attribute columns to exist (see "Vector search" above):
+
+   ```bash
+   drush php:eval "\Drupal::entityTypeManager()->getStorage('search_api_index')->load('aim_vector_index')->save();"
+   ```
+
+   "Table already exists" means a mid-recreate table from a previous
+   attempt - `DROP TABLE aim_facts` and re-run.
+7. **Reindex every fact, not incrementally** - a provider/model change
+   means every existing vector is in the old embedding space. If step 5
+   dropped/rebuilt `aim_facts`, the table is already empty - reindex
+   directly and skip `search-api:clear` (it reprovisions the table down
+   to base columns, dropping `scope`/`source`/`subject`/`text` again). If
+   no dimension change happened, `search-api:clear` is safe first:
+
+   ```bash
+   drush search-api:index aim_vector_index
+   ```
+
+8. **Verify**: `drush aim:recall "<something you know is in there>"`
+   should return sane, correctly-ranked results.
+
+None of this touches `aim_fact` itself. Steps 5-7 cost real
+embedding-API credit (one call per fact/chunk) and scale with fact
+count - trivial at PoC scale, a real line item at volume.
+
+---
+
+## Admin UI
+
+- `/admin/content/aim-facts` (View `views.view.aim_facts`, gated
+  `administer aim memory`) - table of every fact, "still live" for an
+  empty `expires`, `uid` ("Extracted by") and `subject`/`subject_uid`
+  ("about") both shown. Per-row View/Edit/Delete dropbutton and bulk
+  delete.
+- `/admin/content/aim-facts/add` - bundle picker, then a standard
+  `ContentEntityForm` per scope (`/admin/content/aim-facts/add/{aim_scope}`).
+  Gated by the per-scope `create {scope} aim facts` permission (or
+  `administer aim memory`).
+- `/admin/config/system/queue-ui` - manual consolidation-queue trigger.
+- `/admin/config/aim/settings` (`AimSettingsForm`, `#config_target`-backed)
+  - consolidation thresholds and the extraction/consolidation prompt
+  text, both admin-editable, no code deploy needed. The requested output
+  *shape* (the JSON schema extraction/consolidation parse against) is not
+  editable here - it's parsed by PHP downstream and isn't safe to hand to
+  a text field.
+- `/admin/config/aim/user-scope-access` - the role-visibility matrix, see
+  "User-scope role visibility" above.
+- `/admin/config/aim/scopes` - add/edit/delete `aim_scope` entities.
+
+---
+
+## Default content export
+
+```bash
+vendor/bin/dr content:export aim_fact <id>
+```
+
+Not `web/core/scripts/drupal` - its autoload path assumes `vendor/`
+inside the docroot, wrong for this project's layout. Pure read of entity
+field data - never touches search_api/the vector collection table;
+reindex after import is required regardless. Don't use
+`--with-dependencies` to carry `uid` through - the exporter includes the
+**pre-hashed password** on any exported user account. Anonymous
+authorship on re-import is accepted, not a problem to solve.

@@ -22,7 +22,6 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
-use Drupal\Core\Session\AccountSwitcherInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\search_api\IndexInterface;
 use Drupal\search_api\Query\QueryInterface as SearchApiQueryInterface;
@@ -136,10 +135,6 @@ class AimMemoryManager {
    *   The AI provider plugin manager.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    *   The entity type manager.
-   * @param \Drupal\Core\Session\AccountSwitcherInterface $accountSwitcher
-   *   The account switcher, used to run access-checked queries as a
-   *   privileged account for callers with no logged-in user of their own
-   *   (drush, cron).
    * @param \Drupal\Component\Datetime\TimeInterface $time
    *   The time service, used to stamp facts retired by consolidation.
    * @param \Drupal\ai\Guardrail\AiGuardrailRepository $guardrailRepository
@@ -163,15 +158,14 @@ class AimMemoryManager {
    *   consolidation thresholds and extraction/consolidation prompts (see
    *   /admin/config/aim/settings, Drupal\aim\Form\AimSettingsForm).
    * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
-   *   The current user, used by executeAsAdmin() to tell a real
+   *   The current user, used by executeSearchQuery() to tell a real
    *   authenticated caller (Tool API/MCP, an interactive admin) apart from
-   *   an anonymous one (drush, cron) - only the latter needs the uid-1
-   *   elevation that method exists for.
+   *   an anonymous one (drush, cron) - only the latter needs the
+   *   search_api_bypass_access treatment that method exists for.
    */
   public function __construct(
     protected AiProviderPluginManager $aiProvider,
     protected EntityTypeManagerInterface $entityTypeManager,
-    protected AccountSwitcherInterface $accountSwitcher,
     protected TimeInterface $time,
     protected AiGuardrailRepository $guardrailRepository,
     protected QueueFactory $queueFactory,
@@ -487,26 +481,39 @@ class AimMemoryManager {
   }
 
   /**
-   * Runs a search_api query, elevating to user 1 only for an anonymous caller.
+   * Runs a search_api query, bypassing access only for an anonymous caller.
    *
    * Drush (and cron) runs as the anonymous user by default, which has no
    * view access to aim_fact, so the AI Search backend's per-result entity
-   * access check would silently drop every match - elevating to user 1 for
-   * that case keeps drush/cron paths (recall(), consolidation's neighbor
-   * search) working as before.
+   * access check would silently drop every match. Previously "fixed" by
+   * account-switching to uid 1 for the query duration - dropped 2026-09-18
+   * as unsound, not just imperfect: Drupal core has no special-cased uid-1
+   * bypass (confirmed by reading \Drupal\Core\Session\PermissionChecker
+   * directly - it evaluates roles/permissions like any other account) and
+   * no storage-layer protection against uid 1 being deleted (confirmed by
+   * reading \Drupal\user\Entity\User - the only guard is a UI form check, a
+   * direct delete or drush user:cancel bypasses it), so "elevate to uid 1"
+   * both could throw outright (the RuntimeException this method used to
+   * carry for exactly that case) and, even when it didn't, provided no real
+   * guarantee of admin access - purely a site-configuration accident.
+   *
+   * Explicit search_api_bypass_access (SearchApiAiSearchBackend::search(),
+   * confirmed by reading it directly) is the correct replacement, not a
+   * downgrade: a drush/cron caller already has raw database credentials, so
+   * gating search_api's result set behind entity access checks a real
+   * per-scope permission it could trivially route around with
+   * `drush sql:query` is not a real security boundary in this context to
+   * begin with. See ADR-0006's 2026-09-18 addendum for the full reversal
+   * and why the ADR originally rejected this.
    *
    * A real authenticated caller (aim_tool's Tool API/MCP plugins, an
-   * interactive admin) already has an account of its own to query as -
-   * elevating it to user 1 too would bypass the per-scope view permissions
-   * AimFactAccessControlHandler enforces, exactly the gap CLAUDE.md's
-   * "Code review" deferred-bugs list flagged: a caller holding only the
-   * flat "read aim memory" permission could see every other user's
-   * scope=user facts, since uid 1 (via administer aim memory) always sees
-   * everything regardless of the per-scope checks. Running the query as
-   * the caller instead lets ai_search's own per-result
-   * $entity->access('view', $account) check (SearchApiAiSearchBackend::
-   * checkEntityAccess()) apply the real per-scope permission, the same one
-   * the admin UI already relies on - no new filtering logic needed here.
+   * interactive admin) already has an account of its own to query as - it
+   * must run the query as itself, not bypass access, so ai_search's own
+   * per-result $entity->access('view', $account) check
+   * (SearchApiAiSearchBackend::checkEntityAccess()) applies the real
+   * per-scope permission AimFactAccessControlHandler enforces, the same
+   * one the admin UI already relies on - no new filtering logic needed
+   * here.
    *
    * @param \Drupal\search_api\Query\QueryInterface $query
    *   The query to execute.
@@ -514,22 +521,11 @@ class AimMemoryManager {
    * @return \Drupal\search_api\Query\ResultSetInterface
    *   The query results.
    */
-  public function executeAsAdmin(SearchApiQueryInterface $query): ResultSetInterface {
-    if (!$this->currentUser->isAnonymous()) {
-      return $query->execute();
+  public function executeSearchQuery(SearchApiQueryInterface $query): ResultSetInterface {
+    if ($this->currentUser->isAnonymous()) {
+      $query->setOption('search_api_bypass_access', TRUE);
     }
-
-    $admin = $this->entityTypeManager->getStorage('user')->load(1);
-    if (!$admin instanceof AccountInterface) {
-      throw new \RuntimeException('User 1 does not exist, no account to run this query as.');
-    }
-    $this->accountSwitcher->switchTo($admin);
-    try {
-      return $query->execute();
-    }
-    finally {
-      $this->accountSwitcher->switchBack();
-    }
+    return $query->execute();
   }
 
   /**
@@ -914,7 +910,7 @@ class AimMemoryManager {
     // below rather than a query condition here; over-fetch to compensate.
     $query->range(0, $filter_account ? $limit * 5 : $limit);
 
-    $results = $this->executeAsAdmin($query);
+    $results = $this->executeSearchQuery($query);
 
     $rows = [];
     foreach ($results as $result) {
@@ -1215,7 +1211,7 @@ class AimMemoryManager {
 
     $subject_uid = $is_user_scope ? $fact->get('subject_uid')->target_id : NULL;
 
-    $results = $this->executeAsAdmin($query);
+    $results = $this->executeSearchQuery($query);
     foreach ($results as $result) {
       try {
         $original = $result->getOriginalObject();

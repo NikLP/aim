@@ -3,7 +3,8 @@
 Living backlog, not an ADR - a decision here doesn't become binding until
 it gets its own ADR entry in [adr/](adr/0000-index.md). Compiled
 2026-09-10 from a Claude Code thread (OpenKB competitor review) plus the
-open items already on record in the ADRs and [CLAUDE.md](CLAUDE.md).
+open items already on record in the ADRs and [CLAUDE.md](CLAUDE.md)/
+[DEVELOPING.md](DEVELOPING.md).
 Expect entries folded in from other threads independently - don't treat
 this list as exhaustive.
 
@@ -59,7 +60,7 @@ this list as exhaustive.
 - [ ] #5 - retrieval latency at realistic scale: still not benchmarked at
       thousands of facts. Local-Ollama half done and confirmed 2026-09-10
       (`recall()` 33-35ms vs. 450-540ms hosted, ~15x faster, network-hop
-      theory confirmed) - see CLAUDE.md's "Benchmarking" section.
+      theory confirmed) - see DEVELOPING.md's "aim:benchmark" section.
 - [ ] #7 - product framing (own venture vs. folded into an existing pitch) -
       explicitly out of that ADR's own scope, still open.
 - [ ] #8 - "speckit-for-Drupal" per-archetype question sets - no design work
@@ -70,7 +71,7 @@ this list as exhaustive.
 ([ADR-0010](adr/0010-drupal-native-agent-memory-rationale.md), "Open
 questions" section)
 
-## Concrete near-term fixes flagged in CLAUDE.md
+## Concrete near-term fixes flagged in CLAUDE.md/DEVELOPING.md
 
 - [ ] Index `subject_uid` as a search_api attribute (Consolidation
       gotchas - currently over-fetches + PHP-filters).
@@ -79,9 +80,9 @@ questions" section)
       [ADR-0005](adr/0005-consolidation-algorithm.md)).
 - [x] Add the `asserted` field - BUILT 2026-09-11 (installed live via
       `installFieldStorageDefinition()`, no data loss on the 81 existing
-      facts). Covers valid-time *start* only, defaults to `created`. See
-      CLAUDE.md's "Ideas raised" section for why valid-time end wasn't
-      built too.
+      facts). Covers valid-time *start* only, defaults to `created`.
+      Valid-time end was considered and rejected as rarer/harder to
+      elicit, approximated well enough by `expires` on contradiction.
 - [x] Add the `category` field - BUILT 2026-09-11 (entity_reference,
       unlimited cardinality, vocabulary `aim_category`, wired into
       `drush aim:remember --category`). Installed live, no data loss. The
@@ -123,8 +124,7 @@ questions" section)
       a zero-rows check, so a poor top match still gets formatted as
       "Relevant facts:" instead of an honest no-match response.
 
-(CLAUDE.md, "Ideas raised, not designed", "Benchmarking", and "Chatbot"
-sections)
+(DEVELOPING.md's "aim:benchmark" and "Chatbot" sections)
 
 ## Backlog - explicitly "wait for a trigger" per the docs' own framing
 
