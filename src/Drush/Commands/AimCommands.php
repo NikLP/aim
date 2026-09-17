@@ -7,8 +7,8 @@ namespace Drupal\aim\Drush\Commands;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
 use Drush\Attributes as CLI;
+use Drush\Commands\AutowireTrait;
 use Drush\Commands\DrushCommands;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Drush front end for aim's memory store.
@@ -20,6 +20,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * results or errors via $this->io().
  */
 final class AimCommands extends DrushCommands {
+
+  use AutowireTrait;
 
   /**
    * Constructs an AimCommands object.
@@ -34,37 +36,12 @@ final class AimCommands extends DrushCommands {
   }
 
   /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container): self {
-    return new self(
-      $container->get('aim.memory_manager'),
-    );
-  }
-
-  /**
    * Extracts candidate memory facts from a text file and saves them.
    *
    * @param string $file
    *   Path to a text file, resolved from the Drupal root.
    * @param array $options
    *   Command options.
-   *
-   * @command aim:extract
-   * @aliases aim-extract
-   *
-   * @option provider The AI provider plugin ID to use.
-   * @option model The chat model ID to use.
-   * @option source Provenance tag stored on every created fact.
-   * @option subject-uid A uid of a real account to attach any scope=user candidate to. Omit to skip all scope=user candidates (see ADR-0011).
-   * @option index Reindex the vector index immediately after saving.
-   *
-   * @usage drush aim:extract notes.txt
-   *   Extract facts from notes.txt using the default provider and model.
-   * @usage drush aim:extract notes.txt --provider=openai --model=gpt-4o --index
-   *   Use a different provider and reindex immediately.
-   * @usage drush aim:extract notes.txt --subject-uid=42
-   *   Attach any scope=user candidate the model finds to account 42.
    */
   #[CLI\Command(name: 'aim:extract', aliases: ['aim-extract'])]
   #[CLI\Argument(name: 'file', description: 'Path to a text file to extract facts from.')]
@@ -162,26 +139,6 @@ final class AimCommands extends DrushCommands {
    *   The fact text, one short statement. Omit when using --file.
    * @param array $options
    *   Command options.
-   *
-   * @command aim:remember
-   * @aliases aim-remember
-   *
-   * @option scope One of user, role, site, case.
-   * @option subject Who or what the fact is about. For scope=user, a uid of a real account on this site. Empty for site scope.
-   * @option source Provenance tag for this fact.
-   * @option state Optional boolean flag value: true or false. Omit for facts with no boolean shape.
-   * @option category Comma-separated term name(s) from the aim_category vocabulary. A name with no matching term is skipped.
-   * @option asserted When this fact became true in reality, if different from now (any strtotime()-parseable string). Omit unless a caller explicitly knows an earlier date.
-   * @option file Path to a JSON file: an array of fact objects (same fields as the options above, plus "text"), saved in one bootstrap instead of $text/the other options.
-   *
-   * @usage drush aim:remember "Prefers email over phone." --scope=user --subject=42
-   *   Save a plain prose fact about a user, by uid.
-   * @usage drush aim:remember "Opted out of marketing email." --scope=user --subject=42 --state=true
-   *   Save a fact that is itself a boolean flag.
-   * @usage drush aim:remember "Moved to Manchester." --scope=user --subject=42 --asserted="3 months ago"
-   *   Save a fact whose real-world date is earlier than today.
-   * @usage drush aim:remember --file=facts.json
-   *   Save every fact object in facts.json in one bootstrap.
    */
   #[CLI\Command(name: 'aim:remember', aliases: ['aim-remember'])]
   #[CLI\Argument(name: 'text', description: 'The fact text, one short statement. Omit when using --file.')]
@@ -339,20 +296,6 @@ final class AimCommands extends DrushCommands {
    *   The search text.
    * @param array $options
    *   Command options.
-   *
-   * @command aim:recall
-   * @aliases aim-recall
-   *
-   * @option scope Restrict results to one scope: user, role, site, case.
-   * @option subject Restrict results to one subject. Not used for scope=user, see subject-uid.
-   * @option subject-uid Restrict results to one user, by uid or username. Only meaningful with scope=user.
-   * @option limit Maximum number of results.
-   * @option format Output format: table or json.
-   *
-   * @usage drush aim:recall "email preference"
-   *   Search all facts for anything related to email preference.
-   * @usage drush aim:recall "email preference" --scope=user --subject-uid=42 --format=json
-   *   Search scoped to one user, machine-readable output.
    */
   #[CLI\Command(name: 'aim:recall', aliases: ['aim-recall'])]
   #[CLI\Argument(name: 'text', description: 'The search text.')]
@@ -405,7 +348,7 @@ final class AimCommands extends DrushCommands {
       $row['source'],
       $row['state'] === NULL ? '' : ($row['state'] ? 'true' : 'false'),
     ], $rows);
-    $this->io()->table(['ID', 'Score', 'Scope', 'Subject', 'Text', 'Source', 'State'], $table_rows);
+    $this->io()->table(['ID', 'Distance', 'Scope', 'Subject', 'Text', 'Source', 'State'], $table_rows);
   }
 
   /**
@@ -440,21 +383,6 @@ final class AimCommands extends DrushCommands {
    *
    * @param array $options
    *   Command options.
-   *
-   * @command aim:consolidate
-   * @aliases aim-consolidate
-   *
-   * @option scope Restrict the sweep to one scope: user, role, site, case.
-   * @option provider The AI provider plugin ID to use for ambiguous cases.
-   * @option model The chat model ID to use for ambiguous cases.
-   * @option auto-threshold Score at or below which a neighbor is retired automatically, no LLM call. Defaults to the live aim.settings value.
-   * @option ambiguous-threshold Score at or below which an ambiguous neighbor gets a classification call. Above this, facts are left alone. Defaults to the live aim.settings value.
-   * @option dry-run Print decisions without saving anything.
-   *
-   * @usage drush aim:consolidate --dry-run
-   *   Preview consolidation decisions across every scope, changing nothing.
-   * @usage drush aim:consolidate --scope=user
-   *   Consolidate only user-scoped facts.
    */
   #[CLI\Command(name: 'aim:consolidate', aliases: ['aim-consolidate'])]
   #[CLI\Option(name: 'scope', description: 'Restrict the sweep to one scope: user, role, site, case.')]
@@ -530,19 +458,6 @@ final class AimCommands extends DrushCommands {
    *
    * @param array $options
    *   Command options.
-   *
-   * @command aim:benchmark
-   * @aliases aim-benchmark
-   *
-   * @option scope Which scope pool to generate facts into: site, role, case, or user.
-   * @option checkpoints Comma-separated cumulative fact counts to measure at.
-   * @option queries How many timed recall() calls to run at each checkpoint.
-   * @option cleanup Delete every fact this run created once the benchmark finishes.
-   *
-   * @usage drush aim:benchmark --checkpoints=50,200,500 --cleanup
-   *   Time recall() at three fact counts up to 500, then remove them all.
-   * @usage drush aim:benchmark --scope=user --checkpoints=100,500
-   *   Benchmark scope=user (exercises the subject_uid over-fetch gotcha).
    */
   #[CLI\Command(name: 'aim:benchmark', aliases: ['aim-benchmark'])]
   #[CLI\Option(name: 'scope', description: 'Which scope pool to generate facts into: site, role, case, or user.')]
@@ -637,12 +552,6 @@ final class AimCommands extends DrushCommands {
    *
    * @param string $runTag
    *   The run tag printed by aim:benchmark, e.g. benchmark:20260910-141500.
-   *
-   * @command aim:benchmark-cleanup
-   * @aliases aim-benchmark-cleanup
-   *
-   * @usage drush aim:benchmark-cleanup benchmark:20260910-141500
-   *   Remove every fact tagged with that benchmark run and reindex.
    */
   #[CLI\Command(name: 'aim:benchmark-cleanup', aliases: ['aim-benchmark-cleanup'])]
   #[CLI\Argument(name: 'runTag', description: 'The run tag printed by aim:benchmark.')]

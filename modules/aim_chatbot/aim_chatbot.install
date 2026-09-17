@@ -10,7 +10,7 @@ declare(strict_types=1);
 /**
  * Implements hook_uninstall().
  *
- * drush pmu does not reliably remove every config/install entity on its
+ * Drush pmu does not reliably remove every config/install entity on its
  * own (reproduced twice against this exact config set - see CLAUDE.md's
  * "Scope as bundles" gotchas), leaving orphans that throw
  * PreExistingConfigException on the next install. Delete everything this

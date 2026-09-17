@@ -5,18 +5,23 @@ declare(strict_types=1);
 namespace Drupal\aim\Entity;
 
 use Drupal\Core\Entity\Attribute\ContentEntityType;
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Entity\ContentEntityBase;
+use Drupal\Core\Entity\ContentEntityDeleteForm;
 use Drupal\Core\Entity\ContentEntityForm;
+use Drupal\Core\Entity\EntityChangedInterface;
+use Drupal\Core\Entity\EntityChangedTrait;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityViewBuilder;
+use Drupal\Core\Entity\Form\DeleteMultipleForm;
 use Drupal\Core\Entity\Routing\DefaultHtmlRouteProvider;
 use Drupal\Core\Field\BaseFieldDefinition;
-use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\AimFactAccessControlHandler;
+use Drupal\aim\AimFactListBuilder;
+use Drupal\aim\AimFactViewsData;
 use Drupal\user\EntityOwnerInterface;
 use Drupal\user\EntityOwnerTrait;
-use Drupal\views\EntityViewsData;
 
 /**
  * Defines the AIM fact content entity.
@@ -30,11 +35,14 @@ use Drupal\views\EntityViewsData;
   label: new TranslatableMarkup('AIM fact'),
   label_collection: new TranslatableMarkup('AIM facts'),
   handlers: [
-    'views_data' => EntityViewsData::class,
+    'views_data' => AimFactViewsData::class,
     'view_builder' => EntityViewBuilder::class,
+    'list_builder' => AimFactListBuilder::class,
     'access' => AimFactAccessControlHandler::class,
     'form' => [
       'default' => ContentEntityForm::class,
+      'delete' => ContentEntityDeleteForm::class,
+      'delete-multiple-confirm' => DeleteMultipleForm::class,
     ],
     'route_provider' => [
       'html' => DefaultHtmlRouteProvider::class,
@@ -53,14 +61,16 @@ use Drupal\views\EntityViewsData;
     'add-form' => '/admin/content/aim-facts/add/{aim_scope}',
     'canonical' => '/admin/content/aim-facts/{aim_fact}',
     'edit-form' => '/admin/content/aim-facts/{aim_fact}/edit',
+    'delete-form' => '/admin/content/aim-facts/{aim_fact}/delete',
+    'delete-multiple-form' => '/admin/content/aim-facts/delete',
   ],
   admin_permission: 'administer aim memory',
   base_table: 'aim_fact',
 )]
-class AimFact extends ContentEntityBase implements EntityOwnerInterface {
+class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityChangedInterface {
 
+  use EntityChangedTrait;
   use EntityOwnerTrait;
-  use StringTranslationTrait;
 
   /**
    * {@inheritdoc}
@@ -102,14 +112,18 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface {
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['weight' => 30]);
 
-    // Not form-configurable: the field is a nullable tri-state (true/false/
-    // empty, see the description above), but core's only widget for a plain
-    // boolean field is a checkbox, which can only write true or false, never
-    // leave it empty. Still settable via aim:remember --state or the MCP
-    // tool. A real tri-state widget is unbuilt - see CLAUDE.md.
+    // A nullable tri-state (true/false/empty, see the description). Core's
+    // options_buttons widget lists boolean among its field types and, for a
+    // non-required single-value field, adds an "N/A" radio that writes an
+    // empty item - so the tri-state needs no custom widget, just not the
+    // default boolean_checkbox (which can only ever write true or false).
     $fields['state'] = BaseFieldDefinition::create('boolean')
       ->setLabel(t('State'))
-      ->setDescription(t('Optional on/off value when this fact is itself a flag (e.g. "opted out of marketing email" = TRUE). Leave empty for facts that are just prose with no boolean shape.'));
+      ->setDescription(t('Optional on/off value when this fact is itself a flag (e.g. "opted out of marketing email" = TRUE). Leave empty for facts that are just prose with no boolean shape.'))
+      ->setSetting('on_label', t('True'))
+      ->setSetting('off_label', t('False'))
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayOptions('form', ['type' => 'options_buttons', 'weight' => 35]);
 
     $fields['expires'] = BaseFieldDefinition::create('timestamp')
       ->setLabel(t('Expires'))
@@ -148,7 +162,7 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface {
 
     $fields['changed'] = BaseFieldDefinition::create('changed')
       ->setLabel(t('Changed'))
-      ->setDescription(t('The time the fact was last updated by consolidation.'));
+      ->setDescription(t('The time the fact was last saved, whether by consolidation, an edit, or any other write.'));
 
     return $fields;
   }
@@ -157,8 +171,7 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface {
    * {@inheritdoc}
    */
   public function label(): string {
-    $text = $this->get('text')->value ?? '';
-    return strlen($text) > 60 ? substr($text, 0, 57) . '...' : $text;
+    return Unicode::truncate($this->get('text')->value ?? '', 60, TRUE, TRUE);
   }
 
 }

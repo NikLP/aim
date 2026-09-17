@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\aim\Form;
 
-use Drupal\Core\Entity\EntityForm;
+use Drupal\Core\Entity\BundleEntityFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\aim\Entity\AimScope;
 
@@ -12,7 +12,12 @@ use Drupal\aim\Entity\AimScope;
  * Add/edit form for the aim_scope config entity.
  *
  * Deliberately minimal - id and label only, matching AimScope's own
- * config_export shape (see AimScope's docblock). This exists to let
+ * config_export shape (see AimScope's docblock). Extends core's
+ * BundleEntityFormBase, the base class every bundle config entity form in
+ * core uses (NodeTypeForm, MediaTypeForm): it is a plain EntityForm plus
+ * protectBundleIdElement(), which locks the machine name once the bundle
+ * exists. It has nothing to do with Field UI - that is gated solely on
+ * aim_fact's (deliberately absent) field_ui_base_route. This exists to let
  * entity.aim_fact.add_page resolve at all: core's
  * \Drupal\Core\Entity\Controller\EntityController::addPage() unconditionally
  * builds an "Add a new @entity_type" fallback link for aim_fact's
@@ -20,7 +25,7 @@ use Drupal\aim\Entity\AimScope;
  * real add-form route regardless of whether this form is ever used to add a
  * fifth scope in practice.
  */
-final class AimScopeForm extends EntityForm {
+final class AimScopeForm extends BundleEntityFormBase {
 
   /**
    * {@inheritdoc}
@@ -45,10 +50,9 @@ final class AimScopeForm extends EntityForm {
       '#machine_name' => [
         'exists' => [AimScope::class, 'load'],
       ],
-      '#disabled' => !$scope->isNew(),
     ];
 
-    return $form;
+    return $this->protectBundleIdElement($form);
   }
 
   /**

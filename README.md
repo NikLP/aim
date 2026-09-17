@@ -84,7 +84,12 @@ Four memory categories, composable at retrieval the way Mem0 composes
 - **Governance:** every candidate fact passes through `drupal/ai`'s
   Guardrails (prompt-injection/PII filtering) and then sits in a
   draft-to-trusted human-review state before it's retrievable. Nothing
-  extracted by an LLM is trusted on write.
+  extracted by an LLM is trusted on write. One deliberate exception: an
+  entity flagged as being synchronized (`setSyncing(TRUE)`, which core's
+  Migrate destinations set on everything they save) skips both the
+  Guardrails check and the consolidation queue - a migrated corpus is
+  stored exactly as given, and only consolidated if you run
+  `drush aim:consolidate` over it afterward.
 - **Sovereignty:** extraction/consolidation reasoning can run against a local
   model (Ollama, via `drupal/ai`'s existing provider support) for deployments
   where data can't leave the customer's infrastructure. Embedding generation

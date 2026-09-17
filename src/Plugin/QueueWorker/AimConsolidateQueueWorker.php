@@ -7,6 +7,7 @@ namespace Drupal\aim\Plugin\QueueWorker;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Queue\Attribute\QueueWorker;
 use Drupal\Core\Queue\QueueWorkerBase;
+use Drupal\Core\Queue\SuspendQueueException;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Service\AimMemoryManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -88,11 +89,13 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
 
     $provider = $this->memoryManager->getDefaultChatProvider();
     if (empty($provider['provider_id']) || empty($provider['model_id'])) {
-      // No default chat provider configured. Throwing leaves the item in
-      // the queue for the next run rather than silently dropping it -
-      // matches the CLI command's own refusal to guess a provider, just
-      // surfaced as a retry instead of a one-shot error.
-      throw new \RuntimeException('No default chat provider configured; cannot consolidate fact ' . $fact_id . '.');
+      // No default chat provider configured - a queue-wide precondition,
+      // not a problem with this one item. SuspendQueueException is core's
+      // signal for exactly that: the runner releases the item and stops
+      // draining this queue for the rest of the run, instead of failing
+      // every remaining item one by one. Matches the CLI command's own
+      // refusal to guess a provider.
+      throw new SuspendQueueException('No default chat provider configured; cannot consolidate fact ' . $fact_id . '.');
     }
 
     $this->memoryManager->consolidateFact(

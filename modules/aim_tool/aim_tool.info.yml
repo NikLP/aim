@@ -1,9 +1,8 @@
 name: 'AIM Tool'
 type: module
-description: 'Exposes AIM memory via ToolAPI.'
+description: 'Exposes AIM memory as Tool API & optionally MCP.'
 package: AIM
 core_version_requirement: ^11
 dependencies:
   - aim:aim
   - tool:tool (>=1.0.0-beta8)
-  - mcp_server_tool_bridge:mcp_server_tool_bridge

@@ -9,11 +9,13 @@ use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\aim\Service\AimMemoryManager;
 use Drupal\tool\Attribute\Tool;
 use Drupal\tool\ExecutableResult;
 use Drupal\tool\Tool\ToolBase;
 use Drupal\tool\Tool\ToolOperation;
 use Drupal\tool\TypedData\InputDefinition;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Runs a real semantic query against aim_vector_index.
@@ -77,6 +79,22 @@ use Drupal\tool\TypedData\InputDefinition;
 final class AimRecall extends ToolBase {
 
   /**
+   * The aim memory manager.
+   */
+  protected AimMemoryManager $memoryManager;
+
+  /**
+   * {@inheritdoc}
+   *
+   * See AimRemember for why create() rather than the (final) constructor.
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+    $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
+    $instance->memoryManager = $container->get('aim.memory_manager');
+    return $instance;
+  }
+
+  /**
    * {@inheritdoc}
    */
   protected function doExecute(array $values): ExecutableResult {
@@ -86,7 +104,7 @@ final class AimRecall extends ToolBase {
     }
 
     try {
-      $rows = \Drupal::service('aim.memory_manager')->recall(
+      $rows = $this->memoryManager->recall(
         $values['text'],
         $values['scope'] ?? NULL,
         $values['subject'] ?? NULL,

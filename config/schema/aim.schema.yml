@@ -5,14 +5,26 @@ aim.settings:
     auto_threshold:
       type: float
       label: 'Auto-merge threshold'
+      constraints:
+        Range:
+          min: 0
+          max: 1
     ambiguous_threshold:
       type: float
       label: 'Ambiguous threshold'
+      constraints:
+        Range:
+          min: 0
+          max: 1
+    # string, not text: text is core's translatable-string type, and these
+    # are instructions to a model, not UI strings for a translator. Declaring
+    # them text would make config validation demand a langcode on this
+    # config object (LangcodeRequiredIfTranslatableValues).
     extraction_prompt:
-      type: text
+      type: string
       label: 'Extraction prompt'
     consolidation_prompt:
-      type: text
+      type: string
       label: 'Consolidation prompt'
 
 aim.aim_scope.*:

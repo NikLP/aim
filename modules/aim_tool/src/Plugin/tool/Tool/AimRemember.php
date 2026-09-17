@@ -9,6 +9,7 @@ use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\aim\Service\AimMemoryManager;
 use Drupal\tool\Attribute\Tool;
 use Drupal\tool\ExecutableResult;
 use Drupal\tool\Tool\ToolBase;
@@ -16,6 +17,7 @@ use Drupal\tool\Tool\ToolOperation;
 use Drupal\tool\TypedData\InputDefinition;
 use Drupal\tool\TypedData\ListInputDefinition;
 use Drupal\tool\TypedData\MapInputDefinition;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Saves an aim_fact directly, the same write path as drush aim:remember.
@@ -38,10 +40,11 @@ use Drupal\tool\TypedData\MapInputDefinition;
  * "remember ten things" would otherwise cost ten bootstraps regardless of
  * transport.
  *
- * ToolBase's constructor is final (no constructor DI for extra services);
- * AimMemoryManager is fetched via the service container in doExecute()
- * instead, the same pattern aim_eca's plugins already use for the same
- * reason (see CLAUDE.md's ECA integration section).
+ * ToolBase's constructor is final (no constructor DI for extra services),
+ * but its create() is not - so AimMemoryManager is injected by overriding
+ * create() and setting a property after parent::create(), the same pattern
+ * aim_chatbot's FunctionCall plugins use, rather than a \Drupal::service()
+ * call at execution time.
  */
 #[Tool(
   id: 'aim_remember',
@@ -131,6 +134,20 @@ use Drupal\tool\TypedData\MapInputDefinition;
   ],
 )]
 final class AimRemember extends ToolBase {
+
+  /**
+   * The aim memory manager.
+   */
+  protected AimMemoryManager $memoryManager;
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+    $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
+    $instance->memoryManager = $container->get('aim.memory_manager');
+    return $instance;
+  }
 
   /**
    * {@inheritdoc}
@@ -235,7 +252,7 @@ final class AimRemember extends ToolBase {
     }
 
     try {
-      $fact = \Drupal::service('aim.memory_manager')->remember(
+      $fact = $this->memoryManager->remember(
         $fields['text'],
         $scope,
         $subject,

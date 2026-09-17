@@ -22,6 +22,22 @@ display:
     display_options:
       title: 'AIM facts'
       fields:
+        aim_fact_bulk_form:
+          id: aim_fact_bulk_form
+          table: aim_fact
+          field: aim_fact_bulk_form
+          entity_type: aim_fact
+          plugin_id: bulk_form
+          label: ''
+          exclude: false
+          alter:
+            alter_text: false
+          element_class: ''
+          element_default_classes: true
+          empty: ''
+          hide_empty: false
+          empty_zero: false
+          hide_alter_empty: true
         id:
           id: id
           table: aim_fact
@@ -203,6 +219,22 @@ display:
             date_format: short
             custom_date_format: ''
             timezone: ''
+        operations:
+          id: operations
+          table: aim_fact
+          field: operations
+          entity_type: aim_fact
+          plugin_id: entity_operations
+          label: Operations
+          exclude: false
+          alter:
+            alter_text: false
+          element_class: ''
+          element_default_classes: true
+          empty: ''
+          hide_empty: false
+          empty_zero: false
+          hide_alter_empty: true
       pager:
         type: full
         options:
@@ -245,6 +277,7 @@ display:
           row_class: ''
           default_row_class: true
           columns:
+            aim_fact_bulk_form: aim_fact_bulk_form
             id: id
             scope: scope
             subject: subject
@@ -254,8 +287,14 @@ display:
             uid: uid
             state: state
             expires: expires
+            operations: operations
           default: id
           info:
+            aim_fact_bulk_form:
+              align: ''
+              separator: ''
+              empty_column: false
+              responsive: ''
             id:
               sortable: true
               default_sort_order: desc
@@ -319,6 +358,11 @@ display:
               separator: ''
               empty_column: false
               responsive: ''
+            operations:
+              align: ''
+              separator: ''
+              empty_column: false
+              responsive: ''
           override: true
           sticky: true
           summary: ''
@@ -334,7 +378,7 @@ display:
       show_admin_links: false
       display_extenders: {  }
     cache_metadata:
-      max-age: -1
+      max-age: 0
       contexts:
         - 'languages:language_content'
         - 'languages:language_interface'
@@ -358,7 +402,7 @@ display:
         parent: system.admin_content
         context: ''
     cache_metadata:
-      max-age: -1
+      max-age: 0
       contexts:
         - 'languages:language_content'
         - 'languages:language_interface'

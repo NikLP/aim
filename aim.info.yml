@@ -5,7 +5,6 @@ package: AIM
 core_version_requirement: ^11
 configure: aim.settings
 dependencies:
-  - drupal:options
   - drupal:taxonomy
   - ai:ai
   - ai:ai_search

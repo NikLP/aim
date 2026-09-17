@@ -9,6 +9,9 @@ use Drupal\Component\Uuid\UuidInterface;
 use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\Dto\StructuredOutputSchema;
 use Drupal\ai\Guardrail\AiGuardrailRepository;
+use Drupal\ai\Guardrail\NonDeterministicGuardrailInterface;
+use Drupal\ai\Guardrail\Result\PassResult;
+use Drupal\ai\Guardrail\Result\RewriteInputResult;
 use Drupal\ai\Guardrail\Result\StopResult;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
@@ -33,7 +36,7 @@ use Drupal\search_api\Query\ResultSetInterface;
  * algorithm on their own. See CLAUDE.md for the design notes this class
  * implements.
  */
-final class AimMemoryManager {
+class AimMemoryManager {
 
   /**
    * The AI Guardrail Set applied to every candidate fact before it is saved.
@@ -213,11 +216,8 @@ final class AimMemoryManager {
    * Enqueues a fact for async consolidation against its nearest neighbor.
    *
    * Decision 4 (CLAUDE.md): consolidation runs unattended via Queue API,
-   * not on the live request path and not mixed into hook_cron. Public, not
-   * just called internally by remember()/createFactsFromCandidates():
-   * aim_eca's FactWrite action calls this directly via the service locator
-   * for the same reason it calls runGuardrails() that way (ConfigurableAction
-   * Base's final __construct()).
+   * not on the live request path and not mixed into hook_cron. Called from
+   * AimHooks::factInsert() for every newly inserted fact.
    *
    * @param int $factId
    *   The ID of the newly-created fact.
@@ -250,41 +250,71 @@ final class AimMemoryManager {
    * set has been removed from this site, guardrail checking is silently
    * skipped rather than blocking every write.
    *
-   * Public, not just used internally by remember()/createFactsFromCandidates():
-   * aim_eca's FactWrite action calls this directly via the service locator
-   * (its ActionBase has a final __construct(), the same reason
-   * AccountResolverTrait calls resolveAccount() that way) rather than
-   * duplicating the check, since a fact written by an ECA model is exactly
-   * the kind of proposed-by-something-else write decision 7 is aimed at.
+   * The ai module only ever runs a guardrail set from inside a chat call
+   * (GuardrailsEventSubscriber::applyPreGenerateGuardrails(), fired by the
+   * provider's PreGenerateResponseEvent) - there is no public API to apply
+   * a set to arbitrary text, and AiGuardrailHelper::applyGuardrailSetToChat
+   * Input() only attaches a set to an input for a later chat() call. This
+   * method therefore mirrors that subscriber's pre-generate loop, result
+   * type for result type, so a set behaves the same here as it would in
+   * front of a chat call: PassResult is ignored, StopResult scores are
+   * aggregated against the set's stop threshold, RewriteInputResult
+   * replaces the text (which is why this returns the text instead of
+   * void - a redacting guardrail rewrites what gets stored), and a
+   * NonDeterministicGuardrailInterface plugin gets the provider manager it
+   * needs. The subscriber's per-fiber re-entrancy counter is not needed
+   * here: an LLM-backed guardrail's own chat call carries no guardrail set
+   * of its own, so nothing recurses into this method. Re-check this against
+   * the subscriber whenever drupal/ai is updated.
    *
    * @param string $text
    *   The candidate fact text.
+   *
+   * @return string
+   *   The text to store: $text as given, or the rewritten text if a
+   *   RewriteInputResult guardrail changed it.
    *
    * @throws \InvalidArgumentException
    *   If a guardrail's aggregated stop score reaches the set's stop
    *   threshold.
    */
-  public function runGuardrails(string $text): void {
+  public function runGuardrails(string $text): string {
     $guardrail_set = $this->guardrailRepository->getGuardrailSetById(self::GUARDRAIL_SET_ID);
     if (!$guardrail_set) {
-      return;
+      return $text;
     }
 
-    $input = new ChatInput([new ChatMessage('user', $text)]);
+    $message = new ChatMessage('user', $text);
+    $input = new ChatInput([$message]);
     $aggregated_score = 0.0;
     $messages = [];
 
     foreach ($guardrail_set->getPreGenerateGuardrails() as $guardrail) {
+      if ($guardrail instanceof NonDeterministicGuardrailInterface) {
+        $guardrail->setAiPluginManager($this->aiProvider);
+      }
       $result = $guardrail->processInput($input);
-      if (!$result instanceof StopResult) {
+
+      if ($result instanceof PassResult) {
         continue;
       }
-      $aggregated_score += $result->getScore();
-      $messages[] = $result->getMessage();
-      if ($aggregated_score >= $guardrail_set->getStopThreshold()) {
-        throw new \InvalidArgumentException('Guardrail check failed: ' . implode(' ', $messages));
+
+      if ($result instanceof StopResult) {
+        $aggregated_score += $result->getScore();
+        $messages[] = $result->getMessage();
+        if ($aggregated_score >= $guardrail_set->getStopThreshold()) {
+          throw new \InvalidArgumentException('Guardrail check failed: ' . implode(' ', $messages));
+        }
+      }
+
+      if ($result instanceof RewriteInputResult) {
+        // Same as the subscriber: the rewritten text replaces the message
+        // in place, so every later guardrail in the set sees the rewrite.
+        $message->setText($result->getMessage());
       }
     }
+
+    return $message->getText();
   }
 
   /**
@@ -325,10 +355,10 @@ final class AimMemoryManager {
   /**
    * Resolves a uid or username to a real user account.
    *
-   * Read paths only (recall(), aim_eca's FactQuery/FactState): a wrong
-   * match here just returns a wrong query result, not a permanent
-   * misattributed write. See resolveAccountByUid() for the stricter
-   * uid-only resolution write paths use instead.
+   * Read paths only (recall()'s subject filter): a wrong match here just
+   * returns a wrong query result, not a permanent misattributed write. See
+   * resolveAccountByUid() for the stricter uid-only resolution write paths
+   * use instead.
    *
    * @param string $value
    *   A numeric uid, or an account name.
@@ -477,10 +507,14 @@ final class AimMemoryManager {
    * queuing thousands of facts for LLM-mediated consolidation would turn a
    * latency benchmark into an uncontrolled reasoning-call bill the moment
    * aim_consolidate's crontab entry next runs (CLAUDE.md's "Consolidation"
-   * section). Both checks now run universally via AimHooks::factPresave()/
-   * factInsert() (src/Hook/AimHooks.php), so this sets the aim_skip_hooks
-   * flag on every created entity to keep the same bypass. The only real
-   * cost this leaves is one embedding-API call per fact, at reindex() time.
+   * section). Both checks run universally via AimHooks::factPresave()/
+   * factInsert() (src/Hook/AimHooks.php), which skip an entity flagged
+   * with setSyncing(TRUE) - core's own "being synchronized, skip side
+   * effects" flag (SynchronizableInterface, also honored by pathauto,
+   * workspaces, and set by migrate destinations), so this marks every
+   * generated entity that way rather than inventing a private flag. The
+   * only real cost this leaves is one embedding-API call per fact, at
+   * reindex() time.
    * Every created fact is tagged $runTag as its source so
    * deleteBenchmarkFacts() can find and remove exactly this run's data
    * afterward.
@@ -525,7 +559,6 @@ final class AimMemoryManager {
         'text' => $text,
         'source' => $runTag,
         'subject' => '',
-        'aim_skip_hooks' => TRUE,
       ];
       if ($scope === 'user') {
         $values['subject_uid'] = $subjectUids[$i % count($subjectUids)];
@@ -533,6 +566,7 @@ final class AimMemoryManager {
 
       /** @var \Drupal\aim\Entity\AimFact $entity */
       $entity = $storage->create($values);
+      $entity->setSyncing(TRUE);
       $entity->save();
       $ids[] = (int) $entity->id();
     }
@@ -596,7 +630,7 @@ final class AimMemoryManager {
    *   If scope is invalid, scope=user and subject does not resolve to a real
    *   account, or the text fails a guardrail check.
    */
-  public function remember(string $text, string $scope, ?string $subject, ?string $source, ?bool $state, array $category = [], ?int $asserted = NULL): AimFact {
+  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, ?bool $state = NULL, array $category = [], ?int $asserted = NULL): AimFact {
     $allowed = $this->allowedScopes();
     if (!in_array($scope, $allowed, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
@@ -787,7 +821,12 @@ final class AimMemoryManager {
    *
    * @return array
    *   A list of rows, each with keys id, score, scope, subject, text,
-   *   source, state.
+   *   source, state. score is what search_api reports for the match, which
+   *   for ai_vdb_provider_mariadb is MariaDB's VEC_DISTANCE_COSINE value: a
+   *   cosine distance, 0.0 for an identical embedding and larger the less
+   *   similar the fact is, so lower is a better match - the opposite of
+   *   what "score" usually implies. Consolidation's thresholds are
+   *   expressed in the same unit ("at or below").
    *
    * @throws \RuntimeException
    *   If the vector index does not exist.
@@ -1029,7 +1068,7 @@ final class AimMemoryManager {
       [$decision, $merged_text] = $this->classifyPair($kept, $candidate, $providerId, $modelId);
       if ($decision === 'UPDATE') {
         try {
-          $this->runGuardrails($merged_text);
+          $merged_text = $this->runGuardrails((string) $merged_text);
         }
         catch (\InvalidArgumentException) {
           $decision = 'BLOCKED';
@@ -1225,7 +1264,10 @@ final class AimMemoryManager {
               'properties' => [
                 'scope' => [
                   'type' => 'string',
-                  'enum' => ['user', 'role', 'site', 'case'],
+                  // The live aim_scope bundles, not a literal list, so a
+                  // scope added as config is extractable with no code
+                  // change (see CLAUDE.md's "Scope as a config entity").
+                  'enum' => $this->allowedScopes(),
                 ],
                 'subject' => ['type' => 'string'],
                 'text' => ['type' => 'string'],

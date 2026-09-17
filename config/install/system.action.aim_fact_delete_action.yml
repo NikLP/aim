@@ -1,0 +1,10 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - aim
+id: aim_fact_delete_action
+label: 'Delete fact'
+type: aim_fact
+plugin: 'entity:delete_action:aim_fact'
+configuration: {  }

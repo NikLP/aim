@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\aim;
 
+use Drupal\Core\DependencyInjection\AutowireTrait;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\BundlePermissionHandlerTrait;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\aim\Entity\AimScope;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Provides dynamic per-scope permissions for installed AimScope entities.
@@ -18,8 +18,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * aim_fact's four scopes are real aim_scope config entities (see
  * CLAUDE.md's "Scope as a config entity" section), so
  * BundlePermissionHandlerTrait::generatePermissions() can be used directly,
- * same as node's NodePermissions and this codebase's own
- * AnnotationsPermissions - each generated permission carries its
+ * same as node's NodePermissions - each generated permission carries its
  * AimScope as a config dependency, so deleting a scope removes the grant
  * from every role automatically instead of leaving a stale permission
  * string behind.
@@ -31,21 +30,13 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  */
 class AimPermissions implements ContainerInjectionInterface {
 
+  use AutowireTrait;
   use BundlePermissionHandlerTrait;
   use StringTranslationTrait;
 
   public function __construct(
     protected EntityTypeManagerInterface $entityTypeManager,
   ) {}
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container): static {
-    return new static(
-      $container->get('entity_type.manager'),
-    );
-  }
 
   /**
    * Returns per-scope view/create permissions.
@@ -56,10 +47,6 @@ class AimPermissions implements ContainerInjectionInterface {
    * @see \Drupal\user\PermissionHandlerInterface::getPermissions()
    */
   public function permissions(): array {
-    if (!$this->entityTypeManager->hasDefinition('aim_scope')) {
-      return [];
-    }
-
     return $this->generatePermissions(
       $this->entityTypeManager->getStorage('aim_scope')->loadMultiple(),
       [$this, 'buildPermissions'],

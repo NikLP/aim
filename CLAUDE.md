@@ -36,8 +36,9 @@ Environment: DDEV, `drupal11` type, PHP 8.4, MariaDB 11.8, docroot `web/`.
 enabled 2026-09-13, not previously required). See "MCP OAuth" below for
 the OAuth block (`mcp_server_oauth` through `consumers`), added
 2026-09-13.
-**Composer-present but not enabled:** `eca`/`aim_eca` (don't enable without
-being asked), `ai_context` (CCC).
+**Composer-present but not enabled:** `eca` (no `aim` code uses it any
+more - the `aim_eca` submodule was removed 2026-09-17, see "ECA
+integration" below), `ai_context` (CCC).
 **Gotcha:** `mcp_server_tool_bridge`'s Composer package name is
 self-doubled (`drupal/mcp_server_tool_bridge-mcp_server_tool_bridge`) due
 to a real drupal.org packaging bug for this project - the plain
@@ -75,8 +76,10 @@ package dependencies unless `aim` declares them itself; the site's root
 downstream consumer of a published `drupal/aim` ever sees.
 
 Added `web/modules/custom/aim/composer.json` (one file covering `aim` +
-`aim_chatbot` + `aim_tool` + `aim_eca`, since they all live in this one
-repo/project - mirrors how real multi-submodule contrib projects package):
+`aim_chatbot` + `aim_tool`, plus `aim_eca` until its 2026-09-17 removal,
+since they all live in this one repo/project - mirrors how real
+multi-submodule contrib projects package; `license: GPL-2.0-or-later`
+added 2026-09-17, drupal.org requires it):
 `require` holds `drupal/ai`, `drupal/ai_vdb_provider_mariadb`,
 `drupal/search_api`, `drupal/ai_agents`, `drupal/tool
 (^1.0.0-beta8)`, and `drupal/mcp_server_tool_bridge-mcp_server_tool_bridge`
@@ -91,8 +94,8 @@ this one requirement is affected, same as how this project's own root
 `minimum-stability: stable`. AI *provider* modules
 (`ai_provider_anthropic`/`amazeeio`/`ollama`) are deliberately excluded -
 `aim` only calls the generic `ai.provider` service, provider choice is a
-site config decision, not aim's dependency. `drupal/eca`,
-`drupal/ai_context`, `drupal/queue_ui` are `suggest`, not `require` -
+site config decision, not aim's dependency. `drupal/ai_context`,
+`drupal/queue_ui` are `suggest`, not `require` -
 optional, not needed for `aim`'s own code to run. Composer package name
 for the bridge dependency uses the self-doubled name from this file's
 gotcha above, not the semantically-correct plain name - the plain name is
@@ -117,8 +120,11 @@ copied from the `project:module` pattern used elsewhere in this file -
 Views is core, real convention (checked against core's own
 `views_ui.info.yml`) is `drupal:views`. Checked every other custom
 module's declared `dependencies:` against its actual
-`use Drupal\*`/service/entity-storage calls (`aim`, `aim_chatbot`,
-`aim_eca`) - no other mismatch found.
+`use Drupal\*`/service/entity-storage calls (`aim`, `aim_chatbot`, and
+the since-removed `aim_eca`) - no other mismatch found. `drupal:options`
+was dropped from `aim.info.yml` 2026-09-17: nothing used it once `scope`
+left `list_string`, and the options widgets themselves live in core's
+`Drupal\Core\Field` namespace now.
 
 **Trust CLAUDE.md's module lists as intent, verify before relying on
 them.** Found 2026-09-12: `core.extension` config had `ai_agents` recorded
@@ -339,9 +345,9 @@ View (no scope filter existed, `filters: {}`) needed no change.
 `aim_tool`'s `aim_remember`/`aim_recall` Tool plugins and `aim_chatbot`'s
 locked-`scope=site` FunctionCall plugins needed zero changes - both only
 ever pass `scope` through as a string to `AimMemoryManager`, never touch
-`$fact->get('scope')` directly. `aim_eca`'s `FactWrite`/`FactQuery`/
-`FactState` were deliberately left unconverted, per this file's ECA
-integration section (`eca_tool` may make the whole submodule redundant).
+`$fact->get('scope')` directly. (`aim_eca`'s plugins were left
+unconverted at the time; the submodule has since been removed, see "ECA
+integration" below.)
 
 No migration needed (PoC, no real data - see "Schema/config changes during
 early development" below) - a straight `drush pmu`/`drush en` cycle of
@@ -483,6 +489,37 @@ already-reverted `subject`/`subject_uid` per-bundle-field experiment
 above - taking config-entity-ness without taking Field UI exposure avoids
 reopening that.
 
+**If form/view display configuration through the UI is ever wanted
+without "Manage fields" - noted 2026-09-17, not built.** Two facts make
+this cleaner than it looks. First, `BundleEntityFormBase` (which
+`AimScopeForm` now extends) is unrelated to Field UI - it is `EntityForm`
+plus `protectBundleIdElement()`, nothing more; only `field_ui_base_route`
+turns Field UI on. Second, the form/view display config entities
+(`core.entity_form_display.aim_fact.<scope>.default`,
+`core.entity_view_display.aim_fact.<scope>.default`) already work with no
+Field UI at all - `ContentEntityForm` and `EntityViewBuilder` read them
+regardless, so they can be shipped in `config/install` today. What Field
+UI adds is only the UI, as three tab sets registered off the one
+`field_ui_base_route` by `field_ui`'s `RouteSubscriber`, each behind its
+own permission: "Manage fields" needs `administer aim_fact fields`,
+"Manage form display" needs `administer aim_fact form display`, "Manage
+display" needs `administer aim_fact display`. So the no-trick route is:
+set `field_ui_base_route: entity.aim_scope.edit_form` on `AimFact` and
+grant only the two display permissions. The one wrinkle is uid 1 and the
+`administrator` role, which hold every permission (see Drupal gotchas
+below) and would still see "Manage fields"; hiding it from them too needs
+a `RouteSubscriberBase::alterRoutes()` forcing `_access: 'FALSE'` on
+`entity.aim_fact.field_ui_fields` and the `field_storage_config`/
+`field_config` add routes - local tasks follow route access, so the tab
+disappears with the route. Small, but that part is the trick. Also worth
+knowing before deciding: a Field UI-created field is a *configurable*
+field (`field.storage.*` + `field.field.*` config, a real
+`aim_fact__<field>` table), not the storage-less `bundleFieldDefinitions()`
+field that broke `ai_vdb_provider_mariadb`/`EntityViewsData` in the
+reverted experiment - so the original reason for keeping Field UI off is
+partly a policy choice now, not only bug avoidance. Not verified against
+`ai_vdb_provider_mariadb` live; check `isMultiple()` before relying on it.
+
 **Payload is `id` + `label` only** (`config_export: ['id', 'label']`),
 functionally identical to what `hook_entity_bundle_info()` already
 provided - a known, accepted thinness, not an oversight. Real per-scope
@@ -505,7 +542,11 @@ first time it was actually visited as a real HTTP request post-conversion
 `Url::fromRoute()` directly with an explicit bundle argument, which never
 exercises this code path. `AimScope` gained a minimal `AimScopeForm`
 (`src/Form/AimScopeForm.php`, id + label fields only, matching
-`config_export`) plus `add-form`/`edit-form`/`delete-form`/`collection`
+`config_export`; since 2026-09-17 it extends core's `BundleEntityFormBase`
+like `NodeTypeForm`/`MediaTypeForm` - that class is a plain `EntityForm`
+plus `protectBundleIdElement()`, which locks the machine name once the
+bundle exists, and has nothing to do with Field UI, which is gated only by
+`field_ui_base_route`) plus `add-form`/`edit-form`/`delete-form`/`collection`
 links and `route_provider.html`, at `/admin/config/aim/scopes` (menu link
 under `aim.admin_config`, local action "Add AIM scope"). This also
 completes the "add a scope through the admin UI with no code" claim made
@@ -553,8 +594,30 @@ calls it on every `aim_fact` save regardless of path. A stop throws
 for scope validation). If the guardrail set is ever removed from a site,
 checking is silently skipped rather than blocking every write.
 
+**`runGuardrails()` mirrors `ai`'s own subscriber, result type for result
+type - reworked 2026-09-17.** `drupal/ai` only ever runs a guardrail set
+from inside a chat call (`GuardrailsEventSubscriber::
+applyPreGenerateGuardrails()`, fired by the provider's
+`PreGenerateResponseEvent`); there is no public "apply this set to
+arbitrary text" API (`AiGuardrailHelper::applyGuardrailSetToChatInput()`
+only attaches a set to an input for a later `chat()`). So `aim` has to
+run the loop itself, and the first version only handled `StopResult` -
+a `RewriteInputResult` guardrail (e.g. PII redaction) in the set would
+have been silently ignored. It now does exactly what the subscriber does:
+`PassResult` skipped, `StopResult` scores aggregated against the set's
+stop threshold, `RewriteInputResult` replaces the text in place so later
+guardrails see the rewrite, `NonDeterministicGuardrailInterface` plugins
+get `setAiPluginManager()`. Consequently it **returns the text** (the
+original or the rewrite) instead of `void`; `factPresave()` writes the
+returned text back onto the entity, and `decideAndApply()` uses the
+returned merged text. The subscriber's per-fiber re-entrancy counter is
+not needed here (an LLM-backed guardrail's own chat call carries no
+guardrail set). Re-check against the subscriber on every `drupal/ai`
+update - this is a deliberate copy, not an API.
+
 **Guardrails + consolidation enqueue moved to entity hooks, 2026-09-15.**
-`remember()`, `createFactsFromCandidates()`, and `aim_eca`'s `FactWrite`
+`remember()`, `createFactsFromCandidates()`, and the since-removed
+`aim_eca`'s `FactWrite`
 used to call `runGuardrails()` and `enqueueForConsolidation()` explicitly,
 each remembering to do both. Now `AimHooks::factPresave()` (runs
 `runGuardrails()` against the `text` field, can throw to abort the save)
@@ -571,9 +634,10 @@ on an actual save.
 
 **Hooks live in a class, not `aim.module` - built this way from the
 start, not migrated.** `src/Hook/AimHooks.php` (`#[Hook('aim_fact_presave')]`/
-`#[Hook('aim_fact_insert')]`/`#[Hook('entity_bundle_info')]`, the last one
-moved here too for consistency rather than leaving one procedural hook
-behind on its own) uses core's OOP hook system (`\Drupal\Core\Hook\Attribute\Hook`,
+`#[Hook('aim_fact_insert')]`; `entity_bundle_info` lived here too until
+"Scope as a config entity" removed it, and `views_data_alter` until it
+moved to `AimFactViewsData` on 2026-09-17, see "Admin UI") uses core's OOP
+hook system (`\Drupal\Core\Hook\Attribute\Hook`,
 stable since Drupal 11.1, confirmed available and exercised live on this
 site's Drupal 11.4.6) instead of a `.module` file - `aim.module` itself
 was deleted, nothing else needed it. Real precedent copied directly: the
@@ -624,8 +688,9 @@ real regression only caught by testing the rejection path live via
 `EntityStorageException::getPrevious()` is an `\InvalidArgumentException`,
 rethrows that original exception instead - restores the "same exception
 every caller already catches" contract in one place. `remember()`,
-`createFactsFromCandidates()`, and `aim_eca`'s `FactWrite` all call
-`saveFact()` now instead of `$entity->save()` directly. Verified live:
+`createFactsFromCandidates()` (and, until its removal, `aim_eca`'s
+`FactWrite`) all call `saveFact()` now instead of `$entity->save()`
+directly. Verified live:
 a guardrail-rejected `remember()` call, a batch with one blocked
 candidate (batch continues, `blocked` count increments), and
 `generateBenchmarkFacts()`'s bypass (see below) all behave exactly as
@@ -645,6 +710,12 @@ persist. **Standing constraint, not a PoC shortcut:** no conversation or
 transcript recording - the `source` field is a short provenance pointer,
 never the raw dialogue. Don't add a field/table storing full transcripts
 without this being explicitly revisited first.
+
+The structured-output schema's `scope` enum is built from
+`allowedScopes()` at call time (2026-09-17, was a literal
+`['user', 'role', 'site', 'case']`), so a scope added as an `aim_scope`
+config entity is extractable with no code change - the same "zero PHP"
+property "Scope as a config entity" above claims.
 
 `--subject-uid` (uid only, see below) attaches every model-classified
 `scope=user` candidate to that one real account; without it every
@@ -668,17 +739,14 @@ every write path - `remember()`'s `subject` for `scope=user` (so
 `remember()`/share its docs) and `createFactsFromCandidates()`'s
 `$subjectUid` (`aim:extract --subject-uid` above). `resolveAccount()`
 itself is untouched and still dual-format, since it also backs read paths
-(`recall()`'s `--subject-uid` filter, `aim_eca`'s `FactQuery`/
-`FactState`) where a wrong match only returns a wrong query result, not a
-permanent misattributed write - a materially different risk. The two
+(`recall()`'s `--subject-uid` filter) where a wrong match only returns a
+wrong query result, not a permanent misattributed write - a materially
+different risk. The two
 legitimate sources of a write-path subject_uid value stay: the current
 authenticated user (already how `AimRemember`'s MCP-tool default works)
 and a widget-selected value (the still-unbuilt fact-ingress form's
 `entity_reference` autocomplete, see "Ideas raised", never emits freeform
-text either). `aim_eca`'s `FactWrite` still calls the dual-format
-`resolveAccount()` for its own `scope=user` subject - not touched here,
-narrower scope than this decision covered; revisit if `aim_eca` is ever
-un-deprioritized.
+text either).
 
 **Skill:** `.claude/skills/aim-discovery/` ("the grill") - a structured
 discovery interview that distills each topic into a summary and runs it
@@ -712,7 +780,23 @@ alongside `extract()`.
   `--format=json` for a parsing caller.
 
 Both live on `AimCommands`, backed by `AimMemoryManager` (also used by
-`aim_eca` and the chatbot).
+`aim_tool` and the chatbot). `AimCommands` declares commands with Drush
+attributes only (`#[CLI\Command]`/`#[CLI\Option]`/`#[CLI\Usage]`) and
+gets its service via Drush 13's `AutowireTrait` - the legacy
+`@command`/`@option`/`@usage` docblock annotations that had been
+duplicated alongside the attributes were dropped 2026-09-17 (they had
+already drifted: three `@usage` examples in the annotations, one in the
+attributes), as was the hand-written `create()`.
+
+**`recall()`'s `score` is a cosine *distance*, not a similarity.** It is
+whatever search_api reports for the match, and for
+`ai_vdb_provider_mariadb` that is MariaDB's `VEC_DISTANCE_COSINE` value:
+0.0 for an identical embedding, larger the less similar - lower is a
+better match, the opposite of what "score" usually implies. The
+`aim:recall` table column is labeled `Distance` (2026-09-17); the
+`--format=json` key stays `score` to match search_api's own naming and
+not break parsing callers. Consolidation's thresholds ("at or below")
+are in the same unit.
 
 **Case IDs are minted server-side, not by convention.** Built 2026-09-14,
 following on from "Scope as bundles" above. `remember()` with `scope=case`
@@ -791,7 +875,11 @@ drain only via:
 `processItem()` calls `reindex()` before `consolidateFact()` - without
 this, two facts enqueued back to back would each be asked to consolidate
 before the other was indexed (`index_directly` is off) and never find each
-other as neighbors.
+other as neighbors. With no default chat provider configured it throws
+`SuspendQueueException` (2026-09-17, was a plain `\RuntimeException`) -
+core's signal that the *queue* can't proceed this run, not that one item
+is bad: the runner releases the item and stops draining, instead of
+failing every remaining item one by one.
 
 **Gotchas:**
 
@@ -832,10 +920,16 @@ runs. Cost is predictable - one embedding-API call per generated fact, at
 `source=<run tag>` so `aim:benchmark-cleanup` (or `--cleanup` on the same
 invocation) can remove exactly that run's data. Since the 2026-09-15 move
 of guardrails/enqueue into entity hooks (see "Guardrails" above), this
-bypass now works by setting `aim_skip_hooks` (a plain, non-field property
-on the created `AimFact`, not a real field) on every generated entity's
-values array - `AimHooks::factPresave()`/`factInsert()` both check it
-first and return early. Verified live 2026-09-15: the
+bypass works by calling `setSyncing(TRUE)` on every generated entity
+before save (2026-09-17, replacing a private `aim_skip_hooks` dynamic
+property) - core's own `SynchronizableInterface` flag, meaning "being
+synchronized, skip side effects", the same flag pathauto and workspaces
+honor and core's migrate destinations set. `AimHooks::factPresave()`/
+`factInsert()` both check `isSyncing()` first and return early.
+Consequence worth knowing: a fact written through a migration (migrate
+sets this flag on every destination entity) also skips guardrails and the
+consolidation enqueue - arguably right for a bulk sync, but not a free
+choice. Verified live 2026-09-15 and re-verified 2026-09-17: the
 consolidation queue's item count is unchanged before/after a
 `generateBenchmarkFacts()` call.
 
@@ -954,48 +1048,29 @@ exposes tools (done), CCC holds curated policy about when to call them
 ("Pattern A" in CCC's own `docs/developers/rag.md`) - not `aim` becoming a
 CCC content source. See ADR-0008.
 
-## ECA integration (`aim_eca`, not enabled)
+## ECA integration (`aim_eca` - removed 2026-09-17)
 
-**Deprioritized 2026-09-12, not deleted.** A real project,
-`eca_tool` (drupal.org), bridges ECA directly to Tool API - once mature it
-would let an ECA model call `aim_remember`/`aim_recall` (see the "Tool
-API + MCP exposure" section above) as a plain action with the same
-scope/subject flexibility, making `FactWrite`/`FactQuery` below largely
-redundant (`FactState` would not be replaced - it's an ECA *condition*,
-a plugin type Tool API doesn't have). `eca_tool` is dev-only today (no
-tagged release, same composer shape as the other pre-1.0 pieces in this
-stack), and Nik is talking to Jürgen Haas (`eca` maintainer, well
-regarded) about it directly - revisit this section once that lands rather
-than investing further in `aim_eca`'s bespoke plugins now.
+The `aim_eca` submodule (`FactWrite`/`FactQuery` actions, `FactState`
+condition; deprioritized 2026-09-12, never enabled or exercised through a
+real ECA model) was deleted outright on 2026-09-17. It is superseded by
+Tool API usage: `eca_tool` (drupal.org, dev-only at the time of writing)
+lets an ECA model call `aim_remember`/`aim_recall` as plain actions with
+the same scope/subject flexibility, so `aim` has no reason to carry its
+own ECA plugins. Its Composer autoload entry and the `drupal/eca`
+`suggest` are gone from `aim`'s `composer.json` too; `drupal/eca` itself
+is still in this *site's* root `composer.json` and not enabled - don't
+enable it without being asked. ADR-0002/0007/0013/0015/0016 still mention
+`aim_eca` as one of the write paths of their day; those are records, not
+current state.
 
-Submodule, zero dependency from `aim` core. `eca`/`aim_eca` are
-composer-present but not enabled - don't enable without being asked.
-**ECA has no action plugin type of its own** - it reuses Drupal core's
-`#[Action]`/`plugin.manager.action` wholesale; `eca`'s `ActionBase`/
-`ConfigurableActionBase` just add token support via a `final __construct()`
-(no constructor DI in a plugin extending it - use a service locator, as
-`AccountResolverTrait` does).
-
-Three plugins, `Fact<Verb>`/`aim_fact_<verb>`: `FactWrite` (action, writes
-a fact from an ECA model's token-supplied values - same write path as
-`aim:extract`, doesn't decide what's worth remembering, calls
-`runGuardrails()` and `enqueueForConsolidation()` same as every other write
-path), `FactQuery` (action, same vector query as `recall()`), `FactState`
-(condition, direct `loadByProperties()` lookup on `scope`/`subject`/
-`state`, no vector query). Not yet exercised through a real ECA model -
-verified by `phpcs`/`php -l` only.
-
-**Design boundary:** don't wire an ECA model to write a fact for something
-already free from the current request/entity context (acting user's roles,
-the node being viewed) - that's a stale duplicate, not memory. This action
-is for values that would otherwise be lost once the triggering event
-passes.
-
-`Drupal\eca\EcaState` (core's State API under an `eca` key/value
-collection) is not a substitute for `aim_fact` - flat/global, no
-governance, no retrieval, not exportable. Reaching for it instead of
-`FactWrite` is the same mistake as writing a fact for something already
-available from context.
+Two things from that submodule are worth keeping in mind for whatever
+replaces it: `FactState` had no Tool API equivalent (it was a *condition*,
+a plugin type Tool API doesn't have) - a state check via ECA would need to
+go through `aim_recall` or a future fast-path lookup (see "Ideas raised");
+and the design boundary still applies: don't wire any automation to write
+a fact for something already free from the current request/entity context
+(acting user's roles, the node being viewed) - that's a stale duplicate,
+not memory.
 
 ## MCP OAuth
 
@@ -1027,9 +1102,10 @@ a manual one-off: `config/install` ships two `oauth2_scope` entities
 `refresh_token`), and `hook_install()`/`hook_uninstall()` set/clear the
 `mcp_server_oauth` third-party settings (`authentication_mode: required`,
 matching `scopes`) directly on `aim_tool`'s existing `aim_remember`/
-`aim_recall` `mcp_tool_config` entities - this can't ship as a second
-`config/install` file for those entities, that would collide with
-`aim_tool`'s own copy of the same config name.
+`aim_recall` `mcp_tool_config` entities (in `aim_tool`'s `config/optional`
+since 2026-09-17, see the Tool API bullet under "Ideas raised") - this
+can't ship as a second config file for those entities, that would collide
+with `aim_tool`'s own copy of the same config name.
 
 **Gotchas:**
 
@@ -1268,15 +1344,16 @@ Fixed by adding `setDisplayConfigurable('form', TRUE)` +
 widget is used (no `type` forced, except `category`'s
 `entity_reference_autocomplete_tags` and `asserted`'s
 `datetime_timestamp`, since a plain `entity_reference`/`timestamp` field
-has more than one plausible default). **`state` deliberately excluded**:
-it's a nullable tri-state (true/false/empty, see its own description),
-but core's only widget for a plain boolean field is a checkbox, which can
-only ever write true or false - making it form-configurable would mean
-every fact created through this form gets a real boolean value even when
-it has no boolean shape at all, silently changing the field's meaning for
-UI-created facts vs. every other write path. Still settable via
-`aim:remember --state`/the MCP tool; a real tri-state widget is unbuilt,
-see "Ideas raised".
+has more than one plausible default). **`state` was excluded at first**
+on the belief that core's only boolean widget is a checkbox (which can
+only ever write true or false, never empty) - **wrong, fixed 2026-09-17**:
+core's `options_buttons` widget
+(`Drupal\Core\Field\Plugin\Field\FieldWidget\OptionsButtonsWidget`,
+`boolean` is in its `field_types`) renders an `N/A` radio for a
+non-required single-value field that writes an empty item, so `state` is
+now form-configurable with that widget and `on_label`/`off_label` set to
+True/False - a real tri-state with no custom widget. Verified live: the
+`site` bundle's form display resolves `state` to `options_buttons`.
 
 Verified live end to end after both fixes (real `curl` session, not
 `drush php:eval`): all four bundles list correctly on
@@ -1313,7 +1390,11 @@ bundles from `hook_entity_bundle_info()` (see "Scope as bundles" above),
 not config entities, so that trait doesn't apply as-is - written instead
 as a small equivalent, `AimPermissions` (`src/AimPermissions.php`,
 `permission_callbacks` in `aim.permissions.yml`, `AutowireTrait` +
-`ContainerInjectionInterface` same as `NodePermissions`'s current shape),
+`ContainerInjectionInterface` same as `NodePermissions`'s current shape -
+actually true only since 2026-09-17: it had a hand-written `create()`
+despite this note, and a dead `hasDefinition('aim_scope')` guard, removed
+the same day - the callback only runs while `aim` is enabled, and an
+enabled `aim` always defines `aim_scope`),
 looping `entity_type.bundle.info`'s `getBundleInfo('aim_fact')` directly
 and emitting `view {scope} aim facts` / `create {scope} aim facts` with no
 dependency tracking - nothing to clean up, these bundles can't be deleted
@@ -1340,10 +1421,116 @@ correspondingly `view`/`create` on real `aim_fact` entities of each
 scope, with zero changes needed to `EntityController::addPage()` itself -
 it already filters bundles by `createAccess()` per bundle.
 
+**View/edit/delete dropbutton and bulk delete, built 2026-09-15 (later
+session).** `views.view.aim_facts.yml` gained two fields: `entity_operations`
+(the per-row dropbutton) and `bulk_form` (checkboxes + an action select in
+the header). Neither plugin worked out of the box - both needed real entity
+type wiring first, all added to `AimFact`'s `#[ContentEntityType]` attribute:
+
+- `handlers.list_builder` (new `AimFactListBuilder`, `src/AimFactListBuilder.php`).
+  `EntityViewsData` only registers the synthetic `operations` field row at
+  all when `$entityType->hasListBuilderClass()` is true - with no
+  `list_builder` handler, the `entity_operations` Views field silently
+  resolves to Views' `broken` handler placeholder instead of erroring
+  loudly. No `links.collection` was added alongside it, deliberately -
+  `hasListBuilderClass()` and Field UI-style collection-route registration
+  are independently gated (`DefaultHtmlRouteProvider::getCollectionRoute()`
+  requires both `hasListBuilderClass()` *and* `links.collection`), so this
+  doesn't open a second `/admin/content/aim_fact` page competing with the
+  real Views one - confirmed by reading the route provider, not assumed.
+  `AimFactListBuilder` exists only to add a `view` operation ahead of core's
+  own edit/delete pair (`EntityListBuilder::getDefaultOperations()` only
+  ever adds edit/delete) - unlike media, where canonical and edit-form are
+  the same page and a separate view link is redundant, `aim_fact` has its
+  own real read-only canonical route, so a distinct "View" link earns its
+  place. Mirrors the parent method's own `func_get_args()` forward-compat
+  shape (`$cacheability` is a commented-out, not-yet-declared parameter in
+  this Drupal version) rather than declaring it directly - phpstan-drupal
+  (`drupal.entityListBuilderMissingCacheabilityParameter`, CR 3533080)
+  wants it declared as `?CacheableMetadata $cacheability = NULL`;
+  deferred to the bugs/access pass, see "Code review, 2026-09-17".
+- `links.delete-form` (`/admin/content/aim-facts/{aim_fact}/delete`) +
+  `handlers.form.delete` (core's generic `ContentEntityDeleteForm`, same
+  class `media`'s own entity type uses for its own delete form) - needed
+  for the dropbutton's Delete link itself, independent of bulk delete.
+- `links.delete-multiple-form` (`/admin/content/aim-facts/delete`) +
+  `handlers.form.delete-multiple-confirm` (core's generic
+  `DeleteMultipleForm`, again the same classes `media` uses) - this pair,
+  not `delete-form`, is what a bulk "Delete" action actually needs.
+  Confirmed by reading `EntityDeleteActionDeriver::isApplicable()`: the
+  generic `entity:delete_action:{entity_type}` plugin (what `BulkForm`
+  needs an `action` config entity to wrap) is only derived for an entity
+  type with a `delete-multiple-form` link - a real trap, since
+  `entity_delete_action:aim_fact` didn't exist as a selectable plugin at
+  all until this was added, even though `delete-form` (added first, for
+  the dropbutton) already existed and looked like it should have been
+  enough.
+- **A bulk-selectable action needs a real `action` config entity, not just
+  the plugin derivative existing.** `BulkForm::init()` loads
+  `$this->actionStorage->loadMultiple()` (real `system.action.*` config
+  entities), not raw plugin definitions - core ships one hardcoded per
+  entity type it cares about (e.g. `system.action.node_delete_action.yml`),
+  and nothing auto-creates one for a new content entity type. Added
+  `config/install/system.action.aim_fact_delete_action.yml`
+  (`plugin: 'entity:delete_action:aim_fact'`, mirrors `node`'s own
+  `config/install` copy, not `media`'s `config/optional` one - no reason
+  found to prefer optional here). Computed dependencies re-verified live
+  the same way as every other config file in this project (create via
+  `drush php:eval`, refetch `getRawData()`) - turned out to be exactly the
+  hand-typed guess (`module: [aim]`), same shape as `node`'s.
+- **`aim_fact`'s Views data comes from core's generic `EntityViewsData`
+  (no `AimFactViewsData` subclass), which does not register a `bulk_form`
+  field row on its own** - only an entity type's own Views data class
+  does that (e.g. `NodeViewsData`'s `node_bulk_form`). `AimFactViewsData`
+  (`src/AimFactViewsData.php`, wired as `handlers.views_data` - the same
+  shape as `NodeViewsData`; it replaced a `hook_views_data_alter()` in
+  `AimHooks.php` on 2026-09-17, verified live that the View's
+  `aim_fact_bulk_form`/`operations` fields still resolve to `BulkForm`/
+  `EntityOperations`, not `Broken`) adds one row pointing
+  at core's own concrete `bulk_form` plugin directly (it is not abstract -
+  confirmed by reading `BulkForm.php`, unlike `NodeBulkForm`/`node_bulk_form`
+  it needs no subclass, since nothing here overrides its behavior).
+  `Drupal\views\Plugin\ViewsHandlerManager::getHandler()` looks the field
+  plugin up via `views_data($table)[$field][$handler_type]` unconditionally -
+  a `plugin_id` set directly in the View's exported YAML is not enough on
+  its own if the field row itself is missing from views_data, it just
+  silently resolves to the `broken` handler instead.
+- **`views.view.aim_facts.yml`'s own `cache_metadata.max-age` dropped from
+  `-1` to `0` on both displays** as a direct, correctly-computed consequence
+  of adding the bulk form field (`BulkForm::getCacheMaxAge()` returns `0`
+  unconditionally, a deliberate core `@todo` - see its own docblock) -
+  caught only by re-saving the real View entity and diffing
+  `getRawData()`, not something to have hand-typed, per this file's
+  existing config-entity gotcha.
+
+Verified live end to end via a real cookie-jar `curl` session (not
+`drush php:eval`, per this file's existing Chatbot-testing gotcha): the
+dropbutton renders View/Edit/Delete per row, the bulk action select offers
+"Delete fact", and a full submit -> confirm round trip against a throwaway
+test fact printed "Deleted 1 item." and the row was confirmed gone from
+the database afterward.
+
 ## Admin settings
 
 Built 2026-09-14. `/admin/config/aim/settings` (`AimSettingsForm`, a plain
-`ConfigFormBase`, gated on `administer aim memory`) - two collapsible
+`ConfigFormBase`, gated on `administer aim memory`; **converted to
+`#config_target` 2026-09-17** - each element declares
+`'#config_target' => 'aim.settings:<key>'`, so `ConfigFormBase` loads the
+default, validates the submitted value against
+`config/schema/aim.schema.yml` (both thresholds carry a `Range` 0..1
+constraint now) and saves it, no `submitForm()` of its own;
+`validateForm()` keeps only what schema can't express, the threshold
+ordering and the prompt placeholders. Gotcha hit doing this: the two
+prompts were declared `type: text` in `aim.schema.yml`, and core's `text`
+is its *translatable* string type (`string` + `translatable: true`, same
+as `label`), so `#config_target`'s validation demanded a `langcode` on
+the config object (`LangcodeRequiredIfTranslatableValues`) and every save
+failed with an unnamed form error. Nothing in `aim` is translated - the
+prompts are instructions to a model, not UI strings for a translator - so
+the fix was `type: string` for both, not adding a langcode. Rule for
+future schema: `text`/`label` mean "a translator may localize this";
+anything else is `string`) - two
+collapsible
 `details` groups: "Consolidation thresholds" (`auto_threshold`,
 `ambiguous_threshold` - open by default) and "Prompts" (`extraction_prompt`,
 `consolidation_prompt` - collapsed by default, long text). Backed by
@@ -1435,7 +1622,7 @@ authorship on re-import is accepted, not a problem to solve.
   fact ("Nik's employer") and a `volatile` one ("Nik's current mood")
   shouldn't age out on the same clock. Would live as a field alongside
   `asserted` (see bi-temporal validity below), populated by the writer
-  (extraction model, `aim:remember` caller, or ECA's `FactWrite`) rather
+  (extraction model, `aim:remember` caller, or a Tool API caller) rather
   than inferred. Not designed: the actual threshold-per-tier mapping,
   whether a missing hint defaults to the most conservative tier or the
   least, and whether consolidation's own similarity thresholds should
@@ -1575,7 +1762,22 @@ authorship on re-import is accepted, not a problem to solve.
   `read aim memory`, not the admin UI's single `administer aim memory`),
   tested live including the permission split. `mcp_server_tool_bridge`
   exposes both over MCP via config-only `mcp_tool_config` entities -
-  confirmed live via `plugin.manager.mcp_server.tool`. `aim_remember` also
+  confirmed live via `plugin.manager.mcp_server.tool`. Those two YAMLs
+  moved from `config/install` to `config/optional` on 2026-09-17 and
+  `mcp_server_tool_bridge` was dropped from `aim_tool.info.yml`'s
+  dependencies: the `#[Tool]` plugins don't need the bridge, only the MCP
+  exposure does, and Drupal installs optional config whenever its
+  provider module is (or later becomes) enabled - the config's own
+  provider is auto-added as a dependency (`ConfigInstaller::
+  getMissingDependencies()`). `aim_tool_uninstall()` guards on
+  `hasDefinition('mcp_tool_config')` accordingly. The root
+  `composer.json` still `require`s the bridge (the deliberate `1.x-dev`
+  pin, see Project snapshot) - now inconsistent with the info.yml;
+  revisit together with that pin. Both Tool plugins also get
+  `AimMemoryManager` injected via an overridden `create()` now (ToolBase's
+  constructor is final, its `create()` is not - same pattern
+  `aim_chatbot`'s plugins use) instead of a `\Drupal::service()` call at
+  execution time. `aim_remember` also
   takes an optional `facts` list for saving several facts in one call/one
   bootstrap (mirrors `aim:remember --file`'s reasoning: an MCP call is its
   own HTTP request too). Real caveat: `mcp_server_tool_bridge`'s real
@@ -1711,8 +1913,8 @@ authorship on re-import is accepted, not a problem to solve.
   `#[FunctionCall]` already in this codebase, one class per scope owning
   its own default-subject resolution, guardrail set, and ingress-form
   widget spec, discovered instead of the `if ($scope === 'user')` branches
-  currently scattered across `AimMemoryManager`, `AimRemember`,
-  `AimCommands`, and `aim_eca`. Real benefit: a site or contrib archetype
+  currently scattered across `AimMemoryManager`, `AimRemember`, and
+  `AimCommands`. Real benefit: a site or contrib archetype
   adds a fifth scope with real attached behavior in one class, not just a
   bundle label via a new `aim_scope` config entity (today's
   extensibility point, see "Scope as a config entity" - a bundle only, no
@@ -1729,6 +1931,107 @@ authorship on re-import is accepted, not a problem to solve.
   would be the second, a future chat surface or archetype the third),
   that's the trigger to extract an `#[AimScope]` plugin type - by then the
   real interface will be known instead of guessed now.
+- **Per-scope submodules: install only the scopes a site needs - raised
+  2026-09-17, not designed.** Prompted by the `extractFacts()` enum fix
+  (see Extraction): if a site doesn't track people, why install the
+  `user` scope, its `subject_uid` field, its permissions, its
+  subject-resolution code at all? The Drupal-idiomatic building blocks
+  all exist: (1) the scope is already a config entity, so
+  `aim.aim_scope.user.yml` can move out of `aim`'s `config/install` into
+  an `aim_scope_user` submodule's, and `AimPermissions`/`allowedScopes()`/
+  `extractFacts()` all follow installed scopes automatically already;
+  (2) the scope's field can ship as a *configurable* field
+  (`field.storage.aim_fact.subject_uid.yml` +
+  `field.field.aim_fact.user.subject_uid.yml` in that submodule, a real
+  `aim_fact__subject_uid` table via the `field` module, no Field UI
+  needed) - which is the storage-backed shape the reverted
+  `bundleFieldDefinitions()` experiment lacked, so it should not re-trip
+  `ai_vdb_provider_mariadb`/`EntityViewsData`; (3) a per-bundle
+  `base_field_override` for anything that stays a base field; (4) this is
+  the natural unit for [ADR-0014](adr/0014-usecase-archetype-starter-kits.md)'s
+  archetype starter kits (an archetype = a set of scope submodules + a
+  guardrail set + starter categories). What makes it fraught, honestly:
+  `AimMemoryManager` (`remember()`, `findNearestNeighbor()`, `recall()`),
+  `aim_tool`'s plugins and `AimCommands` all carry `if ($scope ===
+  'user')` branches that assume `subject_uid` exists - core code would
+  have to become field-agnostic (`$entity->hasField()`), or the branches
+  move into the scope submodule, which is exactly the "Scopes as a plugin
+  type" extraction above, now with a concrete reason; `views.view.
+  aim_facts` can't be composed from several modules, so a scope module's
+  column either shows nothing when absent or needs a `views_data_alter`
+  (or a per-scope View); uninstalling a scope module with facts present
+  is the same orphan problem as deleting a scope (bug 7 in "Code review"
+  below) - Nik's read 2026-09-17: not too bad, a `hook_uninstall()`
+  count guard in the `NodeTypeDeleteConfirm` shape covers it; and the
+  genuinely tricky one, `search_api.index.aim_vector_index`: the index
+  entity, its `ai_search.index.*` attribute mapping and the `aim_facts`
+  collection table are one shared object across all scopes, owned by
+  `aim` core's `config/install`. A scope module wanting its field indexed
+  as an attribute (the identified fix for the `subject_uid` over-fetch
+  gotcha under Consolidation is exactly this) can't ship a partial index
+  - it would have to `addField()` + save the live index entity and edit
+  the `ai_search` simple config from its `hook_install()` (and reverse
+  both on uninstall), which ALTERs the collection table (the
+  update-not-create gotcha under Vector search) and then needs a full
+  reindex to populate the new column for existing rows, and
+  `ai_search`'s reindex re-embeds every fact - one embedding call each,
+  so enabling a scope module on a site with 10k facts costs 10k
+  embedding calls. Escape hatch worth designing in from the start: keep
+  the index scope-agnostic - one generic indexed attribute defined by
+  `aim` core (e.g. a computed `subject_key` base field, `uid:42` for user
+  scope, the string subject otherwise, or an aggregated-field processor)
+  so per-scope modules never touch the index at all and the over-fetch
+  fix lands once for every scope. Verdict: it can work, and it's the
+  right shape for extensibility, but it is a real design pass (an ADR),
+  not a refactor - do it together with the plugin-type extraction and
+  ADR-0014, not before either.
+
+## Code review, 2026-09-17
+
+A pass over the whole suite for non-idiomatic Drupal code. What changed
+is folded into the sections above (each dated 2026-09-17); the short
+list: `runGuardrails()` mirrors `ai`'s subscriber and returns text;
+`setSyncing()` replaces `aim_skip_hooks`; `AimFactViewsData` replaces
+`hook_views_data_alter()`; `state` is form-configurable via
+`options_buttons`; `AimFact` implements `EntityChangedInterface`, uses
+`Unicode::truncate()` for its label, and dropped an unused
+`StringTranslationTrait`; `AimSettingsForm` uses `#config_target` +
+schema `Range` constraints; `AimScopeForm` extends `BundleEntityFormBase`;
+`AimPermissions` uses `AutowireTrait`; `AimCommands` lost its duplicated
+legacy annotations and uses Drush's `AutowireTrait`; the queue worker
+throws `SuspendQueueException`; `extractFacts()`'s scope enum comes from
+`allowedScopes()`; `remember()`'s `subject`/`source`/`state` default to
+`NULL`; `aim_tool` no longer hard-depends on `mcp_server_tool_bridge` and
+injects `AimMemoryManager` via `create()`; `AimMemoryManager` is no longer
+`final`; `drupal:options` dropped; `composer.json` gained `license`;
+`aim_eca` removed.
+
+**Deferred, deliberately - a separate bugs/access pass:** (1) guardrails
+as an entity validation `Constraint` instead of a presave exception - today
+a guardrail rejection on the entity add/edit form is an uncaught
+`EntityStorageException`, a 500, not a field error; (2) `executeAsAdmin()`
+switching to uid 1 for every caller, so `aim_tool`'s `aim_recall` with any
+`subject_uid` (uid *or username*) lets a `read aim memory` holder read
+every other user's `scope=user` facts, and `aim_remember` never checks
+`create {scope} aim facts` - the per-scope permissions only bind the
+admin UI; (3) the `user` bundle's add form leaves `subject_uid` optional
+(ADR-0007 not enforced at the entity layer - a
+`core.base_field_override.aim_fact.user.subject_uid.yml` with
+`required: true` plus an entity-level constraint is the idiom, not the
+reverted per-bundle-field experiment); (4) `getDefaultChatProvider():
+array` wrapping a `?array`; (5) presave re-running guardrails on untouched
+text when consolidation retires a fact; (6) unguarded
+`getOriginalObject()` nulls in `recall()`/`findNearestNeighbor()`; (7)
+`AimScope` delete with no content guard (`NodeTypeDeleteConfirm` is the
+precedent); (8) `block.block.olivero_aimdemochat.yml` belonging in
+`config/optional` (theme dependency); (9) shipped config with
+`dependencies: {}` needing `enforced: module: [aim]` so uninstall cleans
+it up without the hand-written `hook_uninstall()` loops; (10)
+`AimFactListBuilder::getDefaultOperations()`'s signature per CR 3533080.
+Also deferred, not a bug: splitting `AimMemoryManager` (five concerns,
+1200+ lines) into writer/recall/consolidator/extractor/benchmark services
+behind interfaces - worth doing before drupal.org, not worth doing in the
+same pass as the access fixes. Tests: none yet, planned next.
 
 ## Dev process and rules
 
