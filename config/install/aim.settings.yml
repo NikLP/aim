@@ -1,5 +1,6 @@
 auto_threshold: 0.09
 ambiguous_threshold: 0.45
+recall_max_distance: 0.45
 user_scope_shared_role_fallback: true
 user_scope_role_visibility: {  }
 extraction_prompt: |

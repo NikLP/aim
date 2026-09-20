@@ -26,11 +26,14 @@ widen this without a real per-visitor identity to scope to.
   and block, both shipped so the capability is visible without extra
   config.
 
-## Known gap
+## Abstention
 
-`aim_chatbot:recall` has no similarity-score threshold - see
-[DEVELOPING.md](DEVELOPING.md)'s "Gotchas". A minimum-score cutoff is the
-structural fix, not yet built.
+`aim_chatbot:recall` drops matches past `aim.settings:recall_max_distance`
+and answers "No relevant facts found." when none survive - see
+[DEVELOPING.md](DEVELOPING.md)'s "Gotchas" and
+[ADR-0019](../../adr/0019-recall-abstention-distance-cutoff.md). The
+cutoff is embeddings-model specific: retune it if the model changes, and
+recheck as the site-scope corpus grows or diversifies.
 
 ## CCC (`ai_context`)
 

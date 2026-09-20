@@ -134,6 +134,20 @@ over-fetches (5x the limit) and post-filters on `subject_uid` in PHP for
 the same reason (`subject_uid` isn't an indexed attribute either) - the
 fix is indexing it as a search_api attribute, not yet built.
 
+**Retired facts eat recall's result slots:** that PHP filter runs after
+the index has applied `range(0, $limit)`, and retired facts stay indexed
+(soft supersede), so `recall()` returns fewer than `$limit` live rows -
+2-3 of 5 on this site, where every live site fact has a retired twin.
+Worsens as the retired share grows. Unfixed; the recommended over-fetch
+and why an index flag isn't the first choice are in
+[ADR-0019](adr/0019-recall-abstention-distance-cutoff.md).
+
+**Stale vector rows self-heal:** a row in `aim_facts` whose fact no longer
+exists (deleted directly, or a test leftover) logs a one-off "Could not
+load the following items on index" warning the first time a query returns
+it, then search_api deletes it (`delete_on_fail: TRUE` on the index).
+`recall()` already skips such rows. Harmless; not worth a manual cleanup.
+
 ### `aim:benchmark` - retrieval latency
 
 ```bash
@@ -158,7 +172,8 @@ layer being the cost. Not yet run at thousands-of-facts scale.
 Cache API, keyed on (query text, embeddings model ID) - deterministic
 mapping, no invalidation needed. Complementary to local Ollama, not a
 substitute - caching helps repeat queries, a local model helps every
-query.
+query. Designed in [ADR-0017](adr/0017-query-embedding-cache.md): an
+event subscriber on drupal/ai's provider events, query-time embeds only.
 
 ---
 
@@ -184,9 +199,10 @@ Central service backing every write/read path. Key public methods:
 - `checkCreateAccess(string $scope, AccountInterface $account): bool` -
   wraps the access handler's `createAccess()`; `aim_tool` calls this
   before every Tool API/MCP write.
-- `getAutoThreshold()`/`getAmbiguousThreshold()` - live `aim.settings`
-  values, not the class constants (those are only the shipped defaults
-  and in-code fallback).
+- `getAutoThreshold()`/`getAmbiguousThreshold()`/`getRecallMaxDistance()`
+  - live `aim.settings` values, not the class constants (those are only
+  the shipped defaults and in-code fallback). `recall_max_distance` is
+  applied by `aim_chatbot:recall`, not by `recall()` itself.
 - `getDefaultChatProvider(): ?array` - resolves the site-wide default via
   `AiProviderPluginManager`; `NULL` if none configured. `AimCommands`'
   `--provider`/`--model` options default to `NULL` and fall through to
@@ -454,8 +470,9 @@ count - trivial at PoC scale, a real line item at volume.
   `administer aim memory`).
 - `/admin/config/system/queue-ui` - manual consolidation-queue trigger.
 - `/admin/config/aim/settings` (`AimSettingsForm`, `#config_target`-backed)
-  - consolidation thresholds and the extraction/consolidation prompt
-  text, both admin-editable, no code deploy needed. The requested output
+  - consolidation thresholds, the chatbot recall cutoff, and the
+  extraction/consolidation prompt text, all admin-editable, no code
+  deploy needed. The requested output
   *shape* (the JSON schema extraction/consolidation parse against) is not
   editable here - it's parsed by PHP downstream and isn't safe to hand to
   a text field.

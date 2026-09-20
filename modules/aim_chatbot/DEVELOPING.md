@@ -35,13 +35,27 @@ mechanism and alternatives considered.
 - `drush php:eval` can't exercise the chat endpoint -
   `AssistantMessageBuilder` resolves the current route, which is null
   outside a real HTTP request. Use `curl` against the live endpoint.
-- **`aim_chatbot:recall` has no similarity-score threshold** - any
-  non-empty result set gets formatted as "Relevant facts:" and handed to
-  the model, even when the best match is poor; only zero rows gets a
-  special "No relevant facts found." Tested against a 50-fact benchmark
-  and the model's own judgment covered the gap that time, but this isn't
-  proof it's safe at scale or across models - a minimum-score cutoff is
-  the structural fix, not yet built.
+- **`aim_chatbot:recall` abstains past a distance cutoff** - rows whose
+  cosine distance exceeds `aim.settings:recall_max_distance` (default
+  0.45, editable at `/admin/config/aim/settings`, read via
+  `AimMemoryManager::getRecallMaxDistance()`) are dropped, and an empty
+  remainder returns "No relevant facts found." instead of a "Relevant
+  facts:" list. `AimMemoryManager::recall()` itself does not filter, so
+  `drush aim:recall` and `aim_tool`'s MCP recall still return raw results.
+  Calibrated against `nomic-embed-text` (question vs. fact): answerable
+  questions' best match 0.12-0.29 (full questions and terse keyword
+  queries alike), near-topic-but-unanswerable 0.25-0.33, off-topic
+  0.51-0.64. The cutoff catches the off-topic case only - an unanswerable
+  question about a known topic still gets its nearest facts, and the model
+  has to notice they don't answer it. **Retune if the embeddings model
+  changes**, and recheck as the site-scope corpus grows or diversifies:
+  pairwise distances don't move when facts are added, but more varied
+  facts mean more coincidental near matches, so the off-topic floor
+  drifts down (same queries against all scopes' 120 facts instead of
+  site's 18 matched closer by up to 0.035). Decision, full measurements
+  and the retuning checklist: [ADR-0019](../../adr/0019-recall-abstention-distance-cutoff.md).
+  Separately, `recall()` returns fewer than 5 live rows here because
+  retired facts take result slots - same ADR.
 
 ## CCC (`ai_context`), not enabled here
 

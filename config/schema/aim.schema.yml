@@ -16,6 +16,13 @@ aim.settings:
         Range:
           min: 0
           max: 1
+    recall_max_distance:
+      type: float
+      label: 'Chatbot recall maximum distance'
+      constraints:
+        Range:
+          min: 0
+          max: 1
     # string, not text: text is core's translatable-string type, and these
     # are instructions to a model, not UI strings for a translator. Declaring
     # them text would make config validation demand a langcode on this

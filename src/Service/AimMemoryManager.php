@@ -98,6 +98,25 @@ class AimMemoryManager {
   public const DEFAULT_AMBIGUOUS_THRESHOLD = 0.45;
 
   /**
+   * Shipped default for aim.settings' recall_max_distance, and a fallback.
+   *
+   * See DEFAULT_AUTO_THRESHOLD - same relationship to the live config value,
+   * read via getRecallMaxDistance(). Measured 2026-09-19 against
+   * ollama__nomic-embed-text:latest on the live site-scope facts, question
+   * text against fact text (not fact against fact, so the consolidation
+   * thresholds above don't apply): answerable questions' best match
+   * 0.12-0.29 (full questions and terse keyword queries alike),
+   * near-topic-but-unanswerable 0.25-0.33, off-topic 0.51-0.64. 0.45 sits
+   * in the empty band between the last two, with room either way.
+   * It cannot separate an answerable question from a near-topic
+   * unanswerable one (their ranges overlap) - that stays the model's call.
+   * The off-topic floor drifts down as the corpus grows and diversifies
+   * (more candidates, more coincidental near matches), so recheck it then,
+   * not only when the embeddings model changes.
+   */
+  public const DEFAULT_RECALL_MAX_DISTANCE = 0.45;
+
+  /**
    * Sentence templates generateBenchmarkFacts() fills in with random words.
    *
    * Deliberately not Faker/devel_generate output - those aren't wired to
@@ -212,6 +231,22 @@ class AimMemoryManager {
   public function getAmbiguousThreshold(): float {
     $value = $this->configFactory->get('aim.settings')->get('ambiguous_threshold');
     return $value !== NULL ? (float) $value : self::DEFAULT_AMBIGUOUS_THRESHOLD;
+  }
+
+  /**
+   * Returns the live recall cutoff from aim.settings.
+   *
+   * See getAutoThreshold() - same fallback behavior. Applied by callers
+   * that must abstain on a poor match (aim_chatbot:recall); recall() itself
+   * does not filter by it.
+   *
+   * @return float
+   *   Distance above which a recalled fact is too dissimilar to present as
+   *   relevant.
+   */
+  public function getRecallMaxDistance(): float {
+    $value = $this->configFactory->get('aim.settings')->get('recall_max_distance');
+    return $value !== NULL ? (float) $value : self::DEFAULT_RECALL_MAX_DISTANCE;
   }
 
   /**
@@ -930,7 +965,6 @@ class AimMemoryManager {
       $fact = $original->getValue();
       // `expires` is not an indexed attribute, so a retired fact still
       // matches the vector query; filter it out here instead.
-
       if (!$fact->get('expires')->isEmpty()) {
         continue;
       }

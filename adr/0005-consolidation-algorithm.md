@@ -81,3 +81,14 @@ a side effect, not authored by hand.
   originally scoped by the free-text `subject` string - see ADR-0007 for
   the actual fix (a real account reference, not a consolidation-side
   patch).
+
+## Addendum (2026-09-20): PHP-side `expires` filtering costs recall result slots
+
+The Consequences above fixed `recall()` and `findNearestNeighbor()` by
+filtering retired facts out in PHP. That filter runs after the index has
+already applied `range()`, so retired facts (kept in the index as the
+audit trail) still occupy result slots: on the live site every live site
+fact has a retired twin, and `recall()` at limit 5 returns 2-3 rows.
+Measured, with the recommended over-fetch fix and why an index-level
+flag is not the first choice, in
+[ADR-0019](0019-recall-abstention-distance-cutoff.md).

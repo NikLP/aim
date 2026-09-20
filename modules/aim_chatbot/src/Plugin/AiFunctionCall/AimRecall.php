@@ -77,6 +77,12 @@ final class AimRecall extends FunctionCallBase implements ExecutableFunctionCall
       return;
     }
 
+    // Abstain on a poor match: rows come back best-first, but a non-empty
+    // result set only means the index had *something*, not that it was
+    // relevant.
+    $max_distance = $this->memoryManager->getRecallMaxDistance();
+    $rows = array_filter($rows, static fn (array $row): bool => (float) $row['score'] <= $max_distance);
+
     if (empty($rows)) {
       $this->setOutput('No relevant facts found.');
       return;

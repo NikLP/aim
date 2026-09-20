@@ -20,7 +20,7 @@ use Drupal\Core\Form\FormStateInterface;
  *
  * Each element carries a #config_target, so ConfigFormBase loads the
  * default value, validates the submitted value against aim.schema.yml's
- * constraints (the 0..1 Range on both thresholds), and saves it - no
+ * constraints (the 0..1 Range on each distance threshold), and saves it - no
  * submitForm() of its own. validateForm() only adds the checks the schema
  * can't express: the cross-field ordering of the two thresholds, and the
  * placeholder tokens each prompt must keep.
@@ -66,6 +66,22 @@ final class AimSettingsForm extends ConfigFormBase {
       '#title' => $this->t('Ambiguous threshold'),
       '#description' => $this->t('Distance at or below which a candidate fact gets a single LLM classification call (ADD/UPDATE/DELETE/NOOP). Above this, facts are left alone at zero cost. Must be greater than the auto-merge threshold.'),
       '#config_target' => 'aim.settings:ambiguous_threshold',
+      '#min' => 0,
+      '#max' => 1,
+      '#step' => 0.001,
+      '#required' => TRUE,
+    ];
+
+    $form['recall'] = [
+      '#type' => 'details',
+      '#title' => $this->t('Recall'),
+      '#open' => TRUE,
+    ];
+    $form['recall']['recall_max_distance'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Chatbot recall maximum distance'),
+      '#description' => $this->t("Cosine distance above which a match is dropped from the chatbot's recall tool, so a poor match becomes an honest \"no relevant facts\" instead of being presented as relevant. Question-to-fact distances run larger than the fact-to-fact ones above, and are specific to the current embeddings model: re-check after any change to it."),
+      '#config_target' => 'aim.settings:recall_max_distance',
       '#min' => 0,
       '#max' => 1,
       '#step' => 0.001,

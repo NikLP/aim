@@ -74,7 +74,11 @@ questions" section)
 ## Concrete near-term fixes flagged in CLAUDE.md/DEVELOPING.md
 
 - [ ] Index `subject_uid` as a search_api attribute (Consolidation
-      gotchas - currently over-fetches + PHP-filters).
+      gotchas - currently over-fetches + PHP-filters). Analyzed
+      2026-09-19: the attribute alone is not enough (empty values break
+      the `INT` column insert; MariaDB HNSW post-filters, so it also needs
+      a BTREE index on the column). Findings, plan and one open decision
+      in [ADR-0018](adr/0018-index-subject-uid-with-btree.md).
 - [ ] Add a `related_reason` field on `aim_fact` (provenance-on-invalidation,
       ADR-0010 parity target #6 /
       [ADR-0005](adr/0005-consolidation-algorithm.md)).
@@ -103,10 +107,13 @@ questions" section)
       today (`cache.default` is `DatabaseBackend`) - start DB-backed, add
       Redis only if that itself becomes a bottleneck. Complementary to
       local Ollama embeddings, not a substitute - caching helps repeat
-      queries, a local model helps every query.
+      queries, a local model helps every query. Design and decision in
+      [ADR-0017](adr/0017-query-embedding-cache.md) (drupal/ai event
+      subscriber, query-time embeds only).
 - [ ] Instrument `recall()` to log embed-time vs. DB-search-time separately,
       before further latency work - confirms the split rather than
-      inferring it from one aggregate number.
+      inferring it from one aggregate number. ADR-0017's subscriber
+      logging covers this.
 - [ ] Fast-path lookup for typed facts (`state`, `category`), bypassing
       `recall()`'s vector search entirely. Both fields are exact-match
       (scope+subject), not fuzzy semantic - but everything, including a
@@ -119,10 +126,35 @@ questions" section)
       page-load hot path (e.g. "should this user see the marketing
       banner"). Originally motivated by a 2026-09-09 question about a "warm
       state cache for booleans" - not designed, no ADR yet.
-- [ ] Fix abstention correctness in `aim_chatbot:recall`
-      (`AimRecall::execute()`) - no similarity-score threshold today, only
-      a zero-rows check, so a poor top match still gets formatted as
-      "Relevant facts:" instead of an honest no-match response.
+- [x] Fix abstention correctness in `aim_chatbot:recall` - BUILT
+      2026-09-19 (`aim.settings:recall_max_distance`, 0.45), decision and
+      measurements in
+      [ADR-0019](adr/0019-recall-abstention-distance-cutoff.md). **Still
+      open:** `aim_tool`'s MCP `aim_recall` and `drush aim:recall` still
+      return raw results with no cutoff (ADR-0019's "Not built" has the
+      recommended opt-in `$maxDistance` shape); a near-topic question the
+      facts don't answer still gets its nearest facts (the distance
+      ranges overlap, so this needs the model's judgment, not a
+      threshold); no `drush aim:calibrate` yet.
+- [ ] `recall()` applies `range(0, $limit)` before dropping retired
+      (`expires`) facts, so retired ones eat result slots. Live data:
+      every live site fact has an identical retired twin, so the chatbot's
+      `recall(limit 5)` returns 2-3 rows while 12+ live matches exist in the
+      raw top 25. Worsens over time (retirement keeps an audit trail, the
+      retired share only grows). Same pattern in `findNearestNeighbor()`
+      (`range(0, 5)`, latent: needs 4+ retired near-duplicates of one
+      fact to bite). Cheap fix: over-fetch (`$limit * 5`, as the
+      `subject_uid` post-filter already does) and break at `$limit`; a
+      single query, not paging, since each `execute()` re-embeds the query.
+      An index-level `retired` flag is not the first choice: new column,
+      full reindex, a PHP post-filter still needed for the reindex lag,
+      and MariaDB's HNSW filtering is lossy for sparse filters (see the
+      `subject_uid` item above). Evidence and reasoning in
+      [ADR-0019](adr/0019-recall-abstention-distance-cutoff.md).
+- [ ] Delete the 7 live site facts with NULL text (ids 144-150, created
+      2026-09-15 20:42-20:46 by uid 1, source NULL) - test residue from
+      the scope-to-bundle conversion. `text` is required now; they have no
+      vector row, so they never surface in recall, but they count as live.
 
 (DEVELOPING.md's "aim:benchmark" and "Chatbot" sections)
 
