@@ -1,7 +1,8 @@
 # ADR-0019: Recall abstention via a distance cutoff, and what bounds recall quality
 
 **Status:** Accepted - chatbot cutoff built 2026-09-19; the follow-ups
-under "Not built" are open
+under "Not built" are open. The retired-slot finding is resolved by
+[ADR-0022](0022-exclude-retired-facts-from-vector-index.md) (2026-09-26)
 **Date:** 2026-09-20 (measurements taken 2026-09-19)
 
 ## Context
@@ -105,6 +106,13 @@ not the near-topic one, and is a heuristic rather than a guarantee.
 Found while measuring the above; it limits how many facts the cutoff has
 to work with.
 
+**Resolved 2026-09-26 by
+[ADR-0022](0022-exclude-retired-facts-from-vector-index.md):** a Search
+API processor keeps retired facts out of the index, which is neither
+the over-fetch recommended below nor the indexed `retired` flag argued
+against below (it adds no column and no query condition). The analysis
+below is kept as the evidence it was built on.
+
 `recall()` asks the index for `range(0, $limit)` and only then drops
 facts whose `expires` is set, in PHP, because the index does not know
 `expires` (ADR-0005). Retired facts stay in the index by design (soft
@@ -180,8 +188,8 @@ supersede keeps an audit trail), so they take up result slots.
 - No cutoff exists on `aim_tool`'s MCP `aim_recall` or `drush aim:recall`.
   The MCP connector can reach every scope, so it is the caller most likely
   to want one.
-- The retired-slot problem is recorded and unfixed, and worsens with the
-  retired share.
+- The retired-slot problem was recorded here and fixed by ADR-0022, not by
+  the over-fetch recommended above.
 
 ## Not built
 
@@ -190,6 +198,7 @@ supersede keeps an audit trail), so they take up result slots.
   (which also makes it interact correctly with the over-fetch), with
   `drush aim:recall` staying raw unless given a `--max-distance`.
 - **The over-fetch fix** in `recall()` and `findNearestNeighbor()`.
+  Dropped: ADR-0022 removes retired facts from the index instead.
 - **A `drush aim:calibrate` command** that takes labeled queries, prints
   the three distributions and the gap, and suggests a cutoff, replacing the
   manual recheck above.

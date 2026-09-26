@@ -224,6 +224,13 @@ calling it done:
   the over-fetch, and the flag would have to be a real entity field (a
   processor property fails finding 1; the provider also cannot express
   `IS NULL`, it emits `(expires = ())`).
+- The retired-facts item above is now resolved by excluding retired facts
+  from the index ([ADR-0022](0022-exclude-retired-facts-from-vector-index.md)),
+  not by a flag. That work also found that every index save threw
+  (`ai_vdb_provider_mariadb` bug, fixed by `AimMariaDBProvider`), and the
+  throw came before the provider's `updateFields()` ALTER, so step 2's
+  config save would have thrown before the column was added by that path.
+  It no longer throws.
 - The `subject` filter for role/case scope has the same post-filter
   weakness and could get a BTREE index from the same hook. Out of scope
   here; worth doing with it.

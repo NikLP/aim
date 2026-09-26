@@ -136,21 +136,23 @@ questions" section)
       facts don't answer still gets its nearest facts (the distance
       ranges overlap, so this needs the model's judgment, not a
       threshold); no `drush aim:calibrate` yet.
-- [ ] `recall()` applies `range(0, $limit)` before dropping retired
-      (`expires`) facts, so retired ones eat result slots. Live data:
-      every live site fact has an identical retired twin, so the chatbot's
-      `recall(limit 5)` returns 2-3 rows while 12+ live matches exist in the
-      raw top 25. Worsens over time (retirement keeps an audit trail, the
-      retired share only grows). Same pattern in `findNearestNeighbor()`
-      (`range(0, 5)`, latent: needs 4+ retired near-duplicates of one
-      fact to bite). Cheap fix: over-fetch (`$limit * 5`, as the
-      `subject_uid` post-filter already does) and break at `$limit`; a
-      single query, not paging, since each `execute()` re-embeds the query.
-      An index-level `retired` flag is not the first choice: new column,
-      full reindex, a PHP post-filter still needed for the reindex lag,
-      and MariaDB's HNSW filtering is lossy for sparse filters (see the
-      `subject_uid` item above). Evidence and reasoning in
-      [ADR-0019](adr/0019-recall-abstention-distance-cutoff.md).
+- [x] Retired facts eating `recall()`'s result slots - BUILT 2026-09-26:
+      a Search API processor keeps retired facts out of the vector index
+      instead of the over-fetch this item first proposed. Rolled out on
+      the live site (115 vector rows to 58, `recall(limit 5)` back to 5
+      rows). Decision, verification and rollout in
+      [ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md).
+- [ ] File two upstream issues against `ai_vdb_provider_mariadb` (found
+      2026-09-26, present in 1.0.1 and the 1.0.x head): (1) `createCollection()`
+      lets a bare `mysqli_sql_exception` escape when the table exists, so
+      every index save throws before `updateFields()`; (2) `getVdbIds()`
+      uses `querySearch()`'s default `limit = 10`, so item deletes remove
+      at most 10 rows. Then remove `AimMariaDBProvider` and
+      `AimHooks::vdbProviderInfoAlter()` once released.
+- [ ] Retention/erasure policy for retired facts (prune or archive old
+      `expires` rows out of `aim_fact`) - retired facts about a person are
+      still personal data. Own ADR when needed, see ADR-0022's
+      Consequences.
 - [ ] Delete the 7 live site facts with NULL text (ids 144-150, created
       2026-09-15 20:42-20:46 by uid 1, source NULL) - test residue from
       the scope-to-bundle conversion. `text` is required now; they have no

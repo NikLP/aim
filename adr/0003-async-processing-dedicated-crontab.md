@@ -28,8 +28,10 @@ via an external crontab entry:
 ```
 
 Granularity is per-fact, not a periodic full sweep: `remember()` and
-`createFactsFromCandidates()` call `enqueueForConsolidation($factId)`
-right after `save()`, so each fact is evaluated once, at creation, rather
+`createFactsFromCandidates()` originally called
+`enqueueForConsolidation($factId)` right after `save()` (now an insert
+hook, see the 2026-09-26 addendum), so each fact is evaluated once, at
+creation, rather
 than re-compared against the whole corpus on every future sweep (the
 inefficiency the original on-demand `drush aim:consolidate` CLI sweep
 had, before this queue existed).
@@ -67,3 +69,37 @@ synchronous.
   on-demand CLI sweep a human could `--dry-run` first - the same
   underlying bug, but automation raised its stakes. Recalibrated the same
   day it was found; see ADR-0005.
+
+## Addendum (2026-09-26): enqueue moved to an insert hook
+
+The decision above (Queue API, no `cron` key, dedicated crontab, per-fact
+granularity) is unchanged and still binding. What changed is where the
+enqueue happens, and a few pointers had gone stale.
+
+- **Enqueue is now `hook_aim_fact_insert`.** `AimHooks::factInsert()`
+  (`#[Hook('aim_fact_insert')]`) calls `enqueueForConsolidation()` for
+  every newly inserted fact, so every save path is covered (the admin add
+  form, `remember()`, `createFactsFromCandidates()`, any future writer)
+  without each one having to remember to call it. `remember()` and
+  `createFactsFromCandidates()` no longer call it themselves.
+- **Opt-out is core's `setSyncing(TRUE)`.** An entity flagged syncing
+  skips the enqueue. `generateBenchmarkFacts()` sets it deliberately
+  (synthetic text needs no consolidation), and core's Migrate
+  destinations set it on every entity they save, so migrated facts also
+  skip consolidation. The flag is not exposed on any write path, so a
+  caller cannot use it to keep a real fact out of consolidation - see
+  [ADR-0020](0020-verbatim-facts-consolidation-opt-out.md) for a
+  proposed explicit flag.
+- **Unchanged, re-checked against the code:** `AimConsolidateQueueWorker`
+  still carries no `cron` key; `processItem()` still skips an
+  already-retired or deleted fact, calls `reindex()` before
+  `consolidateFact()`, and throws `SuspendQueueException` when no default
+  chat provider is configured.
+- **`queue_ui` pointer.** The manual per-queue Run button is documented in
+  DEVELOPING.md's `aim:consolidate` section, not a CLAUDE.md "Admin UI"
+  section.
+- **Latency.** The "tighter cadence only if a feature needs it" clause
+  above was explored as an immediate post-write path and deliberately
+  deferred: [ADR-0015](0015-immediate-consolidation-considered-deferred.md).
+
+Checked by reading the code 2026-09-26, not by running the queue.

@@ -126,3 +126,23 @@ zero `scope=user` rows back (confirming the authenticated branch is
 unaffected and still access-checked, not bypassed). See CLAUDE.md's
 "CLI agent adapter" and "Consolidation" sections for the corresponding
 gotcha-text updates.
+
+## Addendum (2026-09-26): what "verbatim" does and does not guarantee
+
+`remember()` is already the verbatim write path: it stores its text as
+given, with no extraction call, and every human-facing entry point (Drush,
+`aim_tool`'s `aim_remember`, the chatbot's `AimRemember`, the admin add
+form) goes through it. Three limits on the word, none of them new
+behavior:
+
+- Over MCP and the chatbot the calling model composes the text, so the
+  fact is verbatim relative to the tool call, not to what the human said.
+  Only `drush aim:remember` and the admin form take a human's literal
+  text.
+- Guardrails still run (ADR-0002). Today they only reject, never rewrite.
+- Consolidation still runs on every inserted fact (ADR-0003, ADR-0005)
+  and can retire, delete, or LLM-rewrite a "verbatim" fact.
+
+The third is a real gap, not just a caveat. Proposed fix (a `verbatim`
+opt-out flag, not built) in
+[ADR-0020](0020-verbatim-facts-consolidation-opt-out.md).

@@ -127,20 +127,43 @@ Manual trigger without a terminal: `drupal/queue_ui` at
 `/admin/config/system/queue-ui` (per-queue "Run" button - deliberately
 not a `cron` key, see [ADR-0003](adr/0003-async-processing-dedicated-crontab.md)).
 
-**Known gap:** the vector index doesn't know `expires` exists (not an
-indexed attribute) - `recall()`/`findNearestNeighbor()` filter
-already-superseded facts out in PHP. `scope: user` neighbor matching
-over-fetches (5x the limit) and post-filters on `subject_uid` in PHP for
-the same reason (`subject_uid` isn't an indexed attribute either) - the
-fix is indexing it as a search_api attribute, not yet built.
+**Retired facts are not in the vector index:** the `aim_exclude_retired`
+Search API processor (`src/Plugin/search_api/processor/ExcludeRetired.php`)
+rejects any fact with `expires` set, and Search API deletes a rejected
+item from the server. Retiring a fact is a plain `save()` that re-tracks
+it, so its row goes on the next `sapi-i` (`index_directly` is off), and
+clearing `expires` brings it back. `recall()`/`findNearestNeighbor()` keep
+their PHP `expires` check as a safety net for that gap. Retired facts stay
+`aim_fact` entities (audit trail, `related` edges, admin views) but are not
+vector-searchable. Design, verification and rollout in
+[ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md).
 
-**Retired facts eat recall's result slots:** that PHP filter runs after
-the index has applied `range(0, $limit)`, and retired facts stay indexed
-(soft supersede), so `recall()` returns fewer than `$limit` live rows -
-2-3 of 5 on this site, where every live site fact has a retired twin.
-Worsens as the retired share grows. Unfixed; the recommended over-fetch
-and why an index flag isn't the first choice are in
-[ADR-0019](adr/0019-recall-abstention-distance-cutoff.md).
+**Enabling the processor on an existing site:** `config/install` does not
+re-run on an installed module. Enable it on the index (admin UI, or config
+import), then purge the retired rows already indexed:
+
+```bash
+ddev drush php:eval '$ids = \Drupal::entityQuery("aim_fact")->accessCheck(FALSE)->exists("expires")->execute(); \Drupal\search_api\Entity\Index::load("aim_vector_index")->trackItemsUpdated("entity:aim_fact", array_map(fn($id) => "$id:en", array_values($ids)));'
+ddev drush sapi-i aim_vector_index
+```
+
+**Known gap:** `scope: user` neighbor matching over-fetches (5x the
+limit) and post-filters on `subject_uid` in PHP (`subject_uid` isn't an
+indexed attribute) - the fix is indexing it as a search_api attribute, not
+yet built.
+
+**`ai_vdb_provider_mariadb` is swapped for a subclass:**
+`Drupal\aim\Vdb\AimMariaDBProvider`, via `AimHooks::vdbProviderInfoAlter()`,
+works around two bugs present in provider 1.0.1 and the 1.0.x head
+(checked 2026-09-26). Saving the index threw `Table 'aim_facts' already
+exists` (an unhandled `mysqli_sql_exception` from `createCollection()`,
+before `updateFields()` ran), and `deleteItems()`/`deleteIndexItems()`
+removed at most 10 rows per call (`getVdbIds()` used `querySearch()`'s
+default limit). If a provider upgrade fixes both, delete the class and the
+hook; if either symptom returns, check the alter hook still applies
+(`ddev drush php:eval 'echo get_class(\Drupal::service("ai.vdb_provider")->createInstance("mariadb"));'`
+should print the aim class). Details in
+[ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md).
 
 **Stale vector rows self-heal:** a row in `aim_facts` whose fact no longer
 exists (deleted directly, or a test leftover) logs a one-off "Could not
@@ -435,8 +458,10 @@ call:
    drush php:eval "\Drupal::entityTypeManager()->getStorage('search_api_index')->load('aim_vector_index')->save();"
    ```
 
-   "Table already exists" means a mid-recreate table from a previous
-   attempt - `DROP TABLE aim_facts` and re-run.
+   Re-saving is safe on an existing table too: `AimMariaDBProvider`
+   swallows the provider's "Table already exists" throw (see "`ai_vdb_provider_mariadb`
+   is swapped for a subclass" above). If that message still appears, the
+   alter hook is not applying - check the class it prints there.
 7. **Reindex every fact, not incrementally** - a provider/model change
    means every existing vector is in the old embedding space. If step 5
    dropped/rebuilt `aim_facts`, the table is already empty - reindex

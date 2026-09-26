@@ -129,8 +129,11 @@ duplicated here.
   `user`/`role`/`site`/`case`. No `field_ui_base_route` - deliberately,
   see [DEVELOPING.md](DEVELOPING.md) for why.
 - Vector search: server `aim_vector`, index `aim_vector_index`, collection
-  table `aim_facts` (MariaDB HNSW `VECTOR INDEX`). Detail in
-  [DEVELOPING.md](DEVELOPING.md).
+  table `aim_facts` (MariaDB HNSW `VECTOR INDEX`). Retired facts (`expires`
+  set) are excluded from the index by the `aim_exclude_retired` processor
+  ([ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md)); the
+  provider plugin is swapped for `AimMariaDBProvider` to work around two
+  upstream bugs. Detail in [DEVELOPING.md](DEVELOPING.md).
 
 ## Permissions
 

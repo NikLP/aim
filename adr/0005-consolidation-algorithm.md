@@ -91,4 +91,20 @@ audit trail) still occupy result slots: on the live site every live site
 fact has a retired twin, and `recall()` at limit 5 returns 2-3 rows.
 Measured, with the recommended over-fetch fix and why an index-level
 flag is not the first choice, in
-[ADR-0019](0019-recall-abstention-distance-cutoff.md).
+[ADR-0019](0019-recall-abstention-distance-cutoff.md). Resolved
+2026-09-26 differently: retired facts are now excluded from the index by
+a Search API processor, [ADR-0022](0022-exclude-retired-facts-from-vector-index.md).
+The PHP `expires` filters above stay as a safety net for the gap before
+the next index run.
+
+## Addendum (2026-09-26): consolidation is not safe for verbatim facts
+
+Nothing above distinguishes a fact written verbatim
+([ADR-0006](0006-agent-native-write-path.md)) from an extracted one, and
+every inserted fact is queued. The lower id is `kept`, the higher id is
+`candidate`, so a verbatim fact can be retired (NOOP), hard-deleted
+(DELETE), or retired while the older neighbor's text is overwritten with
+a merge (UPDATE) when it is the newer fact, and can have its own text
+overwritten by a later fact's UPDATE when it is the older one. Proposed
+opt-out flag, not built, in
+[ADR-0020](0020-verbatim-facts-consolidation-opt-out.md).

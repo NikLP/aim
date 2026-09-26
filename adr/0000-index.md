@@ -6,7 +6,7 @@ Architecture Decision Records for the `aim` module.
 | --- | --- | --- |
 | [0001](0001-storage-and-scope-model.md) | Storage and scope model | Accepted; scope-model deviation resolved 2026-09-15 |
 | [0002](0002-governance-deferred-guardrails-mandatory.md) | Governance deferred for PoC; Guardrails mandatory from day one | Accepted |
-| [0003](0003-async-processing-dedicated-crontab.md) | Async processing via Queue API and a dedicated crontab, never `hook_cron` | Accepted |
+| [0003](0003-async-processing-dedicated-crontab.md) | Async processing via Queue API and a dedicated crontab, never `hook_cron` | Accepted; enqueue mechanism updated 2026-09-26 |
 | [0004](0004-sovereignty-and-poc-build-order.md) | Sovereignty option and zero-API-key PoC build order | Accepted |
 | [0005](0005-consolidation-algorithm.md) | Consolidation algorithm: ADD/UPDATE/DELETE/NOOP with soft supersede | Accepted |
 | [0006](0006-agent-native-write-path.md) | Agent-native write path bypassing extraction's LLM call | Accepted |
@@ -23,3 +23,6 @@ Architecture Decision Records for the `aim` module.
 | [0017](0017-query-embedding-cache.md) | Query-embedding cache via a drupal/ai event subscriber | Proposed - designed, not built |
 | [0018](0018-index-subject-uid-with-btree.md) | Index `subject_uid` as a Search API attribute, with a BTREE index on its column | Proposed - analyzed, not built; empty-value handling still open |
 | [0019](0019-recall-abstention-distance-cutoff.md) | Recall abstention via a distance cutoff, and what bounds recall quality | Accepted - chatbot cutoff built 2026-09-19; follow-ups not built |
+| [0020](0020-verbatim-facts-consolidation-opt-out.md) | Verbatim facts: an explicit opt-out from consolidation | Proposed - analyzed, not built; build/no-build undecided |
+| [0021](0021-jev-typed-decision-provider.md) | Jev (TypeSafe AI) as a typed-decision provider: spike, not adoption | Proposed - researched, not built; waitlist access requested |
+| [0022](0022-exclude-retired-facts-from-vector-index.md) | Retired facts stay out of the vector index (Search API processor) | Accepted - built and rolled out 2026-09-26 |

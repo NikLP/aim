@@ -7,6 +7,7 @@ namespace Drupal\aim\Hook;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
+use Drupal\aim\Vdb\AimMariaDBProvider;
 
 /**
  * Hook implementations for the aim module.
@@ -46,6 +47,22 @@ class AimHooks {
       return;
     }
     $this->memoryManager->enqueueForConsolidation((int) $entity->id());
+  }
+
+  /**
+   * Implements hook_ai_vdb_provider_info_alter().
+   *
+   * Swaps in AimMariaDBProvider, which works around two
+   * ai_vdb_provider_mariadb bugs (see its docblock).
+   *
+   * @param array $definitions
+   *   The VDB provider plugin definitions, keyed by plugin ID.
+   */
+  #[Hook('ai_vdb_provider_info_alter')]
+  public function vdbProviderInfoAlter(array &$definitions): void {
+    if (isset($definitions['mariadb'])) {
+      $definitions['mariadb']['class'] = AimMariaDBProvider::class;
+    }
   }
 
 }

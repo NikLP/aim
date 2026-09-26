@@ -963,8 +963,9 @@ class AimMemoryManager {
         continue;
       }
       $fact = $original->getValue();
-      // `expires` is not an indexed attribute, so a retired fact still
-      // matches the vector query; filter it out here instead.
+      // The aim_exclude_retired processor keeps retired facts out of the
+      // index (ADR-0022), but one retired since the last index run is
+      // still there; filter it out here for that gap.
       if (!$fact->get('expires')->isEmpty()) {
         continue;
       }
@@ -1265,9 +1266,9 @@ class AimMemoryManager {
         continue;
       }
 
-      // The vector index does not know about `expires` (it is not an
-      // indexed attribute), so an already-retired fact would otherwise
-      // keep resurfacing as a neighbor on every future run.
+      // The aim_exclude_retired processor keeps retired facts out of the
+      // index (ADR-0022), but one retired since the last index run is
+      // still there and would otherwise resurface as a neighbor.
       if (!$candidate->get('expires')->isEmpty()) {
         continue;
       }
