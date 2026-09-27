@@ -8,20 +8,6 @@ open items already on record in the ADRs and [CLAUDE.md](CLAUDE.md)/
 Expect entries folded in from other threads independently - don't treat
 this list as exhaustive.
 
-## MCP connector persona/capability parity (raised 2026-09-14)
-
-- [ ] Decide whether the Claude.ai/Claude Desktop MCP connector
-      (`aim_tool` + `mcp_server_oauth`) should get its own persona/
-      behavioral guidance, or stay a plain tool-augmented assistant.
-      Currently it shares the exact same `AimMemoryManager` calls and
-      guardrails as `aim_chatbot`'s Deepchat widget, with no capability
-      gap - if anything the connector is *less* restricted (any scope:
-      user/role/site/case) than the widget's hardcoded `scope: site`
-      lock. The widget has a persona (`system_prompt`) and no-login
-      public access; the connector has neither. A provisional note is
-      parked in `mcp_server.settings:server_instructions` itself -
-      resolve there too once this is decided.
-
 ## Recipes (raised 2026-09-27)
 
 - [ ] Apply `recipes/aim_demo_library` to an isolated scratch site (its
@@ -29,10 +15,22 @@ this list as exhaustive.
       schema validation. Then confirm `aim:remember --file` loads all 31
       facts and the demo questions in the site repo's `demo/README.md`
       answer as before.
-- [ ] Decide whether `aim_tool_oauth` should get a setup command (generate
+- [x] Decide whether `aim_tool_oauth` should get a setup command (generate
       the key pair, set `simple_oauth.settings` paths, verify the scopes
       and discovery URLs) instead of an `aim_mcp` recipe, which would be
-      nearly empty (see DEVELOPING.md, "Recipes").
+      nearly empty (see DEVELOPING.md, "Recipes"). DECIDED 2026-09-27: no
+      command for now, prose runbook in `modules/aim_tool_oauth/
+      DEVELOPING.md`'s "Setup" stands - PoC stage, and the
+      `user_scope_role_visibility` matrix it depends on isn't understood
+      well enough yet to script around confidently (see next item).
+- [ ] `user_scope_role_visibility` matrix: the diagonal cells (viewer role
+      R x subject role R, same role both sides) are inert under the
+      shipped default (`user_scope_shared_role_fallback: true` already
+      grants same-role visibility unconditionally) - only load-bearing if
+      an admin turns that fallback off. Decide whether the admin form at
+      `/admin/config/aim/user-scope-access` should grey out/disable the
+      diagonal while the fallback is on, to stop it looking like a live
+      control. See `AimUserScopeVisibility::checkViewAccess()`.
 - [ ] `drush aim:status`: the database-side checks from the site's
       `demo/preflight.js` (index parity, orphan rows, shim class, HNSW
       settings, cutoff set) as a module command, replacing step 6 of
@@ -169,13 +167,16 @@ questions" section)
       [#3609961](https://www.drupal.org/i/3609961) (RTBC), but its MR 8
       makes `createCollection()` drop the collection first, and the
       index-update hook calls it on every save, so it would wipe the vectors
-      on every index save. **Comment there** that `CREATE TABLE IF NOT
-      EXISTS`, or tolerating MariaDB error 1050 as the shim does, is the safe
-      fix, and do not take a provider release containing MR 8 as written;
+      on every index save. **Commented** on 2026-09-27 that `CREATE TABLE IF
+      NOT EXISTS`, or tolerating MariaDB error 1050 as the shim does, is the
+      safe fix, and not to take a provider release containing MR 8 as
+      written;
       (2) `getVdbIds()` uses `querySearch()`'s default `limit = 10`, so
-      deletes remove at most 10 rows - no issue, **to file**; (3) an empty
+      deletes remove at most 10 rows - filed as
+      [#3626257](https://www.drupal.org/i/3626257) 2026-09-27; (3) an empty
       integer/decimal/date/boolean attribute is inserted as `''`, which
-      strict mode rejects (`ERROR 1366`) - no issue, **to file**; (4)
+      strict mode rejects (`ERROR 1366`) - filed as
+      [#3626262](https://www.drupal.org/i/3626262) 2026-09-27; (4)
       optionally a BTREE index for filterable attribute columns, a feature
       request; (5) string attributes stored Markdown-escaped (`_` as `\_`,
       so `subject` filters miss) - **already fixed** by
@@ -200,10 +201,6 @@ questions" section)
       `expires` rows out of `aim_fact`) - retired facts about a person are
       still personal data. Own ADR when needed, see ADR-0022's
       Consequences.
-- [ ] Delete the 7 live site facts with NULL text (ids 144-150, created
-      2026-09-15 20:42-20:46 by uid 1, source NULL) - test residue from
-      the scope-to-bundle conversion. `text` is required now; they have no
-      vector row, so they never surface in recall, but they count as live.
 
 (DEVELOPING.md's "aim:benchmark" and "Chatbot" sections)
 

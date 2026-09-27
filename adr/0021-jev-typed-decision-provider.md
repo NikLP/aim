@@ -1,7 +1,8 @@
 # ADR-0021: Jev (TypeSafe AI) as a typed-decision provider - spike, not adoption
 
-**Status:** Proposed - researched 2026-09-26, not built. Waitlist access
-requested; nothing can be tried until a key arrives.
+**Status:** Deferred (2026-09-27) - Laya spikes first per the addendum
+below (self-hosted, no waitlist), post-DrupalCon; Jev stays queued behind
+Laya and its own waitlist. Neither spike is scheduled yet.
 **Date:** 2026-09-26
 
 ## Context

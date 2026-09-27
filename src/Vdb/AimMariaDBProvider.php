@@ -29,16 +29,17 @@ use Drupal\ai_vdb_provider_mariadb\Plugin\VdbProvider\MariaDBProvider;
  *   written and before updateFields() runs. That issue's proposed fix drops
  *   the collection on every call, which would wipe the vectors on every
  *   index save; tolerating error 1050 here is the safe one.
- * - getVdbIds(): resolves Drupal item IDs to row IDs through querySearch()
- *   with its default limit of 10, so deleteItems() and deleteIndexItems()
- *   remove at most 10 rows per call, silently leaving the rest. A batch of
- *   retirements (ADR-0022) or a sweep of stale rows would only be purged
- *   ten at a time.
- * - insertIntoCollection(): an empty search_api value reaches it as `''`
- *   (ai_search's EmbeddingBase::getValue()), which MariaDB's strict mode
- *   rejects in an INT, DECIMAL or BIGINT column (ERROR 1366), so an integer
- *   attribute that is empty for some facts, like subject_uid, would stop
- *   those facts indexing. It becomes NULL here (ADR-0018).
+ * - getVdbIds() (drupal.org #3626257): resolves Drupal item IDs to row IDs
+ *   through querySearch() with its default limit of 10, so deleteItems()
+ *   and deleteIndexItems() remove at most 10 rows per call, silently
+ *   leaving the rest. A batch of retirements (ADR-0022) or a sweep of stale
+ *   rows would only be purged ten at a time.
+ * - insertIntoCollection() (drupal.org #3626262): an empty search_api value
+ *   reaches it as `''` (ai_search's EmbeddingBase::getValue()), which
+ *   MariaDB's strict mode rejects in an INT, DECIMAL or BIGINT column
+ *   (ERROR 1366), so an integer attribute that is empty for some facts,
+ *   like subject_uid, would stop those facts indexing. It becomes NULL
+ *   here (ADR-0018).
  * - insertIntoCollection() and string attributes: ai_search's
  *   EmbeddingBase::getValue() passes every single-value string attribute
  *   through an HTML-to-Markdown converter, which escapes `_` as `\_` (and
