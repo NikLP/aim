@@ -23,14 +23,20 @@ this list as exhaustive.
       DEVELOPING.md`'s "Setup" stands - PoC stage, and the
       `user_scope_role_visibility` matrix it depends on isn't understood
       well enough yet to script around confidently (see next item).
-- [ ] `user_scope_role_visibility` matrix: the diagonal cells (viewer role
+- [x] `user_scope_role_visibility` matrix: the diagonal cells (viewer role
       R x subject role R, same role both sides) are inert under the
       shipped default (`user_scope_shared_role_fallback: true` already
       grants same-role visibility unconditionally) - only load-bearing if
-      an admin turns that fallback off. Decide whether the admin form at
-      `/admin/config/aim/user-scope-access` should grey out/disable the
-      diagonal while the fallback is on, to stop it looking like a live
-      control. See `AimUserScopeVisibility::checkViewAccess()`.
+      an admin turns that fallback off. DONE 2026-09-27: the admin form at
+      `/admin/config/aim/user-scope-access` now disables (via `#states`,
+      tied to the fallback checkbox) every diagonal cell except
+      "authenticated" x "authenticated" - that one cell turned out NOT to
+      be inert, because `checkViewAccess()`'s `$meaningfulRoles` exclusion
+      strips the "authenticated" role from both sides before intersecting,
+      specifically so two arbitrary logged-in accounts don't trivially
+      match. `submitForm()` preserves the stored value for a disabled
+      diagonal cell instead of reading it as unchecked, since a
+      client-side-disabled checkbox isn't submitted at all.
 - [ ] `drush aim:status`: the database-side checks from the site's
       `demo/preflight.js` (index parity, orphan rows, shim class, HNSW
       settings, cutoff set) as a module command, replacing step 6 of

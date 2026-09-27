@@ -13,7 +13,7 @@ aim.settings:
   weight: 0
 
 entity.aim_scope.collection:
-  title: 'AIM Scopes'
+  title: 'Scopes'
   description: 'Manage the scopes that facts can be saved under.'
   parent: aim.admin_config
   route_name: entity.aim_scope.collection

@@ -68,7 +68,7 @@ final class AimUserScopeAccessForm extends ConfigFormBase {
     $form['user_scope_shared_role_fallback'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Also allow viewing when the viewer and the subject share at least one role'),
-      '#description' => $this->t('Applies on top of the matrix below, not instead of it. With nothing checked below and this on, visibility is exactly the previous default: any shared role is enough.'),
+      '#description' => $this->t('Applies on top of the matrix below, not instead of it. With nothing checked below and this on, visibility is exactly the previous default: any shared role is enough. While this is on, a same-role diagonal cell below is greyed out because it already grants nothing the fallback does not - the "authenticated" row/column is the one exception, since the fallback deliberately ignores that shared role to avoid matching any two logged-in users.'),
       '#default_value' => $config->get('user_scope_shared_role_fallback') ?? TRUE,
     ];
 
@@ -95,6 +95,19 @@ final class AimUserScopeAccessForm extends ConfigFormBase {
           '#title_display' => 'invisible',
           '#default_value' => in_array($subjectId, $matrix[$viewerId] ?? [], TRUE),
         ];
+        // Same-role diagonal, other than "authenticated": already granted by
+        // the shared-role fallback whenever it's on, so checking it here
+        // changes nothing - see AimUserScopeVisibility::checkViewAccess()'s
+        // $meaningfulRoles exclusion for why "authenticated" itself doesn't
+        // get this treatment (the fallback deliberately ignores that shared
+        // role, since every two logged-in accounts have it).
+        if ($subjectId === $viewerId && $viewerId !== RoleInterface::AUTHENTICATED_ID) {
+          $row[$subjectId]['#states'] = [
+            'disabled' => [
+              ':input[name="user_scope_shared_role_fallback"]' => ['checked' => TRUE],
+            ],
+          ];
+        }
       }
       $form['matrix'][$viewerId] = $row;
     }
@@ -107,12 +120,23 @@ final class AimUserScopeAccessForm extends ConfigFormBase {
    */
   public function submitForm(array &$form, FormStateInterface $form_state): void {
     $roleIds = array_keys($this->entityTypeManager->getStorage('user_role')->loadMultiple());
+    $oldMatrix = $this->config('aim.settings')->get('user_scope_role_visibility') ?? [];
+    $fallback = (bool) $form_state->getValue('user_scope_shared_role_fallback');
 
     $matrix = [];
     foreach ($roleIds as $viewerId) {
       $visible = array_values(array_filter(
         $roleIds,
-        static fn (string $subjectId): bool => (bool) $form_state->getValue(['matrix', $viewerId, $subjectId]),
+        function (string $subjectId) use ($viewerId, $form_state, $fallback, $oldMatrix): bool {
+          // The diagonal checkbox (other than "authenticated") is disabled
+          // client-side while the fallback is on, so a disabled browser
+          // won't submit it at all - keep the stored value instead of
+          // reading the missing field as unchecked and erasing it.
+          if ($fallback && $subjectId === $viewerId && $viewerId !== RoleInterface::AUTHENTICATED_ID) {
+            return in_array($subjectId, $oldMatrix[$viewerId] ?? [], TRUE);
+          }
+          return (bool) $form_state->getValue(['matrix', $viewerId, $subjectId]);
+        },
       ));
       if ($visible) {
         $matrix[$viewerId] = $visible;
@@ -121,7 +145,7 @@ final class AimUserScopeAccessForm extends ConfigFormBase {
 
     $this->config('aim.settings')
       ->set('user_scope_role_visibility', $matrix)
-      ->set('user_scope_shared_role_fallback', (bool) $form_state->getValue('user_scope_shared_role_fallback'))
+      ->set('user_scope_shared_role_fallback', $fallback)
       ->save();
 
     parent::submitForm($form, $form_state);
