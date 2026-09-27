@@ -92,6 +92,7 @@ aim/                    ← root module (always required)
 │   ├── aim_chatbot/     ← ai_agents FunctionCall tools, locked scope=site
 │   ├── aim_tool/        ← Tool API + MCP exposure, any scope
 │   └── aim_tool_oauth/  ← OAuth2 scopes for remote MCP callers
+├── recipes/             ← Drupal Recipes, one dir each (aim_demo_library)
 └── adr/                 ← decision records, see 0000-index.md
 ```
 
@@ -106,6 +107,10 @@ than relying on the site shell's manifest.
 | `aim_chatbot` | `#[FunctionCall]` tools for an `ai_agents` chat assistant, hardcoded `scope: site` | [CLAUDE.md](modules/aim_chatbot/CLAUDE.md) |
 | `aim_tool` | `#[Tool]` plugins (any scope, permission-gated) exposed over Tool API and, via `mcp_server_tool_bridge`, MCP | [CLAUDE.md](modules/aim_tool/CLAUDE.md) |
 | `aim_tool_oauth` | OAuth2 scopes + third-party settings so a remote MCP client with no Drupal session can authenticate | [CLAUDE.md](modules/aim_tool_oauth/CLAUDE.md) |
+
+`recipes/` holds hand-written Recipes (not AI-generated, so outside
+[ADR-0009](adr/0009-recipe-apply-safety-gate.md)'s gate); see
+[DEVELOPING.md](DEVELOPING.md)'s "Recipes". Each has its own README.md.
 
 Each submodule carries its own README.md/CLAUDE.md/DEVELOPING.md
 alongside its `.info.yml`, same shape as this root set. This file (and

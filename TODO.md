@@ -22,6 +22,22 @@ this list as exhaustive.
       parked in `mcp_server.settings:server_instructions` itself -
       resolve there too once this is decided.
 
+## Recipes (raised 2026-09-27)
+
+- [ ] Apply `recipes/aim_demo_library` to an isolated scratch site (its
+      own database) and fix whatever breaks: it has only passed core's
+      schema validation. Then confirm `aim:remember --file` loads all 31
+      facts and the demo questions in the site repo's `demo/README.md`
+      answer as before.
+- [ ] Decide whether `aim_tool_oauth` should get a setup command (generate
+      the key pair, set `simple_oauth.settings` paths, verify the scopes
+      and discovery URLs) instead of an `aim_mcp` recipe, which would be
+      nearly empty (see DEVELOPING.md, "Recipes").
+- [ ] `drush aim:status`: the database-side checks from the site's
+      `demo/preflight.js` (index parity, orphan rows, shim class, HNSW
+      settings, cutoff set) as a module command, replacing step 6 of
+      "Upgrading an existing site".
+
 ## From the OpenKB competitor review (this thread)
 
 - [ ] Close [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s

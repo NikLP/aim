@@ -171,6 +171,10 @@ Each submodule has its own requirements and setup:
    [DEVELOPING.md](modules/aim_tool_oauth/DEVELOPING.md) for the setup
    runbook.
 
+To see it working with a story already loaded, apply the
+[community library demo recipe](recipes/aim_demo_library/README.md) to a
+fresh site (untested so far, see its README).
+
 Full command reference and the developer API are in
 [DEVELOPING.md](DEVELOPING.md).
 

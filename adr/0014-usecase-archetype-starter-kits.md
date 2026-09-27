@@ -103,6 +103,14 @@ assuming one needs to be written from scratch.
   lower-risk case (provisioning config, not generating it from an AI
   pass).
 
+**Addendum, 2026-09-27:** a first kit exists as
+`recipes/aim_demo_library/` (a fictional library, from the DrupalCon demo).
+It answers the Recipe question above for the narrow case only: the
+recipe carries config actions (persona, site identity, recall cutoff) and
+the facts load through `aim:remember --file`, not recipe default content,
+so Guardrails and indexing always run. It ships no Guardrail set or
+category terms yet, and has been schema-validated but never applied.
+
 None of the above is validated against real code or real data - the whole
 "Decision" section is a best guess to be replaced by an actual design once
 this gets prioritized, not a spec to build against as-is.

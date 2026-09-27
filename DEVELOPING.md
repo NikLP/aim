@@ -639,6 +639,46 @@ count - trivial at PoC scale, a real line item at volume.
 
 ---
 
+## Recipes
+
+`recipes/<name>/` holds Drupal Recipes for sites that want a starting
+point. Apply one from the site root (recipes are applied by path):
+
+```bash
+ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>
+```
+
+- **`aim_demo_library`**: a fictional community library (site identity,
+  chat persona, recall cutoff, `index_directly`) plus `facts.json`, loaded
+  afterwards with `drush aim:remember --file`. The first archetype starter
+  kit ([ADR-0014](adr/0014-usecase-archetype-starter-kits.md)). Details and
+  caveats in its [README](recipes/aim_demo_library/README.md).
+- **Facts are not recipe content.** A recipe's default content saves
+  entities directly, and it is unverified whether that runs Guardrails,
+  embedding and indexing. `aim:remember --file` goes through `remember()`,
+  so they always do.
+- **No `aim_mcp` recipe, deliberately.** The remote-MCP stack is already
+  shipped: `aim_tool` carries the tool configs, `aim_tool_oauth` the
+  scopes and the tool-gating settings, and the `simple_oauth`/`mcp_server`
+  defaults match what this site runs, apart from the key paths and the
+  `server_instructions` text. What is left is manual (key generation,
+  HTTPS exposure, the `provide` composer workaround), which a recipe
+  cannot do. See `aim_tool_oauth`'s [DEVELOPING.md](modules/aim_tool_oauth/DEVELOPING.md).
+- **Validate without applying** (read-only, catches schema errors and
+  config actions aimed at extensions that aren't installed):
+
+  ```bash
+  ddev drush php:eval '\Drupal\Core\Recipe\Recipe::createFromDirectory("/var/www/html/web/modules/custom/aim/recipes/<name>");'
+  ```
+
+  No output means valid. That is all that has been checked so far: no
+  recipe here has been applied to a site.
+- Config actions on config entities use `setProperties` (dotted keys reach
+  nested values without replacing the rest); `simpleConfigUpdate` is for
+  simple config like `system.site` and `aim.settings`.
+
+---
+
 ## Default content export
 
 ```bash

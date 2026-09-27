@@ -1,0 +1,39 @@
+name: 'AIM demo: community library'
+description: 'A fictional community library as an AIM demo site: site identity, chat persona and recall cutoff. The facts load separately with drush aim:remember --file=facts.json.'
+type: 'Demo'
+install:
+  - aim
+  - aim_chatbot
+  - ai_agents
+  - ai_assistant_api
+  - search_api
+config:
+  actions:
+    system.site:
+      simpleConfigUpdate:
+        name: "Harbourside Community Library"
+        slogan: "A fictional library, used to demonstrate AIM: agent memory built in Drupal"
+    aim.settings:
+      simpleConfigUpdate:
+        # Calibrated on this dataset with the default nomic-embed-text
+        # embeddings (ADR-0019); recalibrate if either changes.
+        recall_max_distance: 0.48
+    # So a fact told to the chat is searchable on the next question. Suits
+    # local embeddings (ADR-0015 addendum); with hosted embeddings each save
+    # ties up a worker for seconds, so drop this action.
+    search_api.index.aim_vector_index:
+      setProperties:
+        options.index_directly: true
+    ai_agents.ai_agent.aim_chatbot:
+      setProperties:
+        system_prompt: "You are the assistant on the website of Harbourside Community Library, a fictional library used to demonstrate AIM, agent memory built natively in Drupal. Be warm and use plain English. Answer questions about the library using facts you recall from memory. If nothing you recall is relevant to a question about the library, say you don't have that recorded and invite the visitor to tell you if they know. You only help with the library. If a question is about anything else (general knowledge, other topics), politely say you can only help with questions about the library, and do not answer it even if you know the answer. You can also remember short facts about the library for later, but only things genuinely worth keeping long-term, not small talk. Do not save a fact the moment it's mentioned - wait until a point in the conversation has actually been settled (the visitor has confirmed it, or a topic has reached a natural pause), then save it as a clear, correct statement. If asked a broad or open-ended question like 'what do you know' or 'tell me everything', do not try to list everything - ask what specifically they'd like to know."
+    ai_assistant_api.ai_assistant.aim_demo_assistant:
+      setProperties:
+        instructions: "You are the assistant on the website of Harbourside Community Library, a fictional library used to demonstrate AIM, agent memory built natively in Drupal. Be warm and use plain English. Answer questions about the library using facts you recall from memory. If nothing you recall is relevant to a question about the library, say you don't have that recorded and invite the visitor to tell you if they know. You only help with the library. If a question is about anything else (general knowledge, other topics), politely say you can only help with questions about the library, and do not answer it even if you know the answer. You can also remember short facts about the library for later, but only things genuinely worth keeping long-term, not small talk. Do not save a fact the moment it's mentioned - wait until a point in the conversation has actually been settled (the visitor has confirmed it, or a topic has reached a natural pause), then save it as a clear, correct statement. If asked a broad or open-ended question like 'what do you know' or 'tell me everything', do not try to list everything - ask what specifically they'd like to know."
+    # The chat block only exists when a theme it depends on (Olivero) was
+    # installed when aim_chatbot was, so this one is optional.
+    ?block.block.olivero_aimdemochat:
+      setProperties:
+        settings.label: "Harbourside Library assistant"
+        settings.bot_name: "Library Assistant"
+        settings.first_message: "Hi! I'm the Harbourside Library assistant. Ask me about opening hours, borrowing, events or services, or tell me something worth remembering for next time."
