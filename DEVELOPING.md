@@ -165,26 +165,18 @@ the test in [ADR-0018](adr/0018-index-subject-uid-with-btree.md).
 
 **`ai_vdb_provider_mariadb` is swapped for a thin subclass:**
 `Drupal\aim\Vdb\AimMariaDBProvider`, via `AimHooks::vdbProviderInfoAlter()`,
-works around four bugs (three in provider 1.0.1 and the 1.0.x head, one
-in `drupal/ai`'s `ai_search`; checked 2026-09-26/27) and applies HNSW
-tuning. Upstream status: the table-exists throw is #3609961 (its RTBC MR
-drops the whole collection on every index save, so do not take a provider
-release with that as written); the 10-row delete cap and the empty numeric
-value have no issue yet; the `ai_search` escaping is fixed upstream in
-#3572801 but not in the code bundled with `drupal/ai` 1.4.9 or 1.5.0. Saving the index threw
-`Table 'aim_facts' already exists` (an unhandled `mysqli_sql_exception`
-from `createCollection()`, before `updateFields()` ran);
-`deleteItems()`/`deleteIndexItems()` removed at most 10 rows per call
-(`getVdbIds()` used `querySearch()`'s default limit); and an empty
+works around three bugs in provider 1.0.1 and the 1.0.x head (checked
+2026-09-26/27) and applies HNSW tuning. Upstream status: the table-exists
+throw is #3609961 (its RTBC MR drops the whole collection on every index
+save, so do not take a provider release with that as written); the
+10-row delete cap and the empty numeric value have no issue yet. Saving
+the index threw `Table 'aim_facts' already exists` (an unhandled
+`mysqli_sql_exception` from `createCollection()`, before `updateFields()`
+ran); `deleteItems()`/`deleteIndexItems()` removed at most 10 rows per
+call (`getVdbIds()` used `querySearch()`'s default limit); and an empty
 integer/decimal/date/boolean attribute reached the insert as `''`, which
 strict mode rejects in a numeric column (`ERROR 1366`), so it is set to
-`NULL` there. The fourth is in `ai_search`: `EmbeddingBase::getValue()`
-runs every single-value string attribute through an HTML-to-Markdown
-converter, which stores `content_editor` as `content\_editor` (an upstream bug fixed in #3572801, see above), so an
-exact-match filter on any value with an underscore (a real Drupal role ID
-as a role fact's `subject`) never matches and consolidation finds no
-neighbors for it; the shim writes the raw Search API value instead. The
-class also has `ensureColumnIndex()`, aim's own BTREE
+`NULL` there. The class also has `ensureColumnIndex()`, aim's own BTREE
 helper (below). **It is a shim:** each override needs an upstream issue in
 TODO.md and goes when the provider releases the fix, and aim ships tuned
 values under the provider's own config key names rather than inventing
@@ -194,6 +186,55 @@ returns, check the alter hook still applies
 (`ddev drush php:eval 'echo get_class(\Drupal::service("ai.vdb_provider")->createInstance("mariadb"));'`
 should print the aim class). Bug details in
 [ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md).
+
+**A fourth override (string attributes written Markdown-escaped) was
+removed 2026-09-27**, after the site moved from `ai_search` as bundled
+inside `drupal/ai` 1.4.9 to the standalone `drupal/ai_search:^1.3@alpha`
+package (1.3.0-alpha5), which carries the upstream fix (#3572801). See
+"Upgrading to standalone `ai_search`" below for that migration; the
+removed override is documented for provenance in
+[ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md).
+
+### Upgrading to standalone `ai_search`
+
+`ai_search` split out of `drupal/ai` into its own drupal.org project;
+the copy still bundled inside `drupal/ai` (`web/modules/contrib/ai/modules/ai_search`)
+is deprecated (critical fixes only). The standalone 1.x line stays
+compatible with `drupal/ai` 1.x (`requires: drupal/ai ^1.3`, `conflicts:
+drupal/ai <1.3`) - no need to move `drupal/ai` itself to 2.x, which the
+standalone 2.x line would require instead.
+
+```bash
+ddev composer require 'drupal/ai_search:^1.3@alpha'
+rm -rf web/modules/contrib/ai/modules/ai_search
+ddev drush cr
+ddev drush updatedb -y
+```
+
+Two gotchas hit doing this 2026-09-27:
+
+- The two `ai_search` copies share the machine name `ai_search`, which
+  Composer's `conflicts` can't express (it's a subdirectory of another
+  package, not a separate one) - deleting the old bundled copy is a
+  manual step, same as the standalone project's own CI does.
+- `ai_search` 1.3.0-alpha5 ships four `hook_update_N()`s (chunk-tracking
+  columns, RAG access-control config, `max_pager_iterations`, and one
+  specifically for "submodule collision" migrations) - `drush updatedb`
+  is required, not just a cache rebuild.
+
+If the vector collection table gets rebuilt from scratch after this
+(for example, `drush search-api:clear` genuinely drops it), the
+attribute columns (`scope`, `subject_uid`, etc.) only come back when the
+index entity itself is re-saved - a plain reindex does not re-run
+`updateFields()`:
+
+```bash
+ddev drush php:eval '\Drupal\search_api\Entity\Index::load("aim_vector_index")->save();'
+ddev drush sapi-i aim_vector_index
+```
+
+Verify with `drush aim:status` and a real `drush aim:recall`/
+`drush aim:consolidate --dry-run` afterward.
 
 **Tuning vector search accuracy (HNSW):** MariaDB's defaults (`M=6`,
 `mhnsw_ef_search=20`) missed 3-12% of the true nearest facts on a 5,000-row
@@ -268,12 +309,35 @@ round trip. Local Ollama (`nomic-embed-text`), same checkpoints: 33-35ms,
 ~15x faster - confirms the network-hop theory rather than the SQL/HNSW
 layer being the cost. Not yet run at thousands-of-facts scale.
 
-**Recommended next fix, not built:** cache query embeddings via Drupal's
-Cache API, keyed on (query text, embeddings model ID) - deterministic
-mapping, no invalidation needed. Complementary to local Ollama, not a
-substitute - caching helps repeat queries, a local model helps every
-query. Designed in [ADR-0017](adr/0017-query-embedding-cache.md): an
-event subscriber on drupal/ai's provider events, query-time embeds only.
+**Query-embedding cache, built 2026-09-27:** `Drupal\aim\EventSubscriber\
+AimEmbeddingCacheSubscriber` (registered in `aim.services.yml`, tagged
+`event_subscriber`), keyed on (provider ID, model ID, provider
+configuration, query text), in a dedicated `cache.aim_embeddings` bin
+(DB-backed, no Redis on this site). Active only for the duration of
+`AimMemoryManager::executeSearchQuery()` - toggled on and off around
+`$query->execute()` - so index-time embeds are never read from or
+written to it; `ai_search` gives query-time and index-time embeds the
+same operation type and tag set otherwise, so this is the only reliable
+way to tell them apart. Design and alternatives considered in
+[ADR-0017](adr/0017-query-embedding-cache.md), including why the fact's
+own already-indexed vector can't be reused directly instead (blocked on
+`ai_vdb_provider_mariadb`, see "Upgrading to standalone `ai_search`"
+above).
+
+Also logs a hit/miss line and, on a miss, the provider call's own
+duration - the embed-time vs. DB-search-time split previously only
+inferred from `aim:benchmark`'s one aggregate number. Verified live: two
+identical `aim:recall` calls logged a miss then a hit with identical
+results; the missed call's embed cost logged as 556ms on this site's
+local Ollama, noticeably higher than `aim:benchmark`'s 33-35ms aggregate
+above - worth knowing before treating that aggregate as a per-call
+guarantee.
+
+`aim:benchmark` gained `--bypass-cache`: its sample queries repeat every
+`--queries` iterations within a checkpoint, so without it, repeats after
+the first silently become cache hits and the numbers stop being
+comparable to the 2026-09-10 measurements above or to a run with a
+different `--queries` value.
 
 ### `aim:status` - database-side health checks
 

@@ -1,6 +1,6 @@
 # ADR-0017: Cache query embeddings via a drupal/ai event subscriber
 
-**Status:** Proposed - designed, not built
+**Status:** Accepted - built and verified 2026-09-27
 **Date:** 2026-09-20
 
 ## Context
@@ -66,6 +66,19 @@ provider events.** No contrib patch, no decorated service.
 
 - **Cache inside `recall()`.** Not possible without re-implementing the
   backend's query path: aim never holds the vector.
+- **Reuse the fact's own stored vector via `vector_input`, skipping the
+  embed call entirely instead of caching it.** Re-examined 2026-09-27
+  after the site moved to standalone `ai_search` 1.3.0-alpha5, which adds
+  exactly this as a public option (`$query->setOption('vector_input',
+  $vector)`, read by `SearchApiAiSearchBackend::getSearchVectorInput()`).
+  Still blocked: getting the fact's already-indexed vector back out of
+  `aim_facts` requires the VDB provider's `getRawEmbeddingFieldName()`,
+  which `ai_vdb_provider_mariadb`'s `MariaDBProvider` does not implement
+  (inherits the interface's default `NULL`). Without a stored vector to
+  hand it, `vector_input` only accepts a freshly embedded one - the same
+  cost as `->keys()`, no saving. Tracked in TODO.md as a feature request
+  to file; revisit this alternative if it lands, since it would eliminate
+  the redundant embed rather than just caching it.
 - **Patch `ai_search`.** aim is headed for drupal.org as an independent
   project (see CLAUDE.md), and a patch in its own `composer.json` would
   not reliably reach consumer sites.
@@ -98,8 +111,12 @@ provider events.** No contrib patch, no decorated service.
   can leak information about their source text and these derive from user
   queries. Fine under CLAUDE.md's non-classified assumption; worth knowing
   before pointing the bin at a shared backend.
-- Depends on drupal/ai's `setForcedOutputObject()` contract. A kernel test
-  pins it.
+- Depends on drupal/ai's `setForcedOutputObject()` contract. Not pinned by
+  a kernel test (see "Built 2026-09-27" below) - if a future drupal/ai
+  release changes that contract, the failure mode is silent (the
+  subscriber's forced output is ignored, every call falls through to the
+  real provider), not a hard error, so watch for it if `ai`'s version
+  bumps and this cache's hit-rate logging goes quiet.
 
 ## Implementation outline
 
@@ -116,3 +133,36 @@ provider events.** No contrib patch, no decorated service.
   and mark this ADR Accepted.
 - Left to build time: the TTL value, the bypass flag's name, and whether
   the TTL belongs in `aim.settings`.
+
+## Built 2026-09-27
+
+All of the above, as designed, with two deviations:
+
+- **No kernel test.** aim has no test infrastructure yet (checked before
+  starting - no `tests/` directory anywhere in the module), and a kernel
+  test exercising this subscriber would need `aim` fully installed,
+  pulling in its whole dependency chain (`ai_search`, `ai_vdb_provider_mariadb`,
+  `search_api`, `taxonomy`) just to test a subscriber whose own
+  dependencies are three generic Drupal services. Verified live instead,
+  against the real site and the real event dispatcher: confirmed the
+  service resolves and is tagged for both `ai.pre_generate_response` and
+  `ai.post_generate_response`; ran two identical `aim:recall` calls and
+  confirmed a logged miss then hit with identical results both times (the
+  cached vector produces the same search results as a fresh embed); ran
+  `aim:consolidate --dry-run` and `aim:benchmark --bypass-cache`
+  afterward and got the same output as before this change. A kernel test
+  is still worth adding once the module has test infrastructure for
+  anything else - own TODO.md item.
+- **TTL is a class constant** (`AimEmbeddingCacheSubscriber::TTL`, 7
+  days), not an `aim.settings` value - nothing in "left to build time"
+  argued for admin-editable over hardcoded, and every other value this
+  ADR discusses (the bypass flag's name, the cache bin name) stayed a
+  code-level decision too.
+
+Real finding from the instrumentation (decision 5): a single missed
+embed call on this site's local Ollama logged 556ms - well above the
+33-35ms `aim:benchmark` aggregate (DEVELOPING.md, "Benchmarking"). The
+aggregate is a real average across many calls in one warm process; a
+single call, especially the first in a fresh `drush` bootstrap, can cost
+much more. Worth knowing before treating "local Ollama recall() is
+~35ms" as a per-call guarantee rather than a steady-state average.

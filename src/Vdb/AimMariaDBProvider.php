@@ -10,7 +10,7 @@ use Drupal\ai_vdb_provider_mariadb\Exception\CreateCollectionException;
 use Drupal\ai_vdb_provider_mariadb\Plugin\VdbProvider\MariaDBProvider;
 
 /**
- * The MariaDB vector provider, minus four bugs and plus HNSW tuning.
+ * The MariaDB vector provider, minus three bugs and plus HNSW tuning.
  *
  * A shim over ai_vdb_provider_mariadb, swapped in by
  * AimHooks::vdbProviderInfoAlter(). Verified against 1.0.1 and the 1.0.x
@@ -40,17 +40,6 @@ use Drupal\ai_vdb_provider_mariadb\Plugin\VdbProvider\MariaDBProvider;
  *   (ERROR 1366), so an integer attribute that is empty for some facts,
  *   like subject_uid, would stop those facts indexing. It becomes NULL
  *   here (ADR-0018).
- * - insertIntoCollection() and string attributes: ai_search's
- *   EmbeddingBase::getValue() passes every single-value string attribute
- *   through an HTML-to-Markdown converter, which escapes `_` as `\_` (and
- *   other Markdown characters). The stored value then never equals the
- *   value a query filters on, so `subject = 'content_editor'` matches
- *   nothing, and consolidation's neighbor search silently finds no
- *   neighbors for such a fact. The raw Search API value is written instead.
- *   Fixed upstream in ai_search by #3572801 (ai_search 1.3.0-alpha5 and
- *   2.0.0-alpha2, and drupal/ai's 1.x head), but not in the ai_search code
- *   bundled with drupal/ai 1.4.9 or 1.5.0, so it stays until the site has
- *   that code.
  * - createCollection() and vectorSearch(): MariaDB's HNSW defaults (M=6,
  *   ef_search=20) missed 3-12% of the true nearest facts in testing. M=16
  *   is applied to new collections and mhnsw_ef_search from the server's
@@ -81,13 +70,6 @@ class AimMariaDBProvider extends MariaDBProvider {
    * @var \Drupal\search_api\IndexInterface|null
    */
   protected $indexBeingWritten;
-
-  /**
-   * The items being written by indexItems(), keyed by Search API item ID.
-   *
-   * @var \Drupal\search_api\Item\ItemInterface[]
-   */
-  protected array $itemsBeingWritten = [];
 
   /**
    * {@inheritdoc}
@@ -202,16 +184,11 @@ class AimMariaDBProvider extends MariaDBProvider {
     EmbeddingStrategyInterface $embedding_strategy,
   ): array {
     $this->indexBeingWritten = $index;
-    $this->itemsBeingWritten = [];
-    foreach ($items as $item) {
-      $this->itemsBeingWritten[$item->getId()] = $item;
-    }
     try {
       return parent::indexItems($configuration, $index, $items, $embedding_strategy);
     }
     finally {
       $this->indexBeingWritten = NULL;
-      $this->itemsBeingWritten = [];
     }
   }
 
@@ -224,20 +201,12 @@ class AimMariaDBProvider extends MariaDBProvider {
     ?string $database = NULL,
   ): void {
     if ($this->indexBeingWritten) {
-      $item = $this->itemsBeingWritten[$data['drupal_entity_id']['value'] ?? ''] ?? NULL;
       foreach ($this->indexBeingWritten->getFields() as $field_id => $field) {
         if (!isset($data[$field_id]) || $data[$field_id]['is_multiple']) {
           continue;
         }
         if ($data[$field_id]['value'] === '' && in_array($field->getType(), self::NUMERIC_FIELD_TYPES, TRUE)) {
           $data[$field_id]['value'] = NULL;
-        }
-        elseif ($field->getType() === 'string' && $item?->getField($field_id)) {
-          // The raw value, not the Markdown-escaped one (class docblock).
-          $values = $item->getField($field_id)->getValues();
-          if (count($values) === 1) {
-            $data[$field_id]['value'] = mb_substr((string) reset($values), 0, 255);
-          }
         }
       }
     }

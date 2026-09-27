@@ -16,6 +16,7 @@ services:
       - '@uuid'
       - '@config.factory'
       - '@current_user'
+      - '@aim.embedding_cache_subscriber'
 
   # Class alias so autowired consumers (the auto-registered AimHooks
   # service, src/Hook/AimHooks.php) can type-hint AimMemoryManager
@@ -23,3 +24,33 @@ services:
   # its own AnnotationStorageService.
   Drupal\aim\Service\AimMemoryManager:
     alias: aim.memory_manager
+
+  # ADR-0017's dedicated cache bin for query-time embeddings, kept separate
+  # from cache.default so it can be flushed or redirected to another
+  # backend on its own. Database-backed, same as cache.default on this
+  # site (no Redis) - see AimEmbeddingCacheSubscriber.
+  cache.aim_embeddings:
+    class: Drupal\Core\Cache\CacheBackendInterface
+    tags:
+      - { name: cache.bin }
+    factory: cache_factory:get
+    arguments: [aim_embeddings]
+
+  logger.channel.aim:
+    class: Drupal\Core\Logger\LoggerChannel
+    factory: logger.factory:get
+    arguments: ['aim']
+
+  aim.embedding_cache_subscriber:
+    class: Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber
+    arguments:
+      - '@cache.aim_embeddings'
+      - '@datetime.time'
+      - '@logger.channel.aim'
+    tags:
+      - { name: event_subscriber }
+
+  # Class alias, same reason as AimMemoryManager's above - AimCommands
+  # type-hints this directly to toggle aim:benchmark's cache bypass.
+  Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber:
+    alias: aim.embedding_cache_subscriber

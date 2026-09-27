@@ -23,6 +23,7 @@ use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\aim\Entity\AimFact;
+use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
 use Drupal\search_api\IndexInterface;
 use Drupal\search_api\Query\QueryInterface as SearchApiQueryInterface;
 use Drupal\search_api\Query\ResultSetInterface;
@@ -181,6 +182,9 @@ class AimMemoryManager {
    *   authenticated caller (Tool API/MCP, an interactive admin) apart from
    *   an anonymous one (drush, cron) - only the latter needs the
    *   search_api_bypass_access treatment that method exists for.
+   * @param \Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber $embeddingCache
+   *   The query-embedding cache subscriber (ADR-0017), activated by
+   *   executeSearchQuery() for the duration of a query's execute() call.
    */
   public function __construct(
     protected AiProviderPluginManager $aiProvider,
@@ -192,6 +196,7 @@ class AimMemoryManager {
     protected UuidInterface $uuid,
     protected ConfigFactoryInterface $configFactory,
     protected AccountProxyInterface $currentUser,
+    protected AimEmbeddingCacheSubscriber $embeddingCache,
   ) {}
 
   /**
@@ -561,7 +566,16 @@ class AimMemoryManager {
     if ($this->currentUser->isAnonymous()) {
       $query->setOption('search_api_bypass_access', TRUE);
     }
-    return $query->execute();
+    // ADR-0017: cache query-time embeddings for the duration of this call
+    // only, so index-time embeds (never routed through this method) are
+    // never read from or written to the cache.
+    $this->embeddingCache->setActive(TRUE);
+    try {
+      return $query->execute();
+    }
+    finally {
+      $this->embeddingCache->setActive(FALSE);
+    }
   }
 
   /**

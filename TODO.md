@@ -124,20 +124,34 @@ questions" section)
       auto-creates one.
 - [ ] Extraction-input guardrailing, distinct from the existing output-side
       candidate-fact guardrails.
-- [ ] Cache query embeddings via Drupal's Cache API, keyed on (query text,
-      embeddings model ID) - nearly free (deterministic mapping, no
-      invalidation needed), and the direct fix for the 450-540ms `recall()`
-      latency the benchmark measured 2026-09-10. This site has no Redis
-      today (`cache.default` is `DatabaseBackend`) - start DB-backed, add
-      Redis only if that itself becomes a bottleneck. Complementary to
-      local Ollama embeddings, not a substitute - caching helps repeat
-      queries, a local model helps every query. Design and decision in
-      [ADR-0017](adr/0017-query-embedding-cache.md) (drupal/ai event
-      subscriber, query-time embeds only).
-- [ ] Instrument `recall()` to log embed-time vs. DB-search-time separately,
+- [x] Cache query embeddings via Drupal's Cache API, keyed on (query text,
+      embeddings model ID) - BUILT 2026-09-27 as designed in
+      [ADR-0017](adr/0017-query-embedding-cache.md): `AimEmbeddingCacheSubscriber`
+      on drupal/ai's `PreGenerateResponseEvent`/`PostGenerateResponseEvent`,
+      active only for the duration of `AimMemoryManager::executeSearchQuery()`
+      (so index-time embeds are never cached), dedicated `cache.aim_embeddings`
+      bin, DB-backed. Verified live: two identical `aim:recall` calls logged
+      a miss then a hit, with identical results both times; the missed
+      call's own embed cost logged as 556ms on this site's local Ollama -
+      notably higher than the 33-35ms `aim:benchmark` aggregate, a real
+      finding from the instrumentation below. `aim:benchmark` gained
+      `--bypass-cache` so its numbers stay comparable to the 2026-09-10
+      measurements (sample queries otherwise repeat within a checkpoint
+      and would silently become cache hits).
+- [x] Instrument `recall()` to log embed-time vs. DB-search-time separately,
       before further latency work - confirms the split rather than
-      inferring it from one aggregate number. ADR-0017's subscriber
-      logging covers this.
+      inferring it from one aggregate number. BUILT 2026-09-27 as part of
+      `AimEmbeddingCacheSubscriber` (above): logs a hit/miss line and, on a
+      miss, the provider call's own duration.
+- [ ] The whole module has no test infrastructure yet (no `tests/`
+      directory, checked 2026-09-27 building `AimEmbeddingCacheSubscriber`
+      above) - first real gap is a kernel test for that subscriber (a
+      second identical query makes zero provider calls, an index-time
+      embed is not cached, a different model ID misses), deferred at
+      build time rather than standing up a test harness from scratch for
+      one class. Verified live instead - see ADR-0017's "Built
+      2026-09-27". Whatever sets up `tests/src/Kernel` first should cover
+      this too.
 - [ ] Fast-path lookup for typed facts (`state`, `category`), bypassing
       `recall()`'s vector search entirely. Both fields are exact-match
       (scope+subject), not fuzzy semantic - but everything, including a
@@ -188,11 +202,13 @@ questions" section)
       [#3626262](https://www.drupal.org/i/3626262) 2026-09-27; (4)
       optionally a BTREE index for filterable attribute columns, a feature
       request; (5) string attributes stored Markdown-escaped (`_` as `\_`,
-      so `subject` filters miss) - **already fixed** by
+      so `subject` filters miss) - **DONE 2026-09-27**: fixed upstream by
       [#3572801](https://www.drupal.org/i/3572801) in ai_search 1.3.0-alpha5
-      / 2.0.0-alpha2 and `drupal/ai`'s 1.x head, not in the code bundled with
-      `drupal/ai` 1.4.9 or 1.5.0; nothing to file, drop the shim override
-      once the site has that code.
+      / 2.0.0-alpha2 and `drupal/ai`'s 1.x head, not in the code bundled
+      with `drupal/ai` 1.4.9 or 1.5.0 - the site moved from that bundled
+      copy to the standalone `drupal/ai_search:^1.3@alpha` package
+      (DEVELOPING.md, "Upgrading to standalone `ai_search`") and removed
+      the shim override.
       The two tuning overrides (M, ef_search) go as soon as a provider
       release includes [#3605665](https://www.drupal.org/i/3605665) (merged
       on the 1.0.x head, one commit past 1.0.1, not yet released);
@@ -200,6 +216,23 @@ questions" section)
       When the last override goes, delete the class and
       `AimHooks::vdbProviderInfoAlter()`. See
       [ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md).
+- [ ] `ai_vdb_provider_mariadb`'s `MariaDBProvider` does not implement
+      `getRawEmbeddingFieldName()` (inherits `AiVdbProviderClientBase`'s
+      default, which returns `NULL`; checked 2026-09-27) - a feature
+      request to file. Standalone `ai_search` 1.3.0-alpha5 added a real
+      `vector_input` query option (`$query->setOption('vector_input',
+      $vector)`, read by `SearchApiAiSearchBackend::getSearchVectorInput()`)
+      that skips the provider's embed call when the caller already has a
+      vector - explored 2026-09-27 as a way to stop
+      `findNearestNeighbor()` re-embedding each fact's own text on every
+      consolidation sweep (see [ADR-0017](adr/0017-query-embedding-cache.md)),
+      by feeding it the fact's own already-indexed vector. Blocked: with
+      `getRawEmbeddingFieldName()` unimplemented for MariaDB, there is no
+      way to read a fact's already-stored vector back out of `aim_facts`
+      through the supported provider API, so `vector_input` has nothing
+      to be given except a freshly embedded vector - no cheaper than
+      `->keys()`. ADR-0017's embedding cache remains the correct near-term
+      fix; revisit `vector_input` once this is filed and fixed.
 - [ ] Recheck the HNSW tuning (M=16, ef_search=100) when the table grows
       about tenfold, the embeddings model or dimensions change, or the
       provider is upgraded. Method in DEVELOPING.md, "Rechecking accuracy".

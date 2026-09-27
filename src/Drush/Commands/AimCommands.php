@@ -8,6 +8,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\ai\AiVdbProviderPluginManager;
 use Drupal\aim\Entity\AimFact;
+use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Vdb\AimMariaDBProvider;
 use Drush\Attributes as CLI;
@@ -42,6 +43,9 @@ final class AimCommands extends DrushCommands {
    * @param \Drupal\ai\AiVdbProviderPluginManager $vdbProviders
    *   The VDB provider plugin manager, used by aim:status to confirm
    *   AimMariaDBProvider is still swapped in.
+   * @param \Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber $embeddingCache
+   *   The query-embedding cache subscriber (ADR-0017), used by
+   *   aim:benchmark's --bypass-cache option.
    */
   public function __construct(
     protected AimMemoryManager $memoryManager,
@@ -49,6 +53,7 @@ final class AimCommands extends DrushCommands {
     protected ConfigFactoryInterface $configFactory,
     #[Autowire(service: 'ai.vdb_provider')]
     protected AiVdbProviderPluginManager $vdbProviders,
+    protected AimEmbeddingCacheSubscriber $embeddingCache,
   ) {
     parent::__construct();
   }
@@ -478,6 +483,13 @@ final class AimCommands extends DrushCommands {
    * fact, at reindex time - no reasoning/LLM calls anywhere in this
    * command, cost is predictable up front.
    *
+   * --bypass-cache disables ADR-0017's query-embedding cache for the
+   * whole run: the sample queries repeat every `--queries` iterations
+   * within a checkpoint, so without it every repeat after the first
+   * becomes a cache hit and the numbers stop being comparable to earlier
+   * measurements (recorded with no cache in place) or to a differently-
+   * sized `--queries` run.
+   *
    * @param array $options
    *   Command options.
    */
@@ -486,13 +498,16 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'checkpoints', description: 'Comma-separated cumulative fact counts to measure at.')]
   #[CLI\Option(name: 'queries', description: 'How many timed recall() calls to run at each checkpoint.')]
   #[CLI\Option(name: 'cleanup', description: 'Delete every fact this run created once the benchmark finishes.')]
+  #[CLI\Option(name: 'bypass-cache', description: 'Disable the query-embedding cache for this run, so repeat sample queries are not served from it.')]
   #[CLI\Usage(name: 'drush aim:benchmark --checkpoints=50,200,500 --cleanup', description: 'Generate up to 500 site-scope facts in three steps, timing recall() at each, then remove them all.')]
+  #[CLI\Usage(name: 'drush aim:benchmark --bypass-cache', description: 'Measure uncached recall() latency, comparable to earlier ADR-0017 measurements.')]
   public function benchmark(
     array $options = [
       'scope' => 'site',
       'checkpoints' => '50,200,500',
       'queries' => 10,
       'cleanup' => FALSE,
+      'bypass-cache' => FALSE,
     ],
   ): void {
     $scope = $options['scope'];
@@ -525,36 +540,45 @@ final class AimCommands extends DrushCommands {
 
     $this->io()->note("Run tag: $runTag. Bypasses guardrails and consolidation (synthetic text needs neither) - the only real cost is one embedding-API call per fact at reindex time.");
 
+    if (!empty($options['bypass-cache'])) {
+      $this->embeddingCache->setBypassed(TRUE);
+    }
+
     $rows = [];
     $createdSoFar = 0;
-    foreach ($checkpoints as $target) {
-      if ($target > $createdSoFar) {
-        $this->memoryManager->generateBenchmarkFacts($scope, $target - $createdSoFar, $runTag, $subjectUids);
-        $createdSoFar = $target;
-      }
-
-      $indexStart = microtime(TRUE);
-      $indexed = $this->memoryManager->reindex();
-      $indexMs = (int) round((microtime(TRUE) - $indexStart) * 1000);
-
-      $subjectUid = $scope === 'user' ? (string) $subjectUids[array_rand($subjectUids)] : NULL;
-      $timings = [];
-      for ($i = 0; $i < $queryCount; $i++) {
-        $start = microtime(TRUE);
-        try {
-          $this->memoryManager->recall($sampleQueries[$i % count($sampleQueries)], $scope, NULL, $subjectUid, 10);
+    try {
+      foreach ($checkpoints as $target) {
+        if ($target > $createdSoFar) {
+          $this->memoryManager->generateBenchmarkFacts($scope, $target - $createdSoFar, $runTag, $subjectUids);
+          $createdSoFar = $target;
         }
-        catch (\InvalidArgumentException | \RuntimeException $e) {
-          $this->io()->error($e->getMessage());
-          return;
-        }
-        $timings[] = (microtime(TRUE) - $start) * 1000;
-      }
-      sort($timings);
-      $avg = (int) round(array_sum($timings) / count($timings));
-      $p95 = (int) round($timings[(int) floor(0.95 * (count($timings) - 1))]);
 
-      $rows[] = [$createdSoFar, $indexed ?? 'n/a', $indexMs, $avg, $p95];
+        $indexStart = microtime(TRUE);
+        $indexed = $this->memoryManager->reindex();
+        $indexMs = (int) round((microtime(TRUE) - $indexStart) * 1000);
+
+        $subjectUid = $scope === 'user' ? (string) $subjectUids[array_rand($subjectUids)] : NULL;
+        $timings = [];
+        for ($i = 0; $i < $queryCount; $i++) {
+          $start = microtime(TRUE);
+          try {
+            $this->memoryManager->recall($sampleQueries[$i % count($sampleQueries)], $scope, NULL, $subjectUid, 10);
+          }
+          catch (\InvalidArgumentException | \RuntimeException $e) {
+            $this->io()->error($e->getMessage());
+            return;
+          }
+          $timings[] = (microtime(TRUE) - $start) * 1000;
+        }
+        sort($timings);
+        $avg = (int) round(array_sum($timings) / count($timings));
+        $p95 = (int) round($timings[(int) floor(0.95 * (count($timings) - 1))]);
+
+        $rows[] = [$createdSoFar, $indexed ?? 'n/a', $indexMs, $avg, $p95];
+      }
+    }
+    finally {
+      $this->embeddingCache->setBypassed(FALSE);
     }
 
     $this->io()->table(['Facts', 'Indexed this batch', 'Reindex ms', 'Recall avg ms', 'Recall p95 ms'], $rows);
@@ -697,7 +721,10 @@ final class AimCommands extends DrushCommands {
     // only their combination hides it (checked against 2026-09-27 live
     // data). ANSI_QUOTES alone keeps it and still double-quotes
     // identifiers, matching what {aim_facts} substitutes to here, so swap
-    // to that for this one query and restore afterward.
+    // to that for this one query and restore afterward. The M attribute's
+    // case also varies (`M` in DDL written explicitly, `m` when MariaDB
+    // applies createCollection()'s SET SESSION mhnsw_default_m and
+    // re-serializes it) - the match below is case-insensitive.
     $originalMode = (string) $this->database->query('SELECT @@SESSION.sql_mode')->fetchField();
     $this->database->query('SET SESSION sql_mode = :mode', [':mode' => 'ANSI_QUOTES']);
     try {
@@ -706,7 +733,7 @@ final class AimCommands extends DrushCommands {
     finally {
       $this->database->query('SET SESSION sql_mode = :mode', [':mode' => $originalMode]);
     }
-    $m = preg_match('/VECTOR KEY[^\n]*["`]M["`]=\'?(\d+)/', $createTable, $matches) ? (int) $matches[1] : NULL;
+    $m = preg_match('/VECTOR KEY[^\n]*["`]M["`]=\'?(\d+)/i', $createTable, $matches) ? (int) $matches[1] : NULL;
     $efSearch = $this->configFactory->get('search_api.server.aim_vector')->get('backend_config.database_settings.mhnsw_ef_search');
 
     $problems = [];

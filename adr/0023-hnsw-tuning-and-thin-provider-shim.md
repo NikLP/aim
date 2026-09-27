@@ -94,8 +94,17 @@ provider it extends. The rule:
 | Empty numeric value inserted as `NULL` | Generic bug fix | Unfixed; no issue found, to file |
 | M applied to new collections | Generic feature | In 1.0.x head, unreleased |
 | `ef_search` applied per query | Generic feature | In 1.0.x head, unreleased |
-| String attributes written raw, not Markdown-escaped (`content_editor` was stored as `content\_editor`, so `subject` filters missed) | Generic bug fix, in `drupal/ai`'s `ai_search` rather than the provider | Already fixed upstream by #3572801 (ai_search 1.3.0-alpha5, 2.0.0-alpha2, drupal/ai 1.x head); the bundled code in drupal/ai 1.4.9 and 1.5.0 predates it. Do not file; remove when the site has the fix |
 | `ensureColumnIndex()` BTREE on a column | Generic feature, aim picks the column | Feature request to file |
+
+**Removed 2026-09-27:** a fifth row, string attributes written raw
+instead of Markdown-escaped (`content_editor` was stored as
+`content\_editor`, so `subject` filters missed), was fixed upstream (see
+#3572801) in `ai_search` 1.3.0-alpha5/2.0.0-alpha2 but not in the code
+bundled with `drupal/ai` 1.4.9/1.5.0. The site moved from that bundled
+copy to the standalone `drupal/ai_search:^1.3@alpha` package (see
+DEVELOPING.md, "Upgrading to standalone `ai_search`"), which carries the
+fix, so the override was deleted from `AimMariaDBProvider` per this
+ADR's own rule.
 
 Alternatives considered:
 
