@@ -104,6 +104,39 @@ until the spike has a result.**
 - Threshold recalibration per provider (ADR-0005) applies to Jev's
   confidence values as well.
 
+## Addendum (2026-09-27): Laya, an open-source alternative
+
+Convai Innovations released Laya on 2026-09-18, three days after Jev:
+Apache 2.0, weights and code public. Same shape as Jev - a state plus
+typed questions, calibrated probabilities back - but self-hosted: a
+ModernBERT-large checkpoint (about 421M parameters) run via ONNX
+Runtime, no waitlist, no per-token cost. A Node/TypeScript runner
+exists (`receptron/laya` on GitHub). As with the Jev findings above,
+this comes from public coverage and a third-party benchmark, not from
+running it against `aim`.
+
+The third-party numbers (not vendor-run, not head-to-head with Jev on
+the same suite): about 33ms per call on a T4 GPU, 7ms batched; a
+fine-tuned accuracy of 0.766 against Jev's reported 0.727; a
+calibration error of 0.081 after per-question temperature refitting
+against Jev's reported 0.246. The zero-shot base model scores 0.362,
+below a 0.461 majority-class baseline, so fine-tuning on labeled data
+is required before it is usable at all, not optional. Accuracy drops
+sharply past about 20 answer options on a Choice question, and the
+English checkpoint's context is 512 tokens.
+
+This changes the spike's priority, not the decision. Laya fits
+[ADR-0004](0004-sovereignty-and-poc-build-order.md)'s sovereignty
+requirement directly, self-hosted with no hosted-provider dependency,
+where Jev is hosted-only and still waitlisted. Spike Laya first, on the
+same benchmark harness and the same synthetic/hand-labeled fact pairs
+already specified above; keep Jev queued behind waitlist access as a
+comparison, not a blocker. `classifyPair()`'s four-way decision is
+under Laya's roughly-20-option cardinality limit, so that limit does
+not rule it out. The fine-tuning requirement does change the spike's
+shape: it needs a labeled training set before Laya can be evaluated at
+all, which is more up front work than calling a hosted API.
+
 ## Open questions
 
 1. **Retention and training policy.** Unanswered. Blocks any real data.
