@@ -47,14 +47,17 @@ drush aim:remember <text> [--scope] [--subject] [--source] [--state] [--category
 ### `aim:recall` - semantic query
 
 ```bash
-drush aim:recall <text> [--scope] [--subject] [--subject-uid] [--limit] [--format]
+drush aim:recall <text> [--scope] [--subject] [--subject-uid] [--limit] [--max-distance] [--format]
 ```
 
 Real semantic query against `aim_vector_index`. `--format=json` for a
 parsing caller. **`score` is a cosine *distance*, not a similarity** -
 0.0 for an identical embedding, larger the less similar; lower is a
 better match. The table column is labeled `Distance`; the JSON key stays
-`score` to match search_api's own naming.
+`score` to match search_api's own naming. Raw by default (the nearest
+facts however far, which is what calibrating the cutoff needs);
+`--max-distance=0.45` drops matches past that distance, as the chatbot and
+the MCP tool do by default with `aim.settings:recall_max_distance`.
 
 Both commands live on `AimCommands`, backed by `AimMemoryManager` (also
 used by `aim_tool` and the chatbot).
@@ -118,7 +121,8 @@ each new fact right after save. Carries no `cron` key, so
 ```
 
 `processItem()` reindexes before consolidating (`index_directly` is off
-by default, so a just-written fact isn't searchable yet without this).
+in the shipped config, so a just-written fact isn't searchable yet without
+this; see the `index_directly` note under "Vector search").
 Throws `SuspendQueueException` if no default chat provider is configured
 - the runner releases the item and stops draining rather than failing
 every remaining item one by one.
@@ -147,23 +151,96 @@ ddev drush php:eval '$ids = \Drupal::entityQuery("aim_fact")->accessCheck(FALSE)
 ddev drush sapi-i aim_vector_index
 ```
 
-**Known gap:** `scope: user` neighbor matching over-fetches (5x the
-limit) and post-filters on `subject_uid` in PHP (`subject_uid` isn't an
-indexed attribute) - the fix is indexing it as a search_api attribute, not
-yet built.
+**`subject_uid` is an indexed attribute with a BTREE index:** `recall()`
+(with `--subject-uid`) and user-scope `findNearestNeighbor()` filter by a
+`subject_uid` query condition, not in PHP. The column's BTREE index
+(`idx_subject_uid`, added by `AimHooks::vectorIndexUpdate()` through
+`AimMariaDBProvider::ensureColumnIndex()` on every index save) is what
+makes this exact: MariaDB's HNSW index post-filters, so without it a
+selective filter returns short or wrong results. A user holding a large
+share of the table (measured at 20% and 77%) is served by HNSW instead and
+stays approximate (82 to 97% of the exact top-k), which is why `recall()`
+still over-fetches 5x for a uid filter. Measurements and the limits of
+the test in [ADR-0018](adr/0018-index-subject-uid-with-btree.md).
 
-**`ai_vdb_provider_mariadb` is swapped for a subclass:**
+**`ai_vdb_provider_mariadb` is swapped for a thin subclass:**
 `Drupal\aim\Vdb\AimMariaDBProvider`, via `AimHooks::vdbProviderInfoAlter()`,
-works around two bugs present in provider 1.0.1 and the 1.0.x head
-(checked 2026-09-26). Saving the index threw `Table 'aim_facts' already
-exists` (an unhandled `mysqli_sql_exception` from `createCollection()`,
-before `updateFields()` ran), and `deleteItems()`/`deleteIndexItems()`
-removed at most 10 rows per call (`getVdbIds()` used `querySearch()`'s
-default limit). If a provider upgrade fixes both, delete the class and the
-hook; if either symptom returns, check the alter hook still applies
+works around four bugs (three in provider 1.0.1 and the 1.0.x head, one
+in `drupal/ai`'s `ai_search`; checked 2026-09-26/27) and applies HNSW
+tuning. Upstream status: the table-exists throw is #3609961 (its RTBC MR
+drops the whole collection on every index save, so do not take a provider
+release with that as written); the 10-row delete cap and the empty numeric
+value have no issue yet; the `ai_search` escaping is fixed upstream in
+#3572801 but not in the code bundled with `drupal/ai` 1.4.9 or 1.5.0. Saving the index threw
+`Table 'aim_facts' already exists` (an unhandled `mysqli_sql_exception`
+from `createCollection()`, before `updateFields()` ran);
+`deleteItems()`/`deleteIndexItems()` removed at most 10 rows per call
+(`getVdbIds()` used `querySearch()`'s default limit); and an empty
+integer/decimal/date/boolean attribute reached the insert as `''`, which
+strict mode rejects in a numeric column (`ERROR 1366`), so it is set to
+`NULL` there. The fourth is in `ai_search`: `EmbeddingBase::getValue()`
+runs every single-value string attribute through an HTML-to-Markdown
+converter, which stores `content_editor` as `content\_editor` (an upstream bug fixed in #3572801, see above), so an
+exact-match filter on any value with an underscore (a real Drupal role ID
+as a role fact's `subject`) never matches and consolidation finds no
+neighbors for it; the shim writes the raw Search API value instead. The
+class also has `ensureColumnIndex()`, aim's own BTREE
+helper (below). **It is a shim:** each override needs an upstream issue in
+TODO.md and goes when the provider releases the fix, and aim ships tuned
+values under the provider's own config key names rather than inventing
+its own (rule and per-override table in
+[ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md)). If a symptom
+returns, check the alter hook still applies
 (`ddev drush php:eval 'echo get_class(\Drupal::service("ai.vdb_provider")->createInstance("mariadb"));'`
-should print the aim class). Details in
+should print the aim class). Bug details in
 [ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md).
+
+**Tuning vector search accuracy (HNSW):** MariaDB's defaults (`M=6`,
+`mhnsw_ef_search=20`) missed 3-12% of the true nearest facts on a 5,000-row
+test. aim ships `M=16` and `ef_search=100`, which matched the exact answer
+on every test question at 1-6 ms. Plain-English version in
+[README.md](README.md); measurements in
+[ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md).
+
+| Setting | Where | Applies |
+| --- | --- | --- |
+| `mhnsw_ef_search` (100) | `search_api.server.aim_vector`, `backend_config.database_settings.mhnsw_ef_search` (the key the provider's 1.0.x head also uses) | Every query, set with `SET SESSION` on the connection that runs it. Change it any time. |
+| `M` (16) | `AimMariaDBProvider::HNSW_M` | A new collection only. Build-time. |
+
+An existing table keeps the M it was built with. Check it, and rebuild
+once if it is not 16 (seconds for thousands of rows, longer for millions,
+and writes to the table may block meanwhile):
+
+```bash
+ddev drush sql:query "SHOW CREATE TABLE aim_facts" | tr '\\' '\n' | grep "VECTOR KEY"
+ddev drush sql:query "ALTER TABLE aim_facts DROP INDEX embedding, ADD VECTOR INDEX embedding (embedding) M=16 DISTANCE=cosine"
+```
+
+To confirm a setting reaches the query connection, turn on MariaDB's
+general log (`SET GLOBAL log_output='TABLE'; SET GLOBAL general_log=ON;`),
+run `drush aim:recall`, and look in `mysql.general_log` for
+`SET SESSION mhnsw_ef_search` and the `VEC_DISTANCE_COSINE` query on the
+same `thread_id`. Turn the log off afterward.
+
+**Rechecking accuracy** (when the table grows about tenfold, the embeddings
+model or dimensions change, or the provider is upgraded). Build a skewed
+test corpus, then compare the index to exact search:
+
+1. Create throwaway accounts and give each a different number of synthetic
+   user-scope facts with `AimMemoryManager::generateBenchmarkFacts('user',
+   $n, 'zzpar', [$uid])` (from `drush php:eval`), including one user
+   holding 20% or more of all facts. Index them (`sapi-i`); synthetic facts
+   skip the consolidation queue.
+2. For about 30 stored vectors, set `@v` to the vector and compare, for
+   each user and k of 5 and 20, `SELECT drupal_entity_id FROM aim_facts
+   WHERE index_id='aim_vector_index' AND subject_uid=<uid> ORDER BY
+   VEC_DISTANCE_COSINE(embedding, @v) LIMIT k` against the same query with
+   `IGNORE INDEX (embedding)`, which is exact. Recall is the overlap over
+   k. Repeat with `SET SESSION mhnsw_ef_search = <n>` for a few values.
+3. Do this on a copy (`CREATE TABLE ... LIKE aim_facts` then `INSERT ...
+   SELECT`) so index rebuilds and ef_search experiments never touch live
+   data. `aim:benchmark-cleanup zzpar` and deleting the accounts removes
+   the corpus.
 
 **Stale vector rows self-heal:** a row in `aim_facts` whose fact no longer
 exists (deleted directly, or a test leftover) logs a one-off "Could not
@@ -225,7 +302,9 @@ Central service backing every write/read path. Key public methods:
 - `getAutoThreshold()`/`getAmbiguousThreshold()`/`getRecallMaxDistance()`
   - live `aim.settings` values, not the class constants (those are only
   the shipped defaults and in-code fallback). `recall_max_distance` is
-  applied by `aim_chatbot:recall`, not by `recall()` itself.
+  applied only when a caller passes it to `recall()` as `$maxDistance`:
+  `aim_chatbot:recall` and `aim_tool`'s `aim_recall` do; `drush aim:recall`
+  does with `--max-distance` and is raw otherwise.
 - `getDefaultChatProvider(): ?array` - resolves the site-wide default via
   `AiProviderPluginManager`; `NULL` if none configured. `AimCommands`'
   `--provider`/`--model` options default to `NULL` and fall through to
@@ -292,9 +371,25 @@ Server `aim_vector` (backend `search_api_ai_search`, VDB provider
 `mariadb`), index `aim_vector_index` over `entity:aim_fact`, collection
 table `aim_facts` (real MariaDB 11.7+ HNSW `VECTOR INDEX`, not a
 brute-force scan). `text` indexed as `main_content`; `scope`/`subject`/
-`source` as `attributes`. `index_directly` is off by default - index via
-`drush search-api:index aim_vector_index`, or let the consolidation queue
-worker's `reindex()` call handle it.
+`subject_uid`/`source` as `attributes` (`subject_uid` as an `integer`,
+`NULL` for every scope but user).
+
+**`index_directly`:** off in the shipped config, so a saved fact is not
+searchable until an index run (`drush search-api:index aim_vector_index`,
+or the consolidation queue worker's `reindex()`, up to a minute away on the
+crontab). That breaks the obvious chat beat "tell it something, then ask
+about it", so **this site turns it on** in its own config. Measured
+2026-09-26 with local Ollama embeddings: ten writes take the same ~165 ms
+in the request either way, and turning it on adds about 70 ms per fact of
+indexing at shutdown (a fact saved in one request is recalled in the next,
+verified through the demo assistant). Search API does that work after the
+request, so a web visitor should not wait on it (verified in a drush
+process, not over HTTP). With **hosted** embeddings (roughly 500 ms per
+fact) a batch would tie up a PHP worker for seconds, which is why the
+module ships it off ([ADR-0015](adr/0015-immediate-consolidation-considered-deferred.md));
+turn it on only where embeddings are local. To change it:
+`$index->setOptions([...$index->getOptions(), 'index_directly' => TRUE])->save()`,
+then export the index config.
 
 **Gotchas:**
 
@@ -304,8 +399,10 @@ worker's `reindex()` call handle it.
 - The collection table only gets its attribute columns on index
   *update*, not *create* - a freshly created index entity needs a second
   `->save()` (`aim.install`'s `hook_install()` does this automatically).
-  `createCollection()` is not idempotent - rerunning it against an
-  existing table throws; fix is `DROP TABLE aim_facts` and re-save.
+  Re-saving an index whose table already exists is safe:
+  `AimMariaDBProvider` swallows the provider's "Table already exists"
+  throw (see "`ai_vdb_provider_mariadb` is swapped for a subclass" above),
+  so a stale table no longer needs a `DROP TABLE`.
 - `drush search-api:clear aim_vector_index` can drop and reprovision
   `aim_facts` down to just the base columns, silently losing `scope`/
   `source`/`subject`/`text` - the next `search-api:index` then fails
@@ -411,6 +508,41 @@ each documented in their own submodule now:
 - [aim_tool_oauth/DEVELOPING.md](modules/aim_tool_oauth/DEVELOPING.md) -
   the full MCP OAuth setup runbook (dependency chain, composer gotcha,
   key generation, HTTPS exposure via Tailscale Funnel).
+
+---
+
+## Upgrading an existing site (no `hook_update_N()`)
+
+`config/install` does not re-run on an installed module and aim ships no
+update hooks (CLAUDE.md), so a site installed before 2026-09-26 needs these
+by hand. Fresh installs get all of it from config and the shim.
+
+1. **Retired facts out of the index**
+   ([ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md)): add the
+   `aim_exclude_retired` processor to `aim_vector_index`, then purge the
+   retired rows already indexed (the snippet under "Enabling the processor
+   on an existing site" in "Vector search").
+2. **`subject_uid` as an indexed attribute**
+   ([ADR-0018](adr/0018-index-subject-uid-with-btree.md)): add an `integer`
+   field `subject_uid` (datasource `entity:aim_fact`, property path
+   `subject_uid`) to `search_api.index.aim_vector_index`, and
+   `indexing_options.subject_uid: attributes` to
+   `ai_search.index.aim_vector_index`. Saving the index makes the shim add
+   the column and its BTREE index. Then `ddev drush sapi-r aim_vector_index
+   && ddev drush sapi-i aim_vector_index`. This must happen before the code
+   that filters on it runs: old rows have `NULL` until reindexed.
+3. **The provider shim** needs nothing: it is swapped in by
+   `hook_ai_vdb_provider_info_alter()` after `drush cr`. Check with the
+   `get_class(...)` one-liner under "`ai_vdb_provider_mariadb` is swapped
+   for a thin subclass".
+4. **HNSW tuning** ([ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md)):
+   add `mhnsw_ef_search: 100` to the server's `database_settings`, and
+   rebuild the vector index once at `M=16` (the `ALTER TABLE` under "Tuning
+   vector search accuracy").
+5. **Per-site choices, not defaults:** `index_directly` on if embeddings are
+   local; `recall_max_distance` recalibrated to your dataset (ADR-0019).
+6. Export the config and confirm `ddev drush config:status` reports no
+   differences.
 
 ---
 

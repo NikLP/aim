@@ -1,7 +1,6 @@
 # ADR-0018: Index `subject_uid` as a Search API attribute, with a BTREE index on its column
 
-**Status:** Proposed - analyzed 2026-09-19, not built. One open decision
-(empty-value handling, below); everything else is settled by evidence.
+**Status:** Accepted - analyzed 2026-09-19, built and verified 2026-09-26
 **Date:** 2026-09-20
 
 ## Context
@@ -65,8 +64,10 @@ All verified on the live site 2026-09-19 unless marked otherwise.
    returned 0 rows through the index and 1 row with `IGNORE INDEX
    (embedding)`. (The matching row was one of the stale rows in finding 5,
    ranked 88th of 115 by distance; the mechanism does not depend on that.)
-   Session `mhnsw_ef_search = 200` made no difference, so it is not a
-   tunable escape hatch. Consequences: (a) an attribute condition alone
+   Session `mhnsw_ef_search = 200` made no difference to this sparse-filter
+   case (the matching row ranked 88th). For users holding a large share of
+   the table it does matter, as does M; see
+   [ADR-0023](0023-hnsw-tuning-and-thin-provider-shim.md). Consequences: (a) an attribute condition alone
    reproduces today's false negatives, just filtered in SQL instead of PHP,
    and (b) the current `range()` value is the ANN candidate pool size, not
    merely a result count, so shrinking it to the result count when the PHP
@@ -98,24 +99,31 @@ index on its collection column, then switch `recall()` and
 PHP-side uid comparison. The attribute without the BTREE index is not an
 acceptable variant (finding 3).
 
-### Open decision: empty values (finding 2)
+### Decided 2026-09-26: empty values (finding 2)
 
-- **Option A (recommended): patch the provider.** In
-  `MariaDBProvider::indexItems()`, coerce `''` to `NULL` for fields of type
-  integer/decimal/date/boolean before `insertIntoCollection()` (about 3
-  lines; `bind_param` sends `NULL` correctly, to be confirmed with one
-  site-fact write after patching). Apply as a root `composer.json` patch
-  now and send the same change upstream. aim's own `composer.json` cannot
-  carry patches (only the root package's can), so it documents a minimum
-  provider version once a fixed release exists. Correct semantics (no value
-  is `NULL`), fixes every integer attribute for everyone.
-- **Option B: aim-local override.** Ship a subclass of the `contextual_chunks`
-  strategy overriding the protected `getValue()` to return `0` for empty
-  integer-typed fields (its return type forbids `NULL`), and point the
-  server's `embedding_strategy` at it. Self-contained, but couples aim to
-  ai_search internals and uses `0` as a sentinel.
+**Option C: coerce `''` to `NULL` in `AimMariaDBProvider`**, the aim-local
+provider subclass that [ADR-0022](0022-exclude-retired-facts-from-vector-index.md)
+already swaps in for two other provider bugs. It overrides `indexItems()`
+(to remember the index being written) and `insertIntoCollection()` (to
+set `''` to `NULL` for a non-multiple field whose Search API type is
+`integer`, `decimal`, `date` or `boolean`, the types the provider maps to
+numeric columns) before delegating to the parent. String and text fields
+are left alone, so existing `''` values in `source`/`subject` and the
+filters that compare them do not change. `bind_param` sends `NULL`
+correctly.
 
-Record the choice by amending this ADR before building.
+Chosen over the two options considered earlier:
+
+- **A: a root `composer.json` patch to `MariaDBProvider::indexItems()`**
+  (plus the same change upstream). Same semantics, but this site has no
+  `cweagans/composer-patches`, aim's own `composer.json` cannot carry
+  patches, and the subclass already exists for the same reason.
+- **B: a `contextual_chunks` strategy subclass returning `0`** for empty
+  integers. Couples aim to ai_search internals and stores a sentinel, where
+  `NULL` is the correct value for "no uid".
+
+Upstream: file this with the other two `ai_vdb_provider_mariadb` issues
+(TODO.md). The subclass can lose all three overrides once released.
 
 ### Build sequence
 
@@ -167,7 +175,9 @@ consolidation would silently find no neighbors.
 
 - **Attribute only, no BTREE index.** Finding 3: same false negatives as
   today, and a regression if `range()` is shrunk.
-- **Raise `mhnsw_ef_search`.** Tested at 200, no effect.
+- **Raise `mhnsw_ef_search`** to fix the sparse-filter case. Tested at 200,
+  no effect there. It does help dense users, see
+  [ADR-0023](0023-hnsw-tuning-and-thin-provider-shim.md).
 - **`string`-typed `subject_uid`.** `getValue()` converts an entity
   reference to its label for string/fulltext fields (by reading the code),
   so it would store the username, i.e. `User::label()` (display name,
@@ -190,33 +200,85 @@ consolidation would silently find no neighbors.
   cost is silent missed duplicates and short `--subject-uid` results the
   day a second account accumulates facts.
 
-## Verification
+## Outcome (built and verified 2026-09-26)
 
-No test suite exists in the module, so this is manual and must precede
-calling it done:
+Built as decided, with two departures:
 
-- `EXPLAIN` of the generated SQL for a selective uid shows `ref` on the new
-  index.
-- Parity against ground truth: `aim:benchmark` (which spreads user-scope
-  facts across real accounts) compared with exact `IGNORE INDEX (embedding)`
-  top-k, at several facts-per-user counts (roughly 1, 10, 100, 1000) inside a
-  5k+ fact corpus. Create throwaway accounts if 3 is not sparse enough.
-  Pass: identical to exact at every selectivity. If mid-range selectivities
-  show misses (the optimizer picked HNSW), keep a small over-fetch for that
-  case rather than none.
-- Regression: `aim:consolidate --scope=user --dry-run` finds the same
-  known-duplicate pair; `aim:recall --scope=user --subject-uid=1`; write and
-  index one site fact to confirm no `1366` error.
-- `aim:benchmark-cleanup <tag>`, then phpcs and phpstan per CLAUDE.md.
+- **Step 3 adds the index only.** `AimHooks::vectorIndexUpdate()` (a
+  `search_api_index_update` implementation, `Order::Last`) calls
+  `AimMariaDBProvider::ensureColumnIndex()`, which checks the column
+  exists and runs `ADD INDEX IF NOT EXISTS`. The provider's own hook
+  already creates the column, so `ADD COLUMN` is not repeated.
+- **`recall()` keeps its 5x over-fetch when filtering by uid.** The plan
+  was to drop it. The measurements below show why it stays, now as
+  candidate headroom for the HNSW path rather than as a PHP filter.
+  `findNearestNeighbor()` keeps `range(0, 20)` for user scope, headroom
+  for itself and handled ids, and returns `NULL` early for a user fact
+  with no account. Both PHP-side uid comparisons are gone.
+
+The live site was reindexed (`sapi-r`, `sapi-i`): every fact indexed with
+no `1366` error, user rows carry their uid, every other scope carries
+`NULL`. The shipped `config/install` YAML for both indexes matches the
+live saved config.
+
+## Verification (run 2026-09-26)
+
+Corpus: 5,069 vector rows. Five throwaway accounts holding 1, 10, 100,
+1,000 and 3,900 synthetic user-scope facts (`generateBenchmarkFacts()`,
+tagged `zzpar`, removed afterward) plus the site's real facts (uid 1
+holds 38). 30 probe vectors (stored embeddings of random rows) per user,
+k = 5 and 20. Recall against the exact top-k (`IGNORE INDEX (embedding)`),
+reported as k=5 / k=20:
+
+| Facts for the user | Optimizer | Current | Attribute only, no BTREE | Current + 5x over-fetch |
+| --- | --- | --- | --- | --- |
+| 1 | BTREE `ref` | 1.00 / 1.00 | 0.87 / 1.07* | 1.00 / 1.00 |
+| 10 | BTREE `ref` | 1.00 / 1.00 | 0.67 / 0.73 | 1.00 / 1.00 |
+| 38 (uid 1) | BTREE `ref` | 1.00 / 1.00 | 0.05 / 0.10 | 1.00 / 1.00 |
+| 100 | BTREE `ref` | 1.00 / 1.00 | 0.63 / 0.73 | 1.00 / 1.00 |
+| 1,000 (20% of rows) | HNSW | 0.82 / 0.82 | 0.82 / 0.82 | 0.88 / 0.91 |
+| 3,900 (77% of rows) | HNSW | 0.92 / 0.89 | 0.92 / 0.89 | 0.93 / 0.97 |
+
+\* Above 1.0 because of repeated rows, see 3.
+
+1. **The BTREE index is decisive for selective users.** With it the
+   result is exact (0 of 30 probes missed anything) at every size up to
+   100 facts. Without it the same attribute returns 5 to 87 percent of the
+   right rows. Finding 4 holds at scale.
+2. **Large users go through HNSW and stay approximate.** From some share
+   of the table upward the optimizer stops choosing the BTREE index and
+   post-filters HNSW candidates, so recall is 82 to 92 percent on
+   MariaDB's default HNSW settings. The 5x over-fetch lifts that to 88 to
+   97 percent. Tuning M and ef_search closes the rest, to about 100 percent
+   on this test ([ADR-0023](0023-hnsw-tuning-and-thin-provider-shim.md)). The crossover lies between 100 and 1,000 facts
+   (2 to 20 percent of this table) and was not located. In practice a
+   consolidation sweep can miss a duplicate pair for a user who owns a
+   large fraction of all facts.
+3. **The forced HNSW post-filter path returned repeated rows.** With the
+   BTREE index ignored, 2 to 4 of 30 probes returned the same row id twice
+   in one result (max repeat 2) for the 1, 10 and 100-fact users, never
+   with the index in use. A MariaDB 11.8.9 quirk, not investigated. It is
+   another reason the attribute alone is not acceptable, and `recall()`
+   does not de-duplicate.
+4. **`ANALYZE TABLE` changed nothing.** Optimizer choices and recall were
+   identical before and after, so no statistics step is needed.
+5. **End to end through `recall()`** (limit 5): correct row counts for
+   every account and no row from another user.
+6. **Regression:** `aim:consolidate --scope=user --dry-run` is identical
+   to its pre-change output (18 decisions), and site scope is unchanged.
+
+Limits: the corpus is synthetic templated text, which clusters tightly in
+embedding space and is likely harsher than real facts; the probes are
+stored embeddings; one corpus size.
 
 ## Consequences
 
-- aim gains a dependency on a fixed provider release (Option A) or on
-  ai_search's strategy internals (Option B). File upstream against
-  `ai_vdb_provider_mariadb`: `''` to `NULL` for non-string columns; guard
-  `is_field_multiple` like `updateFields()` does; ideally create a BTREE
-  index for filterable attribute columns, which would make step 3
-  unnecessary.
+- aim depends on `ai_vdb_provider_mariadb` internals through
+  `AimMariaDBProvider` (`indexItems()`, `insertIntoCollection()`, the
+  provider's `getClient()`). File upstream against the provider: `''` to
+  `NULL` for numeric columns; guard `is_field_multiple` like
+  `updateFields()` does; ideally create a BTREE index for filterable
+  attribute columns, which would make `ensureColumnIndex()` unnecessary.
 - **Dense filters cannot be pre-filtered**, so an over-fetch factor is
   intrinsic to any low-selectivity condition. This bears on TODO.md's
   retired-facts item: its "durable fix" (an indexed `retired` flag) would

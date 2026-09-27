@@ -237,8 +237,9 @@ class AimMemoryManager {
    * Returns the live recall cutoff from aim.settings.
    *
    * See getAutoThreshold() - same fallback behavior. Applied by callers
-   * that must abstain on a poor match (aim_chatbot:recall); recall() itself
-   * does not filter by it.
+   * that must abstain on a poor match: aim_chatbot:recall and aim_tool's
+   * aim_recall pass it to recall() as $maxDistance; recall() itself does
+   * not apply it unless asked.
    *
    * @return float
    *   Distance above which a recalled fact is too dissimilar to present as
@@ -905,6 +906,11 @@ class AimMemoryManager {
    *   with scope=user.
    * @param int $limit
    *   Maximum number of results.
+   * @param float|null $maxDistance
+   *   Drop matches whose distance exceeds this, so a poor match is not
+   *   presented as relevant (ADR-0019). NULL, the default, returns the
+   *   nearest facts however far. getRecallMaxDistance() is the site's
+   *   calibrated value.
    *
    * @return array
    *   A list of rows, each with keys id, score, scope, subject, text,
@@ -920,7 +926,7 @@ class AimMemoryManager {
    * @throws \InvalidArgumentException
    *   If $subjectUid does not resolve to a real account.
    */
-  public function recall(string $text, ?string $scope, ?string $subject, ?string $subjectUid, int $limit): array {
+  public function recall(string $text, ?string $scope, ?string $subject, ?string $subjectUid, int $limit, ?float $maxDistance = NULL): array {
     $index = $this->loadVectorIndex();
     if (!$index) {
       throw new \RuntimeException('The aim_vector_index search index does not exist.');
@@ -941,14 +947,25 @@ class AimMemoryManager {
     if (!empty($subject)) {
       $query->addCondition('subject', $subject);
     }
-    // subject_uid is not an indexed attribute, so this is a post-filter
-    // below rather than a query condition here; over-fetch to compensate.
+    if ($filter_account) {
+      $query->addCondition('subject_uid', (int) $filter_account->id());
+    }
+    // A user with few facts is pre-filtered exactly through the BTREE index
+    // on subject_uid, but one holding a large share of the table is served
+    // by HNSW candidates post-filtered by the condition, so ask for extra
+    // candidates. The loop below stops at $limit. See ADR-0018.
     $query->range(0, $filter_account ? $limit * 5 : $limit);
 
     $results = $this->executeSearchQuery($query);
 
     $rows = [];
     foreach ($results as $result) {
+      // Checked first: a far match costs no entity load. Rows arrive
+      // nearest-first, but the cutoff is applied before the limit so a
+      // uid-filter over-fetch pool is spent on matches that qualify.
+      if ($maxDistance !== NULL && (float) $result->getScore() > $maxDistance) {
+        continue;
+      }
       try {
         $original = $result->getOriginalObject();
       }
@@ -967,10 +984,6 @@ class AimMemoryManager {
       // index (ADR-0022), but one retired since the last index run is
       // still there; filter it out here for that gap.
       if (!$fact->get('expires')->isEmpty()) {
-        continue;
-      }
-
-      if ($filter_account && (int) $fact->get('subject_uid')->target_id !== (int) $filter_account->id()) {
         continue;
       }
 
@@ -1235,16 +1248,23 @@ class AimMemoryManager {
 
     $query = $index->query()->keys($fact->get('text')->value);
     $query->addCondition('scope', $scope);
-    $subject = $fact->get('subject')->value;
-    // subject_uid is not an indexed attribute (see the gotcha this method's
-    // docblock references), so user scope cannot be narrowed at the index
-    // level - post-filter after fetching a wider result set instead.
-    if (!$is_user_scope && $subject !== NULL && $subject !== '') {
-      $query->addCondition('subject', $subject);
+    if ($is_user_scope) {
+      $subject_uid = $fact->get('subject_uid')->target_id;
+      if ($subject_uid === NULL) {
+        // A user-scope fact with no account has no neighbors to compare.
+        return NULL;
+      }
+      $query->addCondition('subject_uid', (int) $subject_uid);
     }
+    else {
+      $subject = $fact->get('subject')->value;
+      if ($subject !== NULL && $subject !== '') {
+        $query->addCondition('subject', $subject);
+      }
+    }
+    // Headroom for the fact itself and already-handled ids, which are
+    // skipped below.
     $query->range(0, $is_user_scope ? 20 : 5);
-
-    $subject_uid = $is_user_scope ? $fact->get('subject_uid')->target_id : NULL;
 
     $results = $this->executeSearchQuery($query);
     foreach ($results as $result) {
@@ -1271,13 +1291,6 @@ class AimMemoryManager {
       // still there and would otherwise resurface as a neighbor.
       if (!$candidate->get('expires')->isEmpty()) {
         continue;
-      }
-
-      if ($is_user_scope) {
-        $candidate_subject_uid = $candidate->get('subject_uid')->target_id;
-        if ($subject_uid === NULL || $candidate_subject_uid === NULL || (int) $candidate_subject_uid !== (int) $subject_uid) {
-          continue;
-        }
       }
 
       return [$candidate, (float) $result->getScore()];

@@ -21,7 +21,8 @@ lands right after cron just ran, the answer is up to ~60 seconds away
 (average ~30s), not "right now."
 
 Two mechanisms were considered and rejected before landing on the design
-below:
+below (the first, flipping `index_directly`, was re-measured 2026-09-26,
+see the addendum at the end):
 
 - **Flip `index_directly` on** (index-wide config, CLAUDE.md's "Vector
   search"). Rejected once batching entered the picture (see next section):
@@ -138,3 +139,19 @@ and stay on the crontab exactly as before, same as they always have.
   and "how fast is it reviewed" become two different clocks worth
   designing together rather than solving indexing latency in isolation
   again.
+
+## Addendum (2026-09-26): `index_directly` re-measured with local embeddings
+
+The rejection of flipping `index_directly` on assumed a hosted embedding
+call per write (~500 ms). This site embeds locally with Ollama, so it was
+measured: ten `remember()` calls take ~165 ms in the request with it off or
+on, and turning it on adds ~70 ms per fact of indexing at shutdown, after
+the request's own work (measured in a drush process, not over HTTP). A fact
+saved in one process was recalled correctly by the demo assistant in the
+next. **This site therefore runs with `index_directly` on**, which closes
+the "tell it, then ask again" gap this ADR opened with. The module still
+ships it off, because with hosted embeddings the same batch would occupy a
+PHP worker for seconds, and the design in this ADR (post-request
+consolidation) is still the answer for that case. Not a reversal of the
+deferral, only of the first rejected mechanism where embeddings are local.
+

@@ -96,6 +96,9 @@ the provider fixes them.
    than 10 facts between index runs would leave rows behind that nothing
    revisits.
 
+A third override (empty numeric values written as `NULL`) was added later
+by [ADR-0018](0018-index-subject-uid-with-btree.md).
+
 ## Rollout on an existing site
 
 `config/install` does not re-run on an installed module, and no

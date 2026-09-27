@@ -24,6 +24,13 @@ one version ahead of `mcp_server`'s own `^2.0@beta` constraint. Also
 requires core's `serialization` module (schema generation throws
 `LogicException` without it).
 
+Over MCP the Tool API plugin IDs are listed with a `tool_api__` prefix
+(`tool_api__aim_recall`, `tool_api__aim_remember`; observed 2026-09-27 with
+`mcp_server_tool_bridge` 1.0.0-beta3, `mcp_server` 2.0.0-beta5, `mcp/sdk`
+0.8.1), so a client that cached the old bare names needs to refresh its
+tool list. `aim_recall`'s `max_distance` input defaults to the site's
+`recall_max_distance`; an empty result reads "No relevant facts found."
+
 `mcp_server_tool_bridge` and `mcp_server_oauth`'s Composer package names
 were previously self-doubled on drupal.org (`drupal/x-x`, an empty
 metapackage stub) - fixed upstream; both now resolve under their plain

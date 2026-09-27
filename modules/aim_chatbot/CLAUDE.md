@@ -33,7 +33,9 @@ and answers "No relevant facts found." when none survive - see
 [DEVELOPING.md](DEVELOPING.md)'s "Gotchas" and
 [ADR-0019](../../adr/0019-recall-abstention-distance-cutoff.md). The
 cutoff is embeddings-model specific: retune it if the model changes, and
-recheck as the site-scope corpus grows or diversifies.
+recheck as the site-scope corpus grows or diversifies. The same cutoff is
+passed to `AimMemoryManager::recall()` as `$maxDistance`, and `aim_tool`'s
+MCP `aim_recall` applies it by default too.
 
 ## CCC (`ai_context`)
 

@@ -40,6 +40,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * caller can't actually view, including their own scope=user facts if
  * they hold no "view user aim facts" permission - no separate filtering
  * needed in this plugin.
+ *
+ * Drops matches past aim.settings:recall_max_distance by default (the
+ * caller may pass its own max_distance), so an off-topic query returns
+ * "No relevant facts found." rather than the nearest unrelated facts
+ * (ADR-0019). The chatbot's recall does the same.
  */
 #[Tool(
   id: 'aim_recall',
@@ -76,6 +81,12 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
       description: new TranslatableMarkup('Maximum number of results.'),
       required: FALSE,
       default_value: 10,
+    ),
+    'max_distance' => new InputDefinition(
+      data_type: 'float',
+      label: new TranslatableMarkup('Maximum distance'),
+      description: new TranslatableMarkup('Drop facts less similar than this (cosine distance: 0 is identical, lower is stricter, 2 disables the cutoff). Omit to use the site default, which filters out unrelated facts.'),
+      required: FALSE,
     ),
   ],
   output_definitions: [
@@ -120,6 +131,7 @@ final class AimRecall extends ToolBase {
         $values['subject'] ?? NULL,
         $subjectUid,
         (int) ($values['limit'] ?? 10),
+        isset($values['max_distance']) ? (float) $values['max_distance'] : $this->memoryManager->getRecallMaxDistance(),
       );
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {

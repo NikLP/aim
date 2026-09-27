@@ -5,6 +5,12 @@ through them, over MCP via `mcp_server_tool_bridge`. Any scope, gated by
 permission rather than hardcoded like `aim_chatbot`. Part of
 [AIM](../../README.md).
 
+Over MCP the tools are listed as `tool_api__aim_remember` and
+`tool_api__aim_recall` (the bridge prefixes the Tool API plugin ID; observed
+with `mcp_server_tool_bridge` 1.0.0-beta3). `aim_recall` drops facts past
+`aim.settings:recall_max_distance` by default and takes an optional
+`max_distance` (2 disables the cutoff).
+
 ## Requirements
 
 - `aim` (this module's parent)

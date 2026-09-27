@@ -37,8 +37,9 @@ this list as exhaustive.
 
 ## PoC deviations to close before non-PoC data goes in
 
-- [ ] Replace the flat `scope` list field with the four-bundle model
-      (user/role/site/case). [ADR-0001](adr/0001-storage-and-scope-model.md)
+- [x] Replace the flat `scope` list field with the four-bundle model
+      (user/role/site/case) - BUILT 2026-09-15, scopes are `aim_scope`
+      config entities. [ADR-0001](adr/0001-storage-and-scope-model.md)
 - [ ] Make `aim_fact` revisionable and build the Content Moderation
       draft-to-trusted gate.
       [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)
@@ -73,12 +74,12 @@ questions" section)
 
 ## Concrete near-term fixes flagged in CLAUDE.md/DEVELOPING.md
 
-- [ ] Index `subject_uid` as a search_api attribute (Consolidation
-      gotchas - currently over-fetches + PHP-filters). Analyzed
-      2026-09-19: the attribute alone is not enough (empty values break
-      the `INT` column insert; MariaDB HNSW post-filters, so it also needs
-      a BTREE index on the column). Findings, plan and one open decision
-      in [ADR-0018](adr/0018-index-subject-uid-with-btree.md).
+- [x] Index `subject_uid` as a search_api attribute - BUILT and verified
+      2026-09-26, with the BTREE index it needs and empty values written
+      as `NULL` by `AimMariaDBProvider`. Exact for users up to 100 facts
+      in a 5k-row corpus; a user holding a large share of the table stays
+      approximate (82-97%), crossover not located. Results and limits in
+      [ADR-0018](adr/0018-index-subject-uid-with-btree.md).
 - [ ] Add a `related_reason` field on `aim_fact` (provenance-on-invalidation,
       ADR-0010 parity target #6 /
       [ADR-0005](adr/0005-consolidation-algorithm.md)).
@@ -129,26 +130,56 @@ questions" section)
 - [x] Fix abstention correctness in `aim_chatbot:recall` - BUILT
       2026-09-19 (`aim.settings:recall_max_distance`, 0.45), decision and
       measurements in
-      [ADR-0019](adr/0019-recall-abstention-distance-cutoff.md). **Still
-      open:** `aim_tool`'s MCP `aim_recall` and `drush aim:recall` still
-      return raw results with no cutoff (ADR-0019's "Not built" has the
-      recommended opt-in `$maxDistance` shape); a near-topic question the
-      facts don't answer still gets its nearest facts (the distance
-      ranges overlap, so this needs the model's judgment, not a
-      threshold); no `drush aim:calibrate` yet.
+      [ADR-0019](adr/0019-recall-abstention-distance-cutoff.md). Extended
+      2026-09-27: `recall()` takes an optional `$maxDistance`, applied
+      before the limit; `aim_tool`'s MCP `aim_recall` applies the site
+      default unless the caller passes `max_distance`, and `drush
+      aim:recall --max-distance` opts in (raw otherwise, for
+      calibration). **Still open:** a near-topic question the facts don't
+      answer still gets its nearest facts (the distance ranges overlap, so
+      this needs the model's judgment, not a threshold); no `drush
+      aim:calibrate` yet; the 0.45 default was checked on site and user
+      scope only, and needs a recheck against any new dataset.
 - [x] Retired facts eating `recall()`'s result slots - BUILT 2026-09-26:
       a Search API processor keeps retired facts out of the vector index
       instead of the over-fetch this item first proposed. Rolled out on
       the live site (115 vector rows to 58, `recall(limit 5)` back to 5
       rows). Decision, verification and rollout in
       [ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md).
-- [ ] File two upstream issues against `ai_vdb_provider_mariadb` (found
-      2026-09-26, present in 1.0.1 and the 1.0.x head): (1) `createCollection()`
-      lets a bare `mysqli_sql_exception` escape when the table exists, so
-      every index save throws before `updateFields()`; (2) `getVdbIds()`
-      uses `querySearch()`'s default `limit = 10`, so item deletes remove
-      at most 10 rows. Then remove `AimMariaDBProvider` and
-      `AimHooks::vdbProviderInfoAlter()` once released.
+- [ ] Upstream work for `AimMariaDBProvider`'s overrides (status checked
+      against drupal.org and the git history 2026-09-27; the provider project
+      has only 6 issues):
+      (1) index save throws "table exists" - already
+      [#3609961](https://www.drupal.org/i/3609961) (RTBC), but its MR 8
+      makes `createCollection()` drop the collection first, and the
+      index-update hook calls it on every save, so it would wipe the vectors
+      on every index save. **Comment there** that `CREATE TABLE IF NOT
+      EXISTS`, or tolerating MariaDB error 1050 as the shim does, is the safe
+      fix, and do not take a provider release containing MR 8 as written;
+      (2) `getVdbIds()` uses `querySearch()`'s default `limit = 10`, so
+      deletes remove at most 10 rows - no issue, **to file**; (3) an empty
+      integer/decimal/date/boolean attribute is inserted as `''`, which
+      strict mode rejects (`ERROR 1366`) - no issue, **to file**; (4)
+      optionally a BTREE index for filterable attribute columns, a feature
+      request; (5) string attributes stored Markdown-escaped (`_` as `\_`,
+      so `subject` filters miss) - **already fixed** by
+      [#3572801](https://www.drupal.org/i/3572801) in ai_search 1.3.0-alpha5
+      / 2.0.0-alpha2 and `drupal/ai`'s 1.x head, not in the code bundled with
+      `drupal/ai` 1.4.9 or 1.5.0; nothing to file, drop the shim override
+      once the site has that code.
+      The two tuning overrides (M, ef_search) go as soon as a provider
+      release includes [#3605665](https://www.drupal.org/i/3605665) (merged
+      on the 1.0.x head, one commit past 1.0.1, not yet released);
+      `mhnsw_ef_search` in the shipped server config carries over unchanged.
+      When the last override goes, delete the class and
+      `AimHooks::vdbProviderInfoAlter()`. See
+      [ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md).
+- [ ] Recheck the HNSW tuning (M=16, ef_search=100) when the table grows
+      about tenfold, the embeddings model or dimensions change, or the
+      provider is upgraded. Method in DEVELOPING.md, "Rechecking accuracy".
+      Still unmeasured: where the optimizer switches from the BTREE index to
+      HNSW for a user, and whether MariaDB's 16 MB `mhnsw_max_cache_size`
+      matters at larger sizes.
 - [ ] Retention/erasure policy for retired facts (prune or archive old
       `expires` rows out of `aim_fact`) - retired facts about a person are
       still personal data. Own ADR when needed, see ADR-0022's

@@ -90,6 +90,47 @@ Four memory categories, composable at retrieval the way Mem0 composes
   deployments where data can't leave the customer's infrastructure.
   Embedding generation is cheap enough to self-host regardless.
 
+## How accurate is the search, and what can you tune?
+
+Finding the facts closest in meaning to a question would mean comparing
+the question against every stored fact. That gets slow as memory grows, so
+MariaDB builds an index: a map that lets it jump straight to the right
+neighborhood instead of checking everything. The catch is that the map is
+approximate. Most of the time it returns exactly what an exhaustive search
+would. Occasionally it misses one of the closest few.
+
+We measured this rather than assuming it. On a test memory of about 5,000
+facts, MariaDB's out-of-the-box settings missed roughly 3 to 12 of every
+100 of the truly closest facts. Two dials fix that, and both ship set:
+
+- **How well the map is connected (called `M`).** More routes between
+  neighborhoods means fewer dead ends, at the cost of a slightly bigger
+  index. We use 16. MariaDB's own default is 6, which is too low. This is
+  fixed when the index is created, so changing it later means rebuilding
+  the index once (seconds, for thousands of facts).
+- **How many places it checks per question (called `ef_search`).** More
+  means it looks at more candidates before answering, at the cost of a
+  slightly slower search. We use 100. MariaDB's default is 20. You can
+  change it any time in the search server's settings.
+
+With those two, every test question matched the exact answer, in 1 to 6
+milliseconds per search. Raising `M` further did not help and made
+searches slower.
+
+Two more things help. Facts about one person are looked up through a
+sorted list of who owns what, so searching one user's memory is exact
+rather than approximate, unless that user holds a large share of
+everything. And a small memory does not strictly need the map: an
+exhaustive search takes about 18 ms at 5,000 facts and 180 ms at 50,000,
+then gets slow.
+
+What this does not promise: an approximate index cannot guarantee 100%,
+the test used made-up facts, and it was one size. Re-check when your
+memory grows about tenfold, when you change the embeddings model, or when
+you upgrade the vector provider. How, and where these settings live, is in
+[DEVELOPING.md](DEVELOPING.md); the measurements are in
+[ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md).
+
 ## A second surface: generative/planning use
 
 The same extraction/consolidation pipeline, run *before* a site exists,

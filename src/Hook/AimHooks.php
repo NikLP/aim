@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Drupal\aim\Hook;
 
+use Drupal\ai\AiVdbProviderPluginManager;
 use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\Core\Hook\Order\Order;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Vdb\AimMariaDBProvider;
+use Drupal\search_api\IndexInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Hook implementations for the aim module.
@@ -25,8 +29,18 @@ use Drupal\aim\Vdb\AimMariaDBProvider;
  */
 class AimHooks {
 
+  /**
+   * Constructs the hook implementations.
+   *
+   * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
+   *   The aim memory manager.
+   * @param \Drupal\ai\AiVdbProviderPluginManager $vdbProviders
+   *   The VDB provider plugin manager.
+   */
   public function __construct(
     private readonly AimMemoryManager $memoryManager,
+    #[Autowire(service: 'ai.vdb_provider')]
+    private readonly AiVdbProviderPluginManager $vdbProviders,
   ) {}
 
   /**
@@ -62,6 +76,51 @@ class AimHooks {
   public function vdbProviderInfoAlter(array &$definitions): void {
     if (isset($definitions['mariadb'])) {
       $definitions['mariadb']['class'] = AimMariaDBProvider::class;
+    }
+  }
+
+  /**
+   * Implements hook_search_api_index_update().
+   *
+   * Gives aim_vector_index's `subject_uid` column a BTREE index (ADR-0018).
+   * Runs last so the provider's own hook has already created the column.
+   *
+   * @param \Drupal\search_api\IndexInterface $index
+   *   The index that was saved.
+   */
+  #[Hook('search_api_index_update', order: Order::Last)]
+  public function vectorIndexUpdate(IndexInterface $index): void {
+    if ($index->id() !== 'aim_vector_index' || !$index->getField('subject_uid')) {
+      return;
+    }
+    $settings = $index->getServerInstance()->getBackendConfig()['database_settings'] ?? [];
+    $provider = $this->vdbProviders->createInstance('mariadb');
+    if (!empty($settings['collection']) && $provider instanceof AimMariaDBProvider) {
+      $provider->ensureColumnIndex($settings['collection'], 'subject_uid', $settings['database_name'] ?? NULL);
+    }
+  }
+
+  /**
+   * Implements hook_config_schema_info_alter().
+   *
+   * Declares the `mhnsw_ef_search` server setting aim ships
+   * (search_api.server.aim_vector), so config validation accepts it.
+   * ai_vdb_provider_mariadb 1.0.1 has no such key in its schema, its 1.0.x
+   * head does, under the same name.
+   *
+   * @param array $definitions
+   *   The config schema definitions, keyed by type.
+   */
+  #[Hook('config_schema_info_alter')]
+  public function configSchemaInfoAlter(array &$definitions): void {
+    $type = 'plugin.plugin_configuration.search_api_backend.search_api_ai_search';
+    if (isset($definitions[$type]['mapping']['database_settings']['mapping'])) {
+      $definitions[$type]['mapping']['database_settings']['mapping'] += [
+        'mhnsw_ef_search' => [
+          'type' => 'integer',
+          'label' => 'HNSW query candidates (ef_search)',
+        ],
+      ];
     }
   }
 

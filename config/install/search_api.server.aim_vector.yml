@@ -18,6 +18,7 @@ backend_config:
     database_name: ''
     collection: aim_facts
     metric: cosine_similarity
+    mhnsw_ef_search: 100
   embeddings_engine: ollama__nomic-embed-text:latest
   embeddings_engine_configuration:
     set_dimensions: true

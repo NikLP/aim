@@ -131,8 +131,12 @@ duplicated here.
 - Vector search: server `aim_vector`, index `aim_vector_index`, collection
   table `aim_facts` (MariaDB HNSW `VECTOR INDEX`). Retired facts (`expires`
   set) are excluded from the index by the `aim_exclude_retired` processor
-  ([ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md)); the
-  provider plugin is swapped for `AimMariaDBProvider` to work around two
+  ([ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md)),
+  `subject_uid` is an indexed attribute with a BTREE index
+  ([ADR-0018](adr/0018-index-subject-uid-with-btree.md)), HNSW is tuned to
+  `M=16` and `ef_search=100` ([ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md)),
+  and the
+  provider plugin is swapped for `AimMariaDBProvider` to work around four
   upstream bugs. Detail in [DEVELOPING.md](DEVELOPING.md).
 
 ## Permissions
@@ -163,6 +167,12 @@ look at other roles when a permission check unexpectedly fails.
 - No migration/`hook_update_N()` needed while there's no real data to
   preserve (PoC) - just change and reinstall (`drush pmu`/`drush en`).
   Revisit once real data exists that reinstalling would destroy.
+- **`AimMariaDBProvider` stays a thin shim** over `ai_vdb_provider_mariadb`.
+  A workaround lives there only with an upstream issue in TODO.md and is
+  deleted when the provider ships the fix; generic features go upstream
+  first; aim ships values under the provider's own config key names, never
+  its own. Rule and per-override table in
+  [ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md).
 - Hooks live in `src/Hook/AimHooks.php` (`#[Hook(...)]` attributes), not
   `aim.module` - core's OOP hook system, same shape as this codebase's
   sibling `annotations` module's `AnnotationsHooks`.

@@ -14,3 +14,6 @@ indexing_options:
   source:
     field_name: source
     indexing_option: attributes
+  subject_uid:
+    field_name: subject_uid
+    indexing_option: attributes

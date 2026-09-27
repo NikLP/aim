@@ -193,10 +193,15 @@ supersede keeps an audit trail), so they take up result slots.
 
 ## Not built
 
-- **Cutoff for the other callers.** Recommended shape: an opt-in
-  `?float $maxDistance = NULL` on `recall()`, applied before the limit
-  (which also makes it interact correctly with the over-fetch), with
-  `drush aim:recall` staying raw unless given a `--max-distance`.
+- **Cutoff for the other callers.** Built 2026-09-27 as recommended: an
+  opt-in `?float $maxDistance = NULL` on `recall()`, applied before the
+  limit (so it interacts correctly with the over-fetch), `drush
+  aim:recall` staying raw unless given `--max-distance`. `aim_tool`'s MCP
+  `aim_recall` applies `recall_max_distance` by default, since the MCP
+  connector reaches every scope, and takes an optional `max_distance` of
+  its own (2 disables it). A spot check on user scope (uid 1, nomic) put
+  related queries at 0.14-0.36 and off-topic at 0.53-0.63, so 0.45 holds
+  there too; role and case scope were not measured.
 - **The over-fetch fix** in `recall()` and `findNearestNeighbor()`.
   Dropped: ADR-0022 removes retired facts from the index instead.
 - **A `drush aim:calibrate` command** that takes labeled queries, prints
@@ -217,3 +222,26 @@ supersede keeps an audit trail), so they take up result slots.
   `modules/aim_chatbot/DEVELOPING.md`): on-topic questions return their
   facts, "What is the capital of France?", "Best recipe for chocolate
   biscuits" and "hello" return "No relevant facts found."
+
+## Addendum (2026-09-27): a second calibration, on the demo dataset
+
+The 0.45 above was measured on one corpus (18 to 120 facts about a
+fictional company). The demo site now holds a different one (31 facts about
+a fictional library, 19 of them site scope), and the band is narrower. Best
+match per query, nomic-embed-text, site scope:
+
+| Query type | Queries | Best-match distance |
+| --- | --- | --- |
+| Answerable ("Do you charge late fees?" finds "overdue fines", "opening hours") | 13 | 0.244 - 0.457 |
+| Near-topic, unanswerable ("Do you have a cafe?", "Is there parking?") | 6 | 0.299 - 0.505 |
+| Off-topic | 5 | 0.497 - 0.621 |
+
+At 0.45 the answerable "Do you charge late fees?" (0.457) would have been
+dropped, the worse failure per decision 4. The demo site therefore runs
+`recall_max_distance: 0.48`, 0.023 above the highest answerable and 0.017
+below the lowest off-topic. The shipped default stays 0.45: the two corpora
+disagree, so the value is dataset-specific, which the recheck triggers above
+already say. A small, uniform corpus has fewer close matches for an unrelated
+query to land on, so its off-topic floor is higher and its band different.
+Cutoff for the MCP tool and drush was built the same day (see "Not built").
+

@@ -34,6 +34,14 @@ field_settings:
     dependencies:
       module:
         - aim
+  subject_uid:
+    label: 'Subject uid'
+    datasource_id: 'entity:aim_fact'
+    property_path: subject_uid
+    type: integer
+    dependencies:
+      module:
+        - aim
   text:
     label: Text
     datasource_id: 'entity:aim_fact'
