@@ -37,10 +37,13 @@ this list as exhaustive.
       match. `submitForm()` preserves the stored value for a disabled
       diagonal cell instead of reading it as unchecked, since a
       client-side-disabled checkbox isn't submitted at all.
-- [ ] `drush aim:status`: the database-side checks from the site's
-      `demo/preflight.js` (index parity, orphan rows, shim class, HNSW
-      settings, cutoff set) as a module command, replacing step 6 of
-      "Upgrading an existing site".
+- [x] `drush aim:status` - BUILT 2026-09-27: five checks (index parity,
+      orphan vector rows, provider shim class, HNSW tuning, recall cutoff
+      configured), `AimCommands::status()`, exit code 1 if any fails. Used
+      in "Upgrading an existing site"'s step 6. Along the way, found that
+      `SHOW CREATE TABLE` drops a VECTOR KEY's `M=`/`DISTANCE=` suffix
+      under this site's own `sql_mode` (`ANSI,TRADITIONAL`) - the HNSW
+      check works around it, detail in DEVELOPING.md's "aim:status".
 
 ## From the OpenKB competitor review (this thread)
 

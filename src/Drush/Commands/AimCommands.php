@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace Drupal\aim\Drush\Commands;
 
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Database\Connection;
+use Drupal\ai\AiVdbProviderPluginManager;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
+use Drupal\aim\Vdb\AimMariaDBProvider;
 use Drush\Attributes as CLI;
 use Drush\Commands\AutowireTrait;
 use Drush\Commands\DrushCommands;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Drush front end for aim's memory store.
@@ -28,9 +33,22 @@ final class AimCommands extends DrushCommands {
    *
    * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
    *   The aim memory manager.
+   * @param \Drupal\Core\Database\Connection $database
+   *   The default database connection, used by aim:status to query the
+   *   aim_fact and aim_facts tables directly.
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
+   *   The config factory, used by aim:status to read the live HNSW and
+   *   recall cutoff settings.
+   * @param \Drupal\ai\AiVdbProviderPluginManager $vdbProviders
+   *   The VDB provider plugin manager, used by aim:status to confirm
+   *   AimMariaDBProvider is still swapped in.
    */
   public function __construct(
     protected AimMemoryManager $memoryManager,
+    protected Connection $database,
+    protected ConfigFactoryInterface $configFactory,
+    #[Autowire(service: 'ai.vdb_provider')]
+    protected AiVdbProviderPluginManager $vdbProviders,
   ) {
     parent::__construct();
   }
@@ -567,6 +585,164 @@ final class AimCommands extends DrushCommands {
     }
     $this->memoryManager->reindex();
     $this->io()->success("Deleted $deleted fact(s), reindexed.");
+  }
+
+  /**
+   * Reports on the database-side state the vector search feature depends on.
+   *
+   * `config:status` only diffs config, not runtime DB state - a fact can
+   * fall out of the vector index, the provider shim can stop being swapped
+   * in, an existing collection table keeps whatever HNSW M it was built
+   * with regardless of what the code now ships. This checks those directly
+   * instead of walking them by hand, replacing step 6 of DEVELOPING.md's
+   * "Upgrading an existing site".
+   *
+   * @return int
+   *   0 if every check passed, 1 if any failed (DrushCommands::EXIT_*).
+   */
+  #[CLI\Command(name: 'aim:status', aliases: ['aim-status'])]
+  #[CLI\Usage(name: 'drush aim:status', description: 'Check vector index parity, the provider shim, HNSW tuning and the recall cutoff.')]
+  public function status(): int {
+    $checks = [
+      $this->checkIndexParity(),
+      $this->checkOrphanVectorRows(),
+      $this->checkProviderShim(),
+      $this->checkHnswTuning(),
+      $this->checkRecallCutoff(),
+    ];
+
+    $this->io()->table(['Check', 'Status', 'Detail'], array_map(
+      static fn (array $check): array => [$check['label'], $check['ok'] ? 'OK' : 'FAIL', $check['detail']],
+      $checks,
+    ));
+
+    $failed = count(array_filter($checks, static fn (array $check): bool => !$check['ok']));
+    if ($failed > 0) {
+      $this->io()->error("$failed of " . count($checks) . ' check(s) failed.');
+      return self::EXIT_FAILURE;
+    }
+
+    $this->io()->success('All checks passed.');
+    return self::EXIT_SUCCESS;
+  }
+
+  /**
+   * Checks that every live fact has exactly one row in the vector index.
+   *
+   * @return array
+   *   ['label' => string, 'ok' => bool, 'detail' => string].
+   */
+  private function checkIndexParity(): array {
+    $row = $this->database->query('SELECT
+      (SELECT COUNT(*) FROM {aim_fact} WHERE expires IS NULL AND text IS NOT NULL) AS live,
+      (SELECT COUNT(*) FROM {aim_facts}) AS vector_rows')->fetchAssoc();
+    $live = (int) $row['live'];
+    $vectorRows = (int) $row['vector_rows'];
+    $ok = $live === $vectorRows;
+
+    return [
+      'label' => 'Index parity',
+      'ok' => $ok,
+      'detail' => $ok
+        ? "$live live fact(s), $vectorRows vector row(s)"
+        : "$live live fact(s) but $vectorRows vector row(s) - run: drush sapi-i aim_vector_index",
+    ];
+  }
+
+  /**
+   * Checks for vector rows that no longer point at a real aim_fact.
+   *
+   * @return array
+   *   ['label' => string, 'ok' => bool, 'detail' => string].
+   */
+  private function checkOrphanVectorRows(): array {
+    $orphans = (int) $this->database->query("SELECT COUNT(*) FROM {aim_facts} v
+      LEFT JOIN {aim_fact} f ON v.drupal_entity_id = CONCAT('entity:aim_fact/', f.id, ':en')
+      WHERE f.id IS NULL")->fetchField();
+
+    return [
+      'label' => 'Orphan vector rows',
+      'ok' => $orphans === 0,
+      'detail' => $orphans === 0 ? 'none' : "$orphans orphan row(s) - search_api self-heals these on the next query that returns one, or run: drush sapi-i aim_vector_index",
+    ];
+  }
+
+  /**
+   * Checks that the mariadb VDB provider plugin still resolves to the shim.
+   *
+   * @return array
+   *   ['label' => string, 'ok' => bool, 'detail' => string].
+   */
+  private function checkProviderShim(): array {
+    $class = get_class($this->vdbProviders->createInstance('mariadb'));
+    $ok = $class === AimMariaDBProvider::class;
+
+    return [
+      'label' => 'Provider shim',
+      'ok' => $ok,
+      'detail' => $ok ? $class : "expected " . AimMariaDBProvider::class . ", got $class - check AimHooks::vdbProviderInfoAlter() ran (drush cr)",
+    ];
+  }
+
+  /**
+   * Checks the collection table's build-time M and the server's ef_search.
+   *
+   * @return array
+   *   ['label' => string, 'ok' => bool, 'detail' => string].
+   */
+  private function checkHnswTuning(): array {
+    // MariaDB drops the VECTOR KEY's M=/DISTANCE= suffix from SHOW CREATE
+    // TABLE under this connection's own sql_mode ('ANSI,TRADITIONAL', set
+    // by Drupal's mysql driver) - present under ANSI or TRADITIONAL alone,
+    // only their combination hides it (checked against 2026-09-27 live
+    // data). ANSI_QUOTES alone keeps it and still double-quotes
+    // identifiers, matching what {aim_facts} substitutes to here, so swap
+    // to that for this one query and restore afterward.
+    $originalMode = (string) $this->database->query('SELECT @@SESSION.sql_mode')->fetchField();
+    $this->database->query('SET SESSION sql_mode = :mode', [':mode' => 'ANSI_QUOTES']);
+    try {
+      $createTable = (string) $this->database->query('SHOW CREATE TABLE {aim_facts}')->fetchField(1);
+    }
+    finally {
+      $this->database->query('SET SESSION sql_mode = :mode', [':mode' => $originalMode]);
+    }
+    $m = preg_match('/VECTOR KEY[^\n]*["`]M["`]=\'?(\d+)/', $createTable, $matches) ? (int) $matches[1] : NULL;
+    $efSearch = $this->configFactory->get('search_api.server.aim_vector')->get('backend_config.database_settings.mhnsw_ef_search');
+
+    $problems = [];
+    if ($m !== AimMariaDBProvider::HNSW_M) {
+      $problems[] = $m === NULL
+        ? "M not found in aim_facts' VECTOR KEY"
+        : "M=$m, expected " . AimMariaDBProvider::HNSW_M . ' - rebuild the index (DEVELOPING.md "Tuning vector search accuracy")';
+    }
+    if ($efSearch === NULL) {
+      $problems[] = 'backend_config.database_settings.mhnsw_ef_search is unset on search_api.server.aim_vector, MariaDB defaults to 20';
+    }
+
+    return [
+      'label' => 'HNSW tuning',
+      'ok' => empty($problems),
+      'detail' => empty($problems) ? "M=$m, ef_search=$efSearch" : implode('; ', $problems),
+    ];
+  }
+
+  /**
+   * Checks that recall_max_distance is a real per-site value, not a fallback.
+   *
+   * @return array
+   *   ['label' => string, 'ok' => bool, 'detail' => string].
+   */
+  private function checkRecallCutoff(): array {
+    $value = $this->configFactory->get('aim.settings')->get('recall_max_distance');
+    $ok = $value !== NULL;
+
+    return [
+      'label' => 'Recall cutoff configured',
+      'ok' => $ok,
+      'detail' => $ok
+        ? (string) $value
+        : 'not set, silently using the in-code default ' . AimMemoryManager::DEFAULT_RECALL_MAX_DISTANCE . ' - recalibrate for this site\'s dataset (ADR-0019)',
+    ];
   }
 
   /**

@@ -275,6 +275,35 @@ substitute - caching helps repeat queries, a local model helps every
 query. Designed in [ADR-0017](adr/0017-query-embedding-cache.md): an
 event subscriber on drupal/ai's provider events, query-time embeds only.
 
+### `aim:status` - database-side health checks
+
+```bash
+drush aim:status
+```
+
+Five checks `config:status` can't do, because they're runtime DB state,
+not config: vector index parity (live fact count vs. `aim_facts` row
+count), orphan vector rows, the `mariadb` VDB provider plugin still
+resolving to `AimMariaDBProvider`, the collection table's build-time HNSW
+`M` and the server's `mhnsw_ef_search`, and `aim.settings:recall_max_distance`
+actually being set rather than silently using the in-code fallback. Exits
+1 if any check fails, 0 otherwise - safe to use in a preflight script.
+Covers the database-side items in "Upgrading an existing site" below, in
+place of walking them by hand.
+
+**MariaDB quirk found writing this:** `SHOW CREATE TABLE` drops a VECTOR
+KEY's `M=`/`DISTANCE=` suffix under this site's own `sql_mode`
+(`ANSI,TRADITIONAL`, Drupal's own mysql driver default) - present under
+`ANSI` or `TRADITIONAL` alone, only the combination hides it (checked
+2026-09-27). The HNSW check works around it by swapping the session to
+`ANSI_QUOTES` alone (keeps the suffix, keeps double-quoted identifiers
+so `{aim_facts}` substitution still parses) for that one query, restoring
+the original mode straight after. Not filed upstream yet - MariaDB vector
+support is new enough, and this quirk narrow enough (one specific
+sql_mode combination, cosmetic only, the index itself still applies its
+tuning), that it wasn't worth a TODO.md item on its own; revisit if it
+turns out to affect anything beyond this diagnostic's own parsing.
+
 ---
 
 ## Developer API
@@ -541,8 +570,10 @@ by hand. Fresh installs get all of it from config and the shim.
    vector search accuracy").
 5. **Per-site choices, not defaults:** `index_directly` on if embeddings are
    local; `recall_max_distance` recalibrated to your dataset (ADR-0019).
-6. Export the config and confirm `ddev drush config:status` reports no
-   differences.
+6. Run `drush aim:status` to confirm steps 1-4 above actually took (it
+   checks index parity, orphan rows, the provider shim, and HNSW tuning
+   directly against the DB), then export the config and confirm `ddev
+   drush config:status` reports no differences.
 
 ---
 
