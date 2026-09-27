@@ -201,6 +201,24 @@ questions" section)
       `expires` rows out of `aim_fact`) - retired facts about a person are
       still personal data. Own ADR when needed, see ADR-0022's
       Consequences.
+- [ ] `simple_oauth`'s signing keys are a plain file pair
+      (`simple-oauth:generate-keys`) per `aim_tool_oauth`'s setup runbook -
+      no Key module support today. Tried 2026-09-27: `key` module and
+      `league/oauth2-server`'s `CryptKey` already accept raw PEM content
+      with no file at all (confirmed by reading `CryptKey`'s constructor),
+      so the gap is only that `simple_oauth` calls `file_get_contents()` on
+      its config value before that. [#3133698](https://www.drupal.org/i/3133698)
+      is the open issue (since 2020); its MR !45 targets the 6.0.x branch
+      and does not apply to the 6.1.1 installed here, and the maintainer's
+      stated blocker is the MR's hard constructor dependency on
+      `KeyRepositoryInterface`, breaking sites without Key installed.
+      Commented there 2026-09-27 with a fix (a lazy
+      `\Drupal::hasService('key.repository')` call inside
+      `getPrivateKey()`/`getPublicKey()`, gated on a `keys_storage`
+      config value, instead of constructor injection) and an offer to test
+      a reroll. Not worth hand-patching a live OAuth path against a
+      moving demo deadline - revisit once a working reroll exists upstream,
+      or write one properly with time to test it.
 
 (DEVELOPING.md's "aim:benchmark" and "Chatbot" sections)
 

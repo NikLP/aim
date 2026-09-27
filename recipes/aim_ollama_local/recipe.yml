@@ -1,0 +1,27 @@
+name: 'AIM: local Ollama defaults'
+description: 'Points AIM at a local Ollama instance for embeddings and turns on immediate indexing, matching the sovereign path in ADR-0004. Recall cutoff and HNSW tuning are dataset-specific (ADR-0019, ADR-0023) - run drush aim:benchmark after seeding real data and set those yourself, see DEVELOPING.md "Rechecking accuracy".'
+type: 'Configuration'
+install:
+  - aim
+  - ai_provider_ollama
+  - ai_vdb_provider_mariadb
+  - search_api
+config:
+  actions:
+    ai_provider_ollama.settings:
+      simpleConfigUpdate:
+        # Ollama running on the Docker host; adjust for a native or
+        # remote install.
+        host_name: 'http://host.docker.internal'
+        port: 11434
+    ai.settings:
+      setProperties:
+        default_providers.embeddings.provider_id: ollama
+        default_providers.embeddings.model_id: nomic_embed_text_latest
+    # Safe unconditionally for local embeddings - a save is searchable on
+    # the next question. With a hosted provider each save would tie up a
+    # worker for seconds instead (ADR-0015 addendum); this recipe assumes
+    # Ollama, so it's on.
+    search_api.index.aim_vector_index:
+      setProperties:
+        options.index_directly: true
