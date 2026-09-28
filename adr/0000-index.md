@@ -29,3 +29,4 @@ Architecture Decision Records for the `aim` module.
 | [0023](0023-hnsw-tuning-and-thin-provider-shim.md) | HNSW tuning (M=16, ef_search=100), and keeping the provider shim thin | Accepted - built and verified 2026-09-26 |
 | [0024](0024-annotations-integration-target-scoped-promotion.md) | Annotations integration: facts scoped to annotation targets, review as promotion | Proposed - blocker 2 (Annotations write path) done 2026-09-28; blocker 1 (trust gate) designed, not built; still needs `scope: entity` + its ADR-0025 plugin |
 | [0025](0025-scope-access-plugin-type.md) | Scope-specific view access as a plugin type, not hardcoded bundle branches | Proposed - exploratory, seam only, no second dedicated plugin built yet |
+| [0026](0026-pluggable-scope-submodules.md) | Pluggable scope submodules: ThirdPartySettings for config, ADR-0025's plugin type for behavior | Proposed - exploratory, task breakdown only, nothing built |

@@ -1,0 +1,171 @@
+# ADR-0026: Pluggable scope submodules - config via ThirdPartySettings, behavior via the ADR-0025 plugin type
+
+**Status:** Proposed - exploratory, not built. Written to capture the
+mechanism and a task breakdown, not to lock in implementation details.
+**Date:** 2026-09-28
+
+## Context
+
+Today all four scopes ship as `config/install/aim.aim_scope.{user,role,
+site,case}.yml` inside core `aim` itself. Adding a fifth scope needs zero
+PHP (per [ADR-0001](0001-storage-and-scope-model.md)'s addendum), but
+removing one of the shipped four, or installing `aim` without carrying
+all four scopes' permissions/admin UI/access logic, isn't possible - the
+four are baked into the one module.
+
+Nik's ask, raised while discussing [ADR-0025](0025-scope-access-plugin-type.md):
+make the scope architecture genuinely pluggable - split scopes into their
+own submodules, install only the ones a given site wants, with
+per-submodule behavior differences the same way the sibling Annotations
+module (`web/modules/contrib/annotations`) handles its own bundle
+equivalent.
+
+Checked against Annotations' actual code rather than assumed. Two
+separate mechanisms there, not one:
+
+- **`AnnotationType`** (`annotations.annotation_type.*`, `bundle_of:
+  'annotation'`) is a bare config entity in root - `id`/`label`/
+  `description`/`weight`, nothing else. Root ships **no default types at
+  all**; the `annotations_demo_types` recipe provides editorial/
+  technical/rules. Behavior flags (`affects_coverage`, owned by
+  `annotations_audit`; `in_ai_context`, owned by `annotations_context`)
+  are **ThirdPartySettings** - each submodule reads/writes only its own
+  key on a type it doesn't own.
+- **`TargetPluginManager`** is a separate, unrelated mechanism (which
+  entity types can be annotated), via `#[AnnotationsTarget]` attribute
+  discovery, dedicated plugins shadowing a generic deriver-based
+  fallback. This is what ADR-0025 already modeled `AimScopeAccessInterface`
+  on - correctly, since ThirdPartySettings can hold only data, never a
+  method body.
+
+So the "watertight" version of Nik's ask isn't ThirdPartySettings
+*instead of* ADR-0025's plugin type - it's both, split the same way
+Annotations splits them: **ThirdPartySettings for scope-level config,
+the plugin type for scope-level behavior.**
+
+Two things checked in `aim`'s own code and docs that constrain this ADR
+before it starts:
+
+- **Per-bundle fields were already tried and reverted.** DEVELOPING.md's
+  "Scope/bundle model": moving `subject`/`subject_uid` into
+  `bundleFieldDefinitions()` broke `ai_vdb_provider_mariadb`'s
+  `AiVdbProviderClientBase::isMultiple()` (assumes every field is a base
+  field, threw `Table 'aim_fact_vectors__subject' doesn't exist`) and
+  core's `EntityViewsData` (degraded Views columns to `Broken` handlers).
+  "Don't re-attempt without a concrete reason beyond schema tidiness."
+  This ADR does not reopen that - see "Explicitly out of scope" below.
+- **`AimScopeDeleteForm` already refuses deleting a scope config entity
+  while `aim_fact` entities of that bundle exist** (same precedent as
+  core's `NodeTypeDeleteConfirm`). This is *not* Annotations' pattern
+  (which cascades: deleting an `annotation_type` deletes its annotation
+  rows via `hook_ENTITY_TYPE_delete()`) - `aim` already made the opposite
+  choice, and this ADR keeps it rather than switching to match
+  Annotations. What's unverified is whether that same refusal actually
+  fires during **module uninstall** (config-dependency removal), which is
+  a different code path than the direct entity-delete form - see "Open
+  questions".
+
+Two hardcoded-by-name integration points would need to stop assuming
+`user` specifically (found by grep, not assumed): `AimMemoryManager.php:
+1025` and `AimCommands.php:134` both branch on `$fact->bundle() ===
+'user'` directly in core `aim`, rather than asking the scope for its own
+requirement.
+
+## Decision (best-guess proposal - not committed)
+
+Six separable pieces - deliberately split so they can become independent
+TODO.md/task entries rather than one large change:
+
+1. **Core `aim` ships zero scope instances.** The `aim_scope`/`aim_fact`
+   entity types, `AimMemoryManager`, Guardrails, and vector search stay
+   in core; the four `config/install/aim.aim_scope.*.yml` files move out.
+   Mirrors Annotations shipping no default `annotation_type` at all.
+2. **Four new submodules** - `aim_scope_user`, `aim_scope_role`,
+   `aim_scope_site`, `aim_scope_case` - each ships exactly one
+   `config/install/aim.aim_scope.<id>.yml`. A site installs only the
+   scopes it wants. `role`/`site` start as pure config, zero PHP, same as
+   any site-added fifth scope today. `case` likewise starts as a
+   placeholder - it has no access control of its own yet (an already
+   acknowledged gap, unrelated to this ADR).
+3. **Config-level scope differences move to ThirdPartySettings.** ADR-0007's
+   "subject_uid required for scope=user" becomes a ThirdPartySetting
+   `aim_scope_user` owns on its own config entity (e.g.
+   `$scope->getThirdPartySetting('aim_scope_user', 'requires_subject_uid',
+   FALSE)`), read generically by core `aim` instead of the two
+   `bundle() === 'user'` string checks above.
+4. **Behavioral scope differences stay on ADR-0025's plugin type** -
+   promoted from "seam, unbuilt" to "build it now." `AimUserScopeVisibility`
+   moves out of core `aim`'s `src/Access/` into
+   `aim_scope_user/src/Plugin/AimScopeAccess/`, becoming the plugin
+   type's first real dedicated implementation instead of a hardcoded
+   `if ($entity->bundle() === 'user')` branch in
+   `AimFactAccessControlHandler`.
+5. **`aim_chatbot` declares an explicit dependency on `aim_scope_site`**
+   in its `.info.yml`, replacing today's implicit assumption that `scope:
+   site` exists (its tool is hardcoded to that scope - see
+   [aim_chatbot's CLAUDE.md](../modules/aim_chatbot/CLAUDE.md)).
+6. **A recipe bundles "the four default scopes"** for one-step
+   enablement (matching Annotations' `annotations_demo_types` and aim's
+   own `aim_demo_library` precedent in `recipes/`), so a site that wants
+   today's default behavior doesn't need to hand-enable five modules
+   instead of one.
+
+**Explicitly out of scope:** converting `subject`/`subject_uid` to
+per-bundle fields. Already tried and reverted (see Context) - these stay
+always-present base fields in core `aim`, unused on bundles that don't
+need them, regardless of which scope submodules are installed. This ADR
+makes scopes **config- and behavior-pluggable, not schema-pluggable** - a
+scope submodule cannot introduce its own dedicated field.
+
+## Consequences / risks
+
+- Real reduction in installed footprint for a site that doesn't need
+  every scope - e.g. a site with no per-user personalization doesn't
+  carry `AimUserScopeVisibility`'s admin form
+  (`/admin/config/aim/user-scope-access`), its permissions, or its
+  plugin.
+- Doesn't touch storage layout - `aim_fact` stays one entity type/table,
+  `aim_fact_vectors` stays one collection table. Only the config-entity
+  layer and the access-behavior layer split.
+- Overhead risk: five modules to enable instead of one for the common
+  case. Mitigated by the bundling recipe in piece 6 - without it, this
+  ADR would make the default install experience strictly worse.
+- The two integration points already known to break on bundle
+  assumptions (`ai_vdb_provider_mariadb`'s `isMultiple()`, core's
+  `EntityViewsData`) are **not** touched by this ADR - they broke on the
+  reverted per-bundle-*field* attempt, a different thing from
+  per-bundle-*config-entity* splitting. Worth stating plainly so a future
+  reader doesn't conflate the two kinds of "pluggable."
+- [ADR-0024](0024-annotations-integration-target-scoped-promotion.md)'s
+  proposed `scope: entity` bundle would become the fifth candidate
+  submodule (`aim_scope_entity`) once it has its own ADR - this ADR's
+  submodule shape is what it would land into, not a competing design.
+
+## Open questions
+
+- **Does module uninstall actually respect `AimScopeDeleteForm`'s
+  content-based refusal?** That form guards the direct entity-delete UI
+  path; Drupal's config-dependency removal during `drush pmu` is a
+  different code path and may force-delete the config entity regardless,
+  silently orphaning `aim_fact` rows of that bundle. Needs a real test
+  (enable a scope submodule, create a fact, attempt `drush pmu`) before
+  this ships - not assumed either way.
+- **ThirdPartySettings key ownership.** Annotations' precedent
+  (`annotations_audit` owns `affects_coverage` on an `AnnotationType` it
+  doesn't provide) argues for `aim_scope_user` owning its own
+  `requires_subject_uid` key, read but not owned by core `aim`. Recommend
+  following that unless a concrete reason emerges not to.
+- **Build order relative to ADR-0025.** Build the plugin type first, in
+  core, as ADR-0025 originally proposed (it's already independently
+  designed), and only then move `AimUserScopeVisibility` out into
+  `aim_scope_user` - de-risks the submodule split by not bundling two
+  unproven changes into one. Recommend sequencing pieces 4 before 1-3.
+- **Does this ADR supersede ADR-0025, or sit alongside it?** Recommend
+  alongside - ADR-0025 stays the narrower "behavior plugin type" decision,
+  this ADR is the broader "submodule split" decision that consumes it,
+  matching how ADR-0024 already references ADR-0025 as a dependency
+  rather than folding it in.
+
+None of the above is validated against real code beyond the greps and
+file reads cited in Context - this captures the mechanism and a task
+breakdown, not a spec to build against as-is.
