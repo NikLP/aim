@@ -128,7 +128,7 @@ duplicated here.
   a real account per [ADR-0007](adr/0007-user-scope-requires-real-account.md)),
   `text` (Guardrails-validated), `source`, `state` (tri-state boolean),
   `category` (taxonomy, vocabulary `aim_category`), `asserted` (valid-time
-  start), `related`/`expires` (consolidation's supersede edge), `uid`
+  start), `superseded_by`/`expires` (consolidation's supersede edge), `uid`
   (who wrote it), `trusted` (boolean, the draft-to-trusted gate - defaults
   to `aim.settings:default_trusted`, `recall()` excludes untrusted facts
   unless asked otherwise, see
@@ -138,7 +138,9 @@ duplicated here.
   `user`/`role`/`site`/`case`. No `field_ui_base_route` - deliberately,
   see [DEVELOPING.md](DEVELOPING.md) for why.
 - Vector search: server `aim_vector`, index `aim_vector_index`, collection
-  table `aim_facts` (MariaDB HNSW `VECTOR INDEX`). Retired facts (`expires`
+  table `aim_fact_vectors` (MariaDB HNSW `VECTOR INDEX`; renamed from
+  `aim_facts` 2026-09-28 - too easy to confuse with the `aim_fact` entity
+  table in a raw SQL query). Retired facts (`expires`
   set) are excluded from the index by the `aim_exclude_retired` processor
   ([ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md)),
   `subject_uid` is an indexed attribute with a BTREE index

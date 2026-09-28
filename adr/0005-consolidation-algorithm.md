@@ -108,3 +108,32 @@ a merge (UPDATE) when it is the newer fact, and can have its own text
 overwritten by a later fact's UPDATE when it is the older one. Proposed
 opt-out flag, not built, in
 [ADR-0020](0020-verbatim-facts-consolidation-opt-out.md).
+
+## Addendum (2026-09-28): `related` renamed to `superseded_by`, cardinality 1
+
+Raised while testing this mechanism against real data for the first time
+(it had zero populated rows on the live site until this session manually
+manufactured a duplicate to exercise it). The name `related` was
+deliberately generic, per this ADR's original text, to double as "the
+explicit graph half of aim's fact-to-fact relations idea" - but
+[ADR-0012](0012-fact-relation-graph.md), written the same month, already
+concluded that idea should get its own typed relation entity instead of
+reusing this field, since an authored semantic edge needs a type/
+confidence/provenance that a bare `entity_reference` can't carry. That
+settled the naming question in the specific direction: nothing was ever
+going to legitimately reuse `related` for a different edge meaning, so
+keeping the generic name was cost with no matching benefit. Renamed to
+`superseded_by`, and cardinality dropped from unlimited to 1 to match
+what every write site (`decideAndApply()`) actually does - a candidate
+fact points at exactly one kept fact, never several. As a side effect,
+single cardinality moved storage from a dedicated `aim_fact__related`
+table to a plain `superseded_by` column on the `aim_fact` base table
+itself, matching `expires`. Applied live via
+`EntityDefinitionUpdateManager` (uninstall old, install new), the one
+real data row re-set by hand; no `hook_update_N()`, per this module's
+no-migration-yet policy.
+
+Directionality is unchanged and was not revisited here: still one-way
+(retired fact points at its replacement), which is all the audit-trail
+use case needs - see ADR-0012's own "Directionality" open question for
+the discussion of what a reverse edge would take.

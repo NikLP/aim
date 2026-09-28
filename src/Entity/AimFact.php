@@ -135,11 +135,10 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
       ->setLabel(t('Expires'))
       ->setDescription(t('When set, this fact is superseded and should be excluded from retrieval past this time. Set by consolidation instead of deleting the fact outright, to preserve an audit trail.'));
 
-    $fields['related'] = BaseFieldDefinition::create('entity_reference')
-      ->setLabel(t('Related facts'))
-      ->setDescription(t('Other aim_fact entities this one is linked to, e.g. the fact that superseded it during consolidation.'))
-      ->setSetting('target_type', 'aim_fact')
-      ->setCardinality(BaseFieldDefinition::CARDINALITY_UNLIMITED);
+    $fields['superseded_by'] = BaseFieldDefinition::create('entity_reference')
+      ->setLabel(t('Superseded by'))
+      ->setDescription(t('The aim_fact that replaced this one, set by consolidation when this fact is soft-retired.'))
+      ->setSetting('target_type', 'aim_fact');
 
     $fields['category'] = BaseFieldDefinition::create('entity_reference')
       ->setLabel(t('Category'))

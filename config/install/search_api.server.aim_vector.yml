@@ -16,7 +16,7 @@ backend_config:
   database: mariadb
   database_settings:
     database_name: ''
-    collection: aim_facts
+    collection: aim_fact_vectors
     metric: cosine_similarity
     mhnsw_ef_search: 100
   embeddings_engine: ollama__nomic-embed-text:latest

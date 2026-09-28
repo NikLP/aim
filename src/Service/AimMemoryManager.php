@@ -1167,7 +1167,7 @@ class AimMemoryManager {
     if ($neighbor_result === NULL) {
       return NULL;
     }
-    
+
     [$neighbor, $score] = $neighbor_result;
     if ($score > $ambiguousThreshold) {
       return NULL;
@@ -1237,13 +1237,13 @@ class AimMemoryManager {
         $kept->set('text', $merged_text);
         $kept->save();
         $candidate->set('expires', $this->time->getRequestTime());
-        $candidate->set('related', [$kept->id()]);
+        $candidate->set('superseded_by', $kept->id());
         $candidate->save();
         break;
 
       case 'NOOP':
         $candidate->set('expires', $this->time->getRequestTime());
-        $candidate->set('related', [$kept->id()]);
+        $candidate->set('superseded_by', $kept->id());
         $candidate->save();
         break;
 

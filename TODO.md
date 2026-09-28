@@ -73,6 +73,25 @@ this list as exhaustive.
       column same as `subject_uid`. Lightweight flag, NOT Content
       Moderation (no revisions, no new module deps).
       [ADR-0002 addendum](adr/0002-governance-deferred-guardrails-mandatory.md)
+- [ ] Per-caller `trusted` override, raised 2026-09-28 right after the
+      item above shipped: `default_trusted` is one global site-wide value
+      (deliberate, ADR-0002 addendum), but `remember()` is called by both
+      genuinely human paths (`drush aim:remember`, the entity form) and
+      LLM-driven ones (`aim_chatbot`'s `FunctionCall` tool, `aim_tool`'s
+      MCP tool) that arguably shouldn't share one default. Proposed fix:
+      an optional `?bool $trusted = NULL` param on `remember()`/
+      `createFactsFromCandidates()` - `NULL` falls through to
+      `default_trusted` (config policy unchanged), a caller with a real
+      basis passes an explicit value instead. This is a caller expressing
+      its own provenance, not `aim` hardcoding per-caller branching
+      internally, so it doesn't reopen what the addendum rejected.
+      Caveat: this site's chatbot persona says to wait for the visitor's
+      confirmation before saving (CLAUDE.md), which sounds like a
+      human-in-the-loop signal, but it's prompt-level, not code-enforced -
+      the model can ignore it, so "written via the chatbot" isn't the same
+      reliability as "a human typed this into the admin form" even if
+      both would pass `$trusted = TRUE` naively. Left alone for now, per
+      Nik - not started.
 
 ## ADR-0009 - Recipe/apply surface (design only, nothing built)
 
@@ -110,9 +129,11 @@ questions" section)
       in a 5k-row corpus; a user holding a large share of the table stays
       approximate (82-97%), crossover not located. Results and limits in
       [ADR-0018](adr/0018-index-subject-uid-with-btree.md).
-- [ ] Add a `related_reason` field on `aim_fact` (provenance-on-invalidation,
+- [ ] Add a `superseded_by_reason` field on `aim_fact` (provenance-on-invalidation,
       ADR-0010 parity target #6 /
-      [ADR-0005](adr/0005-consolidation-algorithm.md)).
+      [ADR-0005](adr/0005-consolidation-algorithm.md)). Named to match the
+      2026-09-28 rename of `related` to `superseded_by` - see that ADR's
+      addendum.
 - [x] Add the `asserted` field - BUILT 2026-09-11 (installed live via
       `installFieldStorageDefinition()`, no data loss on the 81 existing
       facts). Covers valid-time *start* only, defaults to `created`.
@@ -235,7 +256,7 @@ questions" section)
       consolidation sweep (see [ADR-0017](adr/0017-query-embedding-cache.md)),
       by feeding it the fact's own already-indexed vector. Blocked: with
       `getRawEmbeddingFieldName()` unimplemented for MariaDB, there is no
-      way to read a fact's already-stored vector back out of `aim_facts`
+      way to read a fact's already-stored vector back out of `aim_fact_vectors`
       through the supported provider API, so `vector_input` has nothing
       to be given except a freshly embedded vector - no cheaper than
       `->keys()`. ADR-0017's embedding cache remains the correct near-term

@@ -36,7 +36,7 @@ final class AimCommands extends DrushCommands {
    *   The aim memory manager.
    * @param \Drupal\Core\Database\Connection $database
    *   The default database connection, used by aim:status to query the
-   *   aim_fact and aim_facts tables directly.
+   *   aim_fact and aim_fact_vectors tables directly.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory, used by aim:status to read the live HNSW and
    *   recall cutoff settings.
@@ -663,7 +663,7 @@ final class AimCommands extends DrushCommands {
   private function checkIndexParity(): array {
     $row = $this->database->query('SELECT
       (SELECT COUNT(*) FROM {aim_fact} WHERE expires IS NULL AND text IS NOT NULL) AS live,
-      (SELECT COUNT(*) FROM {aim_facts}) AS vector_rows')->fetchAssoc();
+      (SELECT COUNT(*) FROM {aim_fact_vectors}) AS vector_rows')->fetchAssoc();
     $live = (int) $row['live'];
     $vectorRows = (int) $row['vector_rows'];
     $ok = $live === $vectorRows;
@@ -684,7 +684,7 @@ final class AimCommands extends DrushCommands {
    *   ['label' => string, 'ok' => bool, 'detail' => string].
    */
   private function checkOrphanVectorRows(): array {
-    $orphans = (int) $this->database->query("SELECT COUNT(*) FROM {aim_facts} v
+    $orphans = (int) $this->database->query("SELECT COUNT(*) FROM {aim_fact_vectors} v
       LEFT JOIN {aim_fact} f ON v.drupal_entity_id = CONCAT('entity:aim_fact/', f.id, ':en')
       WHERE f.id IS NULL")->fetchField();
 
@@ -724,15 +724,15 @@ final class AimCommands extends DrushCommands {
     // by Drupal's mysql driver) - present under ANSI or TRADITIONAL alone,
     // only their combination hides it (checked against 2026-09-27 live
     // data). ANSI_QUOTES alone keeps it and still double-quotes
-    // identifiers, matching what {aim_facts} substitutes to here, so swap
-    // to that for this one query and restore afterward. The M attribute's
-    // case also varies (`M` in DDL written explicitly, `m` when MariaDB
-    // applies createCollection()'s SET SESSION mhnsw_default_m and
+    // identifiers, matching what {aim_fact_vectors} substitutes to here, so
+    // swap to that for this one query and restore afterward. The M
+    // attribute's case also varies (`M` in DDL written explicitly, `m` when
+    // MariaDB applies createCollection()'s SET SESSION mhnsw_default_m and
     // re-serializes it) - the match below is case-insensitive.
     $originalMode = (string) $this->database->query('SELECT @@SESSION.sql_mode')->fetchField();
     $this->database->query('SET SESSION sql_mode = :mode', [':mode' => 'ANSI_QUOTES']);
     try {
-      $createTable = (string) $this->database->query('SHOW CREATE TABLE {aim_facts}')->fetchField(1);
+      $createTable = (string) $this->database->query('SHOW CREATE TABLE {aim_fact_vectors}')->fetchField(1);
     }
     finally {
       $this->database->query('SET SESSION sql_mode = :mode', [':mode' => $originalMode]);
@@ -743,7 +743,7 @@ final class AimCommands extends DrushCommands {
     $problems = [];
     if ($m !== AimMariaDBProvider::HNSW_M) {
       $problems[] = $m === NULL
-        ? "M not found in aim_facts' VECTOR KEY"
+        ? "M not found in aim_fact_vectors' VECTOR KEY"
         : "M=$m, expected " . AimMariaDBProvider::HNSW_M . ' - rebuild the index (DEVELOPING.md "Tuning vector search accuracy")';
     }
     if ($efSearch === NULL) {

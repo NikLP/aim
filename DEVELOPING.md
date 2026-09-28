@@ -143,7 +143,7 @@ item from the server. Retiring a fact is a plain `save()` that re-tracks
 it, so its row goes on the next `sapi-i` (`index_directly` is off), and
 clearing `expires` brings it back. `recall()`/`findNearestNeighbor()` keep
 their PHP `expires` check as a safety net for that gap. Retired facts stay
-`aim_fact` entities (audit trail, `related` edges, admin views) but are not
+`aim_fact` entities (audit trail, `superseded_by` edges, admin views) but are not
 vector-searchable. Design, verification and rollout in
 [ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md).
 
@@ -175,7 +175,7 @@ works around three bugs in provider 1.0.1 and the 1.0.x head (checked
 throw is #3609961 (its RTBC MR drops the whole collection on every index
 save, so do not take a provider release with that as written); the
 10-row delete cap and the empty numeric value have no issue yet. Saving
-the index threw `Table 'aim_facts' already exists` (an unhandled
+the index threw `Table 'aim_fact_vectors' already exists` (an unhandled
 `mysqli_sql_exception` from `createCollection()`, before `updateFields()`
 ran); `deleteItems()`/`deleteIndexItems()` removed at most 10 rows per
 call (`getVdbIds()` used `querySearch()`'s default limit); and an empty
@@ -258,8 +258,8 @@ once if it is not 16 (seconds for thousands of rows, longer for millions,
 and writes to the table may block meanwhile):
 
 ```bash
-ddev drush sql:query "SHOW CREATE TABLE aim_facts" | tr '\\' '\n' | grep "VECTOR KEY"
-ddev drush sql:query "ALTER TABLE aim_facts DROP INDEX embedding, ADD VECTOR INDEX embedding (embedding) M=16 DISTANCE=cosine"
+ddev drush sql:query "SHOW CREATE TABLE aim_fact_vectors" | tr '\\' '\n' | grep "VECTOR KEY"
+ddev drush sql:query "ALTER TABLE aim_fact_vectors DROP INDEX embedding, ADD VECTOR INDEX embedding (embedding) M=16 DISTANCE=cosine"
 ```
 
 To confirm a setting reaches the query connection, turn on MariaDB's
@@ -278,17 +278,17 @@ test corpus, then compare the index to exact search:
    holding 20% or more of all facts. Index them (`sapi-i`); synthetic facts
    skip the consolidation queue.
 2. For about 30 stored vectors, set `@v` to the vector and compare, for
-   each user and k of 5 and 20, `SELECT drupal_entity_id FROM aim_facts
+   each user and k of 5 and 20, `SELECT drupal_entity_id FROM aim_fact_vectors
    WHERE index_id='aim_vector_index' AND subject_uid=<uid> ORDER BY
    VEC_DISTANCE_COSINE(embedding, @v) LIMIT k` against the same query with
    `IGNORE INDEX (embedding)`, which is exact. Recall is the overlap over
    k. Repeat with `SET SESSION mhnsw_ef_search = <n>` for a few values.
-3. Do this on a copy (`CREATE TABLE ... LIKE aim_facts` then `INSERT ...
+3. Do this on a copy (`CREATE TABLE ... LIKE aim_fact_vectors` then `INSERT ...
    SELECT`) so index rebuilds and ef_search experiments never touch live
    data. `aim:benchmark-cleanup zzpar` and deleting the accounts removes
    the corpus.
 
-**Stale vector rows self-heal:** a row in `aim_facts` whose fact no longer
+**Stale vector rows self-heal:** a row in `aim_fact_vectors` whose fact no longer
 exists (deleted directly, or a test leftover) logs a one-off "Could not
 load the following items on index" warning the first time a query returns
 it, then search_api deletes it (`delete_on_fail: TRUE` on the index).
@@ -351,7 +351,7 @@ drush aim:status
 ```
 
 Five checks `config:status` can't do, because they're runtime DB state,
-not config: vector index parity (live fact count vs. `aim_facts` row
+not config: vector index parity (live fact count vs. `aim_fact_vectors` row
 count), orphan vector rows, the `mariadb` VDB provider plugin still
 resolving to `AimMariaDBProvider`, the collection table's build-time HNSW
 `M` and the server's `mhnsw_ef_search`, and `aim.settings:recall_max_distance`
@@ -366,7 +366,7 @@ KEY's `M=`/`DISTANCE=` suffix under this site's own `sql_mode`
 `ANSI` or `TRADITIONAL` alone, only the combination hides it (checked
 2026-09-27). The HNSW check works around it by swapping the session to
 `ANSI_QUOTES` alone (keeps the suffix, keeps double-quoted identifiers
-so `{aim_facts}` substitution still parses) for that one query, restoring
+so `{aim_fact_vectors}` substitution still parses) for that one query, restoring
 the original mode straight after. Not filed upstream yet - MariaDB vector
 support is new enough, and this quirk narrow enough (one specific
 sql_mode combination, cosmetic only, the index itself still applies its
@@ -459,7 +459,7 @@ point.
 (`bundleFieldDefinitions()`).** Tried and reverted: it broke
 `ai_vdb_provider_mariadb`'s `AiVdbProviderClientBase::isMultiple()`
 (assumes every field is a base field, throws `Table
-'aim_facts__subject' doesn't exist`) and core's `EntityViewsData`
+'aim_fact_vectors__subject' doesn't exist`) and core's `EntityViewsData`
 (degrades the Views columns to `Broken` handlers). Both are patchable in
 isolation, but the pattern - "every contrib/core integration point that
 assumes all fields are base fields" - generalizes badly for a module
@@ -474,7 +474,9 @@ reason beyond schema tidiness.
 
 Server `aim_vector` (backend `search_api_ai_search`, VDB provider
 `mariadb`), index `aim_vector_index` over `entity:aim_fact`, collection
-table `aim_facts` (real MariaDB 11.7+ HNSW `VECTOR INDEX`, not a
+table `aim_fact_vectors` (renamed from `aim_facts` 2026-09-28 - too close
+to the `aim_fact` entity table for a raw SQL query to tell apart at a
+glance; real MariaDB 11.7+ HNSW `VECTOR INDEX`, not a
 brute-force scan). `text` indexed as `main_content`; `scope`/`subject`/
 `subject_uid`/`source`/`trusted` as `attributes` (`subject_uid` as an
 `integer`, `NULL` for every scope but user; `trusted` as a `boolean`,
@@ -512,7 +514,7 @@ then export the index config.
   throw (see "`ai_vdb_provider_mariadb` is swapped for a subclass" above),
   so a stale table no longer needs a `DROP TABLE`.
 - `drush search-api:clear aim_vector_index` can drop and reprovision
-  `aim_facts` down to just the base columns, silently losing `scope`/
+  `aim_fact_vectors` down to just the base columns, silently losing `scope`/
   `source`/`subject`/`text` - the next `search-api:index` then fails
   `Unknown column 'scope'`. Fix is the same index entity `->save()`
   above, not running `search-api:clear` again. After a `DROP TABLE`-and-
@@ -692,7 +694,7 @@ call:
    one**, verify with a real call (`$provider->embeddings(new
    EmbeddingsInput('test'), '<model>', [])`, count the array), update
    `embeddings_engine_configuration.dimensions`, and `DROP TABLE
-   aim_facts` before step 6 - `VECTOR` columns are fixed-width.
+   aim_fact_vectors` before step 6 - `VECTOR` columns are fixed-width.
 6. **Re-save the index entity** to force the collection table's
    attribute columns to exist (see "Vector search" above):
 
@@ -706,9 +708,11 @@ call:
    alter hook is not applying - check the class it prints there.
 7. **Reindex every fact, not incrementally** - a provider/model change
    means every existing vector is in the old embedding space. If step 5
-   dropped/rebuilt `aim_facts`, the table is already empty - reindex
+   dropped/rebuilt `aim_fact_vectors`, the table is already empty - reindex
    directly and skip `search-api:clear` (it reprovisions the table down
-   to base columns, dropping `scope`/`source`/`subject`/`text` again). If
+   to base columns, dropping `scope`/`source`/`subject`/`text` again; see
+   "Vector search" above for the 2026-09-28 rename to `aim_fact_vectors`).
+   If
    no dimension change happened, `search-api:clear` is safe first:
 
    ```bash
