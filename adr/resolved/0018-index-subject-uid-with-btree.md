@@ -7,7 +7,7 @@
 
 `recall()` (with `--subject-uid`) and `findNearestNeighbor()` (scope=user)
 cannot narrow by `subject_uid` in the query, because it is not an indexed
-Search API attribute. [ADR-0007](0007-user-scope-requires-real-account.md)
+Search API attribute. [ADR-0007](../0007-user-scope-requires-real-account.md)
 shipped an over-fetch (`recall()` asks for 5x the limit, user-scope
 neighbor search asks for 20 instead of 5) plus a PHP-side equality check
 as the workaround. TODO.md carried "index `subject_uid` as a search_api

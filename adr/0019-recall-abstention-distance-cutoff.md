@@ -2,7 +2,7 @@
 
 **Status:** Accepted - chatbot cutoff built 2026-09-19; the follow-ups
 under "Not built" are open. The retired-slot finding is resolved by
-[ADR-0022](0022-exclude-retired-facts-from-vector-index.md) (2026-09-26)
+[ADR-0022](resolved/0022-exclude-retired-facts-from-vector-index.md) (2026-09-26)
 **Date:** 2026-09-20 (measurements taken 2026-09-19)
 
 ## Context
@@ -107,7 +107,7 @@ Found while measuring the above; it limits how many facts the cutoff has
 to work with.
 
 **Resolved 2026-09-26 by
-[ADR-0022](0022-exclude-retired-facts-from-vector-index.md):** a Search
+[ADR-0022](resolved/0022-exclude-retired-facts-from-vector-index.md):** a Search
 API processor keeps retired facts out of the index, which is neither
 the over-fetch recommended below nor the indexed `retired` flag argued
 against below (it adds no column and no query condition). The analysis
@@ -142,7 +142,7 @@ supersede keeps an audit trail), so they take up result slots.
   new index column, a full reindex, and still a PHP post-filter for the
   gap before a retirement is reindexed. It also inherits how MariaDB 11.8
   filters an HNSW query, which is lossy for sparse filters
-  ([ADR-0018](0018-index-subject-uid-with-btree.md), finding 3, which
+  ([ADR-0018](resolved/0018-index-subject-uid-with-btree.md), finding 3, which
   also shows a BTREE index on the column restoring exact results). A spot
   check on 2026-09-20 (`aim_facts`, 115 rows) reproduced its result:
   `scope='role'` (1 row) returned 0 rows through the vector index and 1

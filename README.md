@@ -131,7 +131,7 @@ the test used made-up facts, and it was one size. Re-check when your
 memory grows about tenfold, when you change the embeddings model, or when
 you upgrade the vector provider. How, and where these settings live, is in
 [DEVELOPING.md](DEVELOPING.md); the measurements are in
-[ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md).
+[ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md).
 
 ## A second surface: generative/planning use
 

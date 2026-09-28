@@ -6,12 +6,12 @@
 ## Context
 
 Consolidation retires a superseded fact by setting `expires`, never by
-deleting it, to keep an audit trail ([ADR-0005](0005-consolidation-algorithm.md)).
+deleting it, to keep an audit trail ([ADR-0005](../0005-consolidation-algorithm.md)).
 The vector index does not know `expires`, so retired facts stayed in it and
 `recall()` filtered them out in PHP after the index had already applied
 `range(0, $limit)`. They took result slots: 57 of the 115 rows in the
 vector table were retired, and `recall()` at limit 5 returned 2-3 live
-rows ([ADR-0019](0019-recall-abstention-distance-cutoff.md), "Related
+rows ([ADR-0019](../0019-recall-abstention-distance-cutoff.md), "Related
 finding"). The retired share only grows, and every retired row also
 inflates the HNSW index and every neighbor search consolidation runs.
 
@@ -116,7 +116,7 @@ ddev drush sapi-i aim_vector_index
 - **A separate `aim_fact_retired` table or entity.** Retirement is a state
   of a fact, not a different kind of thing. Moving a row gives it a new id,
   which breaks `related` edges pointing at it (the dangling-edge problem in
-  [ADR-0012](0012-fact-relation-graph.md)), duplicates the entity type,
+  [ADR-0012](../0012-fact-relation-graph.md)), duplicates the entity type,
   views and access handler, complicates consolidation's "lower id is kept"
   rule, and turns un-retiring into a copy. The one thing it buys, removing
   the vector row, this decision gives for free.

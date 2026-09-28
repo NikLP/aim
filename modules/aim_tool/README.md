@@ -31,4 +31,4 @@ with `mcp_server_tool_bridge` 1.0.0-beta3). `aim_recall` drops facts past
    [aim_tool_oauth](../aim_tool_oauth/README.md).
 
 Full detail: [DEVELOPING.md](DEVELOPING.md). Decision record:
-[ADR-0013](../../adr/0013-mcp-tool-exposure.md).
+[ADR-0013](../../adr/resolved/0013-mcp-tool-exposure.md).

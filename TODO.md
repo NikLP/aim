@@ -53,12 +53,13 @@ this list as exhaustive.
       below); still open: whether a per-scope `trust {scope} aim facts`
       permission is worth generating, versus staying on the flat
       `administer aim memory` gate.
-- [ ] Build MCP exposure for aim - `#[Mcp]` plugins (via `drupal/mcp_server`/
-      `drupal/mcp`, confirmed real and maintained on drupal.org) wrapping
-      `AimMemoryManager::remember()`/`recall()`, mirroring `aim_chatbot`'s
-      existing `#[FunctionCall]` plugins. Ties to the Tool API/MCP pattern
-      already flagged in
-      [ADR-0010](adr/0010-drupal-native-agent-memory-rationale.md).
+- [x] Build MCP exposure for aim - DONE, via a different mechanism than
+      first proposed here: not direct `#[Mcp]` plugins, but `aim_tool`'s
+      `#[Tool]` plugins (`AimRemember`/`AimRecall`, backed by
+      `aim.memory_manager` directly) exposed over MCP through
+      `mcp_server_tool_bridge`, OAuth-authenticated. Built and verified
+      2026-09-12/13, see
+      [ADR-0013](adr/resolved/0013-mcp-tool-exposure.md) (resolved).
 
 ## PoC deviations to close before non-PoC data goes in
 
@@ -73,25 +74,26 @@ this list as exhaustive.
       column same as `subject_uid`. Lightweight flag, NOT Content
       Moderation (no revisions, no new module deps).
       [ADR-0002 addendum](adr/0002-governance-deferred-guardrails-mandatory.md)
-- [ ] Per-caller `trusted` override, raised 2026-09-28 right after the
-      item above shipped: `default_trusted` is one global site-wide value
-      (deliberate, ADR-0002 addendum), but `remember()` is called by both
-      genuinely human paths (`drush aim:remember`, the entity form) and
-      LLM-driven ones (`aim_chatbot`'s `FunctionCall` tool, `aim_tool`'s
-      MCP tool) that arguably shouldn't share one default. Proposed fix:
-      an optional `?bool $trusted = NULL` param on `remember()`/
-      `createFactsFromCandidates()` - `NULL` falls through to
-      `default_trusted` (config policy unchanged), a caller with a real
-      basis passes an explicit value instead. This is a caller expressing
-      its own provenance, not `aim` hardcoding per-caller branching
-      internally, so it doesn't reopen what the addendum rejected.
-      Caveat: this site's chatbot persona says to wait for the visitor's
-      confirmation before saving (CLAUDE.md), which sounds like a
-      human-in-the-loop signal, but it's prompt-level, not code-enforced -
-      the model can ignore it, so "written via the chatbot" isn't the same
-      reliability as "a human typed this into the admin form" even if
-      both would pass `$trusted = TRUE` naively. Left alone for now, per
-      Nik - not started.
+- [x] Per-caller `trusted` override - BUILT 2026-09-28 (commit
+      `0b8921f`, right after `default_trusted` flipped to `false` turned
+      out to silently break the demo - every fact written via
+      `aim_chatbot`/`aim_tool`/`drush aim:remember`/`demo/seed.php`
+      became invisible to `recall()`). `remember()`/
+      `createFactsFromCandidates()` both gained `?bool $trusted = NULL`;
+      `NULL` (the default) still falls through to `default_trusted`, so
+      `aim_chatbot`'s `AimRemember` and `aim_tool`'s MCP `AimRemember`
+      are both unchanged, still on the config default. `demo/seed.php`
+      now passes `trusted: TRUE` explicitly on all four `remember()`
+      calls, since it's curated demo data, not live LLM extraction. No
+      `--trusted` flag added to `drush aim:remember`/`aim:extract` - not
+      needed for the immediate demo fix; add one if another human-curated
+      batch-load use case shows up.
+      Caveat still true: this site's chatbot persona says to wait for the
+      visitor's confirmation before saving (CLAUDE.md), which sounds like
+      a human-in-the-loop signal, but it's prompt-level, not
+      code-enforced - the model can ignore it, so "written via the
+      chatbot" isn't the same reliability as "a human typed this into the
+      admin form" even though both stay on the same `NULL` fallback here.
 
 ## ADR-0009 - Recipe/apply surface (design only, nothing built)
 
@@ -128,7 +130,7 @@ questions" section)
       as `NULL` by `AimMariaDBProvider`. Exact for users up to 100 facts
       in a 5k-row corpus; a user holding a large share of the table stays
       approximate (82-97%), crossover not located. Results and limits in
-      [ADR-0018](adr/0018-index-subject-uid-with-btree.md).
+      [ADR-0018](adr/resolved/0018-index-subject-uid-with-btree.md).
 - [ ] Add a `superseded_by_reason` field on `aim_fact` (provenance-on-invalidation,
       ADR-0010 parity target #6 /
       [ADR-0005](adr/0005-consolidation-algorithm.md)). Named to match the
@@ -154,7 +156,7 @@ questions" section)
       candidate-fact guardrails.
 - [x] Cache query embeddings via Drupal's Cache API, keyed on (query text,
       embeddings model ID) - BUILT 2026-09-27 as designed in
-      [ADR-0017](adr/0017-query-embedding-cache.md): `AimEmbeddingCacheSubscriber`
+      [ADR-0017](adr/resolved/0017-query-embedding-cache.md): `AimEmbeddingCacheSubscriber`
       on drupal/ai's `PreGenerateResponseEvent`/`PostGenerateResponseEvent`,
       active only for the duration of `AimMemoryManager::executeSearchQuery()`
       (so index-time embeds are never cached), dedicated `cache.aim_embeddings`
@@ -210,7 +212,7 @@ questions" section)
       instead of the over-fetch this item first proposed. Rolled out on
       the live site (115 vector rows to 58, `recall(limit 5)` back to 5
       rows). Decision, verification and rollout in
-      [ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md).
+      [ADR-0022](adr/resolved/0022-exclude-retired-facts-from-vector-index.md).
 - [ ] Upstream work for `AimMariaDBProvider`'s overrides (status checked
       against drupal.org and the git history 2026-09-27; the provider project
       has only 6 issues):
@@ -243,7 +245,7 @@ questions" section)
       `mhnsw_ef_search` in the shipped server config carries over unchanged.
       When the last override goes, delete the class and
       `AimHooks::vdbProviderInfoAlter()`. See
-      [ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md).
+      [ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md).
 - [ ] `ai_vdb_provider_mariadb`'s `MariaDBProvider` does not implement
       `getRawEmbeddingFieldName()` (inherits `AiVdbProviderClientBase`'s
       default, which returns `NULL`; checked 2026-09-27) - a feature
@@ -253,7 +255,7 @@ questions" section)
       that skips the provider's embed call when the caller already has a
       vector - explored 2026-09-27 as a way to stop
       `findNearestNeighbor()` re-embedding each fact's own text on every
-      consolidation sweep (see [ADR-0017](adr/0017-query-embedding-cache.md)),
+      consolidation sweep (see [ADR-0017](adr/resolved/0017-query-embedding-cache.md)),
       by feeding it the fact's own already-indexed vector. Blocked: with
       `getRawEmbeddingFieldName()` unimplemented for MariaDB, there is no
       way to read a fact's already-stored vector back out of `aim_fact_vectors`
@@ -318,8 +320,10 @@ questions" section)
 
 ## Governance/scope design thread (2026-09-27/28) - handoff
 
-Three ADRs came out of one long design conversation about unblocking the
-Annotations bridge. Status as of 2026-09-28:
+Four ADRs came out of one long design conversation about unblocking the
+Annotations bridge (a fourth, ADR-0026, branched off discussing ADR-0025's
+premise into a broader "make scopes genuinely pluggable" ask). Status as
+of 2026-09-28:
 
 - [x] Annotations' `save()` write path - DONE per Nik, 2026-09-28. Was
       [ADR-0024](adr/0024-annotations-integration-target-scoped-promotion.md)'s
@@ -333,6 +337,28 @@ Annotations bridge. Status as of 2026-09-28:
       plugin) - designed, not built, no forcing function until a second
       scope needs its own access rule.
       [ADR-0025](adr/0025-scope-access-plugin-type.md)
+- [ ] Pluggable scope submodules (`aim_scope_user`/`role`/`site`/`case`,
+      each shipping its own `aim.aim_scope.<id>.yml`; scope-level config
+      differences as ThirdPartySettings the owning submodule reads/writes,
+      e.g. ADR-0007's "subject_uid required for user" instead of the two
+      hardcoded `bundle() === 'user'` checks in `AimMemoryManager.php`/
+      `AimCommands.php`; scope-level behavior differences on ADR-0025's
+      plugin type) - raised 2026-09-28, six-piece breakdown in
+      [ADR-0026](adr/0026-pluggable-scope-submodules.md), nothing built.
+      Explicitly does not move `subject`/`subject_uid` to per-bundle
+      fields - already tried and reverted (DEVELOPING.md's "Scope/bundle
+      model").
+- [ ] Verify `AimScopeDeleteForm`'s refusal to delete a scope while
+      `aim_fact` entities of that bundle exist actually fires during
+      **module uninstall** (`drush pmu`), not just the direct entity-delete
+      UI path - config-dependency removal during uninstall is a different
+      code path and may bypass it, silently orphaning `aim_fact` rows.
+      Untested either way; a real blocker for ADR-0026's submodule split
+      (a scope submodule needs to be safely uninstallable), flagged in
+      that ADR's "Open questions" but worth its own line here since it's
+      a concrete, isolated thing to test (enable a scope submodule, create
+      a fact, attempt `drush pmu`, see what happens) independent of the
+      rest of the split.
 - [ ] `scope: entity` bundle (dynamic reference to any Drupal entity,
       single-value base field so it stays inline on `aim_fact`, no new
       table) - still theoretical, a nice-to-have per Nik, not its own ADR

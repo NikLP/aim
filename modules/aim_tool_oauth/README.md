@@ -26,5 +26,5 @@ Full setup runbook (dependency chain, composer gotcha, key generation,
 HTTPS exposure, client registration) is in
 [DEVELOPING.md](DEVELOPING.md#setup) - follow it in order, it's fiddly.
 
-Decision record: [ADR-0013](../../adr/0013-mcp-tool-exposure.md)'s OAuth
+Decision record: [ADR-0013](../../adr/resolved/0013-mcp-tool-exposure.md)'s OAuth
 addendum.

@@ -13,7 +13,7 @@ MCP client with no Drupal session (Claude.ai/Claude Desktop connector, or
 any headless caller) authenticates via OAuth2 instead of a logged-in
 browser session. Existing cookie/session access is untouched - `oauth2`
 is appended to `mcp_server.handle`'s `_auth`, not swapped in. Full detail
-in [ADR-0013](../../adr/0013-mcp-tool-exposure.md)'s OAuth addendum.
+in [ADR-0013](../../adr/resolved/0013-mcp-tool-exposure.md)'s OAuth addendum.
 
 **Dependency chain:** `drupal/simple_oauth` (OAuth2 authorization server)
 + `e0ipso/simple_oauth_21` (OAuth 2.1: PKCE, RFC 9728 discovery metadata,

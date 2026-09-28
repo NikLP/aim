@@ -145,7 +145,7 @@ clearing `expires` brings it back. `recall()`/`findNearestNeighbor()` keep
 their PHP `expires` check as a safety net for that gap. Retired facts stay
 `aim_fact` entities (audit trail, `superseded_by` edges, admin views) but are not
 vector-searchable. Design, verification and rollout in
-[ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md).
+[ADR-0022](adr/resolved/0022-exclude-retired-facts-from-vector-index.md).
 
 **Enabling the processor on an existing site:** `config/install` does not
 re-run on an installed module. Enable it on the index (admin UI, or config
@@ -166,7 +166,7 @@ selective filter returns short or wrong results. A user holding a large
 share of the table (measured at 20% and 77%) is served by HNSW instead and
 stays approximate (82 to 97% of the exact top-k), which is why `recall()`
 still over-fetches 5x for a uid filter. Measurements and the limits of
-the test in [ADR-0018](adr/0018-index-subject-uid-with-btree.md).
+the test in [ADR-0018](adr/resolved/0018-index-subject-uid-with-btree.md).
 
 **`ai_vdb_provider_mariadb` is swapped for a thin subclass:**
 `Drupal\aim\Vdb\AimMariaDBProvider`, via `AimHooks::vdbProviderInfoAlter()`,
@@ -186,11 +186,11 @@ helper (below). **It is a shim:** each override needs an upstream issue in
 TODO.md and goes when the provider releases the fix, and aim ships tuned
 values under the provider's own config key names rather than inventing
 its own (rule and per-override table in
-[ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md)). If a symptom
+[ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)). If a symptom
 returns, check the alter hook still applies
 (`ddev drush php:eval 'echo get_class(\Drupal::service("ai.vdb_provider")->createInstance("mariadb"));'`
 should print the aim class). Bug details in
-[ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md).
+[ADR-0022](adr/resolved/0022-exclude-retired-facts-from-vector-index.md).
 
 **A fourth override (string attributes written Markdown-escaped) was
 removed 2026-09-27**, after the site moved from `ai_search` as bundled
@@ -198,7 +198,7 @@ inside `drupal/ai` 1.4.9 to the standalone `drupal/ai_search:^1.3@alpha`
 package (1.3.0-alpha5), which carries the upstream fix (#3572801). See
 "Upgrading to standalone `ai_search`" below for that migration; the
 removed override is documented for provenance in
-[ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md).
+[ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md).
 
 ### Upgrading to standalone `ai_search`
 
@@ -246,7 +246,7 @@ Verify with `drush aim:status` and a real `drush aim:recall`/
 test. aim ships `M=16` and `ef_search=100`, which matched the exact answer
 on every test question at 1-6 ms. Plain-English version in
 [README.md](README.md); measurements in
-[ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md).
+[ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md).
 
 | Setting | Where | Applies |
 | --- | --- | --- |
@@ -324,7 +324,7 @@ configuration, query text), in a dedicated `cache.aim_embeddings` bin
 written to it; `ai_search` gives query-time and index-time embeds the
 same operation type and tag set otherwise, so this is the only reliable
 way to tell them apart. Design and alternatives considered in
-[ADR-0017](adr/0017-query-embedding-cache.md), including why the fact's
+[ADR-0017](adr/resolved/0017-query-embedding-cache.md), including why the fact's
 own already-indexed vector can't be reused directly instead (blocked on
 `ai_vdb_provider_mariadb`, see "Upgrading to standalone `ai_search`"
 above).
@@ -628,12 +628,12 @@ update hooks (CLAUDE.md), so a site installed before 2026-09-26 needs these
 by hand. Fresh installs get all of it from config and the shim.
 
 1. **Retired facts out of the index**
-   ([ADR-0022](adr/0022-exclude-retired-facts-from-vector-index.md)): add the
+   ([ADR-0022](adr/resolved/0022-exclude-retired-facts-from-vector-index.md)): add the
    `aim_exclude_retired` processor to `aim_vector_index`, then purge the
    retired rows already indexed (the snippet under "Enabling the processor
    on an existing site" in "Vector search").
 2. **`subject_uid` as an indexed attribute**
-   ([ADR-0018](adr/0018-index-subject-uid-with-btree.md)): add an `integer`
+   ([ADR-0018](adr/resolved/0018-index-subject-uid-with-btree.md)): add an `integer`
    field `subject_uid` (datasource `entity:aim_fact`, property path
    `subject_uid`) to `search_api.index.aim_vector_index`, and
    `indexing_options.subject_uid: attributes` to
@@ -645,7 +645,7 @@ by hand. Fresh installs get all of it from config and the shim.
    `hook_ai_vdb_provider_info_alter()` after `drush cr`. Check with the
    `get_class(...)` one-liner under "`ai_vdb_provider_mariadb` is swapped
    for a thin subclass".
-4. **HNSW tuning** ([ADR-0023](adr/0023-hnsw-tuning-and-thin-provider-shim.md)):
+4. **HNSW tuning** ([ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)):
    add `mhnsw_ef_search: 100` to the server's `database_settings`, and
    rebuild the vector index once at `M=16` (the `ALTER TABLE` under "Tuning
    vector search accuracy").

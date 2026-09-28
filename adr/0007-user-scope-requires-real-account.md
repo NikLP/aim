@@ -36,7 +36,7 @@ about; `subject` (the free string field) is now only meaningful for
   switched from an indexed `subject` condition to an over-fetch
   (5x/4x the limit) plus PHP-side exact `subject_uid` equality filter,
   since `subject_uid` wasn't an indexed Search API attribute. Superseded
-  2026-09-26 by [ADR-0018](0018-index-subject-uid-with-btree.md):
+  2026-09-26 by [ADR-0018](resolved/0018-index-subject-uid-with-btree.md):
   `subject_uid` is now indexed, with a BTREE index, and both filter by a
   query condition. `recall` keeps a 5x over-fetch as ANN headroom only.
 - `recall` gained a separate `--subject-uid` option rather than

@@ -93,7 +93,7 @@ Measured, with the recommended over-fetch fix and why an index-level
 flag is not the first choice, in
 [ADR-0019](0019-recall-abstention-distance-cutoff.md). Resolved
 2026-09-26 differently: retired facts are now excluded from the index by
-a Search API processor, [ADR-0022](0022-exclude-retired-facts-from-vector-index.md).
+a Search API processor, [ADR-0022](resolved/0022-exclude-retired-facts-from-vector-index.md).
 The PHP `expires` filters above stay as a safety net for the gap before
 the next index run.
 

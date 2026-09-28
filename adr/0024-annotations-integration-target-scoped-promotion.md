@@ -71,7 +71,7 @@ Three separable pieces:
 **1. Dependency direction and packaging.** A thin bridge submodule,
 `aim_annotations`, living under `aim` (`aim` depends toward Annotations,
 never the reverse). This matches the thin-shim convention
-[ADR-0023](0023-hnsw-tuning-and-thin-provider-shim.md) already sets for
+[ADR-0023](resolved/0023-hnsw-tuning-and-thin-provider-shim.md) already sets for
 `AimMariaDBProvider`, and keeps Annotations - the funded, closer-to-stable
 project - free of any dependency on `aim`'s experimental stack. `aim`
 stays independently usable without Annotations installed.

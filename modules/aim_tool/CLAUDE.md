@@ -32,5 +32,5 @@ default (an off-topic query returns "No relevant facts found." instead of
 the nearest unrelated facts), and takes an optional `max_distance` input
 to override it ([ADR-0019](../../adr/0019-recall-abstention-distance-cutoff.md)).
 
-See [ADR-0013](../../adr/0013-mcp-tool-exposure.md) for why this is a
+See [ADR-0013](../../adr/resolved/0013-mcp-tool-exposure.md) for why this is a
 separate plugin pair from `aim_chatbot`'s rather than a shared one.

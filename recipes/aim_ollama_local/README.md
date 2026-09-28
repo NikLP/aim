@@ -21,7 +21,7 @@ involved.
 
 It does not set `recall_max_distance` or HNSW tuning (`M`/`ef_search`).
 Both are dataset-specific ([ADR-0019](../../adr/0019-recall-abstention-distance-cutoff.md),
-[ADR-0023](../../adr/0023-hnsw-tuning-and-thin-provider-shim.md)) - run
+[ADR-0023](../../adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)) - run
 `drush aim:benchmark` against your own data and set those yourself, see
 [DEVELOPING.md](../../DEVELOPING.md), "Rechecking accuracy".
 
