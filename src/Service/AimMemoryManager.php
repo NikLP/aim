@@ -724,6 +724,14 @@ class AimMemoryManager {
    * @param int|null $asserted
    *   When this fact became true in reality, as a Unix timestamp, if known
    *   and different from now. NULL means "same as created".
+   * @param bool|null $trusted
+   *   Explicit trusted value for this fact, bypassing
+   *   aim.settings:default_trusted. NULL (the default) leaves the field
+   *   unset so AimFact::getDefaultTrusted() applies the site's configured
+   *   policy - the right fallback for every LLM/human-mixed caller the
+   *   draft-to-trusted gate exists for. Pass TRUE only for curated data
+   *   that was never subject to that gate in the first place, e.g. demo
+   *   seed data.
    *
    * @return \Drupal\aim\Entity\AimFact
    *   The created fact.
@@ -732,7 +740,7 @@ class AimMemoryManager {
    *   If scope is invalid, scope=user and subject does not resolve to a real
    *   account, or the text fails a guardrail check.
    */
-  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, ?bool $state = NULL, array $category = [], ?int $asserted = NULL): AimFact {
+  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, ?bool $state = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL): AimFact {
     $allowed = $this->allowedScopes();
     if (!in_array($scope, $allowed, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
@@ -781,6 +789,10 @@ class AimMemoryManager {
 
     if ($asserted !== NULL) {
       $values['asserted'] = $asserted;
+    }
+
+    if ($trusted !== NULL) {
+      $values['trusted'] = $trusted;
     }
 
     /** @var \Drupal\aim\Entity\AimFact $entity */
@@ -834,6 +846,12 @@ class AimMemoryManager {
    *   a document naming someone is no guarantee that person has an account
    *   on this site. NULL means no such account was supplied, so every
    *   scope=user candidate is skipped.
+   * @param bool|null $trusted
+   *   Explicit trusted value applied to every fact created from $facts,
+   *   bypassing aim.settings:default_trusted. See remember()'s own
+   *   $trusted docblock - NULL is the right default here too, since this
+   *   method's callers are extraction paths the draft-to-trusted gate
+   *   exists for.
    *
    * @return array
    *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[]), 'skipped'
@@ -844,7 +862,7 @@ class AimMemoryManager {
    * @throws \InvalidArgumentException
    *   If $subjectUid is given but does not resolve to a real account.
    */
-  public function createFactsFromCandidates(array $facts, string $source, ?string $subjectUid = NULL): array {
+  public function createFactsFromCandidates(array $facts, string $source, ?string $subjectUid = NULL, ?bool $trusted = NULL): array {
     $storage = $this->entityTypeManager->getStorage('aim_fact');
     $created = [];
     $skipped = 0;
@@ -881,6 +899,10 @@ class AimMemoryManager {
       else {
         $values['scope'] = $fact['scope'];
         $values['subject'] = $fact['subject'] ?? '';
+      }
+
+      if ($trusted !== NULL) {
+        $values['trusted'] = $trusted;
       }
 
       $entity = $storage->create($values);
