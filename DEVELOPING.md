@@ -47,7 +47,7 @@ drush aim:remember <text> [--scope] [--subject] [--source] [--state] [--category
 ### `aim:recall` - semantic query
 
 ```bash
-drush aim:recall <text> [--scope] [--subject] [--subject-uid] [--limit] [--max-distance] [--format]
+drush aim:recall <text> [--scope] [--subject] [--subject-uid] [--limit] [--max-distance] [--include-untrusted] [--format]
 ```
 
 Real semantic query against `aim_vector_index`. `--format=json` for a
@@ -58,6 +58,11 @@ better match. The table column is labeled `Distance`; the JSON key stays
 facts however far, which is what calibrating the cutoff needs);
 `--max-distance=0.45` drops matches past that distance, as the chatbot and
 the MCP tool do by default with `aim.settings:recall_max_distance`.
+
+Untrusted facts (ADR-0002's addendum) are excluded unless
+`--include-untrusted` is given - the interim way to review what
+`aim.settings:default_trusted` is holding back, until a dedicated review
+queue exists.
 
 Both commands live on `AimCommands`, backed by `AimMemoryManager` (also
 used by `aim_tool` and the chatbot).
@@ -378,8 +383,15 @@ autowiring)
 Central service backing every write/read path. Key public methods:
 
 - `remember(string $text, ?string $scope, ?string $subject, ?string
-  $source, ?bool $state, ...): AimFact` - validated direct write.
-- `recall(string $text, ?string $scope, ...): array` - semantic query.
+  $source, ?bool $state, ...): AimFact` - validated direct write. The
+  created fact's `trusted` field is not set here - it takes
+  `aim.settings:default_trusted` via `AimFact::getDefaultTrusted()`, a
+  base field default value callback, so every creation path (this,
+  `createFactsFromCandidates()`, the entity add form) gets the same
+  policy uniformly.
+- `recall(string $text, ?string $scope, ..., bool $includeUntrusted =
+  FALSE): array` - semantic query, restricted to trusted facts unless
+  `$includeUntrusted` is TRUE (ADR-0002's addendum).
 - `allowedScopes(): array` - reads `entity_type.bundle.info`'s
   `getBundleInfo('aim_fact')`, i.e. installed `aim_scope` entities. Every
   scope-validation call site uses this - a new scope needs zero code
@@ -464,8 +476,11 @@ Server `aim_vector` (backend `search_api_ai_search`, VDB provider
 `mariadb`), index `aim_vector_index` over `entity:aim_fact`, collection
 table `aim_facts` (real MariaDB 11.7+ HNSW `VECTOR INDEX`, not a
 brute-force scan). `text` indexed as `main_content`; `scope`/`subject`/
-`subject_uid`/`source` as `attributes` (`subject_uid` as an `integer`,
-`NULL` for every scope but user).
+`subject_uid`/`source`/`trusted` as `attributes` (`subject_uid` as an
+`integer`, `NULL` for every scope but user; `trusted` as a `boolean`,
+BTREE-indexed on the collection table same as `subject_uid`, since
+`recall()` filters on it by default - see ADR-0002's addendum and
+`AimHooks::BTREE_INDEXED_COLUMNS`).
 
 **`index_directly`:** off in the shipped config, so a saved fact is not
 searchable until an index run (`drush search-api:index aim_vector_index`,
@@ -714,18 +729,20 @@ count - trivial at PoC scale, a real line item at volume.
 - `/admin/content/aim-facts` (View `views.view.aim_facts`, gated
   `administer aim memory`) - table of every fact, "still live" for an
   empty `expires`, `uid` ("Extracted by") and `subject`/`subject_uid`
-  ("about") both shown. Per-row View/Edit/Delete dropbutton and bulk
-  delete.
+  ("about") both shown, `trusted` shown and editable inline via the
+  Edit link - this is the review queue ADR-0002's addendum leans on, not
+  a bespoke UI. Per-row View/Edit/Delete dropbutton and bulk delete.
 - `/admin/content/aim-facts/add` - bundle picker, then a standard
   `ContentEntityForm` per scope (`/admin/content/aim-facts/add/{aim_scope}`).
   Gated by the per-scope `create {scope} aim facts` permission (or
   `administer aim memory`).
 - `/admin/config/system/queue-ui` - manual consolidation-queue trigger.
 - `/admin/config/aim/settings` (`AimSettingsForm`, `#config_target`-backed)
-  - consolidation thresholds, the chatbot recall cutoff, and the
-  extraction/consolidation prompt text, all admin-editable, no code
-  deploy needed. The requested output
-  *shape* (the JSON schema extraction/consolidation parse against) is not
+  - consolidation thresholds, the chatbot recall cutoff,
+  `default_trusted` (the initial value a new fact's `trusted` field gets,
+  ADR-0002), and the extraction/consolidation prompt text, all
+  admin-editable, no code deploy needed. The requested output *shape*
+  (the JSON schema extraction/consolidation parse against) is not
   editable here - it's parsed by PHP downstream and isn't safe to hand to
   a text field.
 - `/admin/config/aim/user-scope-access` - the role-visibility matrix, see

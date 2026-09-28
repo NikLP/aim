@@ -23,6 +23,9 @@ aim.settings:
         Range:
           min: 0
           max: 1
+    default_trusted:
+      type: boolean
+      label: 'Trust new facts by default'
     # string, not text: text is core's translatable-string type, and these
     # are instructions to a model, not UI strings for a translator. Declaring
     # them text would make config validation demand a langcode on this

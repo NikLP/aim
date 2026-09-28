@@ -9,7 +9,7 @@ dependencies:
 id: aim_facts
 label: 'AIM facts'
 module: views
-description: 'Lists every remembered fact - scope, subject, text, source, state, and whether it has been retired by consolidation.'
+description: 'Lists every remembered fact - scope, subject, text, source, state, whether it has been retired by consolidation, and whether it is trusted.'
 tag: default
 base_table: aim_fact
 base_field: id
@@ -195,6 +195,28 @@ display:
           type: boolean
           settings:
             format: custom
+            format_custom_false: ''
+            format_custom_true: 'true'
+        trusted:
+          id: trusted
+          table: aim_fact
+          field: trusted
+          entity_type: aim_fact
+          entity_field: trusted
+          plugin_id: field
+          label: Trusted
+          exclude: false
+          alter:
+            alter_text: false
+          element_class: ''
+          element_default_classes: true
+          empty: ''
+          hide_empty: false
+          empty_zero: false
+          hide_alter_empty: true
+          type: boolean
+          settings:
+            format: true-false
             format_custom_false: ''
             format_custom_true: 'true'
         expires:

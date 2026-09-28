@@ -17,3 +17,6 @@ indexing_options:
   subject_uid:
     field_name: subject_uid
     indexing_option: attributes
+  trusted:
+    field_name: trusted
+    indexing_option: attributes

@@ -129,7 +129,11 @@ duplicated here.
   `text` (Guardrails-validated), `source`, `state` (tri-state boolean),
   `category` (taxonomy, vocabulary `aim_category`), `asserted` (valid-time
   start), `related`/`expires` (consolidation's supersede edge), `uid`
-  (who wrote it).
+  (who wrote it), `trusted` (boolean, the draft-to-trusted gate - defaults
+  to `aim.settings:default_trusted`, `recall()` excludes untrusted facts
+  unless asked otherwise, see
+  [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
+  addendum).
 - **`aim_scope`** config entity, `id`/`label` only. Ships four:
   `user`/`role`/`site`/`case`. No `field_ui_base_route` - deliberately,
   see [DEVELOPING.md](DEVELOPING.md) for why.

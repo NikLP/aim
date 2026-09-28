@@ -80,23 +80,46 @@ class AimHooks {
   }
 
   /**
+   * Columns that need a BTREE index once they exist on the collection table.
+   *
+   * `subject_uid`: ADR-0018. `trusted`: ADR-0002's addendum, the same
+   * treatment - recall() filters on it by default (a selective condition
+   * once most facts are untrusted), so it needs the same pre-filtering fix
+   * subject_uid needed rather than reproducing ADR-0018's finding 3.
+   */
+  protected const BTREE_INDEXED_COLUMNS = ['subject_uid', 'trusted'];
+
+  /**
    * Implements hook_search_api_index_update().
    *
-   * Gives aim_vector_index's `subject_uid` column a BTREE index (ADR-0018).
-   * Runs last so the provider's own hook has already created the column.
+   * Gives aim_vector_index's indexed attribute columns listed in
+   * BTREE_INDEXED_COLUMNS a BTREE index. Runs last so the provider's own
+   * hook has already created the columns.
    *
    * @param \Drupal\search_api\IndexInterface $index
    *   The index that was saved.
    */
   #[Hook('search_api_index_update', order: Order::Last)]
   public function vectorIndexUpdate(IndexInterface $index): void {
-    if ($index->id() !== 'aim_vector_index' || !$index->getField('subject_uid')) {
+    if ($index->id() !== 'aim_vector_index') {
       return;
     }
+
     $settings = $index->getServerInstance()->getBackendConfig()['database_settings'] ?? [];
+
+    if (empty($settings['collection'])) {
+      return;
+    }
+
     $provider = $this->vdbProviders->createInstance('mariadb');
-    if (!empty($settings['collection']) && $provider instanceof AimMariaDBProvider) {
-      $provider->ensureColumnIndex($settings['collection'], 'subject_uid', $settings['database_name'] ?? NULL);
+    if (!$provider instanceof AimMariaDBProvider) {
+      return;
+    }
+
+    foreach (self::BTREE_INDEXED_COLUMNS as $column) {
+      if ($index->getField($column)) {
+        $provider->ensureColumnIndex($settings['collection'], $column, $settings['database_name'] ?? NULL);
+      }
     }
   }
 

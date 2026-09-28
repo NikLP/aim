@@ -78,9 +78,11 @@ Four memory categories, composable at retrieval the way Mem0 composes
   on the live request path.
 - **Governance:** every candidate fact passes through `drupal/ai`'s
   Guardrails (prompt-injection/PII filtering) before it's written. A
-  draft-to-trusted human-review gate is designed
-  ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)) but
-  deferred for the PoC - see [CLAUDE.md](CLAUDE.md). One deliberate
+  lightweight `trusted` flag is the draft-to-trusted human-review gate
+  ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
+  addendum) - `recall()` excludes untrusted facts by default; full
+  Content Moderation/revisioning is deferred for the PoC - see
+  [CLAUDE.md](CLAUDE.md). One deliberate
   exception either way: an entity flagged as synchronizing
   (`setSyncing(TRUE)`, which core's Migrate destinations set on
   everything they save) skips both Guardrails and the consolidation

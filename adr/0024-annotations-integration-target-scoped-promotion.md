@@ -43,14 +43,17 @@ is naturally structural (site/role-scoped knowledge), not a route to
 per-content-instance "content notes" - that would need `aim` facts
 referencing specific nodes directly, unrelated to this ADR.
 
-**Confirmed gap, from `annotations_tool`'s own CLAUDE.md:** there is no
-write path today. `AnnotationStorageService` exposes only
-`getForTarget`/`getLatestForTarget`/`getEntitiesForTarget`/
+**Confirmed gap, from `annotations_tool`'s own CLAUDE.md (as of
+2026-09-27):** there was no write path. `AnnotationStorageService`
+exposed only `getForTarget`/`getLatestForTarget`/`getEntitiesForTarget`/
 `getEntityMapForTarget`/`hasAnnotationData`/`deleteForTarget`/
-`countForType`/`deleteForType` - no `save()`. Annotations are created
-only through the `annotations_ui` form. That module's own docs flag a
-write tool as "worth doing if an actual agent-authoring use case shows
-up, not a gap to fill preemptively" - this ADR is that use case.
+`countForType`/`deleteForType` - no `save()`. That module's own docs
+flagged a write tool as "worth doing if an actual agent-authoring use
+case shows up, not a gap to fill preemptively" - this ADR is that use
+case. **Update 2026-09-28: done, per Nik** - the write path was built.
+Re-verify its exact shape against `annotations_tool`'s current CLAUDE.md
+before wiring the bridge to it, rather than assuming the interface
+guessed at above.
 
 **Confirmed gap, from `aim`'s own decision 3:** [ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s
 draft-to-trusted gate is deferred for the PoC. Every `aim_fact` is live

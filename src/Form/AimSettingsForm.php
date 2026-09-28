@@ -88,6 +88,19 @@ final class AimSettingsForm extends ConfigFormBase {
       '#required' => TRUE,
     ];
 
+    $form['governance'] = [
+      '#type' => 'details',
+      '#title' => $this->t('Governance'),
+      '#description' => $this->t('The initial value a newly created fact gets for its own Trusted field (ADR-0002) - not a moderation gate, and editable per-fact afterward on the add/edit form.'),
+      '#open' => TRUE,
+    ];
+    $form['governance']['default_trusted'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Trust new facts by default'),
+      '#description' => $this->t('When off (recommended until the extraction/consolidation pipeline is vetted), a newly created fact starts untrusted and is excluded from recall() until someone reviews it at <code>/admin/content/aim-facts</code> and checks its Trusted box.'),
+      '#config_target' => 'aim.settings:default_trusted',
+    ];
+
     $form['prompts'] = [
       '#type' => 'details',
       '#title' => $this->t('Prompts'),

@@ -327,6 +327,7 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'subject-uid', description: 'Restrict results to one user, by uid or username. Only meaningful with scope=user.')]
   #[CLI\Option(name: 'limit', description: 'Maximum number of results.')]
   #[CLI\Option(name: 'max-distance', description: 'Drop facts with a cosine distance above this. Omit for the raw nearest facts (used to calibrate the cutoff); the site default is aim.settings recall_max_distance.')]
+  #[CLI\Option(name: 'include-untrusted', description: 'Also return untrusted facts, for reviewing what aim.settings:default_trusted left out of ordinary recall() results (ADR-0002).')]
   #[CLI\Option(name: 'format', description: 'Output format: table or json.')]
   #[CLI\Usage(name: 'drush aim:recall "email preference"', description: 'Search all facts for anything related to email preference.')]
   #[CLI\Usage(name: 'drush aim:recall "email preference" --max-distance=0.45', description: 'Only facts within 0.45 cosine distance, as the chatbot and MCP tool do by default.')]
@@ -338,6 +339,7 @@ final class AimCommands extends DrushCommands {
       'subject-uid' => NULL,
       'limit' => 10,
       'max-distance' => NULL,
+      'include-untrusted' => FALSE,
       'format' => 'table',
     ],
   ): void {
@@ -349,6 +351,7 @@ final class AimCommands extends DrushCommands {
         $options['subject-uid'] ?: NULL,
         (int) $options['limit'],
         ($options['max-distance'] ?? NULL) !== NULL && $options['max-distance'] !== '' ? (float) $options['max-distance'] : NULL,
+        (bool) $options['include-untrusted'],
       );
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {
@@ -374,8 +377,9 @@ final class AimCommands extends DrushCommands {
       $row['text'],
       $row['source'],
       $row['state'] === NULL ? '' : ($row['state'] ? 'true' : 'false'),
+      $row['trusted'] ? 'true' : 'false',
     ], $rows);
-    $this->io()->table(['ID', 'Distance', 'Scope', 'Subject', 'Text', 'Source', 'State'], $table_rows);
+    $this->io()->table(['ID', 'Distance', 'Scope', 'Subject', 'Text', 'Source', 'State', 'Trusted'], $table_rows);
   }
 
   /**

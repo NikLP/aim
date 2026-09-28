@@ -157,6 +157,18 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['type' => 'datetime_timestamp', 'weight' => 40]);
 
+    // The draft-to-trusted gate (ADR-0002's addendum): every fact is live in
+    // storage the moment it is saved regardless of this value - it is a
+    // recall()-time filter, not a moderation state, and carries no revision
+    // history. New facts get aim.settings:default_trusted via
+    // getDefaultTrusted() below, uniformly across every creation path.
+    $fields['trusted'] = BaseFieldDefinition::create('boolean')
+      ->setLabel(t('Trusted'))
+      ->setDescription(t('Whether this fact is trusted enough to surface in recall() results. Untrusted facts stay in storage and are visible in this admin listing for review.'))
+      ->setDefaultValueCallback(static::class . '::getDefaultTrusted')
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayOptions('form', ['type' => 'boolean_checkbox', 'weight' => 60]);
+
     $fields += static::ownerBaseFieldDefinitions($entity_type);
     $fields['uid']
       ->setLabel(t('Extracted by'))
@@ -178,6 +190,21 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
    */
   public function label(): string {
     return Unicode::truncate($this->get('text')->value ?? '', 60, TRUE, TRUE);
+  }
+
+  /**
+   * Default value callback for the trusted field.
+   *
+   * Reads aim.settings:default_trusted so every creation path -
+   * remember(), createFactsFromCandidates(), the entity add form, a
+   * future migration - applies the same site-wide policy, rather than
+   * each caller branching on it individually (ADR-0002's addendum).
+   *
+   * @return bool
+   *   The site's configured default.
+   */
+  public static function getDefaultTrusted(): bool {
+    return (bool) \Drupal::config('aim.settings')->get('default_trusted');
   }
 
 }

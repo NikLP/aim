@@ -50,6 +50,14 @@ field_settings:
     dependencies:
       module:
         - aim
+  trusted:
+    label: Trusted
+    datasource_id: 'entity:aim_fact'
+    property_path: trusted
+    type: boolean
+    dependencies:
+      module:
+        - aim
 datasource_settings:
   'entity:aim_fact': {  }
 processor_settings:

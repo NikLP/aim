@@ -48,9 +48,11 @@ this list as exhaustive.
 ## From the OpenKB competitor review (this thread)
 
 - [ ] Close [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
-      deferred governance gate before ship - priority sharpened by the
-      stated ship-soon timeline and OpenKB shipping draft-to-trusted as a
-      day-one feature, not deferred.
+      deferred governance gate before ship - the `trusted` field/
+      `default_trusted` half is BUILT 2026-09-28 (see "PoC deviations"
+      below); still open: whether a per-scope `trust {scope} aim facts`
+      permission is worth generating, versus staying on the flat
+      `administer aim memory` gate.
 - [ ] Build MCP exposure for aim - `#[Mcp]` plugins (via `drupal/mcp_server`/
       `drupal/mcp`, confirmed real and maintained on drupal.org) wrapping
       `AimMemoryManager::remember()`/`recall()`, mirroring `aim_chatbot`'s
@@ -63,9 +65,14 @@ this list as exhaustive.
 - [x] Replace the flat `scope` list field with the four-bundle model
       (user/role/site/case) - BUILT 2026-09-15, scopes are `aim_scope`
       config entities. [ADR-0001](adr/0001-storage-and-scope-model.md)
-- [ ] Make `aim_fact` revisionable and build the Content Moderation
-      draft-to-trusted gate.
-      [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)
+- [x] Build the `trusted` boolean field + `aim.settings:default_trusted`
+      draft-to-trusted gate - BUILT 2026-09-28: `trusted` base field on
+      `aim_fact` (default value callback reads the config), `recall()`
+      excludes untrusted facts unless `$includeUntrusted`/`drush aim:recall
+      --include-untrusted`, indexed as a Search API attribute with a BTREE
+      column same as `subject_uid`. Lightweight flag, NOT Content
+      Moderation (no revisions, no new module deps).
+      [ADR-0002 addendum](adr/0002-governance-deferred-guardrails-mandatory.md)
 
 ## ADR-0009 - Recipe/apply surface (design only, nothing built)
 
@@ -273,8 +280,9 @@ questions" section)
 - [ ] EU AI Act Article 50 disclosure - evaluate `drupal/ai_disclosure`
       before public launch.
 - [ ] Fact-to-fact authored relations graph.
-- [ ] Scheduled TTL/staleness review (defer to Content Moderation, don't
-      build ad hoc).
+- [ ] Scheduled TTL/staleness review - mechanism undecided now that
+      Content Moderation isn't happening (ADR-0002 addendum, 2026-09-28);
+      don't build ad hoc.
 - [ ] Pre-extraction summarization as a dedup lever.
 - [ ] Source-boundary policy per site archetype (a Guardrail set per
       archetype).
@@ -282,4 +290,39 @@ questions" section)
       mechanism only.
 - [ ] Media/source ingestion for re-analysis - gated behind the still-open
       "does aim ever store source material" question.
-- [ ] `revision_graph` module - real fit once Content Moderation lands.
+- [ ] `revision_graph` module - premise gone: Content Moderation isn't
+      landing (ADR-0002 addendum, 2026-09-28), so `aim_fact` has no
+      planned path to revisionable. Revisit only if that changes for an
+      unrelated reason.
+
+## Governance/scope design thread (2026-09-27/28) - handoff
+
+Three ADRs came out of one long design conversation about unblocking the
+Annotations bridge. Status as of 2026-09-28:
+
+- [x] Annotations' `save()` write path - DONE per Nik, 2026-09-28. Was
+      [ADR-0024](adr/0024-annotations-integration-target-scoped-promotion.md)'s
+      second blocker.
+- [x] `trusted` boolean field + `aim.settings:default_trusted` - BUILT
+      2026-09-28, see "PoC deviations to close before non-PoC data goes
+      in" above.
+      [ADR-0002 addendum](adr/0002-governance-deferred-guardrails-mandatory.md)
+- [ ] `AimScopeAccessInterface` plugin type (seam only, default
+      no-op fallback + `AimUserScopeVisibility` as the first dedicated
+      plugin) - designed, not built, no forcing function until a second
+      scope needs its own access rule.
+      [ADR-0025](adr/0025-scope-access-plugin-type.md)
+- [ ] `scope: entity` bundle (dynamic reference to any Drupal entity,
+      single-value base field so it stays inline on `aim_fact`, no new
+      table) - still theoretical, a nice-to-have per Nik, not its own ADR
+      yet. Depends on ADR-0025 landing first (needs a dedicated
+      per-referenced-entity access plugin, not the flat per-scope
+      permission the other bundles use).
+- [ ] `aim_annotations` bridge module itself
+      ([ADR-0024](adr/0024-annotations-integration-target-scoped-promotion.md)) -
+      blocked until `scope: entity` and its ADR-0025 plugin exist (the
+      `trusted` field blocker is cleared). Promotion logic itself is
+      fully custom/programmatic, not gated on any of this.
+
+Build order if picked back up: `trusted` field done -> `scope: entity`
+ADR -> its ADR-0025 plugin -> the bridge module.

@@ -925,23 +925,30 @@ class AimMemoryManager {
    *   presented as relevant (ADR-0019). NULL, the default, returns the
    *   nearest facts however far. getRecallMaxDistance() is the site's
    *   calibrated value.
+   * @param bool $includeUntrusted
+   *   FALSE (the default) restricts results to trusted facts, per
+   *   ADR-0002's addendum - every other caller should leave this alone.
+   *   TRUE lifts that filter, for a review queue that needs to see
+   *   untrusted facts too.
    *
    * @return array
    *   A list of rows, each with keys id, score, scope, subject, text,
-   *   source, state. score is what search_api reports for the match, which
-   *   for ai_vdb_provider_mariadb is MariaDB's VEC_DISTANCE_COSINE value: a
-   *   cosine distance, 0.0 for an identical embedding and larger the less
-   *   similar the fact is, so lower is a better match - the opposite of
-   *   what "score" usually implies. Consolidation's thresholds are
-   *   expressed in the same unit ("at or below").
+   *   source, state, trusted. score is what search_api reports for the
+   *   match, which for ai_vdb_provider_mariadb is MariaDB's
+   *   VEC_DISTANCE_COSINE value: a cosine distance, 0.0 for an identical
+   *   embedding and larger the less similar the fact is, so lower is a
+   *   better match - the opposite of what "score" usually implies.
+   *   Consolidation's thresholds are expressed in the same unit ("at or
+   *   below").
    *
    * @throws \RuntimeException
    *   If the vector index does not exist.
    * @throws \InvalidArgumentException
    *   If $subjectUid does not resolve to a real account.
    */
-  public function recall(string $text, ?string $scope, ?string $subject, ?string $subjectUid, int $limit, ?float $maxDistance = NULL): array {
+  public function recall(string $text, ?string $scope, ?string $subject, ?string $subjectUid, int $limit, ?float $maxDistance = NULL, bool $includeUntrusted = FALSE): array {
     $index = $this->loadVectorIndex();
+
     if (!$index) {
       throw new \RuntimeException('The aim_vector_index search index does not exist.');
     }
@@ -955,15 +962,23 @@ class AimMemoryManager {
     }
 
     $query = $index->query()->keys($text);
+
     if (!empty($scope)) {
       $query->addCondition('scope', $scope);
     }
+
     if (!empty($subject)) {
       $query->addCondition('subject', $subject);
     }
+
     if ($filter_account) {
       $query->addCondition('subject_uid', (int) $filter_account->id());
     }
+
+    if (!$includeUntrusted) {
+      $query->addCondition('trusted', TRUE);
+    }
+
     // A user with few facts is pre-filtered exactly through the BTREE index
     // on subject_uid, but one holding a large share of the table is served
     // by HNSW candidates post-filtered by the condition, so ask for extra
@@ -990,9 +1005,11 @@ class AimMemoryManager {
         // than let one stale row fail the whole recall() call.
         continue;
       }
+
       if ($original === NULL) {
         continue;
       }
+
       $fact = $original->getValue();
       // The aim_exclude_retired processor keeps retired facts out of the
       // index (ADR-0022), but one retired since the last index run is
@@ -1009,6 +1026,7 @@ class AimMemoryManager {
         'text' => $fact->get('text')->value,
         'source' => $fact->get('source')->value,
         'state' => $fact->get('state')->value,
+        'trusted' => (bool) $fact->get('trusted')->value,
       ];
 
       if (count($rows) >= $limit) {
@@ -1065,6 +1083,7 @@ class AimMemoryManager {
 
     $fact_storage = $this->entityTypeManager->getStorage('aim_fact');
     $query = $fact_storage->getQuery()->accessCheck(FALSE)->sort('id')->notExists('expires');
+
     if (!empty($scope)) {
       $query->condition('scope', $scope);
     }
@@ -1086,6 +1105,7 @@ class AimMemoryManager {
       if ($neighbor_result === NULL) {
         continue;
       }
+
       [$neighbor, $score] = $neighbor_result;
       if ($score > $ambiguousThreshold) {
         continue;
@@ -1147,6 +1167,7 @@ class AimMemoryManager {
     if ($neighbor_result === NULL) {
       return NULL;
     }
+    
     [$neighbor, $score] = $neighbor_result;
     if ($score > $ambiguousThreshold) {
       return NULL;
