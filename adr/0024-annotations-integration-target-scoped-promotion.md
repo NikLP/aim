@@ -55,7 +55,11 @@ up, not a gap to fill preemptively" - this ADR is that use case.
 **Confirmed gap, from `aim`'s own decision 3:** [ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s
 draft-to-trusted gate is deferred for the PoC. Every `aim_fact` is live
 the instant it's saved. There is no draft tier on `aim`'s side to promote
-*from* yet either.
+*from* yet either. **Update 2026-09-28:** the design for this is now
+resolved (ADR-0002's addendum) as a single `trusted` boolean field, not
+Content Moderation - much cheaper than this ADR originally assumed, but
+still not built. Promotion itself stays fully programmatic either way -
+it never depended on which mechanism `aim_fact` used for its own gate.
 
 ## Decision (best-guess proposal - not committed)
 

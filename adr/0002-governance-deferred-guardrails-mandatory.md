@@ -75,3 +75,81 @@ doesn't imply a mandatory extra LLM call.
   API cost if `RestrictToTopic` is ever added) but is a provider choice
   already covered by ADR-0004, not local-CPU contention on a shared host
   by default.
+
+## Addendum (2026-09-28): draft-to-trusted resolved as a lightweight flag, not Content Moderation
+
+Re-examined while unblocking [ADR-0024](0024-annotations-integration-target-scoped-promotion.md).
+Content Moderation was the obvious mechanism (this ADR's own Context
+section named it), but doesn't earn its cost here:
+
+- It requires making `aim_fact` revisionable - the schema lift this ADR
+  already flagged as the actual cost, not a small one, on a table that's
+  already 14 columns wide before this.
+- Keeping `recall()`/the vector index clean would need either a
+  `moderation_state`-aware Search API processor (the same shape ADR-0022
+  already built once for `expires`, not reusable as-is) or adopting
+  `EntityPublishedInterface` purely to get Content Moderation's
+  publish-state sync - both are more moving parts than the alternative.
+- Two new hard module dependencies (`content_moderation`, `workflows`) on
+  a module headed to drupal.org that's deliberately trying to stay thin.
+- Trust is a retrieval-quality decision ("should this be surfaced as
+  authoritative"), not an identity-based access rule - it's orthogonal to
+  [ADR-0025](0025-scope-access-plugin-type.md)'s scope-access plugin work
+  and shouldn't be folded into it.
+
+**Decision: one new base field, `trusted` (boolean)**, indexed as a
+Search API attribute from the start (the same treatment `subject_uid`
+already gets, ADR-0018) - filtered at query time, not post-filtered in
+PHP, avoiding the result-slot-eating mistake ADR-0005's addendum already
+paid for once with `expires`. `recall()` defaults to `trusted = 1`; an
+explicit param lets the review queue itself see untrusted rows too.
+
+**No new command or form needed to set it.** `aim_fact` already declares
+real form handlers and routes (`ContentEntityForm`, `edit-form` at
+`/admin/content/aim-facts/{aim_fact}/edit`, gated on `administer aim
+memory` for update per `AimFactAccessControlHandler`'s own docblock) -
+it just has no `entity_form_display` config, so it renders with
+Drupal's default fallback widgets rather than a curated layout. Making
+`trusted` `setDisplayConfigurable('form', TRUE)`, the same treatment
+`category`/`source`/`asserted` already get, puts a checkbox on that
+existing form for free. `AimFactListBuilder`'s existing admin listing at
+`/admin/content/aim-facts` is the review queue, also for free. No Drush
+command, no bespoke review UI.
+
+**Default value resolved as a config setting, not a hardcoded
+per-write-path decision.** `aim.settings:default_trusted` (boolean),
+alongside the existing tunables there (`auto_threshold`,
+`recall_max_distance`, etc.), editable via the existing
+`AimSettingsForm` at `/admin/config/aim/settings`. Read uniformly
+wherever a new `aim_fact` gets created - one site-wide policy, not
+branching logic per caller. A cautious site ships `FALSE`; a site that
+trusts its own extraction pipeline sets `TRUE`. This resolves the "still
+open" item below about per-write-path defaults - it's a site's choice to
+configure, not a hardcoded rule `aim` itself imposes.
+
+**`trusted_by` (who approved it) is deliberately skipped for now, not
+forgotten.** It isn't safely inferable from the existing `uid` field -
+`uid` means "who/what authored the fact" (often a service account for
+LLM-extracted or consolidation-authored facts), and the entire point of
+a review gate is that the reviewer can be a different person from the
+author; collapsing the two would either destroy existing authorship
+provenance or make review unattributable for exactly the facts worth
+reviewing. The one legitimate simplification - defaulting `trusted_by`
+to `uid` automatically for self-trusted writes (a human's own verbatim
+`aim:remember`, no real review happening) - doesn't remove the need for
+a real, distinct value on the reviewed path, so this is a genuine scope
+cut (losing "who approved this"), not a free technical win. Revisit only
+if the audit-of-approver claim becomes load-bearing (e.g. for the
+public-sector/audit-trail pitch raised in an earlier discovery
+conversation), not preemptively.
+
+**Still open, not decided:** whether a per-scope `trust {scope} aim
+facts` permission is ever worth generating via
+`BundlePermissionHandlerTrait`, versus staying on the flat `administer
+aim memory` gate indefinitely.
+
+Promotion into Annotations ([ADR-0024](0024-annotations-integration-target-scoped-promotion.md))
+doesn't depend on any of this either way - `annotation` entities are
+already revisioned on Annotations' own side, and promotion is fully
+custom/programmatic code, not bound to whatever mechanism `aim_fact`
+uses for its own trust gate.

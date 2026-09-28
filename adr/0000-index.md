@@ -5,7 +5,7 @@ Architecture Decision Records for the `aim` module.
 | ADR | Title | Status |
 | --- | --- | --- |
 | [0001](0001-storage-and-scope-model.md) | Storage and scope model | Accepted; scope-model deviation resolved 2026-09-15 |
-| [0002](0002-governance-deferred-guardrails-mandatory.md) | Governance deferred for PoC; Guardrails mandatory from day one | Accepted |
+| [0002](0002-governance-deferred-guardrails-mandatory.md) | Governance deferred for PoC; Guardrails mandatory from day one | Accepted; draft-to-trusted resolved as a lightweight flag (not Content Moderation) 2026-09-28, not yet built |
 | [0003](0003-async-processing-dedicated-crontab.md) | Async processing via Queue API and a dedicated crontab, never `hook_cron` | Accepted; enqueue mechanism updated 2026-09-26 |
 | [0004](0004-sovereignty-and-poc-build-order.md) | Sovereignty option and zero-API-key PoC build order | Accepted |
 | [0005](0005-consolidation-algorithm.md) | Consolidation algorithm: ADD/UPDATE/DELETE/NOOP with soft supersede | Accepted |
@@ -27,4 +27,5 @@ Architecture Decision Records for the `aim` module.
 | [0021](0021-jev-typed-decision-provider.md) | Jev (TypeSafe AI) as a typed-decision provider: spike, not adoption; addendum on Laya, an open-source alternative | Deferred - Laya spikes first (self-hosted), post-DrupalCon; Jev queued behind it |
 | [0022](0022-exclude-retired-facts-from-vector-index.md) | Retired facts stay out of the vector index (Search API processor) | Accepted - built and rolled out 2026-09-26 |
 | [0023](0023-hnsw-tuning-and-thin-provider-shim.md) | HNSW tuning (M=16, ef_search=100), and keeping the provider shim thin | Accepted - built and verified 2026-09-26 |
-| [0024](0024-annotations-integration-target-scoped-promotion.md) | Annotations integration: facts scoped to annotation targets, review as promotion | Proposed - exploratory, blocked on ADR-0002's gate and a write path that doesn't exist on the Annotations side |
+| [0024](0024-annotations-integration-target-scoped-promotion.md) | Annotations integration: facts scoped to annotation targets, review as promotion | Proposed - blocker 1 (trust gate) designed 2026-09-28, not built; blocker 2 (Annotations write path) in progress |
+| [0025](0025-scope-access-plugin-type.md) | Scope-specific view access as a plugin type, not hardcoded bundle branches | Proposed - exploratory, seam only, no second dedicated plugin built yet |
