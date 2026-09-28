@@ -1,0 +1,7 @@
+name: 'AIM Scope: Case'
+type: module
+description: 'Ships the case aim_scope: memory scoped to a single case/incident/thread, auto-minted subject id.'
+package: AIM
+core_version_requirement: ^11
+dependencies:
+  - aim:aim

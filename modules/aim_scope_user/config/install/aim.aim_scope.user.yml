@@ -1,0 +1,13 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - aim_scope_user
+  enforced:
+    module:
+      - aim_scope_user
+third_party_settings:
+  aim_scope_user:
+    requires_account: true
+id: user
+label: User

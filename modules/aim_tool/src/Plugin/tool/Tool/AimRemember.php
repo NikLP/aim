@@ -68,13 +68,13 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     'scope' => new InputDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Scope'),
-      description: new TranslatableMarkup('One of user, role, site, case. Defaults to site if omitted.'),
+      description: new TranslatableMarkup('Required when passing text (not needed inside facts, where each entry has its own). One of the scopes actually installed on this site - typically user, role, site, or case, but ask if unsure which are enabled here.'),
       required: FALSE,
     ),
     'subject' => new InputDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Subject'),
-      description: new TranslatableMarkup('Who or what the fact is about. For scope=user, a uid of a real account; omit to default to the calling account. Not used for scope=site.'),
+      description: new TranslatableMarkup('Who or what the fact is about. For a scope requiring a real account (e.g. user), a uid of a real account; omit to default to the calling account. Not used for scope=site.'),
       required: FALSE,
     ),
     'source' => new InputDefinition(
@@ -85,7 +85,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     ),
     'facts' => new ListInputDefinition(
       label: new TranslatableMarkup('Facts'),
-      description: new TranslatableMarkup('Several facts to save in one call instead of text/scope/subject/source above - use this whenever more than one fact needs saving, instead of calling this tool repeatedly. Each entry is an object: {text (required, the fact statement), scope (optional, one of user/role/site/case, defaults to site), subject (optional), source (optional)}.'),
+      description: new TranslatableMarkup('Several facts to save in one call instead of text/scope/subject/source above - use this whenever more than one fact needs saving, instead of calling this tool repeatedly. Each entry is an object: {text (required, the fact statement), scope (required, one of the scopes actually installed on this site), subject (optional), source (optional)}.'),
       required: FALSE,
       item_definition: new MapInputDefinition(
         label: new TranslatableMarkup('Fact'),
@@ -241,7 +241,7 @@ final class AimRemember extends ToolBase {
   }
 
   /**
-   * Saves one fact, resolving scope=user's default subject.
+   * Saves one fact, resolving a user-account-requiring scope's default subject.
    *
    * @param array $fields
    *   Text/scope/subject/source, as given on a single call or one facts
@@ -252,9 +252,15 @@ final class AimRemember extends ToolBase {
    *   ['error' => string] on failure.
    */
   private function rememberOne(array $fields): array {
-    $scope = $fields['scope'] ?? 'site';
+    $scope = $fields['scope'] ?? NULL;
+    if (empty($scope)) {
+      // No default here - which scopes exist depends entirely on which
+      // aim_scope_* submodules are installed (ADR-0026), so this tool has
+      // no sound default to assume.
+      return ['error' => 'Scope is required: one of ' . implode(', ', $this->memoryManager->allowedScopes()) . '.'];
+    }
     $subject = $fields['subject'] ?? NULL;
-    if ($scope === 'user' && empty($subject)) {
+    if ($this->memoryManager->scopeRequiresAccount($scope) && empty($subject)) {
       $subject = (string) $this->currentUser->id();
     }
 

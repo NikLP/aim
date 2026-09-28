@@ -210,6 +210,29 @@ class AimMemoryManager {
   }
 
   /**
+   * Whether $scope requires a fact to reference a real Drupal account.
+   *
+   * ADR-0007's rule, formerly a hardcoded `$scope === 'user'`/
+   * `$fact->bundle() === 'user'` check in this class and AimCommands - now
+   * a ThirdPartySetting each scope's own submodule declares on its
+   * aim_scope config entity (ADR-0026 piece 3), so a future scope can opt
+   * into the same requirement without another hardcoded string comparison
+   * here. Only aim_scope_user sets this today.
+   *
+   * @param string $scope
+   *   A scope ID, e.g. "user".
+   *
+   * @return bool
+   *   TRUE if $scope requires a real account, FALSE if it has no such
+   *   setting (including an unknown scope, treated as not requiring one).
+   */
+  public function scopeRequiresAccount(string $scope): bool {
+    /** @var \Drupal\aim\Entity\AimScope|null $scopeEntity */
+    $scopeEntity = $this->entityTypeManager->getStorage('aim_scope')->load($scope);
+    return $scopeEntity?->getThirdPartySetting('aim_scope_user', 'requires_account', FALSE) ?? FALSE;
+  }
+
+  /**
    * Returns the live auto-merge threshold from aim.settings.
    *
    * Falls back to DEFAULT_AUTO_THRESHOLD only if the config value is
@@ -458,7 +481,7 @@ class AimMemoryManager {
    * username string: an exact match on a typo'd string can silently
    * collide with a different real account's actual username, permanently
    * attaching a written fact to the wrong person. The two legitimate
-   * sources of a write-path subject_uid value are the current
+   * sources of a write-path user value are the current
    * authenticated user (already uid-formatted by every caller that does
    * this) and a widget-selected value (an entity_reference autocomplete
    * never emits freeform text), so requiring a literal uid costs nothing
@@ -642,8 +665,9 @@ class AimMemoryManager {
     if (!in_array($scope, $allowed, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
     }
-    if ($scope === 'user' && empty($subjectUids)) {
-      throw new \InvalidArgumentException('scope=user needs at least one real account ID in $subjectUids.');
+    $requiresUserAccount = $this->scopeRequiresAccount($scope);
+    if ($requiresUserAccount && empty($subjectUids)) {
+      throw new \InvalidArgumentException('scope=' . $scope . ' needs at least one real account ID in $subjectUids.');
     }
 
     $storage = $this->entityTypeManager->getStorage('aim_fact');
@@ -662,8 +686,8 @@ class AimMemoryManager {
         'source' => $runTag,
         'subject' => '',
       ];
-      if ($scope === 'user') {
-        $values['subject_uid'] = $subjectUids[$i % count($subjectUids)];
+      if ($requiresUserAccount) {
+        $values['user'] = $subjectUids[$i % count($subjectUids)];
       }
 
       /** @var \Drupal\aim\Entity\AimFact $entity */
@@ -752,19 +776,21 @@ class AimMemoryManager {
       'source' => $source,
     ];
 
-    if ($scope === 'user') {
-      // A user-scope fact has to be about a real account: subject is a
-      // genuine entity_reference (subject_uid), not a free-text string that
-      // merely happens to hold a uid - that drift is exactly what let "1"
-      // and "Nik" address the same person without ever matching.
+    if ($this->scopeRequiresAccount($scope)) {
+      // A fact in a scope that requires a real account (ADR-0007,
+      // aim_scope_user's requires_account setting for scope=user)
+      // has to be about one:
+      // subject is a genuine entity_reference (user), not a free-text string
+      // that merely happens to hold a uid - that drift is exactly what let
+      // "1" and "Nik" address the same person without ever matching.
       if (empty($subject)) {
-        throw new \InvalidArgumentException('subject is required for scope=user: a uid of a real account on this site.');
+        throw new \InvalidArgumentException('subject is required for scope=' . $scope . ': a uid of a real account on this site.');
       }
       $account = $this->resolveAccountByUid($subject);
       if (!$account) {
-        throw new \InvalidArgumentException('No user account found for subject "' . $subject . '". A user-scope fact must be about a real account.');
+        throw new \InvalidArgumentException('No user account found for subject "' . $subject . '". A scope=' . $scope . ' fact must be about a real account.');
       }
-      $values['subject_uid'] = $account->id();
+      $values['user'] = $account->id();
       $values['subject'] = '';
     }
     elseif ($scope === 'case' && empty($subject)) {
@@ -882,18 +908,18 @@ class AimMemoryManager {
         'source' => $source,
       ];
 
-      if ($fact['scope'] === 'user') {
+      if ($this->scopeRequiresAccount($fact['scope'])) {
         // Never resolve the model's own freeform subject text against the
         // accounts table (ADR-0011) - a source document naming someone is
         // no guarantee that person is this site's user. Only a caller-
         // supplied $subjectAccount, resolved once above, can attach a
-        // scope=user candidate to a real account.
+        // candidate in such a scope to a real account.
         if (!$subjectAccount) {
           $skipped++;
           continue;
         }
-        $values['scope'] = 'user';
-        $values['subject_uid'] = $subjectAccount->id();
+        $values['scope'] = $fact['scope'];
+        $values['user'] = $subjectAccount->id();
         $values['subject'] = '';
       }
       else {
@@ -994,7 +1020,7 @@ class AimMemoryManager {
     }
 
     if ($filter_account) {
-      $query->addCondition('subject_uid', (int) $filter_account->id());
+      $query->addCondition('user', (int) $filter_account->id());
     }
 
     if (!$includeUntrusted) {
@@ -1002,7 +1028,7 @@ class AimMemoryManager {
     }
 
     // A user with few facts is pre-filtered exactly through the BTREE index
-    // on subject_uid, but one holding a large share of the table is served
+    // on user, but one holding a large share of the table is served
     // by HNSW candidates post-filtered by the condition, so ask for extra
     // candidates. The loop below stops at $limit. See ADR-0018.
     $query->range(0, $filter_account ? $limit * 5 : $limit);
@@ -1017,6 +1043,7 @@ class AimMemoryManager {
       if ($maxDistance !== NULL && (float) $result->getScore() > $maxDistance) {
         continue;
       }
+
       try {
         $original = $result->getOriginalObject();
       }
@@ -1044,7 +1071,7 @@ class AimMemoryManager {
         'id' => $fact->id(),
         'score' => $result->getScore(),
         'scope' => $fact->bundle(),
-        'subject' => $fact->bundle() === 'user' ? $fact->get('subject_uid')->target_id : $fact->get('subject')->value,
+        'subject' => $this->scopeRequiresAccount($fact->bundle()) ? $fact->get('user')->target_id : $fact->get('subject')->value,
         'text' => $fact->get('text')->value,
         'source' => $fact->get('source')->value,
         'state' => $fact->get('state')->value,
@@ -1301,17 +1328,18 @@ class AimMemoryManager {
    */
   protected function findNearestNeighbor(IndexInterface $index, AimFact $fact, array $handled): ?array {
     $scope = $fact->bundle();
-    $is_user_scope = $scope === 'user';
+    $is_user_scope = $this->scopeRequiresAccount($scope);
 
     $query = $index->query()->keys($fact->get('text')->value);
     $query->addCondition('scope', $scope);
     if ($is_user_scope) {
-      $subject_uid = $fact->get('subject_uid')->target_id;
-      if ($subject_uid === NULL) {
-        // A user-scope fact with no account has no neighbors to compare.
+      $user = $fact->get('user')->target_id;
+      if ($user === NULL) {
+        // A scope that requires a real account with no account set has no
+        // neighbors to compare.
         return NULL;
       }
-      $query->addCondition('subject_uid', (int) $subject_uid);
+      $query->addCondition('user', (int) $user);
     }
     else {
       $subject = $fact->get('subject')->value;

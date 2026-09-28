@@ -2,6 +2,9 @@
 
 **Status:** Accepted
 **Date:** 2026-09-10
+**Addendum 2026-09-28:** the `subject_uid` field is now named `user`
+([ADR-0007](0007-user-scope-requires-real-account.md)'s own addendum).
+References below are historical.
 
 ## Context
 

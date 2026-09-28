@@ -3,8 +3,8 @@ status: true
 dependencies:
   config:
     - aim.aim_scope.user
-id: aim_fact.user.subject_uid
-field_name: subject_uid
+id: aim_fact.user.user
+field_name: user
 entity_type: aim_fact
 bundle: user
 label: 'Subject (user)'

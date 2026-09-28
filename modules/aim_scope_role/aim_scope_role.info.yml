@@ -1,0 +1,7 @@
+name: 'AIM Scope: Role'
+type: module
+description: 'Ships the role aim_scope: memory shared across everyone holding a given Drupal role.'
+package: AIM
+core_version_requirement: ^11
+dependencies:
+  - aim:aim

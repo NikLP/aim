@@ -1,0 +1,7 @@
+name: 'AIM Scope: User'
+type: module
+description: 'Ships the user aim_scope: per-user memory tied to a real Drupal account (ADR-0007), plus its role-visibility access plugin.'
+package: AIM
+core_version_requirement: ^11
+dependencies:
+  - aim:aim

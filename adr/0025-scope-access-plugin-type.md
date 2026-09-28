@@ -1,8 +1,11 @@
 # ADR-0025: Scope-specific view access as a plugin type, not hardcoded bundle branches
 
-**Status:** Proposed - exploratory, not built. Written to capture the
-mechanism before either concrete driver (entity scope, case scope) is
-built, not to lock in implementation details.
+**Status:** Accepted - seam built and verified 2026-09-28. Its first
+dedicated plugin moved out of core `aim` into `aim_scope_user`
+(ADR-0026 piece 4, also 2026-09-28) and was renamed `AimScopeUser`
+(was `AimUserScopeVisibility`) to match that module's own naming;
+entity-scope and case-scope plugins remain unbuilt, so the "three data
+points" argument below still rests on two still-unbuilt proposals.
 **Date:** 2026-09-28
 
 ## Context
@@ -44,7 +47,7 @@ plugin per fieldable entity type and dedicated plugins (`RoleTarget`,
 needed. Proven at that module's scale already; not something to redesign
 from scratch here.
 
-## Decision (best-guess proposal - not committed)
+## Decision
 
 **New plugin type, `AimScopeAccessInterface`, scoped to exactly the one
 seam that's actually duplicated today:**
@@ -117,16 +120,25 @@ convention, it doesn't touch its logic.
 
 ## Open questions
 
-- **Discovery mechanism.** Standard attribute-based Plugin API discovery
-  (`#[AimScopeAccess]`, directly mirroring `#[AnnotationsTarget]`) versus
-  a tagged-service compiler pass. Following Annotations' precedent
-  directly is the more defensible default; not committed here.
-- **Ownership.** Core `aim` module - `AimFactAccessControlHandler`
-  already lives there, and this isn't scope-specific enough to belong in
-  a submodule the way `aim_annotations` would (per ADR-0024).
+- ~~**Discovery mechanism.**~~ **Resolved 2026-09-28.** Built as standard
+  attribute-based Plugin API discovery (`#[AimScopeAccess]`, directly
+  mirroring `#[AnnotationsTarget]`), not a tagged-service compiler pass -
+  `Drupal\aim\AimScopeAccessPluginManager` (`plugin.manager.aim_scope_access`),
+  plugins under `src/Plugin/AimScopeAccess/`.
+- ~~**Ownership.**~~ **Resolved 2026-09-28.** Core `aim` module, as
+  expected - `AimFactAccessControlHandler` already lived there.
 - **Whether a generic/derived plugin is ever needed**, or whether the
   single shared default fallback is sufficient permanently given `aim`
   doesn't face the same per-entity-type multiplicity Annotations does.
+  Still open - `getAccessPlugin()` returns NULL for any unregistered
+  scope rather than instantiating a generic plugin, matching the "no
+  deriver needed unless that changes" call above; unchanged by this
+  build.
 
-None of the above is validated against real code - this captures the
-mechanism and its justification, not a spec to build against as-is.
+Verified live 2026-09-28: `AimFactAccessControlHandler::checkAccess()`
+looks up `getAccessPlugin($entity->bundle())` uniformly (no more
+hardcoded `bundle() === 'user'` branch), a disposable scope=user fact
+confirmed a viewer with no flat permission gets view access solely
+through `AimUserScopeVisibility`'s shared-role fallback, and a viewer
+sharing no role was correctly denied - same behavior as the
+pre-refactor code, not a logic change.

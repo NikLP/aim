@@ -156,10 +156,12 @@ ddev drush php:eval '$ids = \Drupal::entityQuery("aim_fact")->accessCheck(FALSE)
 ddev drush sapi-i aim_vector_index
 ```
 
-**`subject_uid` is an indexed attribute with a BTREE index:** `recall()`
-(with `--subject-uid`) and user-scope `findNearestNeighbor()` filter by a
-`subject_uid` query condition, not in PHP. The column's BTREE index
-(`idx_subject_uid`, added by `AimHooks::vectorIndexUpdate()` through
+**`user` is an indexed attribute with a BTREE index** (the field was
+named `subject_uid` until 2026-09-28, `aim_update_10001()` - ADR-0018's
+title and file name still say `subject_uid`, the field itself does not):
+`recall()` (with `--subject-uid`) and user-scope `findNearestNeighbor()`
+filter by a `user` query condition, not in PHP. The column's BTREE index
+(`idx_user`, added by `AimHooks::vectorIndexUpdate()` through
 `AimMariaDBProvider::ensureColumnIndex()` on every index save) is what
 makes this exact: MariaDB's HNSW index post-filters, so without it a
 selective filter returns short or wrong results. A user holding a large
@@ -229,7 +231,7 @@ Two gotchas hit doing this 2026-09-27:
 
 If the vector collection table gets rebuilt from scratch after this
 (for example, `drush search-api:clear` genuinely drops it), the
-attribute columns (`scope`, `subject_uid`, etc.) only come back when the
+attribute columns (`scope`, `user`, etc.) only come back when the
 index entity itself is re-saved - a plain reindex does not re-run
 `updateFields()`:
 
@@ -279,7 +281,7 @@ test corpus, then compare the index to exact search:
    skip the consolidation queue.
 2. For about 30 stored vectors, set `@v` to the vector and compare, for
    each user and k of 5 and 20, `SELECT drupal_entity_id FROM aim_fact_vectors
-   WHERE index_id='aim_vector_index' AND subject_uid=<uid> ORDER BY
+   WHERE index_id='aim_vector_index' AND user=<uid> ORDER BY
    VEC_DISTANCE_COSINE(embedding, @v) LIMIT k` against the same query with
    `IGNORE INDEX (embedding)`, which is exact. Recall is the overlap over
    k. Repeat with `SET SESSION mhnsw_ef_search = <n>` for a few values.
@@ -445,9 +447,17 @@ core has no single convention here (node uses `type`, media uses
 `scope` is a legitimate domain-specific choice like the others. Bundles
 are real `aim_scope` config entities (`bundle_entity_type` on `AimFact`'s
 `#[ContentEntityType]` attribute) - `getBundleInfo('aim_fact')` derives
-automatically, no `hook_entity_bundle_info()` needed. A site or contrib
-module adds a fifth scope with zero PHP via
-`config/install/aim_scope.<id>.yml`.
+automatically, no `hook_entity_bundle_info()` needed. Core `aim` ships
+zero scope instances itself (ADR-0026) - the default four each come from
+their own submodule (`aim_scope_user`/`role`/`site`/`case`). A site or
+contrib module adds a fifth scope the same way: zero PHP needed via
+`config/install/aim.aim_scope.<id>.yml`, with an `enforced` dependency on
+the shipping module (needed for `ScopeUninstallValidator` to find it -
+see [aim_scope_user's CLAUDE.md](modules/aim_scope_user/CLAUDE.md) for
+why), plus a dedicated `AimScopeAccessInterface` plugin and/or
+ThirdPartySettings if the scope needs its own access rule or config
+flags (`requires_account` is `aim_scope_user`'s example of the
+latter).
 
 `links.field_ui_base_route` is deliberately unset - `bundle_entity_type`
 and Field UI's "Manage fields" tab are independently gated, and leaving
@@ -455,7 +465,7 @@ this off keeps per-bundle fields entirely off the table. This matters
 because dedicated per-field tables are exactly what breaks the next
 point.
 
-**Don't move `subject`/`subject_uid` into per-bundle fields
+**Don't move `subject`/`user` into per-bundle fields
 (`bundleFieldDefinitions()`).** Tried and reverted: it broke
 `ai_vdb_provider_mariadb`'s `AiVdbProviderClientBase::isMultiple()`
 (assumes every field is a base field, throws `Table
@@ -478,9 +488,10 @@ table `aim_fact_vectors` (renamed from `aim_facts` 2026-09-28 - too close
 to the `aim_fact` entity table for a raw SQL query to tell apart at a
 glance; real MariaDB 11.7+ HNSW `VECTOR INDEX`, not a
 brute-force scan). `text` indexed as `main_content`; `scope`/`subject`/
-`subject_uid`/`source`/`trusted` as `attributes` (`subject_uid` as an
-`integer`, `NULL` for every scope but user; `trusted` as a `boolean`,
-BTREE-indexed on the collection table same as `subject_uid`, since
+`user`/`source`/`trusted` as `attributes` (`user` as an
+`integer`, `NULL` for every scope but user, renamed from `subject_uid`
+2026-09-28; `trusted` as a `boolean`,
+BTREE-indexed on the collection table same as `user`, since
 `recall()` filters on it by default - see ADR-0002's addendum and
 `AimHooks::BTREE_INDEXED_COLUMNS`).
 
@@ -539,21 +550,23 @@ granted `view user aim facts`.
 
 ### User-scope role visibility
 
-`AimUserScopeVisibility` (`src/Access/AimUserScopeVisibility.php`) adds a
-narrower, additive grant path beyond the flat `view user aim facts`
-permission: a `user_scope_role_visibility` matrix in `aim.settings`
-(viewer role => visible subject roles), editable at
+`AimScopeUser` (`aim_scope_user/src/Plugin/AimScopeAccess/AimScopeUser.php`,
+renamed from `AimUserScopeVisibility` and moved out of core `aim` when it
+became the first `AimScopeAccessInterface` plugin, ADR-0025/ADR-0026)
+adds a narrower, additive grant path beyond the flat `view user aim
+facts` permission: a `user_scope_role_visibility` matrix in
+`aim.settings` (viewer role => visible subject roles), editable at
 `/admin/config/aim/user-scope-access`, plus a
 `user_scope_shared_role_fallback` boolean (default `TRUE`) granting
 access when viewer and subject share any real role (excluding the
 implicit `authenticated` role both accounts always carry). Only ever
 returns allowed or neutral, never forbidden, so
 `AimFactAccessControlHandler` ORs it against the flat permission without
-risk of it revoking a grant it knows nothing about. Not a discovered
-plugin type - a single hardcoded `bundle() === 'user'` branch in the
-access handler; `case`-scope access control is deferred (no `aim_case`
-entity yet, Nik's call) - extract a plugin type only once a second scope
-needs its own rule.
+risk of it revoking a grant it knows nothing about. Discovered generically
+via `plugin.manager.aim_scope_access` (`Drupal\aim\AimScopeAccessPluginManager`,
+attribute-scanned from any enabled module's `src/Plugin/AimScopeAccess/`)
+rather than a hardcoded `bundle() === 'user'` branch; `case`-scope access
+control is deferred (no `aim_case` entity yet, Nik's call).
 
 ---
 
@@ -632,11 +645,13 @@ by hand. Fresh installs get all of it from config and the shim.
    `aim_exclude_retired` processor to `aim_vector_index`, then purge the
    retired rows already indexed (the snippet under "Enabling the processor
    on an existing site" in "Vector search").
-2. **`subject_uid` as an indexed attribute**
+2. **`user` as an indexed attribute** (field renamed from `subject_uid`
+   2026-09-28, `aim_update_10001()`; the ADR title and file name still
+   say `subject_uid`)
    ([ADR-0018](adr/resolved/0018-index-subject-uid-with-btree.md)): add an `integer`
-   field `subject_uid` (datasource `entity:aim_fact`, property path
-   `subject_uid`) to `search_api.index.aim_vector_index`, and
-   `indexing_options.subject_uid: attributes` to
+   field `user` (datasource `entity:aim_fact`, property path
+   `user`) to `search_api.index.aim_vector_index`, and
+   `indexing_options.user: attributes` to
    `ai_search.index.aim_vector_index`. Saving the index makes the shim add
    the column and its BTREE index. Then `ddev drush sapi-r aim_vector_index
    && ddev drush sapi-i aim_vector_index`. This must happen before the code
@@ -732,7 +747,7 @@ count - trivial at PoC scale, a real line item at volume.
 
 - `/admin/content/aim-facts` (View `views.view.aim_facts`, gated
   `administer aim memory`) - table of every fact, "still live" for an
-  empty `expires`, `uid` ("Extracted by") and `subject`/`subject_uid`
+  empty `expires`, `uid` ("Extracted by") and `subject`/`user`
   ("about") both shown, `trusted` shown and editable inline via the
   Edit link - this is the review queue ADR-0002's addendum leans on, not
   a bespoke UI. Per-row View/Edit/Delete dropbutton and bulk delete.

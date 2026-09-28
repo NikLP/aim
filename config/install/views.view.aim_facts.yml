@@ -95,12 +95,12 @@ display:
           type: string
           settings:
             link_to_entity: false
-        subject_uid:
-          id: subject_uid
+        user:
+          id: user
           table: aim_fact
-          field: subject_uid
+          field: user
           entity_type: aim_fact
-          entity_field: subject_uid
+          entity_field: user
           plugin_id: field
           label: 'Subject (user)'
           exclude: false
@@ -303,7 +303,7 @@ display:
             id: id
             scope: scope
             subject: subject
-            subject_uid: subject_uid
+            user: user
             text: text
             source: source
             uid: uid
@@ -338,7 +338,7 @@ display:
               separator: ''
               empty_column: false
               responsive: ''
-            subject_uid:
+            user:
               sortable: false
               default_sort_order: asc
               align: ''

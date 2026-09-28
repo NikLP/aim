@@ -86,12 +86,12 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
 
     $fields['subject'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Subject'))
-      ->setDescription(t('Who or what the fact is about: a role machine name or a case ID. Empty for site scope. Not used for user scope, see subject_uid.'))
+      ->setDescription(t('Who or what the fact is about: a role machine name or a case ID. Empty for site scope. Not used for user scope, see user.'))
       ->setSetting('max_length', 255)
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['weight' => 10]);
 
-    $fields['subject_uid'] = BaseFieldDefinition::create('entity_reference')
+    $fields['user'] = BaseFieldDefinition::create('entity_reference')
       ->setLabel(t('Subject (user)'))
       ->setDescription(t('The real Drupal account this fact is about, when scope is user. A fact cannot be about a person with no account on this site; unlike subject, this is a real reference, not a free-text string that merely happens to hold a uid.'))
       ->setSetting('target_type', 'user')

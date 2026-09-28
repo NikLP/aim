@@ -17,7 +17,7 @@ aim.settings:
 aim.user_scope_access:
   path: '/admin/config/aim/user-scope-access'
   defaults:
-    _form: '\Drupal\aim\Form\AimUserScopeAccessForm'
+    _form: '\Drupal\aim\Form\AimScopeUserAccessForm'
     _title: 'AIM user-scope visibility'
   requirements:
     _permission: 'administer aim memory'

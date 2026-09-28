@@ -1,7 +1,8 @@
 # ADR-0026: Pluggable scope submodules - config via ThirdPartySettings, behavior via the ADR-0025 plugin type
 
-**Status:** Proposed - exploratory, not built. Written to capture the
-mechanism and a task breakdown, not to lock in implementation details.
+**Status:** Partially implemented. Pieces 1-4 (below) built and
+live-verified 2026-09-28; pieces 5-6 still open. See TODO.md's
+"Governance/scope design thread" for the current build-order detail.
 **Date:** 2026-09-28
 
 ## Context
@@ -76,39 +77,63 @@ requirement.
 Six separable pieces - deliberately split so they can become independent
 TODO.md/task entries rather than one large change:
 
-1. **Core `aim` ships zero scope instances.** The `aim_scope`/`aim_fact`
-   entity types, `AimMemoryManager`, Guardrails, and vector search stay
-   in core; the four `config/install/aim.aim_scope.*.yml` files move out.
-   Mirrors Annotations shipping no default `annotation_type` at all.
-2. **Four new submodules** - `aim_scope_user`, `aim_scope_role`,
-   `aim_scope_site`, `aim_scope_case` - each ships exactly one
-   `config/install/aim.aim_scope.<id>.yml`. A site installs only the
-   scopes it wants. `role`/`site` start as pure config, zero PHP, same as
-   any site-added fifth scope today. `case` likewise starts as a
-   placeholder - it has no access control of its own yet (an already
-   acknowledged gap, unrelated to this ADR).
-3. **Config-level scope differences move to ThirdPartySettings.** ADR-0007's
-   "subject_uid required for scope=user" becomes a ThirdPartySetting
-   `aim_scope_user` owns on its own config entity (e.g.
-   `$scope->getThirdPartySetting('aim_scope_user', 'requires_subject_uid',
-   FALSE)`), read generically by core `aim` instead of the two
-   `bundle() === 'user'` string checks above.
-4. **Behavioral scope differences stay on ADR-0025's plugin type** -
-   promoted from "seam, unbuilt" to "build it now." `AimUserScopeVisibility`
-   moves out of core `aim`'s `src/Access/` into
+1. **BUILT 2026-09-28. Core `aim` ships zero scope instances.** The
+   `aim_scope`/`aim_fact` entity types, `AimMemoryManager`, Guardrails,
+   and vector search stay in core; the four
+   `config/install/aim.aim_scope.*.yml` files moved out. Mirrors
+   Annotations shipping no default `annotation_type` at all.
+2. **BUILT 2026-09-28. Four new submodules** - `aim_scope_user`,
+   `aim_scope_role`, `aim_scope_site`, `aim_scope_case` - each ships
+   exactly one `config/install/aim.aim_scope.<id>.yml`. A site installs
+   only the scopes it wants. `role`/`site` are pure config, zero PHP,
+   same as any site-added fifth scope. `case` likewise - it has no access
+   control of its own yet (an already acknowledged gap, unrelated to this
+   ADR). Each config entity's `dependencies` came from a real `->save()`
+   and export, not hand-typing (this file's own "Cross-cutting
+   conventions" rule): `role`/`site`/`case` carry an `enforced` module
+   dependency on themselves only (needed for `ScopeUninstallValidator` to
+   find them, since `aim.aim_scope.<id>`'s name is prefixed by `aim`, the
+   entity type's provider, not by the shipping submodule); `user` additionally
+   carries the `requires_account` ThirdPartySetting from piece 3
+   below, which pulls in the same module dependency automatically, no
+   separate enforced entry needed for it specifically. Live-verified
+   against a real split submodule, not just the earlier scratch-module
+   test: `drush pmu aim_scope_role` is correctly blocked while role-scope
+   facts exist (5 on this site).
+3. **BUILT 2026-09-28. Config-level scope differences move to
+   ThirdPartySettings.** ADR-0007's "subject required for scope=user"
+   is now a ThirdPartySetting `aim_scope_user` owns on its own config
+   entity - `requires_account`, not the earlier draft name
+   `requires_subject_uid` (stale after the 2026-09-28 field rename to
+   `user`) - read generically by core `aim` via
+   `AimMemoryManager::scopeRequiresAccount()` instead of the
+   `bundle() === 'user'`/`scope === 'user'` string checks previously in
+   `AimMemoryManager.php`, `AimCommands.php`, and `aim_tool`'s
+   `AimRemember` tool plugin (a third call site found once actually
+   grepping for every occurrence, not just the two originally spotted
+   above).
+4. **BUILT 2026-09-28. Behavioral scope differences stay on ADR-0025's
+   plugin type** - promoted from "seam, unbuilt" to "build it now."
+   `AimUserScopeVisibility` moved out of core `aim`'s
+   `src/Plugin/AimScopeAccess/` into
    `aim_scope_user/src/Plugin/AimScopeAccess/`, becoming the plugin
    type's first real dedicated implementation instead of a hardcoded
    `if ($entity->bundle() === 'user')` branch in
-   `AimFactAccessControlHandler`.
+   `AimFactAccessControlHandler`. Renamed to `AimScopeUser` on the move
+   (Nik's naming call) - `AimScope[Name]` reads as "the plugin for scope
+   X" and scales to future `AimScopeRole`/`AimScopeSite`/`AimScopeCase`
+   plugins, where `AimUserScopeVisibility` named one current behavior
+   instead.
 5. **`aim_chatbot` declares an explicit dependency on `aim_scope_site`**
    in its `.info.yml`, replacing today's implicit assumption that `scope:
    site` exists (its tool is hardcoded to that scope - see
-   [aim_chatbot's CLAUDE.md](../modules/aim_chatbot/CLAUDE.md)).
+   [aim_chatbot's CLAUDE.md](../modules/aim_chatbot/CLAUDE.md)). Not yet
+   built.
 6. **A recipe bundles "the four default scopes"** for one-step
    enablement (matching Annotations' `annotations_demo_types` and aim's
    own `aim_demo_library` precedent in `recipes/`), so a site that wants
    today's default behavior doesn't need to hand-enable five modules
-   instead of one.
+   instead of one. Not yet built.
 
 **Explicitly out of scope:** converting `subject`/`subject_uid` to
 per-bundle fields. Already tried and reverted (see Context) - these stay
@@ -140,6 +165,43 @@ scope submodule cannot introduce its own dedicated field.
   proposed `scope: entity` bundle would become the fifth candidate
   submodule (`aim_scope_entity`) once it has its own ADR - this ADR's
   submodule shape is what it would land into, not a competing design.
+
+**Addendum 2026-09-28: follow-up audit for leftover scope bias.** Nik
+asked, after pieces 1-4 shipped, what other code in core `aim` is still
+bespoke to one scope without a corresponding install-time guarantee -
+toward the ideal of core working correctly with *any* subset of scope
+submodules installed, no inert code for the ones absent. Two kinds of
+findings, not one:
+
+- **A real gap in piece 3's own rollout, fixed:** a third
+  `$fact['scope'] === 'user'` check in
+  `AimMemoryManager::createFactsFromCandidates()` (the `aim:extract`
+  write path) had been missed by the original grep, since it used
+  array-bracket syntax rather than `bundle() ===`/`scope ===`. Now also
+  `scopeRequiresAccount()`. Also renamed `requires_user_account` to
+  `requires_account` (Nik's call - "account" already implies "user",
+  redundant) and `AimUserScopeAccessForm` to `AimScopeUserAccessForm`
+  (route/path unchanged, `getFormId()` now `aim_scope_user_access_form`)
+  to match the plugin's own rename.
+- **A genuinely separate class of bespoke-ness, partly fixed:** four
+  places defaulted an omitted scope to `'site'` specifically -
+  `aim:remember`'s CLI default, its `--file` batch fallback,
+  `aim:benchmark`'s CLI default, and `aim_tool`'s `AimRemember` tool
+  plugin (both its single-fact and batch-entry `scope` inputs). None of
+  these are config-entity dependents the way pieces 1-3 dealt with -
+  they're an *opinion* baked into core/`aim_tool` about which scope is
+  most common, silently assuming `aim_scope_site` is installed. Fixed by
+  requiring scope explicitly everywhere and erroring clearly when it's
+  missing, rather than guessing.
+- **Not fixed, a different shape of problem:** `case` scope's
+  subject-auto-minting in `remember()` and the "Case ID: ..." CLI hint in
+  `AimCommands.php` are scope-specific *behavior* (mint a UUID), not a
+  config flag - `requires_account`'s ThirdPartySetting mechanism doesn't
+  apply. Fully separating this needs a new plugin type (e.g. a
+  `defaultSubject()` method alongside `AimScopeAccessInterface`) that
+  `aim_scope_case` would implement. Left as an acknowledged, documented
+  gap pending a decision on whether it's worth building - see TODO.md's
+  "Governance/scope design thread".
 
 ## Open questions
 
@@ -204,11 +266,16 @@ scope submodule cannot introduce its own dedicated field.
   doesn't provide) argues for `aim_scope_user` owning its own
   `requires_subject_uid` key, read but not owned by core `aim`. Recommend
   following that unless a concrete reason emerges not to.
-- **Build order relative to ADR-0025.** Build the plugin type first, in
-  core, as ADR-0025 originally proposed (it's already independently
-  designed), and only then move `AimUserScopeVisibility` out into
-  `aim_scope_user` - de-risks the submodule split by not bundling two
-  unproven changes into one. Recommend sequencing pieces 4 before 1-3.
+- ~~**Build order relative to ADR-0025.**~~ **Followed, half-done
+  2026-09-28.** Built the plugin type first, in core, as ADR-0025
+  proposed: `AimScopeAccessPluginManager` +
+  `AimUserScopeVisibility` converted in place into the first dedicated
+  plugin (`src/Plugin/AimScopeAccess/`), still living in core `aim`, not
+  yet moved into `aim_scope_user`. That move - piece 4's other half,
+  relocating the plugin class into a submodule that doesn't exist yet -
+  waits on pieces 1-3 (splitting the scope config entities out) the same
+  as originally recommended; only the "build the plugin type without
+  bundling it into the submodule split" half of the sequencing is done.
 - **Does this ADR supersede ADR-0025, or sit alongside it?** Recommend
   alongside - ADR-0025 stays the narrower "behavior plugin type" decision,
   this ADR is the broader "submodule split" decision that consumes it,

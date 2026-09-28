@@ -23,8 +23,8 @@ Architecture Decision Records for the `aim` module.
 | [0020](0020-verbatim-facts-consolidation-opt-out.md) | Verbatim facts: an explicit opt-out from consolidation | Proposed - analyzed, not built; build/no-build undecided |
 | [0021](0021-jev-typed-decision-provider.md) | Jev (TypeSafe AI) as a typed-decision provider: spike, not adoption; addendum on Laya, an open-source alternative | Deferred - Laya spikes first (self-hosted), post-DrupalCon; Jev queued behind it |
 | [0024](0024-annotations-integration-target-scoped-promotion.md) | Annotations integration: facts scoped to annotation targets, review as promotion | Proposed - blocker 2 (Annotations write path) done 2026-09-28; blocker 1 (trust gate) designed, not built; still needs `scope: entity` + its ADR-0025 plugin |
-| [0025](0025-scope-access-plugin-type.md) | Scope-specific view access as a plugin type, not hardcoded bundle branches | Proposed - exploratory, seam only, no second dedicated plugin built yet |
-| [0026](0026-pluggable-scope-submodules.md) | Pluggable scope submodules: ThirdPartySettings for config, ADR-0025's plugin type for behavior | Proposed - exploratory, task breakdown only, nothing built |
+| [0025](0025-scope-access-plugin-type.md) | Scope-specific view access as a plugin type, not hardcoded bundle branches | Accepted - seam built and verified 2026-09-28; its one plugin now lives in `aim_scope_user`, renamed `AimScopeUser`; no second dedicated plugin built yet |
+| [0026](0026-pluggable-scope-submodules.md) | Pluggable scope submodules: ThirdPartySettings for config, ADR-0025's plugin type for behavior | Partially implemented - pieces 1-4 (submodule split, ThirdPartySetting, plugin move) built and live-verified 2026-09-28; pieces 5-6 (aim_chatbot dependency, bundling recipe) not built |
 
 ## Resolved
 

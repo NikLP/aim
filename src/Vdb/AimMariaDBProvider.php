@@ -38,8 +38,8 @@ use Drupal\ai_vdb_provider_mariadb\Plugin\VdbProvider\MariaDBProvider;
  *   reaches it as `''` (ai_search's EmbeddingBase::getValue()), which
  *   MariaDB's strict mode rejects in an INT, DECIMAL or BIGINT column
  *   (ERROR 1366), so an integer attribute that is empty for some facts,
- *   like subject_uid, would stop those facts indexing. It becomes NULL
- *   here (ADR-0018).
+ *   like user, would stop those facts indexing. It becomes NULL here
+ *   (ADR-0018).
  * - createCollection() and vectorSearch(): MariaDB's HNSW defaults (M=6,
  *   ef_search=20) missed 3-12% of the true nearest facts in testing. M=16
  *   is applied to new collections and mhnsw_ef_search from the server's

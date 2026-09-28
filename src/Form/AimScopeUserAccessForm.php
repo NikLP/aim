@@ -18,12 +18,18 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * A checkbox grid, not #config_target elements like AimSettingsForm - the
  * saved shape (viewer role ID => list of visible subject role IDs) is a
  * matrix, not one value per form element, so buildForm()/submitForm()
- * reshape it by hand. See AimUserScopeVisibility for how this is read back
- * at access-check time, and CLAUDE.md's "Per-scope access control" entry
- * for why this exists alongside the flat "view user aim facts" permission
- * rather than instead of it.
+ * reshape it by hand. See aim_scope_user's AimScopeUser (an AimScopeAccess
+ * plugin, ADR-0025) for how this is read back at access-check time and why
+ * this exists alongside the flat "view user aim facts" permission rather
+ * than instead of it. Renamed from AimUserScopeAccessForm to match the
+ * AimScope[Name] convention the plugin itself was renamed to (Nik's
+ * naming call, ADR-0026). Stays in core aim rather than moving into
+ * aim_scope_user alongside the plugin - unlike the plugin class, this
+ * form isn't discovered generically, so moving it would need its own
+ * route/permission/menu-link split with no corresponding benefit yet;
+ * not revisited unless a second scope needs its own settings form.
  */
-final class AimUserScopeAccessForm extends ConfigFormBase {
+final class AimScopeUserAccessForm extends ConfigFormBase {
 
   public function __construct(
     ConfigFactoryInterface $config_factory,
@@ -48,7 +54,7 @@ final class AimUserScopeAccessForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function getFormId(): string {
-    return 'aim_user_scope_access_form';
+    return 'aim_scope_user_access_form';
   }
 
   /**
@@ -97,7 +103,7 @@ final class AimUserScopeAccessForm extends ConfigFormBase {
         ];
         // Same-role diagonal, other than "authenticated": already granted by
         // the shared-role fallback whenever it's on, so checking it here
-        // changes nothing - see AimUserScopeVisibility::checkViewAccess()'s
+        // changes nothing - see AimScopeUser::checkViewAccess()'s
         // $meaningfulRoles exclusion for why "authenticated" itself doesn't
         // get this treatment (the fallback deliberately ignores that shared
         // role, since every two logged-in accounts have it).

@@ -34,10 +34,10 @@ field_settings:
     dependencies:
       module:
         - aim
-  subject_uid:
-    label: 'Subject uid'
+  user:
+    label: 'Subject (user)'
     datasource_id: 'entity:aim_fact'
-    property_path: subject_uid
+    property_path: user
     type: integer
     dependencies:
       module:

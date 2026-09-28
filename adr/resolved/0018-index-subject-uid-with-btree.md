@@ -2,6 +2,12 @@
 
 **Status:** Accepted - analyzed 2026-09-19, built and verified 2026-09-26
 **Date:** 2026-09-20
+**Addendum 2026-09-28:** the `subject_uid` field this ADR indexes was
+renamed to `user` (`aim_update_10001()`), and the collection column/index
+along with it (`idx_subject_uid` -> `idx_user`) - this ADR's title, file
+name, and body keep the old name throughout as the historical record of
+what was built and why; the mechanism itself is unchanged. See
+[ADR-0007](../0007-user-scope-requires-real-account.md)'s own addendum.
 
 ## Context
 

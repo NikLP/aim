@@ -1,8 +1,13 @@
 services:
-  aim.user_scope_visibility:
-    class: Drupal\aim\Access\AimUserScopeVisibility
-    arguments:
-      - '@config.factory'
+  # Scope access plugins are discovered from src/Plugin/AimScopeAccess of
+  # every enabled module via the #[AimScopeAccess] attribute - no
+  # per-plugin registration needed here. AimScopeUser (aim_scope_user,
+  # ADR-0025's first dedicated plugin) gets its own dependencies through
+  # this manager's DefaultPluginManager container-aware instantiation, not
+  # a services.yml entry of its own.
+  plugin.manager.aim_scope_access:
+    class: Drupal\aim\AimScopeAccessPluginManager
+    parent: default_plugin_manager
 
   aim.scope_uninstall_validator:
     class: Drupal\aim\ScopeUninstallValidator

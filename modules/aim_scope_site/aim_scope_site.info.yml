@@ -1,0 +1,7 @@
+name: 'AIM Scope: Site'
+type: module
+description: 'Ships the site aim_scope: memory shared site-wide, hardcoded as the scope used by aim_chatbot.'
+package: AIM
+core_version_requirement: ^11
+dependencies:
+  - aim:aim

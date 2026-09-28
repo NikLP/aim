@@ -82,12 +82,13 @@ class AimHooks {
   /**
    * Columns that need a BTREE index once they exist on the collection table.
    *
-   * `subject_uid`: ADR-0018. `trusted`: ADR-0002's addendum, the same
+   * `user`: ADR-0018 (renamed from subject_uid 2026-09-28,
+   * aim_update_10001()). `trusted`: ADR-0002's addendum, the same
    * treatment - recall() filters on it by default (a selective condition
    * once most facts are untrusted), so it needs the same pre-filtering fix
-   * subject_uid needed rather than reproducing ADR-0018's finding 3.
+   * user needed rather than reproducing ADR-0018's finding 3.
    */
-  protected const BTREE_INDEXED_COLUMNS = ['subject_uid', 'trusted'];
+  protected const BTREE_INDEXED_COLUMNS = ['user', 'trusted'];
 
   /**
    * Implements hook_search_api_index_update().

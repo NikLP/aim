@@ -2,6 +2,16 @@
 
 **Status:** Accepted
 **Date:** 2026-09-09
+**Addendum 2026-09-28:** the `subject_uid` field this ADR introduces was
+renamed to `user` (`aim_update_10001()`) - unchanged in every other
+respect. References to `subject_uid` below are historical.
+
+**Addendum 2026-09-28 (ADR-0026):** the "must reference a real account"
+rule this ADR mandates is no longer hardcoded to `scope === 'user'`. It's
+now the `requires_account` ThirdPartySetting on the `user`
+`aim_scope` config entity, owned by the `aim_scope_user` submodule and
+read generically via `AimMemoryManager::scopeRequiresAccount()` - the
+rule itself is unchanged, only how a future scope could opt into it.
 
 ## Context
 

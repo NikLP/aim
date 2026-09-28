@@ -28,7 +28,8 @@ Built with the expectation of a local reasoning model in production use.
 
 DDEV, `drupal11` type, PHP 8.4, MariaDB 11.8, docroot `web/`.
 
-**Enabled:** `aim`, `aim_chatbot`, `aim_tool`, `aim_tool_oauth`, `tool`,
+**Enabled:** `aim`, `aim_scope_user`, `aim_scope_role`, `aim_scope_site`,
+`aim_scope_case`, `aim_chatbot`, `aim_tool`, `aim_tool_oauth`, `tool`,
 `mcp_server`, `mcp_server_tool_bridge`, `mcp_server_oauth`, `simple_oauth`
 + `simple_oauth_21`/`simple_oauth_server_metadata`/
 `simple_oauth_client_registration`/`simple_oauth_pkce`/`consumers`
@@ -87,8 +88,12 @@ handled per [ADR-0008](adr/0008-chatbot-integration-mechanism.md).
 ## Repository layout
 
 ```text
-aim/                    ← root module (always required)
+aim/                    ← root module (always required), ships zero scopes
 ├── modules/
+│   ├── aim_scope_user/  ← ships the user aim_scope + its access plugin
+│   ├── aim_scope_role/  ← ships the role aim_scope, zero PHP
+│   ├── aim_scope_site/  ← ships the site aim_scope, zero PHP
+│   ├── aim_scope_case/  ← ships the case aim_scope, zero PHP
 │   ├── aim_chatbot/     ← ai_agents FunctionCall tools, locked scope=site
 │   ├── aim_tool/        ← Tool API + MCP exposure, any scope
 │   └── aim_tool_oauth/  ← OAuth2 scopes for remote MCP callers
@@ -103,10 +108,18 @@ than relying on the site shell's manifest.
 
 | Module | Purpose | Docs |
 | --- | --- | --- |
-| `aim` | Core - `aim_fact`/`aim_scope` entities, `AimMemoryManager`, Guardrails wiring, vector search, admin UI, `aim:remember`/`aim:recall`/`aim:extract`/`aim:consolidate`/`aim:benchmark` Drush commands | this file |
+| `aim` | Core - `aim_fact`/`aim_scope` entities, `AimMemoryManager`, Guardrails wiring, vector search, admin UI, `aim:remember`/`aim:recall`/`aim:extract`/`aim:consolidate`/`aim:benchmark` Drush commands. Ships zero scope instances itself (ADR-0026). | this file |
+| `aim_scope_user` | Ships the `user` `aim_scope`, its `AimScopeUser` access plugin (role-visibility, ADR-0025), and the `requires_account` ThirdPartySetting (ADR-0007) | [CLAUDE.md](modules/aim_scope_user/CLAUDE.md) |
+| `aim_scope_role` | Ships the `role` `aim_scope`. Zero PHP. | [README.md](modules/aim_scope_role/README.md) |
+| `aim_scope_site` | Ships the `site` `aim_scope` - `aim_chatbot`'s hardcoded scope. Zero PHP. | [README.md](modules/aim_scope_site/README.md) |
+| `aim_scope_case` | Ships the `case` `aim_scope`. Zero PHP; access control still unbuilt. | [README.md](modules/aim_scope_case/README.md) |
 | `aim_chatbot` | `#[FunctionCall]` tools for an `ai_agents` chat assistant, hardcoded `scope: site` | [CLAUDE.md](modules/aim_chatbot/CLAUDE.md) |
 | `aim_tool` | `#[Tool]` plugins (any scope, permission-gated) exposed over Tool API and, via `mcp_server_tool_bridge`, MCP | [CLAUDE.md](modules/aim_tool/CLAUDE.md) |
 | `aim_tool_oauth` | OAuth2 scopes + third-party settings so a remote MCP client with no Drupal session can authenticate | [CLAUDE.md](modules/aim_tool_oauth/CLAUDE.md) |
+
+A site that wants today's default behavior enables all four scope
+submodules plus `aim_chatbot`/`aim_tool` as needed - no bundling recipe
+yet (ADR-0026 piece 6, unbuilt).
 
 `recipes/` holds hand-written Recipes (not AI-generated, so outside
 [ADR-0009](adr/0009-recipe-apply-safety-gate.md)'s gate); see
@@ -124,8 +137,11 @@ duplicated here.
 - **`aim_fact`** content entity. Bundle field `scope` (deliberately not
   named `type` - see [DEVELOPING.md](DEVELOPING.md)), bundles are real
   `aim_scope` config entities (`bundle_entity_type`), not code-defined.
-  Fields: `subject`/`subject_uid` (subject_uid required for `scope=user`,
-  a real account per [ADR-0007](adr/0007-user-scope-requires-real-account.md)),
+  Fields: `subject`/`user` (an entity reference to a real Drupal account,
+  required for `scope=user` per
+  [ADR-0007](adr/0007-user-scope-requires-real-account.md); renamed from
+  `subject_uid` 2026-09-28, `aim_update_10001()`, to stop colliding in
+  spirit with the unrelated `uid` field below),
   `text` (Guardrails-validated), `source`, `state` (tri-state boolean),
   `category` (taxonomy, vocabulary `aim_category`), `asserted` (valid-time
   start), `superseded_by`/`expires` (consolidation's supersede edge), `uid`
@@ -134,17 +150,25 @@ duplicated here.
   unless asked otherwise, see
   [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
   addendum).
-- **`aim_scope`** config entity, `id`/`label` only. Ships four:
-  `user`/`role`/`site`/`case`. No `field_ui_base_route` - deliberately,
-  see [DEVELOPING.md](DEVELOPING.md) for why.
+- **`aim_scope`** config entity, `id`/`label` only, defined in core `aim`
+  but shipped by the four `aim_scope_{user,role,site,case}` submodules
+  (ADR-0026), not core `aim` itself - a site installs only the scopes it
+  wants. Scope-level config differences are ThirdPartySettings the owning
+  submodule reads (`requires_account`, `aim_scope_user`-owned,
+  ADR-0007's "a scope=user fact must reference a real account", read
+  generically via `AimMemoryManager::scopeRequiresAccount()`); scope
+  behavior differences are `AimScopeAccessInterface` plugins (ADR-0025).
+  No `field_ui_base_route` - deliberately, see
+  [DEVELOPING.md](DEVELOPING.md) for why.
 - Vector search: server `aim_vector`, index `aim_vector_index`, collection
   table `aim_fact_vectors` (MariaDB HNSW `VECTOR INDEX`; renamed from
   `aim_facts` 2026-09-28 - too easy to confuse with the `aim_fact` entity
   table in a raw SQL query). Retired facts (`expires`
   set) are excluded from the index by the `aim_exclude_retired` processor
   ([ADR-0022](adr/resolved/0022-exclude-retired-facts-from-vector-index.md)),
-  `subject_uid` is an indexed attribute with a BTREE index
-  ([ADR-0018](adr/resolved/0018-index-subject-uid-with-btree.md)), HNSW is tuned to
+  `user` is an indexed attribute with a BTREE index
+  ([ADR-0018](adr/resolved/0018-index-subject-uid-with-btree.md), named
+  for the field's old `subject_uid` name), HNSW is tuned to
   `M=16` and `ef_search=100` ([ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)),
   and the
   provider plugin is swapped for `AimMariaDBProvider` to work around four

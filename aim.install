@@ -58,8 +58,9 @@ function aim_install(): void {
  * What's left genuinely can't be handled by config dependencies:
  * ai_search.index.aim_vector_index is ai_search's own simple config (not
  * a config entity - no uuid, so it is invisible to the dependency graph
- * entirely, see CLAUDE.md's "Vector search" section), and the aim_facts
- * collection table is a real database table, not config at all.
+ * entirely, see CLAUDE.md's "Vector search" section), and the
+ * aim_fact_vectors collection table is a real database table, not config
+ * at all.
  */
 function aim_uninstall(): void {
   \Drupal::configFactory()->getEditable('ai_search.index.aim_vector_index')->delete();
@@ -69,5 +70,5 @@ function aim_uninstall(): void {
   // stray table for the next install's createCollection() to collide
   // with. Safe if the search_api_index delete (now handled by the config
   // dependency cascade above, not this hook) already dropped it.
-  \Drupal::database()->schema()->dropTable('aim_facts');
+  \Drupal::database()->schema()->dropTable('aim_fact_vectors');
 }

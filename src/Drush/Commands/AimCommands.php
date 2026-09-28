@@ -128,10 +128,11 @@ final class AimCommands extends DrushCommands {
       return;
     }
 
+    $memoryManager = $this->memoryManager;
     $rows = array_map(static fn (AimFact $fact): array => [
       $fact->id(),
       $fact->bundle(),
-      $fact->bundle() === 'user' ? $fact->get('subject_uid')->target_id : $fact->get('subject')->value,
+      $memoryManager->scopeRequiresAccount($fact->bundle()) ? $fact->get('user')->target_id : $fact->get('subject')->value,
       $fact->get('text')->value,
     ], $result['created']);
 
@@ -177,7 +178,7 @@ final class AimCommands extends DrushCommands {
   public function remember(
     ?string $text = NULL,
     array $options = [
-      'scope' => 'site',
+      'scope' => NULL,
       'subject' => NULL,
       'source' => NULL,
       'state' => NULL,
@@ -193,6 +194,14 @@ final class AimCommands extends DrushCommands {
 
     if ($text === NULL || trim($text) === '') {
       $this->io()->error('Provide fact text, or --file with a JSON array of fact objects.');
+      return;
+    }
+
+    if (empty($options['scope'])) {
+      // No default here - which scopes exist depends entirely on which
+      // aim_scope_* submodules are installed (ADR-0026), so core has no
+      // sound default to assume.
+      $this->io()->error('--scope is required: one of ' . implode(', ', $this->memoryManager->allowedScopes()) . '.');
       return;
     }
 
@@ -244,11 +253,17 @@ final class AimCommands extends DrushCommands {
         continue;
       }
 
+      if (empty($entry['scope'])) {
+        // No default here - see aim:remember's own --scope error for why.
+        $this->io()->warning("Entry $i: missing scope, skipped.");
+        continue;
+      }
+
       try {
         [$state, $category, $asserted] = $this->parseRememberFields($entry);
         $fact = $this->memoryManager->remember(
           $entry['text'],
-          $entry['scope'] ?? 'site',
+          $entry['scope'],
           $entry['subject'] ?? NULL,
           $entry['source'] ?? NULL,
           $state,
@@ -503,11 +518,11 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'queries', description: 'How many timed recall() calls to run at each checkpoint.')]
   #[CLI\Option(name: 'cleanup', description: 'Delete every fact this run created once the benchmark finishes.')]
   #[CLI\Option(name: 'bypass-cache', description: 'Disable the query-embedding cache for this run, so repeat sample queries are not served from it.')]
-  #[CLI\Usage(name: 'drush aim:benchmark --checkpoints=50,200,500 --cleanup', description: 'Generate up to 500 site-scope facts in three steps, timing recall() at each, then remove them all.')]
-  #[CLI\Usage(name: 'drush aim:benchmark --bypass-cache', description: 'Measure uncached recall() latency, comparable to earlier ADR-0017 measurements.')]
+  #[CLI\Usage(name: 'drush aim:benchmark --scope=site --checkpoints=50,200,500 --cleanup', description: 'Generate up to 500 site-scope facts in three steps, timing recall() at each, then remove them all.')]
+  #[CLI\Usage(name: 'drush aim:benchmark --scope=site --bypass-cache', description: 'Measure uncached recall() latency, comparable to earlier ADR-0017 measurements.')]
   public function benchmark(
     array $options = [
-      'scope' => 'site',
+      'scope' => NULL,
       'checkpoints' => '50,200,500',
       'queries' => 10,
       'cleanup' => FALSE,
@@ -526,11 +541,12 @@ final class AimCommands extends DrushCommands {
     $queryCount = max(1, (int) $options['queries']);
     $runTag = 'benchmark:' . date('Ymd-His');
 
+    $requiresUserAccount = $this->memoryManager->scopeRequiresAccount($scope);
     $subjectUids = [];
-    if ($scope === 'user') {
+    if ($requiresUserAccount) {
       $subjectUids = $this->memoryManager->sampleUserIds();
       if (empty($subjectUids)) {
-        $this->io()->error('No real user accounts found to benchmark scope=user against (a user-scope fact must reference a real account, ADR-0007).');
+        $this->io()->error('No real user accounts found to benchmark scope=' . $scope . ' against (a scope requiring an account must reference a real one, ADR-0007).');
         return;
       }
       $this->io()->note('Distributing generated facts across ' . count($subjectUids) . ' real account(s).');
@@ -561,7 +577,7 @@ final class AimCommands extends DrushCommands {
         $indexed = $this->memoryManager->reindex();
         $indexMs = (int) round((microtime(TRUE) - $indexStart) * 1000);
 
-        $subjectUid = $scope === 'user' ? (string) $subjectUids[array_rand($subjectUids)] : NULL;
+        $subjectUid = $requiresUserAccount ? (string) $subjectUids[array_rand($subjectUids)] : NULL;
         $timings = [];
         for ($i = 0; $i < $queryCount; $i++) {
           $start = microtime(TRUE);

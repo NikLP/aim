@@ -332,22 +332,84 @@ of 2026-09-28:
       2026-09-28, see "PoC deviations to close before non-PoC data goes
       in" above.
       [ADR-0002 addendum](adr/0002-governance-deferred-guardrails-mandatory.md)
-- [ ] `AimScopeAccessInterface` plugin type (seam only, default
+- [x] `AimScopeAccessInterface` plugin type (seam only, default
       no-op fallback + `AimUserScopeVisibility` as the first dedicated
-      plugin) - designed, not built, no forcing function until a second
-      scope needs its own access rule.
+      plugin) - BUILT 2026-09-28: `AimScopeAccessPluginManager`
+      (`plugin.manager.aim_scope_access`, attribute-discovered from
+      `src/Plugin/AimScopeAccess/`), `AimFactAccessControlHandler`
+      refactored off its hardcoded `bundle() === 'user'` branch,
+      `AimUserScopeVisibility` converted into the first dedicated plugin
+      (still in core `aim`, not yet moved to a submodule - see the next
+      item). Verified live with a disposable scope=user fact: a viewer
+      with no flat permission got view access solely through the
+      plugin's shared-role fallback, a viewer sharing no role was denied.
+      No forcing function yet for a second dedicated plugin (entity
+      scope, case scope).
       [ADR-0025](adr/0025-scope-access-plugin-type.md)
-- [ ] Pluggable scope submodules (`aim_scope_user`/`role`/`site`/`case`,
+- [x] Pluggable scope submodules (`aim_scope_user`/`role`/`site`/`case`,
       each shipping its own `aim.aim_scope.<id>.yml`; scope-level config
-      differences as ThirdPartySettings the owning submodule reads/writes,
-      e.g. ADR-0007's "subject_uid required for user" instead of the two
-      hardcoded `bundle() === 'user'` checks in `AimMemoryManager.php`/
-      `AimCommands.php`; scope-level behavior differences on ADR-0025's
-      plugin type) - raised 2026-09-28, six-piece breakdown in
-      [ADR-0026](adr/0026-pluggable-scope-submodules.md), nothing built.
-      Explicitly does not move `subject`/`subject_uid` to per-bundle
+      differences as ThirdPartySettings the owning submodule reads/writes)
+      - raised 2026-09-28, six-piece breakdown in
+      [ADR-0026](adr/0026-pluggable-scope-submodules.md). Pieces 1-4 BUILT
+      and live-verified 2026-09-28: core `aim` ships zero scope instances;
+      the four submodules each ship their own `aim.aim_scope.<id>.yml`
+      (real save + export, not hand-typed, per this file's dependencies
+      rule - `role`/`site`/`case` carry only an `enforced` module
+      dependency on themselves, `user` additionally carries the
+      `requires_account` ThirdPartySetting, which also pulls in its
+      module dependency automatically); `AimUserScopeVisibility` moved
+      into `aim_scope_user` and renamed `AimScopeUser` (Nik's naming call
+      - `AimScope[Name]`, not `[Name]ScopeVisibility`, so it scales to
+      role/site/case plugins without describing one current behavior);
+      ADR-0007's "requires a real account" rule genericized off
+      `bundle() === 'user'`/`scope === 'user'` into
+      `AimMemoryManager::scopeRequiresAccount()`, called from
+      `AimMemoryManager.php`, `AimCommands.php`, and `aim_tool`'s
+      `AimRemember` tool plugin. Live-verified: `remember()`/`recall()`
+      round-trip for scope=user still works; `drush pmu aim_scope_role`
+      is correctly BLOCKED by `ScopeUninstallValidator` while role-scope
+      facts exist (5 on this site) - the real payoff of the enforced
+      dependency, proven against a real split-out submodule, not just the
+      earlier scratch-module test. Pieces 5 (`aim_chatbot`'s explicit
+      dependency on `aim_scope_site`) and 6 (the bundling recipe) remain
+      unbuilt. Explicitly does not move `subject`/`user` to per-bundle
       fields - already tried and reverted (DEVELOPING.md's "Scope/bundle
-      model").
+      model"). (The `user` field was itself `subject_uid` until
+      2026-09-28, `aim_update_10001()` - renamed for readability,
+      unrelated to this item.)
+- [x] Follow-up audit, same day, prompted by Nik asking "what other
+      bespoke-to-one-scope code is still in core `aim`?" toward the goal
+      of core working with any subset of scope submodules installed, no
+      dead code for the ones absent. Found and fixed:
+      - `AimUserScopeAccessForm` renamed `AimScopeUserAccessForm`
+        (`getFormId()` now `aim_scope_user_access_form`) to match the
+        plugin's `AimScope[Name]` rename - route/path unchanged.
+        `requires_account` ThirdPartySetting shortened from
+        `requires_user_account` (redundant - a Drupal "account" already
+        means "user account").
+      - A third hardcoded `$fact['scope'] === 'user'` check the original
+        grep missed (array-bracket syntax, not `bundle() ===`/
+        `scope ===`) in `AimMemoryManager::createFactsFromCandidates()`
+        (the `aim:extract` write path) - now also
+        `scopeRequiresAccount()`.
+      - Four places defaulted an omitted `--scope`/`scope` to `site`,
+        silently assuming `aim_scope_site` is installed:
+        `aim:remember`'s CLI default, its `--file` batch fallback,
+        `aim:benchmark`'s CLI default, and `aim_tool`'s `AimRemember`
+        Tool/MCP plugin (single-fact and batch-entry `scope` inputs).
+        All four now require scope explicitly and error clearly when
+        it's missing, rather than guessing.
+      - **Not fixed, needs a new plugin type to fully separate:** `case`
+        scope's subject-auto-minting in `AimMemoryManager::remember()`
+        and the "Case ID: ..." CLI hint in `AimCommands.php` are
+        genuinely scope-specific *behavior* (mint a UUID), not a config
+        flag - can't become a ThirdPartySetting the way
+        `requires_account` did. Extracting it needs a new interface
+        (e.g. a `defaultSubject()` method alongside
+        `AimScopeAccessInterface`, or its own plugin type) that
+        `aim_scope_case` would implement - bigger than this pass, raised
+        with Nik, decision pending on whether to build it now or leave it
+        as an acknowledged, documented gap.
 - [x] Verify `AimScopeDeleteForm`'s refusal to delete a scope while
       `aim_fact` entities of that bundle exist actually fires during
       **module uninstall** (`drush pmu`), and fix it - DONE 2026-09-28. It

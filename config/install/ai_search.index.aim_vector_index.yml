@@ -14,8 +14,8 @@ indexing_options:
   source:
     field_name: source
     indexing_option: attributes
-  subject_uid:
-    field_name: subject_uid
+  user:
+    field_name: user
     indexing_option: attributes
   trusted:
     field_name: trusted
