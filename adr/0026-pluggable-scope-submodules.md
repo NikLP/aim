@@ -143,13 +143,62 @@ scope submodule cannot introduce its own dedicated field.
 
 ## Open questions
 
-- **Does module uninstall actually respect `AimScopeDeleteForm`'s
-  content-based refusal?** That form guards the direct entity-delete UI
-  path; Drupal's config-dependency removal during `drush pmu` is a
-  different code path and may force-delete the config entity regardless,
-  silently orphaning `aim_fact` rows of that bundle. Needs a real test
-  (enable a scope submodule, create a fact, attempt `drush pmu`) before
-  this ships - not assumed either way.
+- ~~**Does module uninstall actually respect `AimScopeDeleteForm`'s
+  content-based refusal?**~~ **Resolved 2026-09-28, no.** Verified with a
+  disposable scratch module (`aim_scope_zzztest`, one
+  `aim.aim_scope.zzztest.yml` with `dependencies.enforced.module` pointed
+  at itself, since a real scope submodule's config must declare that
+  enforced dependency explicitly - the shipped `aim.aim_scope.{user,role,
+  site,case}.yml` files ship `dependencies: {}` today only because they
+  live in the same module (`aim`) as the `aim_scope` entity type itself,
+  a shortcut a split-out submodule doesn't get). Sequence: enabled the
+  module, created an `aim_fact` in that scope via `drush aim:remember`,
+  ran `drush pmu aim_scope_zzztest -y`. Uninstall succeeded silently, no
+  confirmation prompt, no content-count check -
+  `AimScopeDeleteForm::buildForm()` only runs when a human submits the
+  entity-delete confirmation route; `ConfigManager::uninstall()`'s
+  dependency-removal path calls `$storage->delete()` directly and never
+  instantiates that form. The `aim_fact` row survived in the database
+  with `scope: zzztest`, `AimScope::load('zzztest')` returned NULL, and
+  the row's `view`/`create` permission strings no longer existed for any
+  role to hold - it stayed loadable and renderable (empty build, no
+  error) and still appeared in the admin Views listing, but became
+  permanently inaccessible to anyone without the flat `administer aim
+  memory` bypass, with no delete-form route left to invoke to clean it
+  up. **Fixed and shipped 2026-09-28**, ahead of the rest of this ADR:
+  `Drupal\aim\ScopeUninstallValidator` (`aim.scope_uninstall_validator`
+  service, tagged `module_install.uninstall_validator`) - core's own
+  purpose-built mechanism for exactly this, the same one
+  `field.uninstall_validator`/`FieldUninstallValidator` uses to block
+  uninstalling a module with active field storage. `validate($module)`
+  calls `ConfigManagerInterface::findConfigEntityDependenciesAsEntities('module',
+  [$module])`, filters to `AimScope` entities, and counts `aim_fact` rows
+  of that scope via the same query `AimScopeDeleteForm` already runs -
+  any count > 0 returns a worded reason. Confirmed this is the right
+  layer, not `hook_module_preuninstall()`: drush's own `pm:uninstall`
+  calls `ModuleInstallerInterface::validateUninstall()` (which runs every
+  tagged validator) from an `ARGUMENT_VALIDATOR` hook that fires *before*
+  the "do you want to continue?" confirmation and before any deletion -
+  same mechanism `/admin/modules/uninstall` uses, so one validator class
+  covers both the UI and `drush pmu` with a real, worded reason rather
+  than a bare exception.
+
+  **A second bug caught during testing, fixed before shipping:** the
+  first version fired for *any* module providing an in-use scope,
+  including core `aim` itself - since all four shipped scopes carry a
+  calculated dependency on `aim` (the `aim_scope`/`aim_fact` entity
+  types' own provider), and this site carries 34 real facts right now,
+  that would have also blocked `drush pmu aim`, directly contradicting
+  this repo's own PoC reinstall workflow (CLAUDE.md/DEVELOPING.md: "just
+  change and reinstall (`drush pmu`/`drush en`)" while there's no real
+  data worth migrating). Fixed by skipping validation outright when
+  `$module` is `aim_fact`'s own entity-type provider - uninstalling that
+  module drops the `aim_fact` table wholesale, so nothing is orphaned by
+  it; the real risk this validator guards is a scope surviving its own
+  content's storage, only possible once a scope is provided by a
+  *different* module than `aim_fact` itself. Re-verified live after the
+  fix: `validate('aim')` returns `[]` with all 34 facts still in place,
+  and the scratch-submodule scenario above still correctly blocks.
 - **ThirdPartySettings key ownership.** Annotations' precedent
   (`annotations_audit` owns `affects_coverage` on an `AnnotationType` it
   doesn't provide) argues for `aim_scope_user` owning its own

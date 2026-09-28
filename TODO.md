@@ -348,17 +348,22 @@ of 2026-09-28:
       Explicitly does not move `subject`/`subject_uid` to per-bundle
       fields - already tried and reverted (DEVELOPING.md's "Scope/bundle
       model").
-- [ ] Verify `AimScopeDeleteForm`'s refusal to delete a scope while
+- [x] Verify `AimScopeDeleteForm`'s refusal to delete a scope while
       `aim_fact` entities of that bundle exist actually fires during
-      **module uninstall** (`drush pmu`), not just the direct entity-delete
-      UI path - config-dependency removal during uninstall is a different
-      code path and may bypass it, silently orphaning `aim_fact` rows.
-      Untested either way; a real blocker for ADR-0026's submodule split
-      (a scope submodule needs to be safely uninstallable), flagged in
-      that ADR's "Open questions" but worth its own line here since it's
-      a concrete, isolated thing to test (enable a scope submodule, create
-      a fact, attempt `drush pmu`, see what happens) independent of the
-      rest of the split.
+      **module uninstall** (`drush pmu`), and fix it - DONE 2026-09-28. It
+      did not fire (verified live with a disposable scratch module before
+      building anything); fixed with `Drupal\aim\ScopeUninstallValidator`
+      (`aim.scope_uninstall_validator`, tagged
+      `module_install.uninstall_validator`, same mechanism as core's
+      `field.uninstall_validator`), which blocks both `/admin/modules/
+      uninstall` and `drush pmu` with a worded reason whenever a scope
+      still has `aim_fact` rows - except when the module being uninstalled
+      is `aim_fact`'s own entity-type provider (core `aim` today), since
+      that drops the whole table and orphans nothing; without that guard
+      it would have also blocked `drush pmu aim` on this site's own 34
+      live facts, breaking the PoC reinstall workflow above. Full writeup
+      in [ADR-0026](adr/0026-pluggable-scope-submodules.md)'s "Open
+      questions".
 - [ ] `scope: entity` bundle (dynamic reference to any Drupal entity,
       single-value base field so it stays inline on `aim_fact`, no new
       table) - still theoretical, a nice-to-have per Nik, not its own ADR

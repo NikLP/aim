@@ -4,6 +4,14 @@ services:
     arguments:
       - '@config.factory'
 
+  aim.scope_uninstall_validator:
+    class: Drupal\aim\ScopeUninstallValidator
+    arguments:
+      - '@config.manager'
+      - '@entity_type.manager'
+    tags:
+      - { name: module_install.uninstall_validator }
+
   aim.memory_manager:
     class: Drupal\aim\Service\AimMemoryManager
     arguments:
