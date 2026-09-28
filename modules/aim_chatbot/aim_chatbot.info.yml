@@ -5,6 +5,7 @@ package: AIM
 core_version_requirement: ^11
 dependencies:
   - aim:aim
+  - aim:aim_scope_site
   - ai_agents:ai_agents
   - ai:ai_assistant_api
   - ai:ai_chatbot

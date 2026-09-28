@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\aim\Service;
 
 use Drupal\Component\Datetime\TimeInterface;
-use Drupal\Component\Uuid\UuidInterface;
 use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\Dto\StructuredOutputSchema;
 use Drupal\ai\Guardrail\AiGuardrailRepository;
@@ -22,6 +21,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\aim\AimScopeAccessPluginManagerInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
 use Drupal\search_api\IndexInterface;
@@ -168,11 +168,12 @@ class AimMemoryManager {
    *   \Drupal\aim\Entity\AimScope) instead of a hardcoded list, so a
    *   fifth scope added via a new aim_scope config entity passes
    *   validation here automatically, no code change needed.
-   * @param \Drupal\Component\Uuid\UuidInterface $uuid
-   *   The UUID service, used to mint a new case ID for a scope=case fact
-   *   with no caller-supplied subject, so every caller (MCP client, drush,
-   *   a future ECA action) gets the same format for free instead of each
-   *   needing to invent and agree on its own.
+   * @param \Drupal\aim\AimScopeAccessPluginManagerInterface $scopeAccessManager
+   *   The scope access plugin manager, used to ask a scope's own plugin
+   *   (if any) for a default subject when the caller omits one - e.g.
+   *   aim_scope_case's plugin mints a new case ID, so every caller (MCP
+   *   client, drush, a future ECA action) gets the same format for free
+   *   instead of each needing to invent and agree on its own.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory, used to read aim.settings' admin-editable
    *   consolidation thresholds and extraction/consolidation prompts (see
@@ -193,7 +194,7 @@ class AimMemoryManager {
     protected AiGuardrailRepository $guardrailRepository,
     protected QueueFactory $queueFactory,
     protected EntityTypeBundleInfoInterface $bundleInfo,
-    protected UuidInterface $uuid,
+    protected AimScopeAccessPluginManagerInterface $scopeAccessManager,
     protected ConfigFactoryInterface $configFactory,
     protected AccountProxyInterface $currentUser,
     protected AimEmbeddingCacheSubscriber $embeddingCache,
@@ -793,16 +794,15 @@ class AimMemoryManager {
       $values['user'] = $account->id();
       $values['subject'] = '';
     }
-    elseif ($scope === 'case' && empty($subject)) {
-      // No subject given for a new case-scoped fact: mint one here so
-      // every caller (MCP client, drush, a future ECA action) gets the
-      // same format for free instead of needing to agree on one. subject
-      // is the only field this touches - source stays whatever provenance
-      // the caller already passes, untouched by this.
-      $values['subject'] = 'case-' . substr($this->uuid->generate(), 0, 8);
+    elseif (empty($subject)) {
+      // No subject given: ask this scope's access plugin (if any) for a
+      // default instead of leaving the field empty - e.g. aim_scope_case's
+      // plugin mints a new case ID.
+      $plugin = $this->scopeAccessManager->getAccessPlugin($scope);
+      $values['subject'] = $plugin?->defaultSubject() ?? '';
     }
     else {
-      $values['subject'] = $subject ?? '';
+      $values['subject'] = $subject;
     }
 
     if ($state !== NULL) {

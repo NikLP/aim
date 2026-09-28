@@ -399,17 +399,22 @@ of 2026-09-28:
         Tool/MCP plugin (single-fact and batch-entry `scope` inputs).
         All four now require scope explicitly and error clearly when
         it's missing, rather than guessing.
-      - **Not fixed, needs a new plugin type to fully separate:** `case`
-        scope's subject-auto-minting in `AimMemoryManager::remember()`
-        and the "Case ID: ..." CLI hint in `AimCommands.php` are
-        genuinely scope-specific *behavior* (mint a UUID), not a config
-        flag - can't become a ThirdPartySetting the way
-        `requires_account` did. Extracting it needs a new interface
-        (e.g. a `defaultSubject()` method alongside
-        `AimScopeAccessInterface`, or its own plugin type) that
-        `aim_scope_case` would implement - bigger than this pass, raised
-        with Nik, decision pending on whether to build it now or leave it
-        as an acknowledged, documented gap.
+      - **Subject-minting fixed 2026-09-28, reusing the existing plugin
+        type:** `case` scope's subject-auto-minting in
+        `AimMemoryManager::remember()` was genuinely scope-specific
+        *behavior* (mint a UUID), not a config flag, so it couldn't become
+        a ThirdPartySetting the way `requires_account` did. Extracted via
+        a `defaultSubject(): ?string` method added to the existing
+        `AimScopeAccessInterface` (not a second plugin type - chosen
+        because `AimScopeAccessPluginManager::getAccessPlugin()` already
+        treats "no plugin for this scope" as valid, so `role`/`site`
+        gained no PHP by this), implemented by a new `AimScopeCase`
+        plugin in `aim_scope_case` (mints the case ID, `checkViewAccess()`
+        stays neutral) and a one-line `NULL` addition to `AimScopeUser`.
+        The "Case ID: ..." CLI hint in `AimCommands.php` and its
+        `aim_tool` equivalent were left untouched - they're an unrelated,
+        purely cosmetic `bundle() === 'case'` check on the *output*
+        message, not part of the minting decision.
 - [x] Verify `AimScopeDeleteForm`'s refusal to delete a scope while
       `aim_fact` entities of that bundle exist actually fires during
       **module uninstall** (`drush pmu`), and fix it - DONE 2026-09-28. It
@@ -426,12 +431,28 @@ of 2026-09-28:
       live facts, breaking the PoC reinstall workflow above. Full writeup
       in [ADR-0026](adr/0026-pluggable-scope-submodules.md)'s "Open
       questions".
+- [ ] `checkViewAccess()`'s "allowed or neutral, never forbidden" contract
+      (`AimScopeAccessInterface`) is a deliberate design choice, not a
+      technical ceiling - Drupal's own `AccessResult::orIf()` already lets
+      a forbidden result override an allowed one, the same idiom node
+      grants/content_moderation use to veto access, so
+      `AimFactAccessControlHandler` could combine plugin results that way
+      instead if a scope ever needs a genuine *gate* rather than a
+      widening (e.g. case-scope "must have access to the fact's attached
+      taxonomy term" is a gate: someone holding the flat `view case aim
+      facts` permission needs to be *narrowed*, not just have extra people
+      let in). Today the only way to get that narrowing effect is the
+      pattern `AimScopeUser` already uses: don't grant the flat permission
+      broadly, let the plugin's `checkViewAccess()` be the sole grant.
+      Revisit if that stops being good enough - raised 2026-09-28.
 - [ ] `scope: entity` bundle (dynamic reference to any Drupal entity,
       single-value base field so it stays inline on `aim_fact`, no new
       table) - still theoretical, a nice-to-have per Nik, not its own ADR
       yet. Depends on ADR-0025 landing first (needs a dedicated
       per-referenced-entity access plugin, not the flat per-scope
-      permission the other bundles use).
+      permission the other bundles use) - would hit the same
+      allowed/neutral ceiling above if referenced-entity access ever needs
+      to narrow rather than widen.
 - [ ] `aim_annotations` bridge module itself
       ([ADR-0024](adr/0024-annotations-integration-target-scoped-promotion.md)) -
       blocked until `scope: entity` and its ADR-0025 plugin exist (the

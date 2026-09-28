@@ -114,4 +114,13 @@ class AimScopeUser extends PluginBase implements AimScopeAccessInterface, Contai
       ->addCacheableDependency($cacheability);
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function defaultSubject(): ?string {
+    // scope=user has no sensible default - it requires a real account,
+    // enforced separately by AimMemoryManager::scopeRequiresAccount().
+    return NULL;
+  }
+
 }

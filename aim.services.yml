@@ -26,7 +26,7 @@ services:
       - '@Drupal\ai\Guardrail\AiGuardrailRepository'
       - '@queue'
       - '@entity_type.bundle.info'
-      - '@uuid'
+      - '@plugin.manager.aim_scope_access'
       - '@config.factory'
       - '@current_user'
       - '@aim.embedding_cache_subscriber'

@@ -86,9 +86,11 @@ TODO.md/task entries rather than one large change:
    `aim_scope_role`, `aim_scope_site`, `aim_scope_case` - each ships
    exactly one `config/install/aim.aim_scope.<id>.yml`. A site installs
    only the scopes it wants. `role`/`site` are pure config, zero PHP,
-   same as any site-added fifth scope. `case` likewise - it has no access
-   control of its own yet (an already acknowledged gap, unrelated to this
-   ADR). Each config entity's `dependencies` came from a real `->save()`
+   same as any site-added fifth scope. `case` ships one PHP plugin (see
+   the subject-minting bullet below) but, like `role`/`site`, has no view
+   *access control* of its own yet (an already acknowledged gap, unrelated
+   to this ADR). Each config entity's `dependencies` came from a real
+   `->save()`
    and export, not hand-typing (this file's own "Cross-cutting
    conventions" rule): `role`/`site`/`case` carry an `enforced` module
    dependency on themselves only (needed for `ScopeUninstallValidator` to
@@ -193,15 +195,17 @@ findings, not one:
   most common, silently assuming `aim_scope_site` is installed. Fixed by
   requiring scope explicitly everywhere and erroring clearly when it's
   missing, rather than guessing.
-- **Not fixed, a different shape of problem:** `case` scope's
-  subject-auto-minting in `remember()` and the "Case ID: ..." CLI hint in
-  `AimCommands.php` are scope-specific *behavior* (mint a UUID), not a
-  config flag - `requires_account`'s ThirdPartySetting mechanism doesn't
-  apply. Fully separating this needs a new plugin type (e.g. a
-  `defaultSubject()` method alongside `AimScopeAccessInterface`) that
-  `aim_scope_case` would implement. Left as an acknowledged, documented
-  gap pending a decision on whether it's worth building - see TODO.md's
-  "Governance/scope design thread".
+- **Fixed 2026-09-28, a different shape of problem:** `case` scope's
+  subject-auto-minting in `remember()` was scope-specific *behavior*
+  (mint a UUID), not a config flag - `requires_account`'s ThirdPartySetting
+  mechanism didn't apply. Separated by adding `defaultSubject(): ?string`
+  to `AimScopeAccessInterface` itself, rather than a second plugin type -
+  `AimScopeAccessPluginManager::getAccessPlugin()` already tolerates "no
+  plugin registered" per scope, so `role`/`site` still ship zero PHP.
+  `aim_scope_case` implements it (mints the case ID); `AimScopeUser`
+  returns `NULL`. Detail in TODO.md's "Governance/scope design thread".
+  The "Case ID: ..." CLI hint in `AimCommands.php` is a separate, purely
+  cosmetic output check, left as-is.
 
 ## Open questions
 

@@ -93,7 +93,7 @@ aim/                    ← root module (always required), ships zero scopes
 │   ├── aim_scope_user/  ← ships the user aim_scope + its access plugin
 │   ├── aim_scope_role/  ← ships the role aim_scope, zero PHP
 │   ├── aim_scope_site/  ← ships the site aim_scope, zero PHP
-│   ├── aim_scope_case/  ← ships the case aim_scope, zero PHP
+│   ├── aim_scope_case/  ← ships the case aim_scope + its subject-minting plugin
 │   ├── aim_chatbot/     ← ai_agents FunctionCall tools, locked scope=site
 │   ├── aim_tool/        ← Tool API + MCP exposure, any scope
 │   └── aim_tool_oauth/  ← OAuth2 scopes for remote MCP callers
@@ -112,7 +112,7 @@ than relying on the site shell's manifest.
 | `aim_scope_user` | Ships the `user` `aim_scope`, its `AimScopeUser` access plugin (role-visibility, ADR-0025), and the `requires_account` ThirdPartySetting (ADR-0007) | [CLAUDE.md](modules/aim_scope_user/CLAUDE.md) |
 | `aim_scope_role` | Ships the `role` `aim_scope`. Zero PHP. | [README.md](modules/aim_scope_role/README.md) |
 | `aim_scope_site` | Ships the `site` `aim_scope` - `aim_chatbot`'s hardcoded scope. Zero PHP. | [README.md](modules/aim_scope_site/README.md) |
-| `aim_scope_case` | Ships the `case` `aim_scope`. Zero PHP; access control still unbuilt. | [README.md](modules/aim_scope_case/README.md) |
+| `aim_scope_case` | Ships the `case` `aim_scope` and its `AimScopeCase` plugin (`defaultSubject()` mints case IDs, ADR-0025); access control (`checkViewAccess()`) still unbuilt, stays neutral | [CLAUDE.md](modules/aim_scope_case/CLAUDE.md) |
 | `aim_chatbot` | `#[FunctionCall]` tools for an `ai_agents` chat assistant, hardcoded `scope: site` | [CLAUDE.md](modules/aim_chatbot/CLAUDE.md) |
 | `aim_tool` | `#[Tool]` plugins (any scope, permission-gated) exposed over Tool API and, via `mcp_server_tool_bridge`, MCP | [CLAUDE.md](modules/aim_tool/CLAUDE.md) |
 | `aim_tool_oauth` | OAuth2 scopes + third-party settings so a remote MCP client with no Drupal session can authenticate | [CLAUDE.md](modules/aim_tool_oauth/CLAUDE.md) |
@@ -157,8 +157,13 @@ duplicated here.
   submodule reads (`requires_account`, `aim_scope_user`-owned,
   ADR-0007's "a scope=user fact must reference a real account", read
   generically via `AimMemoryManager::scopeRequiresAccount()`); scope
-  behavior differences are `AimScopeAccessInterface` plugins (ADR-0025).
-  No `field_ui_base_route` - deliberately, see
+  behavior differences are `AimScopeAccessInterface` plugins (ADR-0025) -
+  `checkViewAccess()` (extra view-access logic, ORed against the flat
+  permission) and `defaultSubject()` (a default subject for a new fact
+  of this scope when the caller omits one, e.g. `aim_scope_case`'s
+  minted case IDs), read generically via
+  `AimScopeAccessPluginManager::getAccessPlugin()`. No
+  `field_ui_base_route` - deliberately, see
   [DEVELOPING.md](DEVELOPING.md) for why.
 - Vector search: server `aim_vector`, index `aim_vector_index`, collection
   table `aim_fact_vectors` (MariaDB HNSW `VECTOR INDEX`; renamed from

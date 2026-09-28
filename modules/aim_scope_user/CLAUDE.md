@@ -34,7 +34,11 @@ is specific to `aim_scope_user`.
   user_scope_role_visibility`/`user_scope_shared_role_fallback`), stays
   in core `aim` - it isn't plugin-discovered the way the access check is,
   so moving it would need its own route/permission split with no
-  corresponding benefit yet.
+  corresponding benefit yet. Also implements `defaultSubject()`, returning
+  `NULL` - `user` has no sensible default subject, it requires a real
+  account instead (see `requires_account` above). See
+  [aim_scope_case](../aim_scope_case/CLAUDE.md) for a scope that does
+  supply one.
 
 ## Reading `requires_account` generically
 
