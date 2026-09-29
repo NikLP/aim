@@ -21,3 +21,11 @@ aim.user_scope_access:
     _title: 'AIM user-scope visibility'
   requirements:
     _permission: 'administer aim memory'
+
+aim.status:
+  path: '/admin/config/aim/status'
+  defaults:
+    _controller: '\Drupal\aim\Controller\AimStatusController::build'
+    _title: 'AIM status'
+  requirements:
+    _permission: 'administer aim memory'

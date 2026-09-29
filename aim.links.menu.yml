@@ -10,18 +10,25 @@ aim.settings:
   description: 'Configure AI memory settings.'
   parent: aim.admin_config
   route_name: aim.settings
-  weight: 0
+  weight: 100
 
 entity.aim_scope.collection:
   title: 'Scopes'
   description: 'Manage the scopes that facts can be saved under.'
   parent: aim.admin_config
   route_name: entity.aim_scope.collection
-  weight: 1
+  weight: 10
 
 aim.user_scope_access:
   title: 'User-scope visibility'
   description: 'Configure which roles may view another role''s scope=user facts.'
   parent: aim.admin_config
   route_name: aim.user_scope_access
-  weight: 2
+  weight: 20
+
+aim.status:
+  title: 'Status'
+  description: 'Check vector index parity, the provider shim, HNSW tuning and the recall cutoff.'
+  parent: aim.admin_config
+  route_name: aim.status
+  weight: -10

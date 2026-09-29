@@ -43,6 +43,19 @@ services:
   Drupal\aim\Service\AimMemoryManager:
     alias: aim.memory_manager
 
+  # Shared by aim:status (Drush) and AimStatusController
+  # (/admin/config/aim/status) - see AimStatusChecker's own docblock.
+  aim.status_checker:
+    class: Drupal\aim\AimStatusChecker
+    arguments:
+      - '@database'
+      - '@config.factory'
+      - '@ai.vdb_provider'
+      - '@entity_type.manager'
+
+  Drupal\aim\AimStatusChecker:
+    alias: aim.status_checker
+
   # ADR-0017's dedicated cache bin for query-time embeddings, kept separate
   # from cache.default so it can be flushed or redirected to another
   # backend on its own. Database-backed, same as cache.default on this
