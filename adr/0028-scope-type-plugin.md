@@ -1,8 +1,8 @@
 # ADR-0028: Widen the scope-access plugin into a scope-type plugin - fields, settings, and behavior in one seam
 
-**Status:** Built and verified 2026-09-29 - pieces 0-3 (see "Decision"
-below). Piece 4, added the same day once pieces 1-3 exposed it, is design
-only - see its own entry.
+**Status:** Built and verified 2026-09-29 - pieces 0-4 (see "Decision"
+below). Piece 4, added the same day once pieces 1-3 exposed it, was
+initially design only; built and verified later the same day.
 **Date:** 2026-09-29
 
 ## Context
@@ -180,36 +180,95 @@ special case - one mechanism instead of two. Piece 1 (built) makes this
 possible; the `remember()` change itself is not part of this ADR's build
 and remains open, tracked in TODO.md.
 
-**Piece 4: the Tool API/MCP endpoint shape is still not pluggable -
-found 2026-09-29, design only.** Pieces 1-3 make the *entity* and
-*admin form* shape of a scope type pluggable, but `aim_tool`'s
-`AimRemember` `#[Tool]` attribute still statically lists `target_type`/
+**Piece 4: the Tool API/MCP endpoint shape - found 2026-09-29 design
+only, built and verified the same day.** Pieces 1-3 make the *entity*
+and *admin form* shape of a scope type pluggable, but `aim_tool`'s
+`AimRemember` `#[Tool]` attribute statically listed `target_type`/
 `target_id` in its `input_definitions` - a plain PHP attribute, read
 once to build the schema MCP's `tools/list` advertises. No scope-type
-plugin can inject a new named input into that schema at call time, so
-today's `input_definitions` bakes in `scope=entity`'s shape regardless
-of whether `aim_scope_entity` is even installed, and a hypothetical
-future scope type with its own fields would need `AimRemember` hand-
-patched again, exactly the coupling pieces 1-3 removed from the entity
-and the form.
+plugin could inject a new named input into that schema at call time, so
+`input_definitions` baked in `scope=entity`'s shape regardless of
+whether `aim_scope_entity` was even installed, and a future scope type
+with its own fields would have needed `AimRemember` hand-patched again,
+exactly the coupling pieces 1-3 removed from the entity and the form.
 
 The Tool API's own extension point,
 `Drupal\tool\TypedData\InputDefinitionRefinerInterface`
-(`input_definition_refiners` on `#[Tool]`), does not solve this as-is:
-by contract (see the interface's own docblock) a refiner may only
-*narrow* a definition already present in the static advertisement - add
-constraints, declare properties on an already-declared free map, tighten
-`required`, set a default - never introduce a whole new named input
-unadvertised. The concrete mechanism this piece would need: replace the
-scope-specific named inputs (`target_type`/`target_id` today) with one
-generic, statically-declared free-map input (e.g. `scope_fields`,
-untyped/no fixed properties), and have `AimRemember` implement
-`InputDefinitionRefinerInterface` so each request's chosen scope's
-plugin (via a new interface method, name TBD, something like
-`refineToolInput(): array` returning property definitions) declares its
-own properties onto that map. Not built. Also applies to `aim_recall`'s
-read-side filters and to any future scope-type-specific Tool input, not
-just `AimRemember`'s write side.
+(`input_definition_refiners` on `#[Tool]`), does not solve this
+unaided: by contract (see the interface's own docblock) a refiner may
+only *narrow* a definition already present in the static advertisement
+- add constraints, declare properties on an already-declared free map,
+tighten `required`, set a default - never introduce a whole new named
+input unadvertised. Built exactly as sketched: `target_type`/
+`target_id` replaced by one generic, statically-declared free-map input,
+`scope_fields` (a `MapInputDefinition`, no fixed properties - both the
+single-call input and the `facts` batch item's own copy); `AimRemember`
+implements `InputDefinitionRefinerInterface` with
+`input_definition_refiners: ['scope_fields' => ['scope']]`, so once a
+call's `scope` value is known, `refineInputDefinition()` resolves that
+scope's plugin via the existing `AimScopeTypePluginManager::
+getTypePlugin()` (piece 3) and translates each of its
+`getBaseFieldDefinitions()` entries (piece 1) into a Tool
+`InputDefinition` via a small `BaseFieldDefinition` -> `InputDefinition`
+translator (`AimRemember::toolInputFromBaseField()` - maps Field API
+`string`/`boolean`/`integer` types to their same-named Tool `data_type`s,
+defaulting to `string`; only `string` fields exist among any shipped
+scope type's base fields today). No new interface method was needed on
+`AimScopeTypeInterface` - `getBaseFieldDefinitions()` already carried
+enough (label, description, required, field type) to build the Tool
+input generically, so this piece added no new coupling between core
+`aim`'s scope-type interface and the `tool` module, which core `aim`
+does not and should not depend on.
+
+The `facts` batch item's own `scope_fields` deliberately stays
+unrefined (an always-unconstrained map) - Tool API's refiner mechanism
+narrows a named *top-level* input from other top-level inputs' values
+(`TypedInputsTrait::setInputValue()` dispatches refiners keyed by input
+name, confirmed by reading that method directly), with no per-list-item
+equivalent: a batch entry's own `scope` value cannot drive refinement of
+that same entry's `scope_fields`. Not a functional loss - an
+unconstrained map already accepts whatever a batch entry needs to send,
+just without the single-call path's stricter per-scope typing.
+
+**Not solved by this piece, deliberately deferred, not a regression**:
+`AimMemoryManager::remember()` itself still takes `$targetType`/
+`$targetId` as two fixed positional parameters, not a generic bag, so
+`AimRemember::rememberOne()` still reads exactly those two names out of
+the now-generic `scope_fields` map before calling `remember()` - the
+only two names any shipped scope type's `getBaseFieldDefinitions()`
+returns today, so no live data is silently dropped. A future scope type
+adding a third base field would be correctly *advertised* by this
+piece's generic schema but silently *dropped* at the `remember()` call
+boundary until that method's own signature is widened to match -
+tracked as its own follow-up in TODO.md, out of scope here per this
+ADR's own piece boundaries (piece 1 touched fields, piece 2 settings,
+piece 3 ID decoupling, each independently).
+
+Not applied to `aim_recall`'s read-side filters: unlike `AimRemember`,
+`AimRecall` has no scope-specific filter input today (no shipped scope
+type offers one to filter on) - genericizing a filter mechanism nothing
+currently populates would be exactly the "ceremony, not a feature"
+this ADR's own Consequences already rejected for a generic/default
+scope-type plugin. Revisit once a real scope-specific filter exists to
+generalize.
+
+Live-verified: `getInputDefinition('scope_fields')` on a fresh
+`aim_remember` instance has zero properties; setting `scope` to `entity`
+refines it to `target_type`/`target_id` (both `string`, not required,
+correct labels), matching `AimScopeEntity::getBaseFieldDefinitions()`
+exactly; setting `scope` to `role` (no plugin) or leaving a fresh
+instance untouched both leave it unconstrained; a full `execute()` call
+with `scope: entity` and a real node's `scope_fields` wrote
+`target_type`/`target_id` onto the created `aim_fact` correctly; a plain
+`scope: site` call and a batch call mixing a plain-scope and an
+entity-scope entry both still round-tripped. The actual MCP `tools/list`
+JSON Schema (read directly off the live `tool_api__aim_remember`
+derivative's `inputSchema`, not just the PHP-level `InputDefinition`
+objects) confirms `target_type`/`target_id` are gone from the
+advertisement and `scope_fields` appears as an open object
+(`"properties": {}`, no `additionalProperties: false` at that nesting
+level, so a client may still send whatever the runtime refiner would
+have allowed). phpcs/phpstan clean.
 
 ## Consequences / risks
 
@@ -260,10 +319,30 @@ just `AimRemember`'s write side.
   re-deriving that same safety check. A scope type sharing columns with
   a scope that *doesn't* block its own uninstall this way would need the
   distinct check described above - not a case that exists yet.
-- Migrating `aim_scope_user`'s existing `requires_account`
+- ~~Migrating `aim_scope_user`'s existing `requires_account`
   ThirdPartySetting to the new settings mechanism is still a nice-to-have
   cleanup this ADR enables, not a requirement of it - confirmed not done
-  as part of this build; the two mechanisms coexist.
+  as part of this build; the two mechanisms coexist.~~ **Done
+  2026-09-29** (separate pass from this ADR's own build): `AimScopeUser::
+  defaultSettings()` now returns `['requires_account' => TRUE]` and
+  `buildSettingsForm()` renders the matching checkbox;
+  `AimMemoryManager::scopeRequiresAccount()` reads
+  `$scope->get('settings')['requires_account']` instead of the
+  ThirdPartySetting; `aim_scope_user`'s own `config/schema/` (which
+  existed solely to type the ThirdPartySetting) was deleted. Surfaced a
+  real, unrelated schema gap while doing it: `aim.aim_scope.*.settings`
+  was typed `mapping` with an empty `mapping: {}`, which is not an open
+  wildcard in Drupal's config schema system - the very first real
+  (non-empty) `settings` value threw a "missing schema" warning on save.
+  Retyped `settings` to `ignore` (core's own type for schema-agnostic
+  config, `\Drupal\Core\Config\Schema\Ignore`) - the correct fix given
+  this ADR's own "shape defined by the plugin itself" intent, not a
+  workaround. Live-verified: `aim.aim_scope.user`'s saved `dependencies`
+  dropped its ThirdPartySettings-derived top-level `module:` entry and
+  now matches `role`/`site`/`case`'s enforced-only shape exactly;
+  `remember()` still rejects a subject-less `scope=user` fact and
+  accepts one with a real account; `AimScopeForm` renders the checkbox
+  with the right default. phpcs/phpstan clean.
 - Piece 0's rename touched every then-current caller:
   `AimFactAccessControlHandler`, `AimMemoryManager::remember()`,
   `aim.services.yml`, and all three existing plugins (`AimScopeUser`,

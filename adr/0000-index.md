@@ -26,7 +26,7 @@ Architecture Decision Records for the `aim` module.
 | [0025](0025-scope-access-plugin-type.md) | Scope-specific view access as a plugin type, not hardcoded bundle branches | Accepted - seam built and verified 2026-09-28; second dedicated plugin (`AimScopeEntity`, ADR-0027) built 2026-09-29 |
 | [0026](0026-pluggable-scope-submodules.md) | Pluggable scope submodules: ThirdPartySettings for config, ADR-0025's plugin type for behavior | Partially implemented - pieces 1-5 (submodule split, ThirdPartySetting, plugin move, aim_chatbot dependency) built and live-verified, piece 5 on 2026-09-29; piece 6 (bundling recipe) not built |
 | [0027](0027-entity-scope.md) | `scope: entity`: facts about an arbitrary Drupal entity, view access mirroring that entity's own | Built and verified 2026-09-29, including CLI/Tool wiring |
-| [0028](0028-scope-type-plugin.md) | Widen the scope-access plugin into a scope-type plugin: fields, settings, and behavior in one seam | Built and verified 2026-09-29 (pieces 0-3); corrects 0027's base-field reasoning; piece 4 (Tool API/MCP endpoint shape still not pluggable) is a named gap, design only |
+| [0028](0028-scope-type-plugin.md) | Widen the scope-access plugin into a scope-type plugin: fields, settings, and behavior in one seam | Built and verified 2026-09-29 (pieces 0-4, including the Tool API/MCP endpoint shape); corrects 0027's base-field reasoning |
 
 ## Resolved
 

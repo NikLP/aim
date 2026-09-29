@@ -22,7 +22,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * Moved out of core aim's AimMemoryManager::remember() (ADR-0026's
  * follow-up audit flagged this as scope-specific behavior, not a config
- * flag, so requires_account's ThirdPartySetting mechanism didn't apply -
+ * flag, so requires_account's settings-based mechanism didn't apply -
  * needed defaultSubject() added to AimScopeTypeInterface instead).
  * checkViewAccess() stays neutral: case-scope access control is a
  * separate, still-unbuilt problem, not addressed by this plugin.

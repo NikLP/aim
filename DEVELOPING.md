@@ -443,7 +443,7 @@ to find it - see [aim_scope_user's CLAUDE.md](modules/aim_scope_user/CLAUDE.md)
 for why), but it also needs its own access rule and its own base fields
 (`target_type`/`target_id`), so it adds a dedicated
 `AimScopeTypeInterface` plugin (`AimScopeEntity`) the same way
-`aim_scope_user`'s `requires_account` adds a ThirdPartySetting instead for
+`aim_scope_user`'s `requires_account` adds a `settings` entry instead for
 a config-shaped (not behavior-shaped) scope difference. The plugin's
 `getBaseFieldDefinitions()` (ADR-0028 piece 1) is how its own fields get
 onto `aim_fact` without core `aim` hardcoding them - see

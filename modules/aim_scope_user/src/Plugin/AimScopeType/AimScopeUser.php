@@ -12,6 +12,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Plugin\PluginBase;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Attribute\AimScopeType;
 use Drupal\aim\Entity\AimFact;
@@ -42,6 +43,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   label: new TranslatableMarkup('User scope role visibility'),
 )]
 class AimScopeUser extends PluginBase implements AimScopeTypeInterface, ContainerFactoryPluginInterface {
+
+  use StringTranslationTrait;
 
   /**
    * Constructs the plugin.
@@ -131,8 +134,7 @@ class AimScopeUser extends PluginBase implements AimScopeTypeInterface, Containe
     // The `user` base field stays in AimFact::baseFieldDefinitions()
     // (core aim) rather than moving here - unlike target_type/target_id
     // (ADR-0027/0028 piece 1), migrating it is a nice-to-have this ADR
-    // enables, not something it requires; requires_account also stays a
-    // ThirdPartySetting for the same reason (see defaultSettings()).
+    // enables, not something it requires.
     return [];
   }
 
@@ -140,13 +142,19 @@ class AimScopeUser extends PluginBase implements AimScopeTypeInterface, Containe
    * {@inheritdoc}
    */
   public function defaultSettings(): array {
-    return [];
+    return ['requires_account' => TRUE];
   }
 
   /**
    * {@inheritdoc}
    */
   public function buildSettingsForm(array $form, FormStateInterface $form_state, array $settings): array {
+    $form['requires_account'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Requires a real user account'),
+      '#description' => $this->t('A scope=user fact must reference a real Drupal account (ADR-0007). Checked by AimMemoryManager::scopeRequiresAccount() before a fact of this scope is written.'),
+      '#default_value' => $settings['requires_account'] ?? TRUE,
+    ];
     return $form;
   }
 

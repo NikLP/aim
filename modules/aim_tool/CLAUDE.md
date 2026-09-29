@@ -22,7 +22,16 @@ use of the tool at all, not which scopes it can write.
   `scope: site` like `aim_chatbot`'s equivalents - a Tool API caller is a
   real, authenticated account, so scope/subject are caller-supplied
   (same shape as `drush aim:remember`, per
-  [ADR-0006](../../adr/0006-agent-native-write-path.md)).
+  [ADR-0006](../../adr/0006-agent-native-write-path.md)). `AimRemember`'s
+  `scope_fields` input (ADR-0028 piece 4) is a generic free map, refined
+  per call via `InputDefinitionRefinerInterface` once `scope` is known -
+  it gains whichever properties the chosen scope's `AimScopeTypeInterface`
+  plugin declares via `getBaseFieldDefinitions()` (translated to Tool
+  `InputDefinition`s by `AimRemember::toolInputFromBaseField()`), so the
+  MCP schema reflects whatever scope submodules are actually installed
+  instead of a hardcoded `scope=entity` shape. A `facts` batch entry's
+  own `scope_fields` stays unrefined - Tool API's refiner mechanism has
+  no per-list-item equivalent.
 - `config/optional/mcp_server_tool_bridge.mcp_tool_config.*.yml` - MCP
   exposure config, installs automatically once `mcp_server_tool_bridge`
   is enabled.

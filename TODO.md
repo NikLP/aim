@@ -495,6 +495,19 @@ still-unbuilt data point - see its own entry below. Status as of
       (`ModuleInstaller::uninstall()` already does this for any field
       whose provider matches the uninstalling module) and crashes -
       removed entirely, `hook_install()` alone is correct.
+- [x] Migrate `aim_scope_user`'s `requires_account` off its
+      ThirdPartySetting onto ADR-0028 piece 2's `settings` mechanism -
+      BUILT 2026-09-29, the nice-to-have ADR-0028 named but left undone.
+      `AimScopeUser::defaultSettings()`/`buildSettingsForm()` now own it;
+      `AimMemoryManager::scopeRequiresAccount()` reads
+      `settings['requires_account']`; `aim_scope_user`'s
+      `config/schema/aim_scope_user.schema.yml` deleted (nothing left to
+      type). Surfaced and fixed a real schema gap along the way: generic
+      `aim.aim_scope.*.settings` was typed `mapping: {}`, which errors as
+      "missing schema" on the first real (non-empty) settings value
+      rather than acting as an open wildcard - retyped to `ignore`. See
+      [ADR-0028](adr/0028-scope-type-plugin.md)'s Consequences for the
+      full write-up and live verification.
 - [ ] **Drush oddity found while verifying the above, not yet diagnosed
       further or filed upstream.** `drush pmu aim_scope_entity` throws
       `SQLSTATE[42S22]: Column not found: 'target_type'` even after both
@@ -509,17 +522,44 @@ still-unbuilt data point - see its own entry below. Status as of
       lifecycle works correctly through the real API - but a site
       operator using `drush pmu` on a scope-field-providing submodule
       should expect to hit this until it's actually root-caused.
-- [ ] **ADR-0028 piece 4, found 2026-09-29 while answering "are the
-      endpoints pluggable too?", design only.** `aim_tool`'s `AimRemember`
-      still hardcodes `target_type`/`target_id` in its `#[Tool]`
-      `input_definitions` - pieces 1-3 made the entity and admin-form
-      shape pluggable, not the Tool API/MCP schema, which is a static
-      attribute read once for `tools/list`. Tool API's own
-      `InputDefinitionRefinerInterface` can't solve this as-is (narrows
-      an already-advertised input, can't add a new named one). Concrete
-      mechanism sketched in ADR-0028's piece 4 entry: one generic
-      statically-declared free-map input, refined per scope type at call
-      time. Not built.
+- [x] ADR-0028 piece 4, found 2026-09-29 while answering "are the
+      endpoints pluggable too?" - BUILT AND VERIFIED same day.
+      `aim_tool`'s `AimRemember` no longer hardcodes `target_type`/
+      `target_id` in its `#[Tool]` `input_definitions`: replaced by one
+      generic `scope_fields` free-map input, refined per call via
+      `InputDefinitionRefinerInterface` (`input_definition_refiners:
+      ['scope_fields' => ['scope']]`) using the existing
+      `getTypePlugin()`/`getBaseFieldDefinitions()` machinery pieces 1
+      and 3 already built - no new coupling between core `aim`'s scope-
+      type interface and the `tool` module was needed. `aim_recall`'s
+      read side deliberately left alone - no scope type offers a filter
+      to genericize yet. Live-verified at three layers: the refined
+      `InputDefinition` objects, a full write execution (single, plain-
+      scope, and batch calls), and the actual MCP `tools/list` JSON
+      Schema read off the live derivative. See
+      [ADR-0028](adr/0028-scope-type-plugin.md)'s piece 4 entry for the
+      full write-up, including the one thing this piece deliberately
+      does not solve (`AimMemoryManager::remember()`'s own signature
+      still takes two fixed positional params, not a generic bag - no
+      live gap today since `target_type`/`target_id` are the only base
+      fields any shipped scope type declares, but a real limit on how
+      far the new generic schema actually reaches).
+- [ ] Widen `AimMemoryManager::remember()`'s `$targetType`/`$targetId`
+      positional parameters into one generic scope-fields bag - found
+      2026-09-29 while building ADR-0028 piece 4 above, not built.
+      Piece 4 made the Tool API/MCP *schema* genuinely generic, but
+      `rememberOne()` still extracts exactly `target_type`/`target_id`
+      by name from the now-generic `scope_fields` map before calling
+      `remember()`, because that is all `remember()`'s own signature
+      accepts - a real (if currently silent, since no other shipped
+      scope type has fields to lose) gap: a future scope type's own
+      base field would be correctly advertised and accepted by the Tool
+      layer, then silently dropped at this boundary. Same CLI-side gap
+      in `aim:remember --target-type`/`--target-id` (ADR-0027, still
+      two named flags, not generic either). No forcing function yet -
+      revisit once a second field-bearing scope type exists, the same
+      "don't abstract before it's earned" call ADR-0028's own
+      Consequences already made for role/site's plugin.
 - [ ] `aim_annotations` bridge module itself
       ([ADR-0024](adr/0024-annotations-integration-target-scoped-promotion.md)) -
       both prerequisites this was blocked on are now cleared (`trusted`

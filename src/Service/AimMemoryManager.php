@@ -184,10 +184,11 @@ class AimMemoryManager {
    *
    * ADR-0007's rule, formerly a hardcoded `$scope === 'user'`/
    * `$fact->bundle() === 'user'` check in this class and AimCommands - now
-   * a ThirdPartySetting each scope's own submodule declares on its
-   * aim_scope config entity (ADR-0026 piece 3), so a future scope can opt
-   * into the same requirement without another hardcoded string comparison
-   * here. Only aim_scope_user sets this today.
+   * a `requires_account` entry in the `settings` a scope's own plugin
+   * declares (ADR-0028 piece 2, migrated off aim_scope_user's earlier
+   * ThirdPartySetting), so a future scope can opt into the same
+   * requirement without another hardcoded string comparison here. Only
+   * aim_scope_user's plugin sets this today.
    *
    * @param string $scope
    *   A scope ID, e.g. "user".
@@ -199,7 +200,8 @@ class AimMemoryManager {
   public function scopeRequiresAccount(string $scope): bool {
     /** @var \Drupal\aim\Entity\AimScope|null $scopeEntity */
     $scopeEntity = $this->entityTypeManager->getStorage('aim_scope')->load($scope);
-    return $scopeEntity?->getThirdPartySetting('aim_scope_user', 'requires_account', FALSE) ?? FALSE;
+    $settings = $scopeEntity?->get('settings') ?? [];
+    return (bool) ($settings['requires_account'] ?? FALSE);
   }
 
   /**

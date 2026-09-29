@@ -1,9 +1,0 @@
-aim.aim_scope.*.third_party.aim_scope_user:
-  type: mapping
-  label: 'AIM Scope: User settings'
-  constraints:
-    FullyValidatable: ~
-  mapping:
-    requires_account:
-      type: boolean
-      label: 'Requires a real user account'

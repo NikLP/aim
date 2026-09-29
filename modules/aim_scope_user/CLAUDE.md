@@ -8,9 +8,12 @@ is specific to `aim_scope_user`.
 ## What lives here
 
 - `config/install/aim.aim_scope.user.yml` - the `user` `aim_scope`
-  config entity, carrying the `requires_account: true`
-  ThirdPartySetting (ADR-0007's "a scope=user fact must reference a real
-  account") and an `enforced` dependency on this module, needed so
+  config entity, carrying `settings: {requires_account: true}`
+  (ADR-0007's "a scope=user fact must reference a real
+  account", migrated 2026-09-29 from a `requires_account` ThirdPartySetting
+  onto ADR-0028 piece 2's generic settings mechanism - see
+  `AimScopeUser::defaultSettings()`/`buildSettingsForm()`) and an
+  `enforced` dependency on this module, needed so
   `Drupal\aim\ScopeUninstallValidator` can find this config entity as a
   dependent of `aim_scope_user` specifically - the config's own name
   (`aim.aim_scope.user`) is prefixed by `aim` (the `aim_scope` entity
@@ -18,11 +21,11 @@ is specific to `aim_scope_user`.
   dependency the validator would find nothing to check and let
   `drush pmu aim_scope_user` through even with live `user`-scope facts.
   Live-verified 2026-09-28 with a sibling submodule
-  (`aim_scope_role`, 5 live facts): uninstall correctly blocked.
-- `config/schema/aim_scope_user.schema.yml` - schema for the
-  ThirdPartySetting above, same pattern as the sibling Annotations
-  suite's `annotations_audit`/`annotations_context` submodules
-  (`web/modules/contrib/annotations`).
+  (`aim_scope_role`, 5 live facts): uninstall correctly blocked. No
+  `config/schema/` of its own any more - `aim.aim_scope.*`'s own schema
+  (core `aim`) types `settings` as `ignore`, so a plugin's settings need
+  no schema file in the plugin's own module (see core `aim`'s
+  CLAUDE.md's data model section).
 - `src/Plugin/AimScopeType/AimScopeUser.php` - the role-visibility
   access plugin (ADR-0025), moved here from core `aim` and renamed from
   `AimUserScopeVisibility` to match this module's own name (`AimScope` +
@@ -43,10 +46,13 @@ is specific to `aim_scope_user`.
 ## Reading `requires_account` generically
 
 Core `aim`'s `AimMemoryManager::scopeRequiresAccount(string $scope):
-bool` reads this ThirdPartySetting off the `aim_scope` config entity -
-every call site that used to hardcode `$scope === 'user'`/
-`$fact->bundle() === 'user'` (in `AimMemoryManager.php`, `AimCommands.php`,
-and `aim_tool`'s `AimRemember` tool plugin) now calls that method instead.
-A future scope wanting the same "must reference a real account" behavior
-sets this ThirdPartySetting on its own config entity - no code change
-needed in core `aim`.
+bool` reads the `requires_account` key out of the `aim_scope` config
+entity's `settings` property - every call site that used to hardcode
+`$scope === 'user'`/`$fact->bundle() === 'user'` (in
+`AimMemoryManager.php`, `AimCommands.php`, and `aim_tool`'s
+`AimRemember` tool plugin) now calls that method instead. A future scope
+wanting the same "must reference a real account" behavior has its own
+`AimScopeTypeInterface` plugin return `['requires_account' => TRUE]`
+from `defaultSettings()` (and render the matching checkbox from
+`buildSettingsForm()`, see `AimScopeUser::buildSettingsForm()`) - no
+code change needed in core `aim`.

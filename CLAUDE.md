@@ -198,7 +198,11 @@ duplicated here.
   definition must call `->setProvider('own_module')` itself, since the
   merge point lives in core `aim`, not the declaring module), and
   `defaultSettings()`/`buildSettingsForm()` (the type's own instance
-  settings, rendered inline by `AimScopeForm`'s type selector). No
+  settings, rendered inline by `AimScopeForm`'s type selector; the
+  `settings` config property itself is schema-typed `ignore` - a
+  plugin's settings need no schema file of their own, e.g.
+  `aim_scope_user`'s `requires_account`, migrated 2026-09-29 off a
+  ThirdPartySetting onto this mechanism). No
   `field_ui_base_route` - deliberately, see
   [DEVELOPING.md](DEVELOPING.md) for why.
 - Vector search: server `aim_vector`, index `aim_vector_index`, collection

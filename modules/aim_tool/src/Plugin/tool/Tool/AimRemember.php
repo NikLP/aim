@@ -6,15 +6,19 @@ namespace Drupal\aim_tool\Plugin\tool\Tool;
 
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\tool\Attribute\Tool;
 use Drupal\tool\ExecutableResult;
 use Drupal\tool\Tool\ToolBase;
 use Drupal\tool\Tool\ToolOperation;
 use Drupal\tool\TypedData\InputDefinition;
+use Drupal\tool\TypedData\InputDefinitionInterface;
+use Drupal\tool\TypedData\InputDefinitionRefinerInterface;
 use Drupal\tool\TypedData\ListInputDefinition;
 use Drupal\tool\TypedData\MapInputDefinition;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -52,6 +56,24 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * create() and setting a property after parent::create(), the same pattern
  * aim_chatbot's FunctionCall plugins use, rather than a \Drupal::service()
  * call at execution time.
+ *
+ * scope_fields (ADR-0028 piece 4) replaces what used to be static
+ * target_type/target_id inputs: an unconstrained map, refined per call via
+ * InputDefinitionRefinerInterface once scope is known, gaining whichever
+ * properties that scope's AimScopeTypeInterface plugin declares via
+ * getBaseFieldDefinitions() (piece 1) - so the advertised schema reflects
+ * whichever scope submodules are actually installed, not a hardcoded
+ * scope=entity shape. A facts batch entry's own scope_fields stays
+ * unrefined (an unconstrained map) regardless - Tool API's refiner
+ * mechanism narrows a named top-level input from other top-level inputs'
+ * values, it has no per-list-item equivalent, so a batch entry's scope
+ * value can't drive its own scope_fields the way the single-call inputs
+ * do. rememberOne() still only reads target_type/target_id by name out of
+ * scope_fields, matching the only two field-bearing base fields any
+ * shipped scope type declares today (AimMemoryManager::remember() itself
+ * still takes them as two fixed parameters, not a generic bag) - a future
+ * scope type adding a third field would need remember()'s own signature
+ * widened too, not just this file; not built, see TODO.md.
  */
 #[Tool(
   id: 'aim_remember',
@@ -83,21 +105,14 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
       description: new TranslatableMarkup('Provenance tag for this fact.'),
       required: FALSE,
     ),
-    'target_type' => new InputDefinition(
-      data_type: 'string',
-      label: new TranslatableMarkup('Target entity type'),
-      description: new TranslatableMarkup('The referenced entity type ID (e.g. node), required for scope=entity. Ignored for every other scope.'),
-      required: FALSE,
-    ),
-    'target_id' => new InputDefinition(
-      data_type: 'string',
-      label: new TranslatableMarkup('Target entity ID'),
-      description: new TranslatableMarkup('The referenced entity ID, required for scope=entity. Ignored for every other scope.'),
+    'scope_fields' => new MapInputDefinition(
+      label: new TranslatableMarkup('Scope fields'),
+      description: new TranslatableMarkup('Extra fields the chosen scope needs, if any - e.g. target_type/target_id for scope=entity. Ask if unsure what a given scope expects here; omit entirely for a scope with none.'),
       required: FALSE,
     ),
     'facts' => new ListInputDefinition(
       label: new TranslatableMarkup('Facts'),
-      description: new TranslatableMarkup('Several facts to save in one call instead of text/scope/subject/source above - use this whenever more than one fact needs saving, instead of calling this tool repeatedly. Each entry is an object: {text (required, the fact statement), scope (required, one of the scopes actually installed on this site), subject (optional), source (optional), target_type/target_id (optional, required for scope=entity)}.'),
+      description: new TranslatableMarkup('Several facts to save in one call instead of text/scope/subject/source above - use this whenever more than one fact needs saving, instead of calling this tool repeatedly. Each entry is an object: {text (required, the fact statement), scope (required, one of the scopes actually installed on this site), subject (optional), source (optional), scope_fields (optional, extra fields the entry scope needs, e.g. target_type/target_id for scope=entity)}.'),
       required: FALSE,
       item_definition: new MapInputDefinition(
         label: new TranslatableMarkup('Fact'),
@@ -127,21 +142,17 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
             description: new TranslatableMarkup('Provenance tag for this fact.'),
             required: FALSE,
           ),
-          'target_type' => new InputDefinition(
-            data_type: 'string',
-            label: new TranslatableMarkup('Target entity type'),
-            description: new TranslatableMarkup('The referenced entity type ID (e.g. node), required for scope=entity.'),
-            required: FALSE,
-          ),
-          'target_id' => new InputDefinition(
-            data_type: 'string',
-            label: new TranslatableMarkup('Target entity ID'),
-            description: new TranslatableMarkup('The referenced entity ID, required for scope=entity.'),
+          'scope_fields' => new MapInputDefinition(
+            label: new TranslatableMarkup('Scope fields'),
+            description: new TranslatableMarkup('Extra fields the entry scope needs, if any - e.g. target_type/target_id for scope=entity. Not refined per entry the way the single-call scope_fields input is - see the docblock above.'),
             required: FALSE,
           ),
         ],
       ),
     ),
+  ],
+  input_definition_refiners: [
+    'scope_fields' => ['scope'],
   ],
   output_definitions: [
     'fact_id' => new ContextDefinition(
@@ -164,7 +175,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     ),
   ],
 )]
-final class AimRemember extends ToolBase {
+final class AimRemember extends ToolBase implements InputDefinitionRefinerInterface {
 
   /**
    * The aim memory manager.
@@ -172,12 +183,74 @@ final class AimRemember extends ToolBase {
   protected AimMemoryManager $memoryManager;
 
   /**
+   * The aim scope type plugin manager.
+   */
+  protected AimScopeTypePluginManagerInterface $scopeTypeManager;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->memoryManager = $container->get('aim.memory_manager');
+    $instance->scopeTypeManager = $container->get('plugin.manager.aim_scope_type');
     return $instance;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * The scope_fields input starts as an unconstrained map (see the
+   * #[Tool] attribute above) - once scope is known, this adds whichever
+   * properties that scope's AimScopeTypeInterface plugin declares via
+   * getBaseFieldDefinitions() (ADR-0028 piece 1), translating each
+   * BaseFieldDefinition into an InputDefinition. A scope with no plugin, or
+   * whose plugin declares no fields (every scope but entity, today), leaves
+   * scope_fields unconstrained - still a valid, permissive map, not an
+   * error.
+   */
+  public function refineInputDefinition(string $name, InputDefinitionInterface $definition, array $values): InputDefinitionInterface {
+    if ($name !== 'scope_fields' || empty($values['scope']) || !$definition instanceof MapInputDefinition) {
+      return $definition;
+    }
+
+    $plugin = $this->scopeTypeManager->getTypePlugin((string) $values['scope']);
+    $properties = [];
+    foreach ($plugin?->getBaseFieldDefinitions() ?? [] as $fieldName => $fieldDefinition) {
+      $properties[$fieldName] = $this->toolInputFromBaseField($fieldDefinition);
+    }
+    if ($properties) {
+      $definition->setPropertyDefinitions($properties);
+    }
+    return $definition;
+  }
+
+  /**
+   * Translates one aim_fact base field into a Tool API input definition.
+   *
+   * Only 'string' fields exist among any shipped scope type's
+   * getBaseFieldDefinitions() today (target_type/target_id) - this covers
+   * the field types actually in use, not every Field API type.
+   *
+   * @param \Drupal\Core\Field\BaseFieldDefinition $fieldDefinition
+   *   The base field definition, as returned by an AimScopeTypeInterface
+   *   plugin's getBaseFieldDefinitions().
+   *
+   * @return \Drupal\tool\TypedData\InputDefinitionInterface
+   *   The equivalent Tool API input definition.
+   */
+  private function toolInputFromBaseField(BaseFieldDefinition $fieldDefinition): InputDefinitionInterface {
+    $dataType = match ($fieldDefinition->getType()) {
+      'boolean' => 'boolean',
+      'integer' => 'integer',
+      default => 'string',
+    };
+    return new InputDefinition(
+      data_type: $dataType,
+      label: $fieldDefinition->getLabel(),
+      description: $fieldDefinition->getDescription() ?? '',
+      required: $fieldDefinition->isRequired(),
+    );
   }
 
   /**
@@ -268,8 +341,8 @@ final class AimRemember extends ToolBase {
    * Saves one fact, resolving a user-account-requiring scope's default subject.
    *
    * @param array $fields
-   *   Text/scope/subject/source/target_type/target_id, as given on a
-   *   single call or one facts entry.
+   *   Text/scope/subject/source/scope_fields, as given on a single call or
+   *   one facts entry.
    *
    * @return array
    *   ['id' => int, 'bundle' => string, 'subject' => string] on success, or
@@ -277,6 +350,7 @@ final class AimRemember extends ToolBase {
    */
   private function rememberOne(array $fields): array {
     $scope = $fields['scope'] ?? NULL;
+    $scopeFields = $fields['scope_fields'] ?? [];
     if (empty($scope)) {
       // No default here - which scopes exist depends entirely on which
       // aim_scope_* submodules are installed (ADR-0026), so this tool has
@@ -309,8 +383,8 @@ final class AimRemember extends ToolBase {
         [],
         NULL,
         NULL,
-        $fields['target_type'] ?? NULL,
-        $fields['target_id'] ?? NULL,
+        $scopeFields['target_type'] ?? NULL,
+        $scopeFields['target_id'] ?? NULL,
       );
     }
     catch (\InvalidArgumentException $e) {

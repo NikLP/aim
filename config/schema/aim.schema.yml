@@ -63,7 +63,10 @@ aim.aim_scope.*:
       type: string
       label: 'AimScopeType plugin ID (ADR-0028 piece 3), empty for a plain config-only scope'
       nullable: true
+      constraints:
+        PluginExists:
+          manager: plugin.manager.aim_scope_type
+          interface: '\Drupal\aim\Plugin\AimScopeType\AimScopeTypeInterface'
     settings:
-      type: mapping
+      type: ignore
       label: 'Instance settings for plugin, shape defined by the plugin itself'
-      mapping: {}
