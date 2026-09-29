@@ -11,3 +11,5 @@ third_party_settings:
     requires_account: true
 id: user
 label: User
+plugin: user
+settings: {  }

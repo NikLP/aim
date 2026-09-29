@@ -1,0 +1,49 @@
+<?php
+
+/**
+ * @file
+ * Install hooks for the AIM Scope: Entity module.
+ */
+
+declare(strict_types=1);
+
+/**
+ * Implements hook_install().
+ *
+ * The target_type/target_id base fields
+ * (AimScopeEntity::getBaseFieldDefinitions()) are merged onto aim_fact
+ * generically by hook_entity_base_field_info() (AimHooks) whenever this
+ * module is enabled - but the actual database columns still need
+ * creating explicitly, the same as any other base field added to an
+ * entity type that already exists (ADR-0028 piece 1).
+ *
+ * No matching hook_uninstall() - core's own
+ * \Drupal\Core\Extension\ModuleInstaller::uninstall() already does this
+ * generically for every fieldable entity type, for any field whose
+ * getProvider() matches the module being uninstalled (see its own
+ * "notify interested components that this module's entity types are
+ * being deleted" block, ModuleInstaller.php:588-602).
+ * AimScopeEntity::getBaseFieldDefinitions() explicitly calls
+ * ->setProvider('aim_scope_entity') on both fields for exactly this
+ * reason. A hand-written hook_uninstall() doing the same
+ * uninstallFieldStorageDefinition() calls was tried first and removed:
+ * it is redundant with core's own generic pass, which runs regardless.
+ *
+ * Verified live 2026-09-29: calling
+ * \Drupal::service('module_installer')->uninstall(['aim_scope_entity'])
+ * (or ->install(), the reverse) directly completes cleanly and correctly
+ * drops/recreates both columns via core's generic pass alone. `drush
+ * pmu aim_scope_entity` reproducibly throws a "column not found"
+ * SQLSTATE[42S22] on target_type instead, for reasons isolated to
+ * Drush's own `pm:uninstall` command layer, not to
+ * ModuleInstaller::uninstall() itself or anything in this module - the
+ * exact same field-removal code path, called directly, does not
+ * reproduce it. Not filed upstream yet; see TODO.md.
+ */
+function aim_scope_entity_install(): void {
+  $manager = \Drupal::entityDefinitionUpdateManager();
+  $plugin = \Drupal::service('plugin.manager.aim_scope_type')->createInstance('entity');
+  foreach ($plugin->getBaseFieldDefinitions() as $name => $definition) {
+    $manager->installFieldStorageDefinition($name, 'aim_fact', 'aim_scope_entity', $definition);
+  }
+}

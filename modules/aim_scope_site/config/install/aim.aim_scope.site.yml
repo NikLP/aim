@@ -6,3 +6,5 @@ dependencies:
       - aim_scope_site
 id: site
 label: Site
+plugin: null
+settings: {  }

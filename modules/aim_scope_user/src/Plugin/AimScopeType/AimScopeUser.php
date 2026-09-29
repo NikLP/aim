@@ -2,19 +2,20 @@
 
 declare(strict_types=1);
 
-namespace Drupal\aim_scope_user\Plugin\AimScopeAccess;
+namespace Drupal\aim_scope_user\Plugin\AimScopeType;
 
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Plugin\PluginBase;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\aim\Attribute\AimScopeAccess;
+use Drupal\aim\Attribute\AimScopeType;
 use Drupal\aim\Entity\AimFact;
-use Drupal\aim\Plugin\AimScopeAccess\AimScopeAccessInterface;
+use Drupal\aim\Plugin\AimScopeType\AimScopeTypeInterface;
 use Drupal\user\RoleInterface;
 use Drupal\user\UserInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -22,7 +23,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Role-to-role visibility for scope=user aim_fact entities.
  *
- * The first dedicated AimScopeAccess plugin (ADR-0025), moved out of core
+ * The first dedicated AimScopeType plugin (ADR-0025), moved out of core
  * aim into this scope's own submodule (ADR-0026 piece 4) - was named
  * AimUserScopeVisibility there; renamed to match the rest of this module's
  * AimScope[Name] convention on the move, the logic itself is unchanged.
@@ -34,13 +35,13 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * the aim.settings:user_scope_role_visibility matrix
  * (AimScopeUserAccessForm, still in core aim - see this module's
  * CLAUDE.md). checkViewAccess() only ever returns allowed or neutral,
- * never forbidden, per AimScopeAccessInterface's contract.
+ * never forbidden, per AimScopeTypeInterface's contract.
  */
-#[AimScopeAccess(
+#[AimScopeType(
   id: 'user',
   label: new TranslatableMarkup('User scope role visibility'),
 )]
-class AimScopeUser extends PluginBase implements AimScopeAccessInterface, ContainerFactoryPluginInterface {
+class AimScopeUser extends PluginBase implements AimScopeTypeInterface, ContainerFactoryPluginInterface {
 
   /**
    * Constructs the plugin.
@@ -121,6 +122,32 @@ class AimScopeUser extends PluginBase implements AimScopeAccessInterface, Contai
     // scope=user has no sensible default - it requires a real account,
     // enforced separately by AimMemoryManager::scopeRequiresAccount().
     return NULL;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getBaseFieldDefinitions(): array {
+    // The `user` base field stays in AimFact::baseFieldDefinitions()
+    // (core aim) rather than moving here - unlike target_type/target_id
+    // (ADR-0027/0028 piece 1), migrating it is a nice-to-have this ADR
+    // enables, not something it requires; requires_account also stays a
+    // ThirdPartySetting for the same reason (see defaultSettings()).
+    return [];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function defaultSettings(): array {
+    return [];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function buildSettingsForm(array $form, FormStateInterface $form_state, array $settings): array {
+    return $form;
   }
 
 }

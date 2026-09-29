@@ -21,7 +21,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
-use Drupal\aim\AimScopeAccessPluginManagerInterface;
+use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
 use Drupal\search_api\IndexInterface;
@@ -118,37 +118,6 @@ class AimMemoryManager {
   public const DEFAULT_RECALL_MAX_DISTANCE = 0.45;
 
   /**
-   * Sentence templates generateBenchmarkFacts() fills in with random words.
-   *
-   * Deliberately not Faker/devel_generate output - those aren't wired to
-   * aim_fact's bundle, and this needs semantically plausible short
-   * statements (so recall() queries have something real to match), not
-   * arbitrary lorem ipsum.
-   */
-  protected const BENCHMARK_TEMPLATES = [
-    'Prefers %s over %s for %s.',
-    'Uses %s for %s on a regular basis.',
-    'Mentioned interest in %s during a recent %s.',
-    'Works mainly on %s, occasionally touches %s.',
-    'Asked about %s pricing for %s.',
-    'Reported an issue with %s while using %s.',
-    'Recommended %s to a colleague for %s.',
-    'Follows up on %s roughly every %s.',
-  ];
-
-  /**
-   * Word pool BENCHMARK_TEMPLATES draws from.
-   */
-  protected const BENCHMARK_WORDS = [
-    'email', 'phone', 'chat', 'billing', 'onboarding', 'the mobile app',
-    'the API', 'support tickets', 'the newsletter', 'dark mode',
-    'accessibility', 'the checkout flow', 'exports', 'the dashboard',
-    'notifications', 'two-factor login', 'the search feature', 'reporting',
-    'integrations', 'the calendar view', 'week', 'month', 'quarter',
-    'marketing', 'engineering', 'sales', 'support', 'design', 'product',
-  ];
-
-  /**
    * Constructs an AimMemoryManager object.
    *
    * @param \Drupal\ai\AiProviderPluginManager $aiProvider
@@ -168,7 +137,7 @@ class AimMemoryManager {
    *   \Drupal\aim\Entity\AimScope) instead of a hardcoded list, so a
    *   fifth scope added via a new aim_scope config entity passes
    *   validation here automatically, no code change needed.
-   * @param \Drupal\aim\AimScopeAccessPluginManagerInterface $scopeAccessManager
+   * @param \Drupal\aim\AimScopeTypePluginManagerInterface $scopeAccessManager
    *   The scope access plugin manager, used to ask a scope's own plugin
    *   (if any) for a default subject when the caller omits one - e.g.
    *   aim_scope_case's plugin mints a new case ID, so every caller (MCP
@@ -194,7 +163,7 @@ class AimMemoryManager {
     protected AiGuardrailRepository $guardrailRepository,
     protected QueueFactory $queueFactory,
     protected EntityTypeBundleInfoInterface $bundleInfo,
-    protected AimScopeAccessPluginManagerInterface $scopeAccessManager,
+    protected AimScopeTypePluginManagerInterface $scopeAccessManager,
     protected ConfigFactoryInterface $configFactory,
     protected AccountProxyInterface $currentUser,
     protected AimEmbeddingCacheSubscriber $embeddingCache,
@@ -404,7 +373,7 @@ class AimMemoryManager {
    * nothing left throwing from inside save() itself, that unwrapping is
    * gone too.
    *
-   * generateBenchmarkFacts() deliberately bypasses this entirely by
+   * aim_benchmark's fact generator deliberately bypasses this entirely by
    * calling $entity->save() directly instead of going through saveFact() -
    * synthetic benchmark text needs no validation, see its own docblock.
    *
@@ -470,6 +439,7 @@ class AimMemoryManager {
       $account = $storage->load((int) $value);
       return $account instanceof AccountInterface ? $account : NULL;
     }
+
     $accounts = $storage->loadByProperties(['name' => $value]);
     $account = reset($accounts);
     return $account instanceof AccountInterface ? $account : NULL;
@@ -603,127 +573,6 @@ class AimMemoryManager {
   }
 
   /**
-   * Returns a sample of real, active account IDs for user-scope benchmarking.
-   *
-   * A scope=user fact must reference a real account (ADR-0007) - can't be
-   * fabricated, so benchmarking that scope round-robins generated facts
-   * across whichever real accounts the site already has.
-   *
-   * @param int $limit
-   *   Maximum number of account IDs to return.
-   *
-   * @return int[]
-   *   Active, non-anonymous, non-uid-1 account IDs.
-   */
-  public function sampleUserIds(int $limit = 20): array {
-    $ids = $this->entityTypeManager->getStorage('user')->getQuery()
-      ->accessCheck(FALSE)
-      ->condition('uid', 1, '>')
-      ->condition('status', 1)
-      ->range(0, $limit)
-      ->execute();
-    return array_values(array_map('intval', $ids));
-  }
-
-  /**
-   * Creates synthetic facts for benchmarking recall/consolidation at scale.
-   *
-   * Bypasses remember()'s guardrail check and consolidation enqueue on
-   * purpose: generated text has nothing for a guardrail to catch, and
-   * queuing thousands of facts for LLM-mediated consolidation would turn a
-   * latency benchmark into an uncontrolled reasoning-call bill the moment
-   * aim_consolidate's crontab entry next runs (CLAUDE.md's "Consolidation"
-   * section). Both checks run universally via AimHooks::factPresave()/
-   * factInsert() (src/Hook/AimHooks.php), which skip an entity flagged
-   * with setSyncing(TRUE) - core's own "being synchronized, skip side
-   * effects" flag (SynchronizableInterface, also honored by pathauto,
-   * workspaces, and set by migrate destinations), so this marks every
-   * generated entity that way rather than inventing a private flag. The
-   * only real cost this leaves is one embedding-API call per fact, at
-   * reindex() time.
-   * Every created fact is tagged $runTag as its source so
-   * deleteBenchmarkFacts() can find and remove exactly this run's data
-   * afterward.
-   *
-   * @param string $scope
-   *   One of user, role, site, case.
-   * @param int $count
-   *   How many facts to create.
-   * @param string $runTag
-   *   Provenance tag stored on every created fact.
-   * @param int[] $subjectUids
-   *   For scope=user, the pool of real account IDs to assign facts to,
-   *   round-robin (see sampleUserIds()). Ignored for other scopes.
-   *
-   * @return int[]
-   *   The created fact IDs.
-   *
-   * @throws \InvalidArgumentException
-   *   If scope is invalid, or scope=user and $subjectUids is empty.
-   */
-  public function generateBenchmarkFacts(string $scope, int $count, string $runTag, array $subjectUids = []): array {
-    $allowed = $this->allowedScopes();
-    if (!in_array($scope, $allowed, TRUE)) {
-      throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
-    }
-    $requiresUserAccount = $this->scopeRequiresAccount($scope);
-    if ($requiresUserAccount && empty($subjectUids)) {
-      throw new \InvalidArgumentException('scope=' . $scope . ' needs at least one real account ID in $subjectUids.');
-    }
-
-    $storage = $this->entityTypeManager->getStorage('aim_fact');
-    $ids = [];
-    for ($i = 0; $i < $count; $i++) {
-      $template = self::BENCHMARK_TEMPLATES[array_rand(self::BENCHMARK_TEMPLATES)];
-      $words = [];
-      for ($p = 0; $p < substr_count($template, '%s'); $p++) {
-        $words[] = self::BENCHMARK_WORDS[array_rand(self::BENCHMARK_WORDS)];
-      }
-      $text = vsprintf($template, $words) . ' (#' . uniqid() . ')';
-
-      $values = [
-        'scope' => $scope,
-        'text' => $text,
-        'source' => $runTag,
-        'subject' => '',
-      ];
-      if ($requiresUserAccount) {
-        $values['user'] = $subjectUids[$i % count($subjectUids)];
-      }
-
-      /** @var \Drupal\aim\Entity\AimFact $entity */
-      $entity = $storage->create($values);
-      $entity->setSyncing(TRUE);
-      $entity->save();
-      $ids[] = (int) $entity->id();
-    }
-
-    return $ids;
-  }
-
-  /**
-   * Deletes every fact created by a benchmark run, by its source tag.
-   *
-   * @param string $runTag
-   *   The run tag passed to generateBenchmarkFacts().
-   *
-   * @return int
-   *   The number of facts deleted.
-   */
-  public function deleteBenchmarkFacts(string $runTag): int {
-    $storage = $this->entityTypeManager->getStorage('aim_fact');
-    $ids = $storage->getQuery()
-      ->accessCheck(FALSE)
-      ->condition('source', $runTag)
-      ->execute();
-    if (empty($ids)) {
-      return 0;
-    }
-    $storage->delete($storage->loadMultiple($ids));
-    return count($ids);
-  }
-
-  /**
    * Creates an aim_fact directly, no chat call.
    *
    * Unlike extractFacts(), this does not decide what is worth remembering -
@@ -757,6 +606,12 @@ class AimMemoryManager {
    *   draft-to-trusted gate exists for. Pass TRUE only for curated data
    *   that was never subject to that gate in the first place, e.g. demo
    *   seed data.
+   * @param string|null $targetType
+   *   The referenced entity's type ID, for scope=entity (e.g. node).
+   *   Ignored for every other scope.
+   * @param string|null $targetId
+   *   The referenced entity's ID, for scope=entity. Ignored for every
+   *   other scope.
    *
    * @return \Drupal\aim\Entity\AimFact
    *   The created fact.
@@ -765,7 +620,7 @@ class AimMemoryManager {
    *   If scope is invalid, scope=user and subject does not resolve to a real
    *   account, or the text fails a guardrail check.
    */
-  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, ?bool $state = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL): AimFact {
+  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, ?bool $state = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL, ?string $targetType = NULL, ?string $targetId = NULL): AimFact {
     $allowed = $this->allowedScopes();
     if (!in_array($scope, $allowed, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
@@ -798,7 +653,7 @@ class AimMemoryManager {
       // No subject given: ask this scope's access plugin (if any) for a
       // default instead of leaving the field empty - e.g. aim_scope_case's
       // plugin mints a new case ID.
-      $plugin = $this->scopeAccessManager->getAccessPlugin($scope);
+      $plugin = $this->scopeAccessManager->getTypePlugin($scope);
       $values['subject'] = $plugin?->defaultSubject() ?? '';
     }
     else {
@@ -819,6 +674,14 @@ class AimMemoryManager {
 
     if ($trusted !== NULL) {
       $values['trusted'] = $trusted;
+    }
+
+    if ($targetType !== NULL) {
+      $values['target_type'] = $targetType;
+    }
+
+    if ($targetId !== NULL) {
+      $values['target_id'] = $targetId;
     }
 
     /** @var \Drupal\aim\Entity\AimFact $entity */

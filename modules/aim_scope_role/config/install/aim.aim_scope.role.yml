@@ -6,3 +6,5 @@ dependencies:
       - aim_scope_role
 id: role
 label: Role
+plugin: null
+settings: {  }

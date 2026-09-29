@@ -1,0 +1,12 @@
+services:
+  aim_benchmark.generator:
+    class: Drupal\aim_benchmark\Service\AimBenchmarkGenerator
+    arguments:
+      - '@entity_type.manager'
+      - '@aim.memory_manager'
+
+  # Class alias so the autowired AimBenchmarkCommands (Drush's own
+  # discovery + AutowireTrait, same pattern core aim's AimCommands uses)
+  # can type-hint AimBenchmarkGenerator directly.
+  Drupal\aim_benchmark\Service\AimBenchmarkGenerator:
+    alias: aim_benchmark.generator

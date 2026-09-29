@@ -3,9 +3,16 @@
 **Status:** Accepted - seam built and verified 2026-09-28. Its first
 dedicated plugin moved out of core `aim` into `aim_scope_user`
 (ADR-0026 piece 4, also 2026-09-28) and was renamed `AimScopeUser`
-(was `AimUserScopeVisibility`) to match that module's own naming;
-entity-scope and case-scope plugins remain unbuilt, so the "three data
-points" argument below still rests on two still-unbuilt proposals.
+(was `AimUserScopeVisibility`) to match that module's own naming. A
+second dedicated plugin, `AimScopeEntity`, was built 2026-09-29
+([ADR-0027](0027-entity-scope.md)) - the "three data points" argument
+below now rests on two shipped plugins and one still-unbuilt proposal
+(`case`-scope access control). The interface and manager this ADR
+defines (`AimScopeAccessInterface`/`AimScopeAccessPluginManager` below)
+were themselves renamed `AimScopeTypeInterface`/`AimScopeTypePluginManager`
+on 2026-09-29 ([ADR-0028](0028-scope-type-plugin.md) piece 0), once the
+plugin's mandate grew past pure access-checking - read this ADR's body
+with that later name in mind.
 **Date:** 2026-09-28
 
 ## Context
@@ -89,14 +96,14 @@ convention, it doesn't touch its logic.
 
 ## Consequences / risks
 
-- **This ADR alone changes nothing observable.** With only `user`'s
-  plugin registered, the refactor is pure indirection until a second
-  dedicated plugin (entity scope, or case scope) actually exists. The
-  "three data points justify a plugin type" argument rests on two of
-  those three points being still-unbuilt proposals, not shipped code -
-  worth being honest that this is refactor-ahead-of-need in the narrow
-  sense, justified by the *shape* of what's coming, not by present
-  duplication alone.
+- ~~**This ADR alone changes nothing observable.**~~ **No longer true as
+  of 2026-09-29.** With only `user`'s plugin registered, the refactor was
+  pure indirection until a second dedicated plugin actually existed - it
+  now does (`AimScopeEntity`, [ADR-0027](0027-entity-scope.md)), and its
+  "replace, not widen" combinator (see that ADR) is genuinely different
+  administrative behavior from `AimScopeUser`'s "widen," not just a second
+  copy of the same shape. `case`-scope access control remains the one
+  still-unbuilt proposal.
 - **Low-risk mechanical refactor**, same category as the 2026-09-14
   scope-to-bundle conversion (see `project_aim_scope_bundle_conversion_tradeoffs`
   memory) - a calling-convention change, not a logic change, for the one

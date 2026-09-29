@@ -3,8 +3,8 @@ status: true
 dependencies:
   enforced:
     module:
-      - aim_scope_case
-id: case
-label: Case
-plugin: case
+      - aim_scope_entity
+id: entity
+label: Entity
+plugin: entity
 settings: {  }

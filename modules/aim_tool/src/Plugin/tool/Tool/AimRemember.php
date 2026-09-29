@@ -83,9 +83,21 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
       description: new TranslatableMarkup('Provenance tag for this fact.'),
       required: FALSE,
     ),
+    'target_type' => new InputDefinition(
+      data_type: 'string',
+      label: new TranslatableMarkup('Target entity type'),
+      description: new TranslatableMarkup('The referenced entity type ID (e.g. node), required for scope=entity. Ignored for every other scope.'),
+      required: FALSE,
+    ),
+    'target_id' => new InputDefinition(
+      data_type: 'string',
+      label: new TranslatableMarkup('Target entity ID'),
+      description: new TranslatableMarkup('The referenced entity ID, required for scope=entity. Ignored for every other scope.'),
+      required: FALSE,
+    ),
     'facts' => new ListInputDefinition(
       label: new TranslatableMarkup('Facts'),
-      description: new TranslatableMarkup('Several facts to save in one call instead of text/scope/subject/source above - use this whenever more than one fact needs saving, instead of calling this tool repeatedly. Each entry is an object: {text (required, the fact statement), scope (required, one of the scopes actually installed on this site), subject (optional), source (optional)}.'),
+      description: new TranslatableMarkup('Several facts to save in one call instead of text/scope/subject/source above - use this whenever more than one fact needs saving, instead of calling this tool repeatedly. Each entry is an object: {text (required, the fact statement), scope (required, one of the scopes actually installed on this site), subject (optional), source (optional), target_type/target_id (optional, required for scope=entity)}.'),
       required: FALSE,
       item_definition: new MapInputDefinition(
         label: new TranslatableMarkup('Fact'),
@@ -113,6 +125,18 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
             data_type: 'string',
             label: new TranslatableMarkup('Source'),
             description: new TranslatableMarkup('Provenance tag for this fact.'),
+            required: FALSE,
+          ),
+          'target_type' => new InputDefinition(
+            data_type: 'string',
+            label: new TranslatableMarkup('Target entity type'),
+            description: new TranslatableMarkup('The referenced entity type ID (e.g. node), required for scope=entity.'),
+            required: FALSE,
+          ),
+          'target_id' => new InputDefinition(
+            data_type: 'string',
+            label: new TranslatableMarkup('Target entity ID'),
+            description: new TranslatableMarkup('The referenced entity ID, required for scope=entity.'),
             required: FALSE,
           ),
         ],
@@ -244,8 +268,8 @@ final class AimRemember extends ToolBase {
    * Saves one fact, resolving a user-account-requiring scope's default subject.
    *
    * @param array $fields
-   *   Text/scope/subject/source, as given on a single call or one facts
-   *   entry.
+   *   Text/scope/subject/source/target_type/target_id, as given on a
+   *   single call or one facts entry.
    *
    * @return array
    *   ['id' => int, 'bundle' => string, 'subject' => string] on success, or
@@ -282,6 +306,11 @@ final class AimRemember extends ToolBase {
         $subject,
         $fields['source'] ?? 'tool:aim_remember',
         NULL,
+        [],
+        NULL,
+        NULL,
+        $fields['target_type'] ?? NULL,
+        $fields['target_id'] ?? NULL,
       );
     }
     catch (\InvalidArgumentException $e) {

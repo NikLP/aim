@@ -1,13 +1,18 @@
 services:
-  # Scope access plugins are discovered from src/Plugin/AimScopeAccess of
-  # every enabled module via the #[AimScopeAccess] attribute - no
+  # Scope type plugins are discovered from src/Plugin/AimScopeType of
+  # every enabled module via the #[AimScopeType] attribute - no
   # per-plugin registration needed here. AimScopeUser (aim_scope_user,
   # ADR-0025's first dedicated plugin) gets its own dependencies through
   # this manager's DefaultPluginManager container-aware instantiation, not
-  # a services.yml entry of its own.
-  plugin.manager.aim_scope_access:
-    class: Drupal\aim\AimScopeAccessPluginManager
+  # a services.yml entry of its own. The explicit entity_type.manager
+  # argument is appended after default_plugin_manager's own three
+  # (namespaces/cache/module_handler) - needed since ADR-0028 piece 3 for
+  # getTypePlugin() to load the aim_scope instance and read its `plugin`
+  # property.
+  plugin.manager.aim_scope_type:
+    class: Drupal\aim\AimScopeTypePluginManager
     parent: default_plugin_manager
+    arguments: ['@entity_type.manager']
 
   aim.scope_uninstall_validator:
     class: Drupal\aim\ScopeUninstallValidator
@@ -26,7 +31,7 @@ services:
       - '@Drupal\ai\Guardrail\AiGuardrailRepository'
       - '@queue'
       - '@entity_type.bundle.info'
-      - '@plugin.manager.aim_scope_access'
+      - '@plugin.manager.aim_scope_type'
       - '@config.factory'
       - '@current_user'
       - '@aim.embedding_cache_subscriber'
@@ -63,7 +68,8 @@ services:
     tags:
       - { name: event_subscriber }
 
-  # Class alias, same reason as AimMemoryManager's above - AimCommands
-  # type-hints this directly to toggle aim:benchmark's cache bypass.
+  # Class alias, same reason as AimMemoryManager's above - aim_benchmark's
+  # Drush commands type-hint this directly to toggle aim:benchmark's cache
+  # bypass.
   Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber:
     alias: aim.embedding_cache_subscriber

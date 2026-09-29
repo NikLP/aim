@@ -59,3 +59,11 @@ aim.aim_scope.*:
     label:
       type: label
       label: 'Label'
+    plugin:
+      type: string
+      label: 'AimScopeType plugin ID (ADR-0028 piece 3), empty for a plain config-only scope'
+      nullable: true
+    settings:
+      type: mapping
+      label: 'Instance settings for plugin, shape defined by the plugin itself'
+      mapping: {}

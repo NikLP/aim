@@ -29,8 +29,9 @@ Built with the expectation of a local reasoning model in production use.
 DDEV, `drupal11` type, PHP 8.4, MariaDB 11.8, docroot `web/`.
 
 **Enabled:** `aim`, `aim_scope_user`, `aim_scope_role`, `aim_scope_site`,
-`aim_scope_case`, `aim_chatbot`, `aim_tool`, `aim_tool_oauth`, `tool`,
-`mcp_server`, `mcp_server_tool_bridge`, `mcp_server_oauth`, `simple_oauth`
+`aim_scope_case`, `aim_scope_entity`, `aim_chatbot`, `aim_tool`,
+`aim_tool_oauth`, `aim_benchmark`, `tool`, `mcp_server`, `mcp_server_tool_bridge`,
+`mcp_server_oauth`, `simple_oauth`
 + `simple_oauth_21`/`simple_oauth_server_metadata`/
 `simple_oauth_client_registration`/`simple_oauth_pkce`/`consumers`
 (OAuth stack, see [DEVELOPING.md](DEVELOPING.md)'s "MCP OAuth"),
@@ -94,9 +95,11 @@ aim/                    ← root module (always required), ships zero scopes
 │   ├── aim_scope_role/  ← ships the role aim_scope, zero PHP
 │   ├── aim_scope_site/  ← ships the site aim_scope, zero PHP
 │   ├── aim_scope_case/  ← ships the case aim_scope + its subject-minting plugin
+│   ├── aim_scope_entity/← ships the entity aim_scope + its view-access plugin
 │   ├── aim_chatbot/     ← ai_agents FunctionCall tools, locked scope=site
 │   ├── aim_tool/        ← Tool API + MCP exposure, any scope
-│   └── aim_tool_oauth/  ← OAuth2 scopes for remote MCP callers
+│   ├── aim_tool_oauth/  ← OAuth2 scopes for remote MCP callers
+│   └── aim_benchmark/   ← synthetic fact generation, aim:benchmark commands
 ├── recipes/             ← Drupal Recipes, one dir each (aim_demo_library)
 └── adr/                 ← decision records, see 0000-index.md
 ```
@@ -108,14 +111,16 @@ than relying on the site shell's manifest.
 
 | Module | Purpose | Docs |
 | --- | --- | --- |
-| `aim` | Core - `aim_fact`/`aim_scope` entities, `AimMemoryManager`, Guardrails wiring, vector search, admin UI, `aim:remember`/`aim:recall`/`aim:extract`/`aim:consolidate`/`aim:benchmark` Drush commands. Ships zero scope instances itself (ADR-0026). | this file |
+| `aim` | Core - `aim_fact`/`aim_scope` entities, `AimMemoryManager`, Guardrails wiring, vector search, admin UI, `aim:remember`/`aim:recall`/`aim:extract`/`aim:consolidate` Drush commands. Ships zero scope instances itself (ADR-0026). | this file |
 | `aim_scope_user` | Ships the `user` `aim_scope`, its `AimScopeUser` access plugin (role-visibility, ADR-0025), and the `requires_account` ThirdPartySetting (ADR-0007) | [CLAUDE.md](modules/aim_scope_user/CLAUDE.md) |
 | `aim_scope_role` | Ships the `role` `aim_scope`. Zero PHP. | [README.md](modules/aim_scope_role/README.md) |
 | `aim_scope_site` | Ships the `site` `aim_scope` - `aim_chatbot`'s hardcoded scope. Zero PHP. | [README.md](modules/aim_scope_site/README.md) |
 | `aim_scope_case` | Ships the `case` `aim_scope` and its `AimScopeCase` plugin (`defaultSubject()` mints case IDs, ADR-0025); access control (`checkViewAccess()`) still unbuilt, stays neutral | [CLAUDE.md](modules/aim_scope_case/CLAUDE.md) |
+| `aim_scope_entity` | Ships the `entity` `aim_scope` and its `AimScopeEntity` plugin (`checkViewAccess()` mirrors the referenced entity's own view access, ADR-0025/ADR-0027; also declares/installs the `target_type`/`target_id` base fields, ADR-0028) | [CLAUDE.md](modules/aim_scope_entity/CLAUDE.md) |
 | `aim_chatbot` | `#[FunctionCall]` tools for an `ai_agents` chat assistant, hardcoded `scope: site` | [CLAUDE.md](modules/aim_chatbot/CLAUDE.md) |
 | `aim_tool` | `#[Tool]` plugins (any scope, permission-gated) exposed over Tool API and, via `mcp_server_tool_bridge`, MCP | [CLAUDE.md](modules/aim_tool/CLAUDE.md) |
 | `aim_tool_oauth` | OAuth2 scopes + third-party settings so a remote MCP client with no Drupal session can authenticate | [CLAUDE.md](modules/aim_tool_oauth/CLAUDE.md) |
+| `aim_benchmark` | Synthetic fact generation (`AimBenchmarkGenerator`) and the `aim:benchmark`/`aim:benchmark-cleanup` Drush commands, split out so production sites don't ship dev-only load generation | [CLAUDE.md](modules/aim_benchmark/CLAUDE.md) |
 
 A site that wants today's default behavior enables all four scope
 submodules plus `aim_chatbot`/`aim_tool` as needed - no bundling recipe
@@ -142,6 +147,17 @@ duplicated here.
   [ADR-0007](adr/0007-user-scope-requires-real-account.md); renamed from
   `subject_uid` 2026-09-28, `aim_update_10001()`, to stop colliding in
   spirit with the unrelated `uid` field below),
+  `target_type`/`target_id` (plain strings naming an arbitrary referenced
+  entity, required for `scope=entity` in practice though not enforced at
+  write time yet - see
+  [ADR-0027](adr/0027-entity-scope.md); not a real `entity_reference`
+  since that field type needs one fixed target type, and not
+  `drupal/dynamic_entity_reference` either, to keep the dependency out of
+  core `aim` - see that ADR's Context; declared by
+  `aim_scope_entity`'s own `AimScopeEntity::getBaseFieldDefinitions()`,
+  not `AimFact::baseFieldDefinitions()`, and merged onto `aim_fact`
+  generically by `AimHooks::entityBaseFieldInfo()` -
+  [ADR-0028](adr/0028-scope-type-plugin.md) piece 1),
   `text` (Guardrails-validated), `source`, `state` (tri-state boolean),
   `category` (taxonomy, vocabulary `aim_category`), `asserted` (valid-time
   start), `superseded_by`/`expires` (consolidation's supersede edge), `uid`
@@ -150,19 +166,39 @@ duplicated here.
   unless asked otherwise, see
   [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
   addendum).
-- **`aim_scope`** config entity, `id`/`label` only, defined in core `aim`
-  but shipped by the four `aim_scope_{user,role,site,case}` submodules
-  (ADR-0026), not core `aim` itself - a site installs only the scopes it
-  wants. Scope-level config differences are ThirdPartySettings the owning
-  submodule reads (`requires_account`, `aim_scope_user`-owned,
-  ADR-0007's "a scope=user fact must reference a real account", read
-  generically via `AimMemoryManager::scopeRequiresAccount()`); scope
-  behavior differences are `AimScopeAccessInterface` plugins (ADR-0025) -
+- **`aim_scope`** config entity, `id`/`label`/`plugin`/`settings`,
+  defined in core `aim` but shipped by the five
+  `aim_scope_{user,role,site,case,entity}` submodules
+  (ADR-0026/ADR-0027), not core `aim` itself - a site installs only the
+  scopes it wants. `plugin` names the `AimScopeTypeInterface` plugin ID
+  this instance uses, if any (nullable - `role`/`site` ship
+  `plugin: null`, a plain config-only scope with no dedicated behavior);
+  not required to equal the scope's own `id`
+  ([ADR-0028](adr/0028-scope-type-plugin.md) piece 3 - two differently-
+  configured scope instances can share one plugin, each with its own
+  `settings`). Resolved generically via
+  `AimScopeTypePluginManager::getTypePlugin($scopeId)`, which loads the
+  scope and reads its `plugin` property rather than assuming scope ID
+  and plugin ID are the same string. `aim_scope_user`'s
+  `requires_account` ThirdPartySetting
+  (ADR-0007's "a scope=user fact must reference a real account", read
+  generically via `AimMemoryManager::scopeRequiresAccount()`) still
+  predates and coexists with `settings` - migrating it is a nice-to-have
+  ADR-0028 enables, not something it required.
+  `AimScopeTypeInterface` (ADR-0025, widened by ADR-0028) supplies a
+  scope type's fields, settings, and behavior together:
   `checkViewAccess()` (extra view-access logic, ORed against the flat
-  permission) and `defaultSubject()` (a default subject for a new fact
-  of this scope when the caller omits one, e.g. `aim_scope_case`'s
-  minted case IDs), read generically via
-  `AimScopeAccessPluginManager::getAccessPlugin()`. No
+  permission - `aim_scope_user`'s widens it, `aim_scope_entity`'s
+  effectively replaces it by never granting the flat permission itself,
+  see ADR-0027), `defaultSubject()` (a default subject for a new fact of
+  this scope when the caller omits one, e.g. `aim_scope_case`'s minted
+  case IDs), `getBaseFieldDefinitions()` (the type's own base fields on
+  `aim_fact`, e.g. `aim_scope_entity`'s `target_type`/`target_id` -
+  merged generically by `AimHooks::entityBaseFieldInfo()`; each
+  definition must call `->setProvider('own_module')` itself, since the
+  merge point lives in core `aim`, not the declaring module), and
+  `defaultSettings()`/`buildSettingsForm()` (the type's own instance
+  settings, rendered inline by `AimScopeForm`'s type selector). No
   `field_ui_base_route` - deliberately, see
   [DEVELOPING.md](DEVELOPING.md) for why.
 - Vector search: server `aim_vector`, index `aim_vector_index`, collection

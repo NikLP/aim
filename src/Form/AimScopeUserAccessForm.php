@@ -18,7 +18,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * A checkbox grid, not #config_target elements like AimSettingsForm - the
  * saved shape (viewer role ID => list of visible subject role IDs) is a
  * matrix, not one value per form element, so buildForm()/submitForm()
- * reshape it by hand. See aim_scope_user's AimScopeUser (an AimScopeAccess
+ * reshape it by hand. See aim_scope_user's AimScopeUser (an AimScopeType
  * plugin, ADR-0025) for how this is read back at access-check time and why
  * this exists alongside the flat "view user aim facts" permission rather
  * than instead of it. Renamed from AimUserScopeAccessForm to match the

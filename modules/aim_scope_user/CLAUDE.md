@@ -23,7 +23,7 @@ is specific to `aim_scope_user`.
   ThirdPartySetting above, same pattern as the sibling Annotations
   suite's `annotations_audit`/`annotations_context` submodules
   (`web/modules/contrib/annotations`).
-- `src/Plugin/AimScopeAccess/AimScopeUser.php` - the role-visibility
+- `src/Plugin/AimScopeType/AimScopeUser.php` - the role-visibility
   access plugin (ADR-0025), moved here from core `aim` and renamed from
   `AimUserScopeVisibility` to match this module's own name (`AimScope` +
   the scope ID) rather than describing its one current behavior. Its

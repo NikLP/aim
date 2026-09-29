@@ -23,7 +23,7 @@ worth remembering - no extraction LLM round-trip. See
 alongside `extract()`.
 
 ```bash
-drush aim:remember <text> [--scope] [--subject] [--source] [--state] [--category] [--asserted]
+drush aim:remember <text> [--scope] [--subject] [--source] [--state] [--category] [--asserted] [--target-type] [--target-id]
 ```
 
 - Validates scope, creates the fact directly, prints its ID.
@@ -33,6 +33,9 @@ drush aim:remember <text> [--scope] [--subject] [--source] [--state] [--category
 - `--asserted` sets when the fact became true in reality if different
   from today (any `strtotime()`-parseable string); empty means "same as
   created".
+- `--target-type`/`--target-id` name the referenced entity for
+  `scope=entity` (e.g. `--target-type=node --target-id=42`); ignored for
+  every other scope. See [ADR-0027](adr/0027-entity-scope.md).
 - `scope=case` with no `--subject` mints a case ID server-side
   (`case-<8 hex chars>`, from Drupal's `uuid` service) and stamps it onto
   the fact - the success message (and `aim_tool`'s `aim_remember`
@@ -275,10 +278,12 @@ model or dimensions change, or the provider is upgraded). Build a skewed
 test corpus, then compare the index to exact search:
 
 1. Create throwaway accounts and give each a different number of synthetic
-   user-scope facts with `AimMemoryManager::generateBenchmarkFacts('user',
-   $n, 'zzpar', [$uid])` (from `drush php:eval`), including one user
-   holding 20% or more of all facts. Index them (`sapi-i`); synthetic facts
-   skip the consolidation queue.
+   user-scope facts with `aim_benchmark`'s
+   `AimBenchmarkGenerator::generateBenchmarkFacts('user', $n, 'zzpar',
+   [$uid])` (from `drush php:eval`; see
+   [aim_benchmark's DEVELOPING.md](modules/aim_benchmark/DEVELOPING.md)),
+   including one user holding 20% or more of all facts. Index them
+   (`sapi-i`); synthetic facts skip the consolidation queue.
 2. For about 30 stored vectors, set `@v` to the vector and compare, for
    each user and k of 5 and 20, `SELECT drupal_entity_id FROM aim_fact_vectors
    WHERE index_id='aim_vector_index' AND user=<uid> ORDER BY
@@ -296,55 +301,35 @@ load the following items on index" warning the first time a query returns
 it, then search_api deletes it (`delete_on_fail: TRUE` on the index).
 `recall()` already skips such rows. Harmless; not worth a manual cleanup.
 
-### `aim:benchmark` - retrieval latency
+### Query-embedding cache
 
-```bash
-drush aim:benchmark [--scope] [--checkpoints] [--queries] [--cleanup]
-drush aim:benchmark-cleanup <tag>
-```
-
-Generates synthetic facts (a template/word-pool generator, not
-`devel_generate`), reindexes, and times batches of `recall()` calls at
-each checkpoint. Deliberately bypasses Guardrails and the consolidation
-queue via `setSyncing(TRUE)` (core's `SynchronizableInterface` flag -
-`AimHooks`/the guardrail constraint both check `isSyncing()` first).
-Every generated fact is tagged `source=<run tag>` for cleanup.
-
-**Numbers so far:** hosted embeddings (`amazeeio__mistral-embed`),
-`recall()` averaged 450-540ms, dominated by the query-embedding network
-round trip. Local Ollama (`nomic-embed-text`), same checkpoints: 33-35ms,
-~15x faster - confirms the network-hop theory rather than the SQL/HNSW
-layer being the cost. Not yet run at thousands-of-facts scale.
-
-**Query-embedding cache, built 2026-09-27:** `Drupal\aim\EventSubscriber\
-AimEmbeddingCacheSubscriber` (registered in `aim.services.yml`, tagged
-`event_subscriber`), keyed on (provider ID, model ID, provider
-configuration, query text), in a dedicated `cache.aim_embeddings` bin
-(DB-backed, no Redis on this site). Active only for the duration of
-`AimMemoryManager::executeSearchQuery()` - toggled on and off around
-`$query->execute()` - so index-time embeds are never read from or
-written to it; `ai_search` gives query-time and index-time embeds the
-same operation type and tag set otherwise, so this is the only reliable
-way to tell them apart. Design and alternatives considered in
-[ADR-0017](adr/resolved/0017-query-embedding-cache.md), including why the fact's
-own already-indexed vector can't be reused directly instead (blocked on
-`ai_vdb_provider_mariadb`, see "Upgrading to standalone `ai_search`"
-above).
+`Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber` (registered in
+`aim.services.yml`, tagged `event_subscriber`), keyed on (provider ID,
+model ID, provider configuration, query text), in a dedicated
+`cache.aim_embeddings` bin (DB-backed, no Redis on this site). Active
+only for the duration of `AimMemoryManager::executeSearchQuery()` -
+toggled on and off around `$query->execute()` - so index-time embeds are
+never read from or written to it; `ai_search` gives query-time and
+index-time embeds the same operation type and tag set otherwise, so this
+is the only reliable way to tell them apart. Design and alternatives
+considered in [ADR-0017](adr/resolved/0017-query-embedding-cache.md),
+including why the fact's own already-indexed vector can't be reused
+directly instead (blocked on `ai_vdb_provider_mariadb`, see "Upgrading to
+standalone `ai_search`" above).
 
 Also logs a hit/miss line and, on a miss, the provider call's own
-duration - the embed-time vs. DB-search-time split previously only
-inferred from `aim:benchmark`'s one aggregate number. Verified live: two
+duration - the embed-time vs. DB-search-time split, previously only
+inferred from a benchmark run's one aggregate number. Verified live: two
 identical `aim:recall` calls logged a miss then a hit with identical
 results; the missed call's embed cost logged as 556ms on this site's
-local Ollama, noticeably higher than `aim:benchmark`'s 33-35ms aggregate
-above - worth knowing before treating that aggregate as a per-call
+local Ollama, noticeably higher than the ~33-35ms aggregate a benchmark
+run reports - worth knowing before treating that aggregate as a per-call
 guarantee.
 
-`aim:benchmark` gained `--bypass-cache`: its sample queries repeat every
-`--queries` iterations within a checkpoint, so without it, repeats after
-the first silently become cache hits and the numbers stop being
-comparable to the 2026-09-10 measurements above or to a run with a
-different `--queries` value.
+**Retrieval-latency benchmarking** (`aim:benchmark`/
+`aim:benchmark-cleanup`, including `--bypass-cache` for this cache) moved
+to the `aim_benchmark` submodule - see
+[its DEVELOPING.md](modules/aim_benchmark/DEVELOPING.md).
 
 ### `aim:status` - database-side health checks
 
@@ -449,15 +434,22 @@ are real `aim_scope` config entities (`bundle_entity_type` on `AimFact`'s
 `#[ContentEntityType]` attribute) - `getBundleInfo('aim_fact')` derives
 automatically, no `hook_entity_bundle_info()` needed. Core `aim` ships
 zero scope instances itself (ADR-0026) - the default four each come from
-their own submodule (`aim_scope_user`/`role`/`site`/`case`). A site or
-contrib module adds a fifth scope the same way: zero PHP needed via
-`config/install/aim.aim_scope.<id>.yml`, with an `enforced` dependency on
-the shipping module (needed for `ScopeUninstallValidator` to find it -
-see [aim_scope_user's CLAUDE.md](modules/aim_scope_user/CLAUDE.md) for
-why), plus a dedicated `AimScopeAccessInterface` plugin and/or
-ThirdPartySettings if the scope needs its own access rule or config
-flags (`requires_account` is `aim_scope_user`'s example of the
-latter).
+their own submodule (`aim_scope_user`/`role`/`site`/`case`). A fifth,
+`aim_scope_entity` (ADR-0027), ships the same way and shows both halves
+of the pattern in one real example: zero PHP would suffice if it only
+needed `config/install/aim.aim_scope.<id>.yml` plus an `enforced`
+dependency on the shipping module (needed for `ScopeUninstallValidator`
+to find it - see [aim_scope_user's CLAUDE.md](modules/aim_scope_user/CLAUDE.md)
+for why), but it also needs its own access rule and its own base fields
+(`target_type`/`target_id`), so it adds a dedicated
+`AimScopeTypeInterface` plugin (`AimScopeEntity`) the same way
+`aim_scope_user`'s `requires_account` adds a ThirdPartySetting instead for
+a config-shaped (not behavior-shaped) scope difference. The plugin's
+`getBaseFieldDefinitions()` (ADR-0028 piece 1) is how its own fields get
+onto `aim_fact` without core `aim` hardcoding them - see
+[aim_scope_entity's CLAUDE.md](modules/aim_scope_entity/CLAUDE.md) for
+the field-ownership gotcha (`->setProvider()`) and the uninstall-hook
+mistake that pattern surfaced.
 
 `links.field_ui_base_route` is deliberately unset - `bundle_entity_type`
 and Field UI's "Manage fields" tab are independently gated, and leaving
@@ -476,6 +468,20 @@ assumes all fields are base fields" - generalizes badly for a module
 headed to drupal.org. Both fields stay always-present base fields, unused
 on bundles that don't need them. Don't re-attempt without a concrete
 reason beyond schema tidiness.
+
+This is a lesson about *bundle* fields specifically, not about which
+module may declare a base field - confirmed the hard way when ADR-0027
+first over-applied it, concluding `target_type`/`target_id` "has to
+live in core `aim`" for the same reason. [ADR-0028](adr/0028-scope-type-plugin.md)
+corrected that: `isMultiple()` and `EntityViewsData` both key off
+`EntityFieldManager::getFieldStorageDefinitions()`, which merges a base
+field declared via another module's `hook_entity_base_field_info()`
+indistinguishably from one declared in the entity's own class - neither
+bug is about declaring-module, only about bundle-conditionality. A
+scope type's own base fields (e.g. `aim_scope_entity`'s
+`target_type`/`target_id`) now live with the plugin that declares them
+(`AimScopeTypeInterface::getBaseFieldDefinitions()`), merged generically
+by `AimHooks::entityBaseFieldInfo()`.
 
 `AimScope` deletion refuses if any `aim_fact` of that scope still exists
 (`AimScopeDeleteForm`, same precedent as core's `NodeTypeDeleteConfirm`).
@@ -550,9 +556,9 @@ granted `view user aim facts`.
 
 ### User-scope role visibility
 
-`AimScopeUser` (`aim_scope_user/src/Plugin/AimScopeAccess/AimScopeUser.php`,
+`AimScopeUser` (`aim_scope_user/src/Plugin/AimScopeType/AimScopeUser.php`,
 renamed from `AimUserScopeVisibility` and moved out of core `aim` when it
-became the first `AimScopeAccessInterface` plugin, ADR-0025/ADR-0026)
+became the first `AimScopeTypeInterface` plugin, ADR-0025/ADR-0026)
 adds a narrower, additive grant path beyond the flat `view user aim
 facts` permission: a `user_scope_role_visibility` matrix in
 `aim.settings` (viewer role => visible subject roles), editable at
@@ -563,8 +569,8 @@ implicit `authenticated` role both accounts always carry). Only ever
 returns allowed or neutral, never forbidden, so
 `AimFactAccessControlHandler` ORs it against the flat permission without
 risk of it revoking a grant it knows nothing about. Discovered generically
-via `plugin.manager.aim_scope_access` (`Drupal\aim\AimScopeAccessPluginManager`,
-attribute-scanned from any enabled module's `src/Plugin/AimScopeAccess/`)
+via `plugin.manager.aim_scope_type` (`Drupal\aim\AimScopeTypePluginManager`,
+attribute-scanned from any enabled module's `src/Plugin/AimScopeType/`)
 rather than a hardcoded `bundle() === 'user'` branch; `case`-scope access
 control is deferred (no `aim_case` entity yet, Nik's call).
 

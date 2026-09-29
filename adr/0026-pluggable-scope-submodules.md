@@ -1,8 +1,12 @@
 # ADR-0026: Pluggable scope submodules - config via ThirdPartySettings, behavior via the ADR-0025 plugin type
 
-**Status:** Partially implemented. Pieces 1-4 (below) built and
-live-verified 2026-09-28; pieces 5-6 still open. See TODO.md's
+**Status:** Partially implemented. Pieces 1-5 (below) built and
+live-verified, piece 5 on 2026-09-29; piece 6 still open. See TODO.md's
 "Governance/scope design thread" for the current build-order detail.
+`AimScopeAccessInterface`/`AimScopeAccessPluginManager`, referenced
+throughout piece 4 below, were renamed
+`AimScopeTypeInterface`/`AimScopeTypePluginManager` on 2026-09-29
+([ADR-0028](0028-scope-type-plugin.md) piece 0).
 **Date:** 2026-09-28
 
 ## Context
@@ -126,11 +130,10 @@ TODO.md/task entries rather than one large change:
    X" and scales to future `AimScopeRole`/`AimScopeSite`/`AimScopeCase`
    plugins, where `AimUserScopeVisibility` named one current behavior
    instead.
-5. **`aim_chatbot` declares an explicit dependency on `aim_scope_site`**
-   in its `.info.yml`, replacing today's implicit assumption that `scope:
-   site` exists (its tool is hardcoded to that scope - see
-   [aim_chatbot's CLAUDE.md](../modules/aim_chatbot/CLAUDE.md)). Not yet
-   built.
+5. **BUILT 2026-09-29. `aim_chatbot` declares an explicit dependency on
+   `aim_scope_site`** in its `.info.yml`, replacing the prior implicit
+   assumption that `scope: site` exists (its tool is hardcoded to that
+   scope - see [aim_chatbot's CLAUDE.md](../modules/aim_chatbot/CLAUDE.md)).
 6. **A recipe bundles "the four default scopes"** for one-step
    enablement (matching Annotations' `annotations_demo_types` and aim's
    own `aim_demo_library` precedent in `recipes/`), so a site that wants
@@ -164,9 +167,10 @@ scope submodule cannot introduce its own dedicated field.
   per-bundle-*config-entity* splitting. Worth stating plainly so a future
   reader doesn't conflate the two kinds of "pluggable."
 - [ADR-0024](0024-annotations-integration-target-scoped-promotion.md)'s
-  proposed `scope: entity` bundle would become the fifth candidate
-  submodule (`aim_scope_entity`) once it has its own ADR - this ADR's
-  submodule shape is what it would land into, not a competing design.
+  proposed `scope: entity` bundle became the fifth submodule,
+  `aim_scope_entity`, built 2026-09-29 per its own
+  [ADR-0027](0027-entity-scope.md) - landed into this ADR's submodule
+  shape exactly, not a competing design.
 
 **Addendum 2026-09-28: follow-up audit for leftover scope bias.** Nik
 asked, after pieces 1-4 shipped, what other code in core `aim` is still
@@ -265,21 +269,22 @@ findings, not one:
   *different* module than `aim_fact` itself. Re-verified live after the
   fix: `validate('aim')` returns `[]` with all 34 facts still in place,
   and the scratch-submodule scenario above still correctly blocks.
-- **ThirdPartySettings key ownership.** Annotations' precedent
-  (`annotations_audit` owns `affects_coverage` on an `AnnotationType` it
-  doesn't provide) argues for `aim_scope_user` owning its own
-  `requires_subject_uid` key, read but not owned by core `aim`. Recommend
-  following that unless a concrete reason emerges not to.
-- ~~**Build order relative to ADR-0025.**~~ **Followed, half-done
+- ~~**ThirdPartySettings key ownership.**~~ **Resolved 2026-09-28.**
+  Annotations' precedent (`annotations_audit` owns `affects_coverage` on
+  an `AnnotationType` it doesn't provide) was followed: `aim_scope_user`
+  owns the key on its own config entity, read but not owned by core `aim`
+  via `AimMemoryManager::scopeRequiresAccount()`. Named `requires_account`,
+  not the draft `requires_subject_uid` above (stale after the same-day
+  field rename to `user`, and shortened from `requires_user_account`
+  during the follow-up audit - "account" already implies "user").
+- ~~**Build order relative to ADR-0025.**~~ **Followed in full, completed
   2026-09-28.** Built the plugin type first, in core, as ADR-0025
   proposed: `AimScopeAccessPluginManager` +
   `AimUserScopeVisibility` converted in place into the first dedicated
-  plugin (`src/Plugin/AimScopeAccess/`), still living in core `aim`, not
-  yet moved into `aim_scope_user`. That move - piece 4's other half,
-  relocating the plugin class into a submodule that doesn't exist yet -
-  waits on pieces 1-3 (splitting the scope config entities out) the same
-  as originally recommended; only the "build the plugin type without
-  bundling it into the submodule split" half of the sequencing is done.
+  plugin (`src/Plugin/AimScopeAccess/`). Piece 4's other half - relocating
+  the plugin class into `aim_scope_user` - followed later the same day in
+  the follow-up audit once pieces 1-3 existed for it to land in, per piece
+  4's own bullet above.
 - **Does this ADR supersede ADR-0025, or sit alongside it?** Recommend
   alongside - ADR-0025 stays the narrower "behavior plugin type" decision,
   this ADR is the broader "submodule split" decision that consumes it,

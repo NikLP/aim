@@ -98,6 +98,10 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['weight' => 20]);
 
+    // target_type/target_id (scope=entity's referenced-entity pair) are
+    // not declared here - they are aim_scope_entity's own base fields
+    // (AimScopeEntity::getBaseFieldDefinitions()), merged in generically
+    // by hook_entity_base_field_info() (AimHooks) per ADR-0028 piece 1.
     $fields['text'] = BaseFieldDefinition::create('string_long')
       ->setLabel(t('Text'))
       ->setDescription(t('The fact itself, as one short statement.'))

@@ -22,7 +22,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * this. update/delete are deliberately left on administer aim memory
  * only - not asked to be scoped, see CLAUDE.md.
  *
- * view additionally ORs in whatever AimScopeAccessPluginManager returns for
+ * view additionally ORs in whatever AimScopeTypePluginManager returns for
  * the fact's own bundle (ADR-0025) - a scope with no registered plugin
  * (every bundle but user today) falls through to the flat permission
  * alone, unchanged from before this plugin type existed.
@@ -31,7 +31,7 @@ class AimFactAccessControlHandler extends EntityAccessControlHandler implements 
 
   public function __construct(
     EntityTypeInterface $entity_type,
-    protected AimScopeAccessPluginManagerInterface $scopeAccessManager,
+    protected AimScopeTypePluginManagerInterface $scopeAccessManager,
   ) {
     parent::__construct($entity_type);
   }
@@ -40,7 +40,7 @@ class AimFactAccessControlHandler extends EntityAccessControlHandler implements 
    * {@inheritdoc}
    */
   public static function createInstance(ContainerInterface $container, EntityTypeInterface $entity_type) {
-    return new static($entity_type, $container->get('plugin.manager.aim_scope_access'));
+    return new static($entity_type, $container->get('plugin.manager.aim_scope_type'));
   }
 
   /**
@@ -50,7 +50,7 @@ class AimFactAccessControlHandler extends EntityAccessControlHandler implements 
     if ($operation === 'view') {
       $access = AccessResult::allowedIfHasPermission($account, 'view ' . $entity->bundle() . ' aim facts');
       if ($entity instanceof AimFact) {
-        $plugin = $this->scopeAccessManager->getAccessPlugin($entity->bundle());
+        $plugin = $this->scopeAccessManager->getTypePlugin($entity->bundle());
         if ($plugin) {
           $access = $access->orIf($plugin->checkViewAccess($entity, $account));
         }

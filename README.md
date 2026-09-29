@@ -68,6 +68,12 @@ Four memory categories, composable at retrieval the way Mem0 composes
 - **Support tracking** - session-scoped episodic memory, modeled as a real
   entity with workflow states (open -> assigned -> resolved), not a bare
   session-ID string.
+- **Entity memory** - a fact about one specific piece of site content
+  (a node, a media item, anything with its own Drupal access model),
+  visible to whoever can already see that content rather than through a
+  flat permission. Added later than the original four
+  ([ADR-0027](adr/0027-entity-scope.md)), as the bridge point for a future
+  integration with Annotations (human-curated site knowledge).
 
 ## How it works
 
@@ -152,16 +158,18 @@ yet built - see [ADR-0009](adr/0009-recipe-apply-safety-gate.md).
 - `drupal/ai` (provider abstraction, Guardrails submodule)
 - Local Ollama for zero-API-key development
 
-`aim` itself ships zero scopes (ADR-0026) - `user`/`role`/`site`/`case`
-each come from their own submodule, so a site installs only the ones it
-wants. Each submodule has its own requirements and setup:
+`aim` itself ships zero scopes (ADR-0026) - `user`/`role`/`site`/`case`/
+`entity` each come from their own submodule, so a site installs only the
+ones it wants. Each submodule has its own requirements and setup:
 [aim_scope_user](modules/aim_scope_user/README.md),
 [aim_scope_role](modules/aim_scope_role/README.md),
 [aim_scope_site](modules/aim_scope_site/README.md),
 [aim_scope_case](modules/aim_scope_case/README.md),
+[aim_scope_entity](modules/aim_scope_entity/README.md),
 [aim_chatbot](modules/aim_chatbot/README.md),
 [aim_tool](modules/aim_tool/README.md),
-[aim_tool_oauth](modules/aim_tool_oauth/README.md).
+[aim_tool_oauth](modules/aim_tool_oauth/README.md),
+[aim_benchmark](modules/aim_benchmark/README.md) (dev tool, optional).
 
 ## Getting started
 

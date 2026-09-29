@@ -73,6 +73,8 @@ use Drupal\aim\Form\AimScopeForm;
   config_export: [
     'id',
     'label',
+    'plugin',
+    'settings',
   ],
 )]
 class AimScope extends ConfigEntityBundleBase {
@@ -86,6 +88,27 @@ class AimScope extends ConfigEntityBundleBase {
    * Human-readable label, e.g. "User".
    */
   protected string $label;
+
+  /**
+   * The AimScopeType plugin ID this instance uses, if any.
+   *
+   * Not required to equal $id (ADR-0028 piece 3) - two scope instances
+   * can point at the same plugin, each with its own $settings. NULL for
+   * a plain, config-only scope (e.g. role/site) with no dedicated
+   * behavior, fields, or settings - resolved generically by
+   * AimScopeTypePluginManager::getTypePlugin() rather than every
+   * ThirdPartySetting-style special case aim used before this existed.
+   */
+  protected ?string $plugin = NULL;
+
+  /**
+   * Instance-level settings for $plugin, if any.
+   *
+   * Shape is entirely up to the plugin - see
+   * AimScopeTypeInterface::defaultSettings()/buildSettingsForm(). Empty
+   * for a scope with no plugin, or a plugin with nothing to configure.
+   */
+  protected array $settings = [];
 
   /**
    * Returns the permission machine name for viewing facts of this scope.

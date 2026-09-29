@@ -112,7 +112,8 @@ this list as exhaustive.
 - [ ] #5 - retrieval latency at realistic scale: still not benchmarked at
       thousands of facts. Local-Ollama half done and confirmed 2026-09-10
       (`recall()` 33-35ms vs. 450-540ms hosted, ~15x faster, network-hop
-      theory confirmed) - see DEVELOPING.md's "aim:benchmark" section.
+      theory confirmed) - see `aim_benchmark`'s
+      [DEVELOPING.md](modules/aim_benchmark/DEVELOPING.md).
 - [ ] #7 - product framing (own venture vs. folded into an existing pitch) -
       explicitly out of that ADR's own scope, still open.
 - [ ] #8 - "speckit-for-Drupal" per-archetype question sets - no design work
@@ -292,7 +293,7 @@ questions" section)
       moving demo deadline - revisit once a working reroll exists upstream,
       or write one properly with time to test it.
 
-(DEVELOPING.md's "aim:benchmark" and "Chatbot" sections)
+(`aim_benchmark`'s DEVELOPING.md and this file's DEVELOPING.md's "Chatbot" section)
 
 ## Backlog - explicitly "wait for a trigger" per the docs' own framing
 
@@ -318,12 +319,15 @@ questions" section)
       planned path to revisionable. Revisit only if that changes for an
       unrelated reason.
 
-## Governance/scope design thread (2026-09-27/28) - handoff
+## Governance/scope design thread (2026-09-27/28, continued 2026-09-29) - handoff
 
 Four ADRs came out of one long design conversation about unblocking the
 Annotations bridge (a fourth, ADR-0026, branched off discussing ADR-0025's
-premise into a broader "make scopes genuinely pluggable" ask). Status as
-of 2026-09-28:
+premise into a broader "make scopes genuinely pluggable" ask). A fifth,
+[ADR-0027](adr/0027-entity-scope.md), followed on 2026-09-29 to build the
+`scope: entity` bundle this thread had left as ADR-0025's second
+still-unbuilt data point - see its own entry below. Status as of
+2026-09-28 unless noted otherwise:
 
 - [x] Annotations' `save()` write path - DONE per Nik, 2026-09-28. Was
       [ADR-0024](adr/0024-annotations-integration-target-scoped-promotion.md)'s
@@ -370,9 +374,10 @@ of 2026-09-28:
       is correctly BLOCKED by `ScopeUninstallValidator` while role-scope
       facts exist (5 on this site) - the real payoff of the enforced
       dependency, proven against a real split-out submodule, not just the
-      earlier scratch-module test. Pieces 5 (`aim_chatbot`'s explicit
-      dependency on `aim_scope_site`) and 6 (the bundling recipe) remain
-      unbuilt. Explicitly does not move `subject`/`user` to per-bundle
+      earlier scratch-module test. Piece 5 (`aim_chatbot`'s explicit
+      dependency on `aim_scope_site`) BUILT 2026-09-29; piece 6 (the
+      bundling recipe) remains unbuilt. Explicitly does not move
+      `subject`/`user` to per-bundle
       fields - already tried and reverted (DEVELOPING.md's "Scope/bundle
       model"). (The `user` field was itself `subject_uid` until
       2026-09-28, `aim_update_10001()` - renamed for readability,
@@ -445,19 +450,84 @@ of 2026-09-28:
       pattern `AimScopeUser` already uses: don't grant the flat permission
       broadly, let the plugin's `checkViewAccess()` be the sole grant.
       Revisit if that stops being good enough - raised 2026-09-28.
-- [ ] `scope: entity` bundle (dynamic reference to any Drupal entity,
-      single-value base field so it stays inline on `aim_fact`, no new
-      table) - still theoretical, a nice-to-have per Nik, not its own ADR
-      yet. Depends on ADR-0025 landing first (needs a dedicated
-      per-referenced-entity access plugin, not the flat per-scope
-      permission the other bundles use) - would hit the same
-      allowed/neutral ceiling above if referenced-entity access ever needs
-      to narrow rather than widen.
+- [x] `scope: entity` bundle - BUILT 2026-09-29, see
+      [ADR-0027](adr/0027-entity-scope.md). Two always-present base
+      fields on `aim_fact` (`target_type`/`target_id`, plain strings, no
+      new package dependency - `drupal/dynamic_entity_reference` was
+      considered and rejected, see that ADR's Context), a new
+      `aim_scope_entity` submodule, and `AimScopeEntity` as the second
+      real `AimScopeAccessInterface` plugin (`checkViewAccess()` returns
+      the referenced entity's own view-access result directly). CLI/Tool
+      wiring also built same day - `aim:remember --target-type`/
+      `--target-id` (single and `--file` batch), and `aim_tool`'s
+      `AimRemember` plugin (single and `facts` batch) - all three
+      verified live. Write-time validation that a `scope: entity` fact
+      actually carries a target is deliberately still not built (see that
+      ADR's "Not yet built") - a missing target just makes
+      `checkViewAccess()` neutral forever, not a security gap.
+- [x] `AimScopeAccessInterface`/`AimScopeAccessPluginManager` renamed
+      `AimScopeTypeInterface`/`AimScopeTypePluginManager` - BUILT
+      2026-09-29, see [ADR-0028](adr/0028-scope-type-plugin.md) piece 0.
+      Raised by Nik asking whether "access" still fit once the plugin was
+      proposed to also own field declarations and settings, not just
+      view-access/default-subject; mechanical rename only, all three
+      existing plugins (`AimScopeUser`, `AimScopeEntity`, `AimScopeCase`)
+      and every call site moved.
+- [x] Widen the scope type plugin - field declaration, settings schema,
+      decoupling plugin ID from scope ID (ADR-0028 pieces 1-3) - BUILT
+      2026-09-29, raised by Nik asking whether the module split had
+      actually made scopes pluggable end-to-end or just structurally
+      separated, given `AimMemoryManager`/`aim_tool` still hardcoded
+      `target_type`/`target_id`. `target_type`/`target_id` moved from
+      `AimFact::baseFieldDefinitions()` into
+      `AimScopeEntity::getBaseFieldDefinitions()`, merged generically by
+      `AimHooks::entityBaseFieldInfo()`; `AimScope` gained `plugin`/
+      `settings` (`config_export` now `[id, label, plugin, settings]`),
+      `AimScopeForm` grew a type selector + AJAX settings sub-form;
+      `AimScopeTypePluginManager::getTypePlugin()` now resolves via
+      `$scope->get('plugin')` instead of assuming plugin ID == scope ID.
+      Two real bugs found and fixed live, not just a clean build - see
+      ADR-0028's Consequences for detail: (a) a field merged through
+      another module's `hook_entity_base_field_info()` needs
+      `->setProvider()` called explicitly or it's misattributed to the
+      *hook's* module; (b) a hand-written `hook_uninstall()` calling
+      `uninstallFieldStorageDefinition()` races core's own generic pass
+      (`ModuleInstaller::uninstall()` already does this for any field
+      whose provider matches the uninstalling module) and crashes -
+      removed entirely, `hook_install()` alone is correct.
+- [ ] **Drush oddity found while verifying the above, not yet diagnosed
+      further or filed upstream.** `drush pmu aim_scope_entity` throws
+      `SQLSTATE[42S22]: Column not found: 'target_type'` even after both
+      fixes above; calling
+      `\Drupal::service('module_installer')->uninstall(['aim_scope_entity'])`
+      directly (confirmed via stack trace to be the exact same
+      `ModuleInstaller::uninstall()` -> `EntityDefinitionUpdateManager->
+      uninstallFieldStorageDefinition()` code path Drush's `pm:uninstall`
+      itself calls into) completes cleanly. Isolated to Drush's command
+      layer specifically for a module providing 2+ base fields merged via
+      another module's hook. Not blocking - `aim_scope_entity`'s own
+      lifecycle works correctly through the real API - but a site
+      operator using `drush pmu` on a scope-field-providing submodule
+      should expect to hit this until it's actually root-caused.
+- [ ] **ADR-0028 piece 4, found 2026-09-29 while answering "are the
+      endpoints pluggable too?", design only.** `aim_tool`'s `AimRemember`
+      still hardcodes `target_type`/`target_id` in its `#[Tool]`
+      `input_definitions` - pieces 1-3 made the entity and admin-form
+      shape pluggable, not the Tool API/MCP schema, which is a static
+      attribute read once for `tools/list`. Tool API's own
+      `InputDefinitionRefinerInterface` can't solve this as-is (narrows
+      an already-advertised input, can't add a new named one). Concrete
+      mechanism sketched in ADR-0028's piece 4 entry: one generic
+      statically-declared free-map input, refined per scope type at call
+      time. Not built.
 - [ ] `aim_annotations` bridge module itself
       ([ADR-0024](adr/0024-annotations-integration-target-scoped-promotion.md)) -
-      blocked until `scope: entity` and its ADR-0025 plugin exist (the
-      `trusted` field blocker is cleared). Promotion logic itself is
-      fully custom/programmatic, not gated on any of this.
+      both prerequisites this was blocked on are now cleared (`trusted`
+      field built; `scope: entity` + its ADR-0025 plugin built per
+      ADR-0027 above). The bridge module's own write path is still
+      unbuilt. Promotion logic itself is fully custom/programmatic, not
+      gated on any of this.
 
-Build order if picked back up: `trusted` field done -> `scope: entity`
-ADR -> its ADR-0025 plugin -> the bridge module.
+Build order, followed: `trusted` field done -> `scope: entity` ADR
+(ADR-0027) done -> its ADR-0025 plugin done -> the bridge module (not
+started).

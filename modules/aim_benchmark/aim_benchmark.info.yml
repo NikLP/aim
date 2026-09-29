@@ -1,0 +1,7 @@
+name: 'AIM Benchmark'
+type: module
+description: 'Synthetic fact generation and the aim:benchmark/aim:benchmark-cleanup Drush commands for measuring recall() latency at scale.'
+package: AIM
+core_version_requirement: ^11
+dependencies:
+  - aim:aim

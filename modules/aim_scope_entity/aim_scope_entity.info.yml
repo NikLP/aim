@@ -1,0 +1,7 @@
+name: 'AIM Scope: Entity'
+type: module
+description: 'Ships the entity aim_scope: memory about an arbitrary Drupal entity, view access mirroring that entity''s own (ADR-0027).'
+package: AIM
+core_version_requirement: ^11
+dependencies:
+  - aim:aim
