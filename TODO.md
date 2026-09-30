@@ -106,7 +106,15 @@ questions" section)
       API layer (keyed scope+subject, invalidated on save) for a true
       page-load hot path (e.g. "should this user see the marketing
       banner"). Originally motivated by a 2026-09-09 question about a "warm
-      state cache for booleans" - not designed, no ADR yet.
+      state cache for booleans" - not designed. Partly superseded
+      2026-10-01 by [ADR-0032](adr/0032-dated-category-listing-for-quick-notes.md)'s
+      `listFacts()` (same non-vector query, category/date filters):
+      build that first, add a `state` filter to it, and only then decide
+      whether the Cache API layer is still wanted. Also open: `state`
+      duplicates what the fact text already says and nothing reads it
+      (recall() just echoes it), so if no consumer for the hot-path
+      lookup appears, drop the field rather than keep a column that can
+      silently disagree with its text.
 - [ ] Upstream work for `AimMariaDBProvider`'s overrides (status checked
       against drupal.org and the git history 2026-09-27; the provider project
       has only 6 issues):
