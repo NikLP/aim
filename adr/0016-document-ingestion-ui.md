@@ -46,8 +46,8 @@ new form call this same method - no duplicated extraction logic.
 upload (or a textarea for the smallest first cut), `scope`/`subject`/
 `category` fields matching `aim:remember`'s options, submits to
 `ingestText()`. The uploaded file is never saved to a managed File/Media
-entity - read into memory and discarded, same no-transcript-recording
-posture `aim:extract` already has. `source` is tagged `upload:<filename>`
+entity - read into memory and discarded, same as `aim:extract` already
+does. `source` is tagged `upload:<filename>`
 (or `form:<timestamp>` for pasted text), extending `aim:extract`'s
 existing `extract:<filename>` convention rather than inventing a new one.
 

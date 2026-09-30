@@ -1,0 +1,10 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - aim
+id: aim_fact_trust
+label: 'Trust'
+type: aim_fact
+plugin: aim_fact_trust
+configuration: {  }

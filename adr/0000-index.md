@@ -27,6 +27,8 @@ Architecture Decision Records for the `aim` module.
 | [0026](0026-pluggable-scope-submodules.md) | Pluggable scope submodules: ThirdPartySettings for config, ADR-0025's plugin type for behavior | Partially implemented - pieces 1-5 (submodule split, ThirdPartySetting, plugin move, aim_chatbot dependency) built and live-verified, piece 5 on 2026-09-29; piece 6 (bundling recipe) not built |
 | [0027](0027-entity-scope.md) | `scope: entity`: facts about an arbitrary Drupal entity, view access mirroring that entity's own | Built and verified 2026-09-29, including CLI/Tool wiring |
 | [0028](0028-scope-type-plugin.md) | Widen the scope-access plugin into a scope-type plugin: fields, settings, and behavior in one seam | Built and verified 2026-09-29 (pieces 0-4, including the Tool API/MCP endpoint shape); corrects 0027's base-field reasoning |
+| [0029](0029-context-carrying-turns.md) | Context-carrying turns: mention tokens, an API-first console with context chips, `batch_id` provenance, one review pipeline | Accepted 2026-09-30 - design only, not built |
+| [0030](0030-fact-groups.md) | Fact groups: a scope-agnostic `group` field shipped as an `aim_group` submodule, plus a generic `recall()` filter seam | Accepted 2026-09-30 - design only, not built |
 
 ## Resolved
 

@@ -79,9 +79,7 @@ drush aim:extract <file> [--provider] [--model] [--source] [--index] [--subject-
 Sends the file to a chat provider with a structured-JSON-schema request,
 creates one `AimFact` per returned item (scope/subject classified by the
 model). The source file itself is never stored - only the extracted
-facts persist. **Standing constraint:** no conversation/transcript
-recording - `source` is a short provenance pointer, never the raw
-dialogue.
+facts persist. `source` is a short provenance pointer.
 
 The structured-output schema's `scope` enum is built from
 `allowedScopes()` at call time, so a scope added as an `aim_scope` config

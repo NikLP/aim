@@ -183,6 +183,13 @@ questions" section)
       one class. Verified live instead - see ADR-0017's "Built
       2026-09-27". Whatever sets up `tests/src/Kernel` first should cover
       this too.
+- [ ] Bulk actions for `state` and `category` on the admin facts view -
+      deliberately not built (2026-09-30) because neither field is in use
+      yet. `trusted`/retire/un-retire have them
+      (`src/Plugin/Action/`, `system.action.aim_fact_*`). `state` is three
+      plain field-set actions (true/false/unset); `category` needs a
+      configurable action with a term form (add/replace/clear), so it is
+      the larger job. Revisit when either field starts being populated.
 - [ ] Fast-path lookup for typed facts (`state`, `category`), bypassing
       `recall()`'s vector search entirely. Both fields are exact-match
       (scope+subject), not fuzzy semantic - but everything, including a
@@ -318,6 +325,13 @@ questions" section)
       landing (ADR-0002 addendum, 2026-09-28), so `aim_fact` has no
       planned path to revisionable. Revisit only if that changes for an
       unrelated reason.
+
+## Case scope access control (raised 2026-09-30, ADR-0029)
+
+- [ ] Design and build case-scope view access (`AimScopeCase::checkViewAccess()`
+      is neutral today) plus a case membership model. Needs its own ADR.
+      Required before the console's case chips ship; user and entity chips
+      do not depend on it.
 
 ## Governance/scope design thread (2026-09-27/28, continued 2026-09-29) - handoff
 
