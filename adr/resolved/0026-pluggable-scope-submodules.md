@@ -1,12 +1,7 @@
 # ADR-0026: Pluggable scope submodules - config via ThirdPartySettings, behavior via the ADR-0025 plugin type
 
-**Status:** Partially implemented. Pieces 1-5 (below) built and
-live-verified, piece 5 on 2026-09-29; piece 6 still open. See TODO.md's
-"Governance/scope design thread" for the current build-order detail.
-`AimScopeAccessInterface`/`AimScopeAccessPluginManager`, referenced
-throughout piece 4 below, were renamed
-`AimScopeTypeInterface`/`AimScopeTypePluginManager` on 2026-09-29
-([ADR-0028](0028-scope-type-plugin.md) piece 0).
+**Status:** Built (pieces 1-5, live-verified 2026-09-28/29). Piece 6, the bundling recipe, is tracked in TODO.md.
+`AimScopeAccessInterface`/`AimScopeAccessPluginManager`, referenced throughout piece 4 below, were renamed `AimScopeTypeInterface`/`AimScopeTypePluginManager` on 2026-09-29 ([ADR-0028](0028-scope-type-plugin.md) piece 0).
 **Date:** 2026-09-28
 
 ## Context
@@ -133,7 +128,7 @@ TODO.md/task entries rather than one large change:
 5. **BUILT 2026-09-29. `aim_chatbot` declares an explicit dependency on
    `aim_scope_site`** in its `.info.yml`, replacing the prior implicit
    assumption that `scope: site` exists (its tool is hardcoded to that
-   scope - see [aim_chatbot's CLAUDE.md](../modules/aim_chatbot/CLAUDE.md)).
+   scope - see [aim_chatbot's CLAUDE.md](../../modules/aim_chatbot/CLAUDE.md)).
 6. **A recipe bundles "the four default scopes"** for one-step
    enablement (matching Annotations' `annotations_demo_types` and aim's
    own `aim_demo_library` precedent in `recipes/`), so a site that wants
@@ -166,7 +161,7 @@ scope submodule cannot introduce its own dedicated field.
   reverted per-bundle-*field* attempt, a different thing from
   per-bundle-*config-entity* splitting. Worth stating plainly so a future
   reader doesn't conflate the two kinds of "pluggable."
-- [ADR-0024](0024-annotations-integration-target-scoped-promotion.md)'s
+- [ADR-0024](../0024-annotations-integration-target-scoped-promotion.md)'s
   proposed `scope: entity` bundle became the fifth submodule,
   `aim_scope_entity`, built 2026-09-29 per its own
   [ADR-0027](0027-entity-scope.md) - landed into this ADR's submodule

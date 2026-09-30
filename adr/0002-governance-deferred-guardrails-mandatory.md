@@ -94,7 +94,7 @@ section named it), but doesn't earn its cost here:
   a module headed to drupal.org that's deliberately trying to stay thin.
 - Trust is a retrieval-quality decision ("should this be surfaced as
   authoritative"), not an identity-based access rule - it's orthogonal to
-  [ADR-0025](0025-scope-access-plugin-type.md)'s scope-access plugin work
+  [ADR-0025](resolved/0025-scope-access-plugin-type.md)'s scope-access plugin work
   and shouldn't be folded into it.
 
 **Decision: one new base field, `trusted` (boolean)**, indexed as a

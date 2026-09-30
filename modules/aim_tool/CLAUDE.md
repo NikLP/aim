@@ -22,7 +22,7 @@ use of the tool at all, not which scopes it can write.
   `scope: site` like `aim_chatbot`'s equivalents - a Tool API caller is a
   real, authenticated account, so scope/subject are caller-supplied
   (same shape as `drush aim:remember`, per
-  [ADR-0006](../../adr/0006-agent-native-write-path.md)). `AimRemember`'s
+  [ADR-0006](../../adr/resolved/0006-agent-native-write-path.md)). `AimRemember`'s
   `scope_fields` input (ADR-0028 piece 4) is a generic free map, refined
   per call via `InputDefinitionRefinerInterface` once `scope` is known -
   it gains whichever properties the chosen scope's `AimScopeTypeInterface`

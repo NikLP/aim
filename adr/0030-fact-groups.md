@@ -106,11 +106,11 @@ and is not decided here.
 
 ## Related
 
-[ADR-0001](0001-storage-and-scope-model.md),
+[ADR-0001](resolved/0001-storage-and-scope-model.md),
 [ADR-0012](0012-fact-relation-graph.md),
 [ADR-0018](resolved/0018-index-subject-uid-with-btree.md),
-[ADR-0026](0026-pluggable-scope-submodules.md),
-[ADR-0028](0028-scope-type-plugin.md),
+[ADR-0026](resolved/0026-pluggable-scope-submodules.md),
+[ADR-0028](resolved/0028-scope-type-plugin.md),
 [ADR-0029](0029-context-carrying-turns.md) (`batch_id` is per-turn
 provenance, distinct from `group`; piece 5's case titles and membership
 overlap with open question 2).

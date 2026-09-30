@@ -11,7 +11,7 @@ what is specific to `aim_chatbot`.
 **Hardcoded to `scope: site`, deliberately.** A chat visitor isn't
 resolved to a real Drupal account, so `scope: user` writes/reads aren't
 offered here - see
-[ADR-0007](../../adr/0007-user-scope-requires-real-account.md). Don't
+[ADR-0007](../../adr/resolved/0007-user-scope-requires-real-account.md). Don't
 widen this without a real per-visitor identity to scope to.
 `aim_chatbot.info.yml` depends on `aim_scope_site` (ADR-0026 piece 5) so
 the `site` bundle this hardcode relies on is guaranteed installed.

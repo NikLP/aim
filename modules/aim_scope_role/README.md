@@ -7,5 +7,5 @@ Requires `aim`. Zero PHP - just the `aim.aim_scope.role` config entity.
 Install this to let facts be written with `scope: role` - without it,
 `role` isn't a valid scope on this site.
 
-Decision record: [ADR-0026](../../adr/0026-pluggable-scope-submodules.md)
+Decision record: [ADR-0026](../../adr/resolved/0026-pluggable-scope-submodules.md)
 (the submodule split).

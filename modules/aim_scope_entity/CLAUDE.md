@@ -36,7 +36,7 @@ is specific to `aim_scope_entity`.
 ADR-0027 originally put `target_type`/`target_id` in core `aim`'s own
 `AimFact::baseFieldDefinitions()`, reasoning that a base field's type
 must resolve whether or not this module is installed and therefore
-"has to live in core." [ADR-0028](../../adr/0028-scope-type-plugin.md)
+"has to live in core." [ADR-0028](../../adr/resolved/0028-scope-type-plugin.md)
 found that reasoning conflated two different things: a base field
 declared via `hook_entity_base_field_info()` **by a different module**
 is just as always-present and just as invisible to
@@ -78,8 +78,8 @@ autocomplete widget is a real, undecided option again, not foreclosed.
 Not done - `target_type`/`target_id` are still two plain `string` base
 fields, resolved by hand in `AimScopeEntity::checkViewAccess()`, at the
 cost of no autocomplete widget on the admin form. Full reasoning in
-[ADR-0027](../../adr/0027-entity-scope.md) (the original rejection) and
-[ADR-0028](../../adr/0028-scope-type-plugin.md) (the correction).
+[ADR-0027](../../adr/resolved/0027-entity-scope.md) (the original rejection) and
+[ADR-0028](../../adr/resolved/0028-scope-type-plugin.md) (the correction).
 
 ## "Replace, not widen" - what that means in practice
 

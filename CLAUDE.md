@@ -8,7 +8,7 @@ dependency on any sibling suite. Status: working PoC.
 See [README.md](README.md) for the pitch and requirements,
 [DEVELOPING.md](DEVELOPING.md) for commands/API/runbooks, and
 [adr/](adr/0000-index.md) for decision records (start with
-[ADR-0010](adr/0010-drupal-native-agent-memory-rationale.md) for the
+[ADR-0010](adr/resolved/0010-drupal-native-agent-memory-rationale.md) for the
 founding rationale). [TODO.md](TODO.md) is the living backlog - don't
 duplicate it here.
 
@@ -17,7 +17,7 @@ duplicate it here.
 **Scope stays broad.** Work so far follows one path (conversational input
 turned into extracted facts) as a convenient first exercise, not a
 decision to drop the other three categories in
-[ADR-0001](adr/0001-storage-and-scope-model.md)'s scope model - role
+[ADR-0001](adr/resolved/0001-storage-and-scope-model.md)'s scope model - role
 memory, site memory, and general per-user memory are equally in scope.
 
 It is assumed this module isn't used for classified information - a
@@ -55,20 +55,20 @@ assuming a `drush en`/`drush cr` failure is about what you just changed.
 Binding until superseded. Full context in [adr/](adr/0000-index.md):
 
 1. **Storage** - entities + `VECTOR` fields via `ai_vdb_provider_mariadb`,
-   in-database mode only. ([ADR-0001](adr/0001-storage-and-scope-model.md))
+   in-database mode only. ([ADR-0001](adr/resolved/0001-storage-and-scope-model.md))
 2. **Scope model** - four bundles (user/role/site/case), composable at
-   retrieval. ([ADR-0001](adr/0001-storage-and-scope-model.md))
+   retrieval. ([ADR-0001](adr/resolved/0001-storage-and-scope-model.md))
 3. **Governance** - permissions/roles + Content Moderation draft-to-trusted
    gate; nothing LLM-extracted is auto-trusted. **Deferred for PoC** - see
    below. ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md))
 4. **Processing** - Queue API + a dedicated crontab entry, never
-   `hook_cron`. ([ADR-0003](adr/0003-async-processing-dedicated-crontab.md))
+   `hook_cron`. ([ADR-0003](adr/resolved/0003-async-processing-dedicated-crontab.md))
 5. **Sovereignty** - extraction/consolidation must support Ollama; hosted
    providers are additional options, not replacements.
-   ([ADR-0004](adr/0004-sovereignty-and-poc-build-order.md))
+   ([ADR-0004](adr/resolved/0004-sovereignty-and-poc-build-order.md))
 6. **Build order** - prove schema/logic with interactive Claude Code +
    local embeddings before any unattended provider.
-   ([ADR-0004](adr/0004-sovereignty-and-poc-build-order.md))
+   ([ADR-0004](adr/resolved/0004-sovereignty-and-poc-build-order.md))
 7. **Guardrails mandatory** - every candidate fact runs through
    `drupal/ai`'s Guardrails before it's written anywhere. Live today, not
    part of the governance deferral above.
@@ -144,20 +144,20 @@ duplicated here.
   `aim_scope` config entities (`bundle_entity_type`), not code-defined.
   Fields: `subject`/`user` (an entity reference to a real Drupal account,
   required for `scope=user` per
-  [ADR-0007](adr/0007-user-scope-requires-real-account.md); renamed from
+  [ADR-0007](adr/resolved/0007-user-scope-requires-real-account.md); renamed from
   `subject_uid` 2026-09-28, `aim_update_10001()`, to stop colliding in
   spirit with the unrelated `uid` field below),
   `target_type`/`target_id` (plain strings naming an arbitrary referenced
   entity, required for `scope=entity` in practice though not enforced at
   write time yet - see
-  [ADR-0027](adr/0027-entity-scope.md); not a real `entity_reference`
+  [ADR-0027](adr/resolved/0027-entity-scope.md); not a real `entity_reference`
   since that field type needs one fixed target type, and not
   `drupal/dynamic_entity_reference` either, to keep the dependency out of
   core `aim` - see that ADR's Context; declared by
   `aim_scope_entity`'s own `AimScopeEntity::getBaseFieldDefinitions()`,
   not `AimFact::baseFieldDefinitions()`, and merged onto `aim_fact`
   generically by `AimHooks::entityBaseFieldInfo()` -
-  [ADR-0028](adr/0028-scope-type-plugin.md) piece 1),
+  [ADR-0028](adr/resolved/0028-scope-type-plugin.md) piece 1),
   `text` (Guardrails-validated), `source`, `state` (tri-state boolean),
   `category` (taxonomy, vocabulary `aim_category`), `asserted` (valid-time
   start), `superseded_by`/`expires` (consolidation's supersede edge), `uid`
@@ -174,7 +174,7 @@ duplicated here.
   this instance uses, if any (nullable - `role`/`site` ship
   `plugin: null`, a plain config-only scope with no dedicated behavior);
   not required to equal the scope's own `id`
-  ([ADR-0028](adr/0028-scope-type-plugin.md) piece 3 - two differently-
+  ([ADR-0028](adr/resolved/0028-scope-type-plugin.md) piece 3 - two differently-
   configured scope instances can share one plugin, each with its own
   `settings`). Resolved generically via
   `AimScopeTypePluginManager::getTypePlugin($scopeId)`, which loads the

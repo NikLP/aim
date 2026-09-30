@@ -1,18 +1,6 @@
 # ADR-0025: Scope-specific view access as a plugin type, not hardcoded bundle branches
 
-**Status:** Accepted - seam built and verified 2026-09-28. Its first
-dedicated plugin moved out of core `aim` into `aim_scope_user`
-(ADR-0026 piece 4, also 2026-09-28) and was renamed `AimScopeUser`
-(was `AimUserScopeVisibility`) to match that module's own naming. A
-second dedicated plugin, `AimScopeEntity`, was built 2026-09-29
-([ADR-0027](0027-entity-scope.md)) - the "three data points" argument
-below now rests on two shipped plugins and one still-unbuilt proposal
-(`case`-scope access control). The interface and manager this ADR
-defines (`AimScopeAccessInterface`/`AimScopeAccessPluginManager` below)
-were themselves renamed `AimScopeTypeInterface`/`AimScopeTypePluginManager`
-on 2026-09-29 ([ADR-0028](0028-scope-type-plugin.md) piece 0), once the
-plugin's mandate grew past pure access-checking - read this ADR's body
-with that later name in mind.
+**Status:** Accepted - built and verified 2026-09-28; widened into the scope-type plugin by [ADR-0028](0028-scope-type-plugin.md).
 **Date:** 2026-09-28
 
 ## Context
@@ -27,7 +15,7 @@ step once a second scope needs its own rule, not before."
 
 Two more scopes are now on a path to needing exactly that:
 
-- [ADR-0024](0024-annotations-integration-target-scoped-promotion.md)'s
+- [ADR-0024](../0024-annotations-integration-target-scoped-promotion.md)'s
   discussion surfaced a proposed `scope: entity` bundle (a fact pointing
   at an arbitrary Drupal entity via a dynamic reference) whose natural
   access rule is "can this account view the referenced entity" - not
@@ -39,7 +27,7 @@ Two more scopes are now on a path to needing exactly that:
 Three data points (`user` today, `entity` and `case` on deck) is the
 threshold this codebase's own comment already set for converting
 hardcoded branches into a real plugin type, the same "don't abstract
-before it's earned" instinct [DEVELOPING.md](../DEVELOPING.md)'s
+before it's earned" instinct [DEVELOPING.md](../../DEVELOPING.md)'s
 "Scope/bundle model" section applies elsewhere on this entity (per-bundle
 *fields* were tried once and reverted for being premature relative to a
 real need - this ADR is the mirror-image case, where the need is now

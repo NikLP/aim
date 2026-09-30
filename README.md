@@ -15,7 +15,7 @@ aim:remember`/`aim:recall` let an agent that has already done its own
 reasoning write and query facts with no extra chat call. See
 [CLAUDE.md](CLAUDE.md) for current build state and
 [adr/](adr/0000-index.md) for the decisions made building it, including
-[ADR-0010](adr/0010-drupal-native-agent-memory-rationale.md), the
+[ADR-0010](adr/resolved/0010-drupal-native-agent-memory-rationale.md), the
 original deeper rationale (market comparison, risk analysis) this repo's
 other ADRs are downstream of.
 
@@ -72,7 +72,7 @@ Four memory categories, composable at retrieval the way Mem0 composes
   (a node, a media item, anything with its own Drupal access model),
   visible to whoever can already see that content rather than through a
   flat permission. Added later than the original four
-  ([ADR-0027](adr/0027-entity-scope.md)), as the bridge point for a future
+  ([ADR-0027](adr/resolved/0027-entity-scope.md)), as the bridge point for a future
   integration with Annotations (human-curated site knowledge).
 
 ## How it works
@@ -202,7 +202,7 @@ Full command reference and the developer API are in
 
 See [TODO.md](TODO.md) for the living backlog. The questions that block
 starting real (non-PoC) work, per
-[ADR-0010](adr/0010-drupal-native-agent-memory-rationale.md):
+[ADR-0010](adr/resolved/0010-drupal-native-agent-memory-rationale.md):
 
 1. What's the first concrete, sellable feature this unlocks?
 2. Consolidation conflict-resolution policy - threshold heuristics vs.
@@ -211,4 +211,4 @@ starting real (non-PoC) work, per
 4. Relationship to `ai_agents`/`ai_search` - compose with them, or
    standalone?
 
-Full list: [ADR-0010 § Open questions](adr/0010-drupal-native-agent-memory-rationale.md#open-questions).
+Full list: [ADR-0010 § Open questions](adr/resolved/0010-drupal-native-agent-memory-rationale.md#open-questions).

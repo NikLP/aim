@@ -1,7 +1,7 @@
 # AIM: local Ollama defaults
 
 Points [AIM](../../README.md) at a local Ollama instance for embeddings,
-the sovereign path in [ADR-0004](../../adr/0004-sovereignty-and-poc-build-order.md).
+the sovereign path in [ADR-0004](../../adr/resolved/0004-sovereignty-and-poc-build-order.md).
 For anyone who wants the same local-embeddings setup this module's own
 PoC development uses, without hand-editing the three config objects
 involved.

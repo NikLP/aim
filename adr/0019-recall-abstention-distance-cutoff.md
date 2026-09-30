@@ -5,7 +5,7 @@ under "Not built" are open. The retired-slot finding is resolved by
 [ADR-0022](resolved/0022-exclude-retired-facts-from-vector-index.md) (2026-09-26)
 **Date:** 2026-09-20 (measurements taken 2026-09-19)
 **Addendum 2026-09-28:** the `subject_uid` field is now named `user`
-([ADR-0007](0007-user-scope-requires-real-account.md)'s own addendum).
+([ADR-0007](resolved/0007-user-scope-requires-real-account.md)'s own addendum).
 
 ## Context
 

@@ -137,7 +137,7 @@ promote into, not run alongside it as a second, separate gate.
   bridge module.
 - Manual admin action (a button on the draft-fact review UI) vs. a Drush
   command or queue worker that can batch-promote. Manual first is
-  consistent with [ADR-0004](0004-sovereignty-and-poc-build-order.md)'s
+  consistent with [ADR-0004](resolved/0004-sovereignty-and-poc-build-order.md)'s
   build order (prove the mechanism interactively before automating it).
 - Whether [ADR-0012](0012-fact-relation-graph.md)'s entity-linking/
   co-mention idea (cited there from `mem0ai/mem0`) has any bearing on

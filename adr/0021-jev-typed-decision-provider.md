@@ -43,7 +43,7 @@ been exercised against `aim`.
 4. **Where it fits.**
    - **Consolidation.** `AimMemoryManager::classifyPair()` is already a
      four-way enum (ADD/UPDATE/DELETE/NOOP,
-     [ADR-0005](0005-consolidation-algorithm.md)) asked of a chat model
+     [ADR-0005](resolved/0005-consolidation-algorithm.md)) asked of a chat model
      via structured output. That is a Choice question. Only UPDATE's
      `merged_text` needs generation, so a Jev call would decide and the
      chat model would run only when the answer is UPDATE. Jev's
@@ -65,7 +65,7 @@ been exercised against `aim`.
 only. Do not adopt it, and do not build anything that depends on it,
 until the spike has a result.**
 
-- **Additional, never the only path.** [ADR-0004](0004-sovereignty-and-poc-build-order.md)
+- **Additional, never the only path.** [ADR-0004](resolved/0004-sovereignty-and-poc-build-order.md)
   requires Ollama support, with hosted providers as extra options. Any
   Jev code path sits behind a setting (chat versus decision) and the chat
   path stays the default and stays complete.
@@ -127,7 +127,7 @@ sharply past about 20 answer options on a Choice question, and the
 English checkpoint's context is 512 tokens.
 
 This changes the spike's priority, not the decision. Laya fits
-[ADR-0004](0004-sovereignty-and-poc-build-order.md)'s sovereignty
+[ADR-0004](resolved/0004-sovereignty-and-poc-build-order.md)'s sovereignty
 requirement directly, self-hosted with no hosted-provider dependency,
 where Jev is hosted-only and still waitlisted. Spike Laya first, on the
 same benchmark harness and the same synthetic/hand-labeled fact pairs

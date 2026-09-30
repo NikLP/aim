@@ -15,37 +15,7 @@ this list as exhaustive.
       schema validation. Then confirm `aim:remember --file` loads all 31
       facts and the demo questions in the site repo's `demo/README.md`
       answer as before.
-- [x] Decide whether `aim_tool_oauth` should get a setup command (generate
-      the key pair, set `simple_oauth.settings` paths, verify the scopes
-      and discovery URLs) instead of an `aim_mcp` recipe, which would be
-      nearly empty (see DEVELOPING.md, "Recipes"). DECIDED 2026-09-27: no
-      command for now, prose runbook in `modules/aim_tool_oauth/
-      DEVELOPING.md`'s "Setup" stands - PoC stage, and the
-      `user_scope_role_visibility` matrix it depends on isn't understood
-      well enough yet to script around confidently (see next item).
-- [x] `user_scope_role_visibility` matrix: the diagonal cells (viewer role
-      R x subject role R, same role both sides) are inert under the
-      shipped default (`user_scope_shared_role_fallback: true` already
-      grants same-role visibility unconditionally) - only load-bearing if
-      an admin turns that fallback off. DONE 2026-09-27: the admin form at
-      `/admin/config/aim/user-scope-access` now disables (via `#states`,
-      tied to the fallback checkbox) every diagonal cell except
-      "authenticated" x "authenticated" - that one cell turned out NOT to
-      be inert, because `checkViewAccess()`'s `$meaningfulRoles` exclusion
-      strips the "authenticated" role from both sides before intersecting,
-      specifically so two arbitrary logged-in accounts don't trivially
-      match. `submitForm()` preserves the stored value for a disabled
-      diagonal cell instead of reading it as unchecked, since a
-      client-side-disabled checkbox isn't submitted at all.
-- [x] `drush aim:status` - BUILT 2026-09-27: five checks (index parity,
-      orphan vector rows, provider shim class, HNSW tuning, recall cutoff
-      configured), `AimCommands::status()`, exit code 1 if any fails. Used
-      in "Upgrading an existing site"'s step 6. Along the way, found that
-      `SHOW CREATE TABLE` drops a VECTOR KEY's `M=`/`DISTANCE=` suffix
-      under this site's own `sql_mode` (`ANSI,TRADITIONAL`) - the HNSW
-      check works around it, detail in DEVELOPING.md's "aim:status".
-
-## From the OpenKB competitor review (this thread)
+## Governance
 
 - [ ] Close [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
       deferred governance gate before ship - the `trusted` field/
@@ -55,47 +25,7 @@ this list as exhaustive.
       Untrust bulk actions). Still open: the `trusted` override on
       `remember()` bypasses it - decide whether callers passing
       `trusted: TRUE` should need the permission.
-- [x] Build MCP exposure for aim - DONE, via a different mechanism than
-      first proposed here: not direct `#[Mcp]` plugins, but `aim_tool`'s
-      `#[Tool]` plugins (`AimRemember`/`AimRecall`, backed by
-      `aim.memory_manager` directly) exposed over MCP through
-      `mcp_server_tool_bridge`, OAuth-authenticated. Built and verified
-      2026-09-12/13, see
-      [ADR-0013](adr/resolved/0013-mcp-tool-exposure.md) (resolved).
-
 ## PoC deviations to close before non-PoC data goes in
-
-- [x] Replace the flat `scope` list field with the four-bundle model
-      (user/role/site/case) - BUILT 2026-09-15, scopes are `aim_scope`
-      config entities. [ADR-0001](adr/0001-storage-and-scope-model.md)
-- [x] Build the `trusted` boolean field + `aim.settings:default_trusted`
-      draft-to-trusted gate - BUILT 2026-09-28: `trusted` base field on
-      `aim_fact` (default value callback reads the config), `recall()`
-      excludes untrusted facts unless `$includeUntrusted`/`drush aim:recall
-      --include-untrusted`, indexed as a Search API attribute with a BTREE
-      column same as `subject_uid`. Lightweight flag, NOT Content
-      Moderation (no revisions, no new module deps).
-      [ADR-0002 addendum](adr/0002-governance-deferred-guardrails-mandatory.md)
-- [x] Per-caller `trusted` override - BUILT 2026-09-28 (commit
-      `0b8921f`, right after `default_trusted` flipped to `false` turned
-      out to silently break the demo - every fact written via
-      `aim_chatbot`/`aim_tool`/`drush aim:remember`/`demo/seed.php`
-      became invisible to `recall()`). `remember()`/
-      `createFactsFromCandidates()` both gained `?bool $trusted = NULL`;
-      `NULL` (the default) still falls through to `default_trusted`, so
-      `aim_chatbot`'s `AimRemember` and `aim_tool`'s MCP `AimRemember`
-      are both unchanged, still on the config default. `demo/seed.php`
-      now passes `trusted: TRUE` explicitly on all four `remember()`
-      calls, since it's curated demo data, not live LLM extraction. No
-      `--trusted` flag added to `drush aim:remember`/`aim:extract` - not
-      needed for the immediate demo fix; add one if another human-curated
-      batch-load use case shows up.
-      Caveat still true: this site's chatbot persona says to wait for the
-      visitor's confirmation before saving (CLAUDE.md), which sounds like
-      a human-in-the-loop signal, but it's prompt-level, not
-      code-enforced - the model can ignore it, so "written via the
-      chatbot" isn't the same reliability as "a human typed this into the
-      admin form" even though both stay on the same `NULL` fallback here.
 
 - [ ] User-scope authorship gap (raised 2026-09-30): nothing checks that a
       `scope=user` fact's `user` (who it is about) is the poster (`uid`,
@@ -109,7 +39,7 @@ this list as exhaustive.
       others; later option, accept it but force `trusted=FALSE` so the
       per-scope trust permission reviews it. Same class of gap as the
       `trusted` override on `remember()` above. Not built.
-      [ADR-0007](adr/0007-user-scope-requires-real-account.md)
+      [ADR-0007](adr/resolved/0007-user-scope-requires-real-account.md)
 
 ## ADR-0009 - Recipe/apply surface (design only, nothing built)
 
@@ -137,59 +67,18 @@ this list as exhaustive.
 - [ ] #10 - CCC adopt/integrate decision - revisit once `ai_context` leaves
       beta (currently beta5).
 
-([ADR-0010](adr/0010-drupal-native-agent-memory-rationale.md), "Open
+([ADR-0010](adr/resolved/0010-drupal-native-agent-memory-rationale.md), "Open
 questions" section)
 
 ## Concrete near-term fixes flagged in CLAUDE.md/DEVELOPING.md
 
-- [x] Index `subject_uid` as a search_api attribute - BUILT and verified
-      2026-09-26, with the BTREE index it needs and empty values written
-      as `NULL` by `AimMariaDBProvider`. Exact for users up to 100 facts
-      in a 5k-row corpus; a user holding a large share of the table stays
-      approximate (82-97%), crossover not located. Results and limits in
-      [ADR-0018](adr/resolved/0018-index-subject-uid-with-btree.md).
 - [ ] Add a `superseded_by_reason` field on `aim_fact` (provenance-on-invalidation,
       ADR-0010 parity target #6 /
-      [ADR-0005](adr/0005-consolidation-algorithm.md)). Named to match the
+      [ADR-0005](adr/resolved/0005-consolidation-algorithm.md)). Named to match the
       2026-09-28 rename of `related` to `superseded_by` - see that ADR's
       addendum.
-- [x] Add the `asserted` field - BUILT 2026-09-11 (installed live via
-      `installFieldStorageDefinition()`, no data loss on the 81 existing
-      facts). Covers valid-time *start* only, defaults to `created`.
-      Valid-time end was considered and rejected as rarer/harder to
-      elicit, approximated well enough by `expires` on contradiction.
-- [x] Add the `category` field - BUILT 2026-09-11 (entity_reference,
-      unlimited cardinality, vocabulary `aim_category`, wired into
-      `drush aim:remember --category`). Installed live, no data loss. The
-      `aim_category` vocabulary itself is also built (created
-      programmatically, not by hand, so the machine name is exact; shipped
-      in `config/install/taxonomy.vocabulary.aim_category.yml`; `aim.info.yml`
-      gained the `drupal:taxonomy` dependency it needed). **Still open:**
-      no terms exist yet - add real ones via
-      `/admin/structure/taxonomy/manage/aim_category/add` as categories
-      emerge; the field resolves names to existing terms only, never
-      auto-creates one.
 - [ ] Extraction-input guardrailing, distinct from the existing output-side
       candidate-fact guardrails.
-- [x] Cache query embeddings via Drupal's Cache API, keyed on (query text,
-      embeddings model ID) - BUILT 2026-09-27 as designed in
-      [ADR-0017](adr/resolved/0017-query-embedding-cache.md): `AimEmbeddingCacheSubscriber`
-      on drupal/ai's `PreGenerateResponseEvent`/`PostGenerateResponseEvent`,
-      active only for the duration of `AimMemoryManager::executeSearchQuery()`
-      (so index-time embeds are never cached), dedicated `cache.aim_embeddings`
-      bin, DB-backed. Verified live: two identical `aim:recall` calls logged
-      a miss then a hit, with identical results both times; the missed
-      call's own embed cost logged as 556ms on this site's local Ollama -
-      notably higher than the 33-35ms `aim:benchmark` aggregate, a real
-      finding from the instrumentation below. `aim:benchmark` gained
-      `--bypass-cache` so its numbers stay comparable to the 2026-09-10
-      measurements (sample queries otherwise repeat within a checkpoint
-      and would silently become cache hits).
-- [x] Instrument `recall()` to log embed-time vs. DB-search-time separately,
-      before further latency work - confirms the split rather than
-      inferring it from one aggregate number. BUILT 2026-09-27 as part of
-      `AimEmbeddingCacheSubscriber` (above): logs a hit/miss line and, on a
-      miss, the provider call's own duration.
 - [ ] The whole module has no test infrastructure yet (no `tests/`
       directory, checked 2026-09-27 building `AimEmbeddingCacheSubscriber`
       above) - first real gap is a kernel test for that subscriber (a
@@ -218,25 +107,6 @@ questions" section)
       page-load hot path (e.g. "should this user see the marketing
       banner"). Originally motivated by a 2026-09-09 question about a "warm
       state cache for booleans" - not designed, no ADR yet.
-- [x] Fix abstention correctness in `aim_chatbot:recall` - BUILT
-      2026-09-19 (`aim.settings:recall_max_distance`, 0.45), decision and
-      measurements in
-      [ADR-0019](adr/0019-recall-abstention-distance-cutoff.md). Extended
-      2026-09-27: `recall()` takes an optional `$maxDistance`, applied
-      before the limit; `aim_tool`'s MCP `aim_recall` applies the site
-      default unless the caller passes `max_distance`, and `drush
-      aim:recall --max-distance` opts in (raw otherwise, for
-      calibration). **Still open:** a near-topic question the facts don't
-      answer still gets its nearest facts (the distance ranges overlap, so
-      this needs the model's judgment, not a threshold); no `drush
-      aim:calibrate` yet; the 0.45 default was checked on site and user
-      scope only, and needs a recheck against any new dataset.
-- [x] Retired facts eating `recall()`'s result slots - BUILT 2026-09-26:
-      a Search API processor keeps retired facts out of the vector index
-      instead of the over-fetch this item first proposed. Rolled out on
-      the live site (115 vector rows to 58, `recall(limit 5)` back to 5
-      rows). Decision, verification and rollout in
-      [ADR-0022](adr/resolved/0022-exclude-retired-facts-from-vector-index.md).
 - [ ] Upstream work for `AimMariaDBProvider`'s overrides (status checked
       against drupal.org and the git history 2026-09-27; the provider project
       has only 6 issues):
@@ -316,8 +186,6 @@ questions" section)
       moving demo deadline - revisit once a working reroll exists upstream,
       or write one properly with time to test it.
 
-(`aim_benchmark`'s DEVELOPING.md and this file's DEVELOPING.md's "Chatbot" section)
-
 ## Backlog - explicitly "wait for a trigger" per the docs' own framing
 
 - [ ] Fact verification as a user-facing feature - now reinforced twice
@@ -342,6 +210,14 @@ questions" section)
       planned path to revisionable. Revisit only if that changes for an
       unrelated reason.
 
+## Queue processing (ADR-0031)
+
+- [ ] Build the opt-in cron fallback for `aim_consolidate`
+      ([ADR-0031](adr/0031-cron-fallback-for-queue-processing.md)):
+      `consolidate_on_cron`/`cron_time` settings, `hook_queue_info_alter`,
+      `aim:status` warning, then amend CLAUDE.md decision 4, README.md and
+      DEVELOPING.md's "never `hook_cron`" wording.
+
 ## Case scope access control (raised 2026-09-30, ADR-0029)
 
 - [ ] Design and build case-scope view access (`AimScopeCase::checkViewAccess()`
@@ -349,125 +225,10 @@ questions" section)
       Required before the console's case chips ship; user and entity chips
       do not depend on it.
 
-## Governance/scope design thread (2026-09-27/28, continued 2026-09-29) - handoff
+## Scope architecture follow-ups (from ADR-0025 to 0028, all built)
 
-Four ADRs came out of one long design conversation about unblocking the
-Annotations bridge (a fourth, ADR-0026, branched off discussing ADR-0025's
-premise into a broader "make scopes genuinely pluggable" ask). A fifth,
-[ADR-0027](adr/0027-entity-scope.md), followed on 2026-09-29 to build the
-`scope: entity` bundle this thread had left as ADR-0025's second
-still-unbuilt data point - see its own entry below. Status as of
-2026-09-28 unless noted otherwise:
-
-- [x] Annotations' `save()` write path - DONE per Nik, 2026-09-28. Was
-      [ADR-0024](adr/0024-annotations-integration-target-scoped-promotion.md)'s
-      second blocker.
-- [x] `trusted` boolean field + `aim.settings:default_trusted` - BUILT
-      2026-09-28, see "PoC deviations to close before non-PoC data goes
-      in" above.
-      [ADR-0002 addendum](adr/0002-governance-deferred-guardrails-mandatory.md)
-- [x] `AimScopeAccessInterface` plugin type (seam only, default
-      no-op fallback + `AimUserScopeVisibility` as the first dedicated
-      plugin) - BUILT 2026-09-28: `AimScopeAccessPluginManager`
-      (`plugin.manager.aim_scope_access`, attribute-discovered from
-      `src/Plugin/AimScopeAccess/`), `AimFactAccessControlHandler`
-      refactored off its hardcoded `bundle() === 'user'` branch,
-      `AimUserScopeVisibility` converted into the first dedicated plugin
-      (still in core `aim`, not yet moved to a submodule - see the next
-      item). Verified live with a disposable scope=user fact: a viewer
-      with no flat permission got view access solely through the
-      plugin's shared-role fallback, a viewer sharing no role was denied.
-      No forcing function yet for a second dedicated plugin (entity
-      scope, case scope).
-      [ADR-0025](adr/0025-scope-access-plugin-type.md)
-- [x] Pluggable scope submodules (`aim_scope_user`/`role`/`site`/`case`,
-      each shipping its own `aim.aim_scope.<id>.yml`; scope-level config
-      differences as ThirdPartySettings the owning submodule reads/writes)
-      - raised 2026-09-28, six-piece breakdown in
-      [ADR-0026](adr/0026-pluggable-scope-submodules.md). Pieces 1-4 BUILT
-      and live-verified 2026-09-28: core `aim` ships zero scope instances;
-      the four submodules each ship their own `aim.aim_scope.<id>.yml`
-      (real save + export, not hand-typed, per this file's dependencies
-      rule - `role`/`site`/`case` carry only an `enforced` module
-      dependency on themselves, `user` additionally carries the
-      `requires_account` ThirdPartySetting, which also pulls in its
-      module dependency automatically); `AimUserScopeVisibility` moved
-      into `aim_scope_user` and renamed `AimScopeUser` (Nik's naming call
-      - `AimScope[Name]`, not `[Name]ScopeVisibility`, so it scales to
-      role/site/case plugins without describing one current behavior);
-      ADR-0007's "requires a real account" rule genericized off
-      `bundle() === 'user'`/`scope === 'user'` into
-      `AimMemoryManager::scopeRequiresAccount()`, called from
-      `AimMemoryManager.php`, `AimCommands.php`, and `aim_tool`'s
-      `AimRemember` tool plugin. Live-verified: `remember()`/`recall()`
-      round-trip for scope=user still works; `drush pmu aim_scope_role`
-      is correctly BLOCKED by `ScopeUninstallValidator` while role-scope
-      facts exist (5 on this site) - the real payoff of the enforced
-      dependency, proven against a real split-out submodule, not just the
-      earlier scratch-module test. Piece 5 (`aim_chatbot`'s explicit
-      dependency on `aim_scope_site`) BUILT 2026-09-29; piece 6 (the
-      bundling recipe) remains unbuilt. Explicitly does not move
-      `subject`/`user` to per-bundle
-      fields - already tried and reverted (DEVELOPING.md's "Scope/bundle
-      model"). (The `user` field was itself `subject_uid` until
-      2026-09-28, `aim_update_10001()` - renamed for readability,
-      unrelated to this item.)
-- [x] Follow-up audit, same day, prompted by Nik asking "what other
-      bespoke-to-one-scope code is still in core `aim`?" toward the goal
-      of core working with any subset of scope submodules installed, no
-      dead code for the ones absent. Found and fixed:
-      - `AimUserScopeAccessForm` renamed `AimScopeUserAccessForm`
-        (`getFormId()` now `aim_scope_user_access_form`) to match the
-        plugin's `AimScope[Name]` rename - route/path unchanged.
-        `requires_account` ThirdPartySetting shortened from
-        `requires_user_account` (redundant - a Drupal "account" already
-        means "user account").
-      - A third hardcoded `$fact['scope'] === 'user'` check the original
-        grep missed (array-bracket syntax, not `bundle() ===`/
-        `scope ===`) in `AimMemoryManager::createFactsFromCandidates()`
-        (the `aim:extract` write path) - now also
-        `scopeRequiresAccount()`.
-      - Four places defaulted an omitted `--scope`/`scope` to `site`,
-        silently assuming `aim_scope_site` is installed:
-        `aim:remember`'s CLI default, its `--file` batch fallback,
-        `aim:benchmark`'s CLI default, and `aim_tool`'s `AimRemember`
-        Tool/MCP plugin (single-fact and batch-entry `scope` inputs).
-        All four now require scope explicitly and error clearly when
-        it's missing, rather than guessing.
-      - **Subject-minting fixed 2026-09-28, reusing the existing plugin
-        type:** `case` scope's subject-auto-minting in
-        `AimMemoryManager::remember()` was genuinely scope-specific
-        *behavior* (mint a UUID), not a config flag, so it couldn't become
-        a ThirdPartySetting the way `requires_account` did. Extracted via
-        a `defaultSubject(): ?string` method added to the existing
-        `AimScopeAccessInterface` (not a second plugin type - chosen
-        because `AimScopeAccessPluginManager::getAccessPlugin()` already
-        treats "no plugin for this scope" as valid, so `role`/`site`
-        gained no PHP by this), implemented by a new `AimScopeCase`
-        plugin in `aim_scope_case` (mints the case ID, `checkViewAccess()`
-        stays neutral) and a one-line `NULL` addition to `AimScopeUser`.
-        The "Case ID: ..." CLI hint in `AimCommands.php` and its
-        `aim_tool` equivalent were left untouched - they're an unrelated,
-        purely cosmetic `bundle() === 'case'` check on the *output*
-        message, not part of the minting decision.
-- [x] Verify `AimScopeDeleteForm`'s refusal to delete a scope while
-      `aim_fact` entities of that bundle exist actually fires during
-      **module uninstall** (`drush pmu`), and fix it - DONE 2026-09-28. It
-      did not fire (verified live with a disposable scratch module before
-      building anything); fixed with `Drupal\aim\ScopeUninstallValidator`
-      (`aim.scope_uninstall_validator`, tagged
-      `module_install.uninstall_validator`, same mechanism as core's
-      `field.uninstall_validator`), which blocks both `/admin/modules/
-      uninstall` and `drush pmu` with a worded reason whenever a scope
-      still has `aim_fact` rows - except when the module being uninstalled
-      is `aim_fact`'s own entity-type provider (core `aim` today), since
-      that drops the whole table and orphans nothing; without that guard
-      it would have also blocked `drush pmu aim` on this site's own 34
-      live facts, breaking the PoC reinstall workflow above. Full writeup
-      in [ADR-0026](adr/0026-pluggable-scope-submodules.md)'s "Open
-      questions".
 - [ ] `checkViewAccess()`'s "allowed or neutral, never forbidden" contract
-      (`AimScopeAccessInterface`) is a deliberate design choice, not a
+      (`AimScopeTypeInterface`) is a deliberate design choice, not a
       technical ceiling - Drupal's own `AccessResult::orIf()` already lets
       a forbidden result override an allowed one, the same idiom node
       grants/content_moderation use to veto access, so
@@ -480,68 +241,10 @@ still-unbuilt data point - see its own entry below. Status as of
       pattern `AimScopeUser` already uses: don't grant the flat permission
       broadly, let the plugin's `checkViewAccess()` be the sole grant.
       Revisit if that stops being good enough - raised 2026-09-28.
-- [x] `scope: entity` bundle - BUILT 2026-09-29, see
-      [ADR-0027](adr/0027-entity-scope.md). Two always-present base
-      fields on `aim_fact` (`target_type`/`target_id`, plain strings, no
-      new package dependency - `drupal/dynamic_entity_reference` was
-      considered and rejected, see that ADR's Context), a new
-      `aim_scope_entity` submodule, and `AimScopeEntity` as the second
-      real `AimScopeAccessInterface` plugin (`checkViewAccess()` returns
-      the referenced entity's own view-access result directly). CLI/Tool
-      wiring also built same day - `aim:remember --target-type`/
-      `--target-id` (single and `--file` batch), and `aim_tool`'s
-      `AimRemember` plugin (single and `facts` batch) - all three
-      verified live. Write-time validation that a `scope: entity` fact
-      actually carries a target is deliberately still not built (see that
-      ADR's "Not yet built") - a missing target just makes
-      `checkViewAccess()` neutral forever, not a security gap.
-- [x] `AimScopeAccessInterface`/`AimScopeAccessPluginManager` renamed
-      `AimScopeTypeInterface`/`AimScopeTypePluginManager` - BUILT
-      2026-09-29, see [ADR-0028](adr/0028-scope-type-plugin.md) piece 0.
-      Raised by Nik asking whether "access" still fit once the plugin was
-      proposed to also own field declarations and settings, not just
-      view-access/default-subject; mechanical rename only, all three
-      existing plugins (`AimScopeUser`, `AimScopeEntity`, `AimScopeCase`)
-      and every call site moved.
-- [x] Widen the scope type plugin - field declaration, settings schema,
-      decoupling plugin ID from scope ID (ADR-0028 pieces 1-3) - BUILT
-      2026-09-29, raised by Nik asking whether the module split had
-      actually made scopes pluggable end-to-end or just structurally
-      separated, given `AimMemoryManager`/`aim_tool` still hardcoded
-      `target_type`/`target_id`. `target_type`/`target_id` moved from
-      `AimFact::baseFieldDefinitions()` into
-      `AimScopeEntity::getBaseFieldDefinitions()`, merged generically by
-      `AimHooks::entityBaseFieldInfo()`; `AimScope` gained `plugin`/
-      `settings` (`config_export` now `[id, label, plugin, settings]`),
-      `AimScopeForm` grew a type selector + AJAX settings sub-form;
-      `AimScopeTypePluginManager::getTypePlugin()` now resolves via
-      `$scope->get('plugin')` instead of assuming plugin ID == scope ID.
-      Two real bugs found and fixed live, not just a clean build - see
-      ADR-0028's Consequences for detail: (a) a field merged through
-      another module's `hook_entity_base_field_info()` needs
-      `->setProvider()` called explicitly or it's misattributed to the
-      *hook's* module; (b) a hand-written `hook_uninstall()` calling
-      `uninstallFieldStorageDefinition()` races core's own generic pass
-      (`ModuleInstaller::uninstall()` already does this for any field
-      whose provider matches the uninstalling module) and crashes -
-      removed entirely, `hook_install()` alone is correct.
-- [x] Migrate `aim_scope_user`'s `requires_account` off its
-      ThirdPartySetting onto ADR-0028 piece 2's `settings` mechanism -
-      BUILT 2026-09-29, the nice-to-have ADR-0028 named but left undone.
-      `AimScopeUser::defaultSettings()`/`buildSettingsForm()` now own it;
-      `AimMemoryManager::scopeRequiresAccount()` reads
-      `settings['requires_account']`; `aim_scope_user`'s
-      `config/schema/aim_scope_user.schema.yml` deleted (nothing left to
-      type). Surfaced and fixed a real schema gap along the way: generic
-      `aim.aim_scope.*.settings` was typed `mapping: {}`, which errors as
-      "missing schema" on the first real (non-empty) settings value
-      rather than acting as an open wildcard - retyped to `ignore`. See
-      [ADR-0028](adr/0028-scope-type-plugin.md)'s Consequences for the
-      full write-up and live verification.
-- [ ] **Drush oddity found while verifying the above, not yet diagnosed
+- [ ] **Drush oddity found verifying ADR-0028, not yet diagnosed
       further or filed upstream.** `drush pmu aim_scope_entity` throws
-      `SQLSTATE[42S22]: Column not found: 'target_type'` even after both
-      fixes above; calling
+      `SQLSTATE[42S22]: Column not found: 'target_type'` even after the two
+      ADR-0028 fixes; calling
       `\Drupal::service('module_installer')->uninstall(['aim_scope_entity'])`
       directly (confirmed via stack trace to be the exact same
       `ModuleInstaller::uninstall()` -> `EntityDefinitionUpdateManager->
@@ -552,31 +255,9 @@ still-unbuilt data point - see its own entry below. Status as of
       lifecycle works correctly through the real API - but a site
       operator using `drush pmu` on a scope-field-providing submodule
       should expect to hit this until it's actually root-caused.
-- [x] ADR-0028 piece 4, found 2026-09-29 while answering "are the
-      endpoints pluggable too?" - BUILT AND VERIFIED same day.
-      `aim_tool`'s `AimRemember` no longer hardcodes `target_type`/
-      `target_id` in its `#[Tool]` `input_definitions`: replaced by one
-      generic `scope_fields` free-map input, refined per call via
-      `InputDefinitionRefinerInterface` (`input_definition_refiners:
-      ['scope_fields' => ['scope']]`) using the existing
-      `getTypePlugin()`/`getBaseFieldDefinitions()` machinery pieces 1
-      and 3 already built - no new coupling between core `aim`'s scope-
-      type interface and the `tool` module was needed. `aim_recall`'s
-      read side deliberately left alone - no scope type offers a filter
-      to genericize yet. Live-verified at three layers: the refined
-      `InputDefinition` objects, a full write execution (single, plain-
-      scope, and batch calls), and the actual MCP `tools/list` JSON
-      Schema read off the live derivative. See
-      [ADR-0028](adr/0028-scope-type-plugin.md)'s piece 4 entry for the
-      full write-up, including the one thing this piece deliberately
-      does not solve (`AimMemoryManager::remember()`'s own signature
-      still takes two fixed positional params, not a generic bag - no
-      live gap today since `target_type`/`target_id` are the only base
-      fields any shipped scope type declares, but a real limit on how
-      far the new generic schema actually reaches).
 - [ ] Widen `AimMemoryManager::remember()`'s `$targetType`/`$targetId`
       positional parameters into one generic scope-fields bag - found
-      2026-09-29 while building ADR-0028 piece 4 above, not built.
+      2026-09-29 while building ADR-0028 piece 4, not built.
       Piece 4 made the Tool API/MCP *schema* genuinely generic, but
       `rememberOne()` still extracts exactly `target_type`/`target_id`
       by name from the now-generic `scope_fields` map before calling
@@ -592,12 +273,15 @@ still-unbuilt data point - see its own entry below. Status as of
       Consequences already made for role/site's plugin.
 - [ ] `aim_annotations` bridge module itself
       ([ADR-0024](adr/0024-annotations-integration-target-scoped-promotion.md)) -
-      both prerequisites this was blocked on are now cleared (`trusted`
+      both prerequisites are cleared (`trusted`
       field built; `scope: entity` + its ADR-0025 plugin built per
       ADR-0027 above). The bridge module's own write path is still
       unbuilt. Promotion logic itself is fully custom/programmatic, not
       gated on any of this.
-
-Build order, followed: `trusted` field done -> `scope: entity` ADR
-(ADR-0027) done -> its ADR-0025 plugin done -> the bridge module (not
-started).
+- [ ] Bundling recipe for the scope submodules
+      ([ADR-0026](adr/resolved/0026-pluggable-scope-submodules.md) piece 6).
+- [ ] Write-time validation that a `scope: entity` fact carries a target,
+      and an entity-type-select plus autocomplete widget for
+      `target_type`/`target_id` on the admin form
+      ([ADR-0027](adr/resolved/0027-entity-scope.md)). Today a targetless
+      fact is just neutral for view access, not a security gap.

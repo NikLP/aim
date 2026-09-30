@@ -16,7 +16,7 @@ the overall pitch.
 
 Both tools are hardcoded to `scope: site` - a chat visitor isn't resolved
 to a real Drupal account, and `scope: user` facts require one
-([ADR-0007](../../adr/0007-user-scope-requires-real-account.md)).
+([ADR-0007](../../adr/resolved/0007-user-scope-requires-real-account.md)).
 
 ## Requirements
 

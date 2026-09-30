@@ -8,5 +8,5 @@ Requires `aim`. Zero PHP - just the `aim.aim_scope.site` config entity.
 `scope: site`, so any site running `aim_chatbot` needs this installed
 (not yet an explicit module dependency - ADR-0026 piece 5, unbuilt).
 
-Decision record: [ADR-0026](../../adr/0026-pluggable-scope-submodules.md)
+Decision record: [ADR-0026](../../adr/resolved/0026-pluggable-scope-submodules.md)
 (the submodule split).

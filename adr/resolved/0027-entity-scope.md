@@ -17,7 +17,7 @@ ADR-0028 as authoritative on where these fields actually live.**
 
 ## Context
 
-[ADR-0024](0024-annotations-integration-target-scoped-promotion.md)'s
+[ADR-0024](../0024-annotations-integration-target-scoped-promotion.md)'s
 discussion proposed a `scope: entity` bundle (a fact pointing at an
 arbitrary Drupal entity) whose natural view-access rule is "can this
 account view the referenced entity" - not expressible as the flat
@@ -31,7 +31,7 @@ scopes need custom access logic" argument rested on (the other being
 in a single field. `drupal/dynamic_entity_reference` solves this
 generically with its own field type, widget, formatter, and Views
 integration. Checked against this codebase's own history before picking
-either: [DEVELOPING.md](../DEVELOPING.md)'s "Scope/bundle model" records
+either: [DEVELOPING.md](../../DEVELOPING.md)'s "Scope/bundle model" records
 that per-bundle fields on `aim_fact` were tried once and reverted -
 `ai_vdb_provider_mariadb`'s `AiVdbProviderClientBase::isMultiple()`
 assumes every field is a base field, and core's `EntityViewsData`
@@ -154,7 +154,7 @@ auto-minted the way `case` mints a subject ID; a caller has to supply
   `dynamic_entity_reference`, accepted deliberately above. A custom widget
   pairing an entity-type select with a `dynamic_entity_reference`-less
   autocomplete is possible later without changing the storage shape.
-- **`aim_annotations` bridge module itself** ([ADR-0024](0024-annotations-integration-target-scoped-promotion.md))
+- **`aim_annotations` bridge module itself** ([ADR-0024](../0024-annotations-integration-target-scoped-promotion.md))
   - this ADR clears one of its two blockers (`scope: entity` existing with
     a working access plugin); the `trusted`/draft-to-trusted blocker is
     separately already resolved (see ADR-0002's addendum); the bridge

@@ -19,7 +19,7 @@ README.md/CLAUDE.md/DEVELOPING.md:
 
 For a caller (Claude Code, or any agent) that already decided what's
 worth remembering - no extraction LLM round-trip. See
-[ADR-0006](adr/0006-agent-native-write-path.md) for why this exists
+[ADR-0006](adr/resolved/0006-agent-native-write-path.md) for why this exists
 alongside `extract()`.
 
 ```bash
@@ -35,7 +35,7 @@ drush aim:remember <text> [--scope] [--subject] [--source] [--state] [--category
   created".
 - `--target-type`/`--target-id` name the referenced entity for
   `scope=entity` (e.g. `--target-type=node --target-id=42`); ignored for
-  every other scope. See [ADR-0027](adr/0027-entity-scope.md).
+  every other scope. See [ADR-0027](adr/resolved/0027-entity-scope.md).
 - `scope=case` with no `--subject` mints a case ID server-side
   (`case-<8 hex chars>`, from Drupal's `uuid` service) and stamps it onto
   the fact - the success message (and `aim_tool`'s `aim_remember`
@@ -45,7 +45,7 @@ drush aim:remember <text> [--scope] [--subject] [--source] [--state] [--category
 - `scope=user` requires a real account (`--subject` resolved via
   `resolveAccountByUid()`, uid only - no username fallback on write paths,
   to avoid a typo'd username silently misattributing a fact). See
-  [ADR-0007](adr/0007-user-scope-requires-real-account.md).
+  [ADR-0007](adr/resolved/0007-user-scope-requires-real-account.md).
 
 ### `aim:recall` - semantic query
 
@@ -89,7 +89,7 @@ entity is extractable with no code change.
 candidate to that one real account; without it every `scope=user`
 candidate is skipped (with a warning) - extraction never attempts to
 match the model's own freeform subject text against the accounts table.
-See [ADR-0011](adr/0011-extraction-explicit-subject-uid.md) for why the
+See [ADR-0011](adr/resolved/0011-extraction-explicit-subject-uid.md) for why the
 match can't be model-guessed.
 
 **Skill:** `.claude/skills/aim-discovery/` ("the grill") - a structured
@@ -107,7 +107,7 @@ drush aim:consolidate [--scope] [--provider] [--model] [--auto-threshold] [--amb
 ```
 
 On-demand sweep. Algorithm, schema, and thresholds in
-[ADR-0005](adr/0005-consolidation-algorithm.md). Current defaults:
+[ADR-0005](adr/resolved/0005-consolidation-algorithm.md). Current defaults:
 `auto_threshold: 0.09`, `ambiguous_threshold: 0.45`, calibrated against
 `ollama__nomic-embed-text:latest` - both live in `aim.settings`, editable
 at `/admin/config/aim/settings` ("Consolidation thresholds"), not just a
@@ -135,7 +135,7 @@ every remaining item one by one.
 
 Manual trigger without a terminal: `drupal/queue_ui` at
 `/admin/config/system/queue-ui` (per-queue "Run" button - deliberately
-not a `cron` key, see [ADR-0003](adr/0003-async-processing-dedicated-crontab.md)).
+not a `cron` key, see [ADR-0003](adr/resolved/0003-async-processing-dedicated-crontab.md)).
 
 **Retired facts are not in the vector index:** the `aim_exclude_retired`
 Search API processor (`src/Plugin/search_api/processor/ExcludeRetired.php`)
@@ -470,7 +470,7 @@ reason beyond schema tidiness.
 This is a lesson about *bundle* fields specifically, not about which
 module may declare a base field - confirmed the hard way when ADR-0027
 first over-applied it, concluding `target_type`/`target_id` "has to
-live in core `aim`" for the same reason. [ADR-0028](adr/0028-scope-type-plugin.md)
+live in core `aim`" for the same reason. [ADR-0028](adr/resolved/0028-scope-type-plugin.md)
 corrected that: `isMultiple()` and `EntityViewsData` both key off
 `EntityFieldManager::getFieldStorageDefinitions()`, which merges a base
 field declared via another module's `hook_entity_base_field_info()`
@@ -542,7 +542,7 @@ then export the index config.
 of elevating to any particular account - a drush/cron caller has no real
 "viewer" to check access on behalf of, and already holds raw DB
 credentials, so the access check was never a real security boundary at
-that call site. See [ADR-0006](adr/0006-agent-native-write-path.md)'s
+that call site. See [ADR-0006](adr/resolved/0006-agent-native-write-path.md)'s
 addendum for the full reasoning (an earlier uid-1-elevation approach was
 reworked away from - uid 1 has no core guarantee of existing or holding
 any particular role). A real authenticated caller (Tool API/MCP, an

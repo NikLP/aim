@@ -176,17 +176,17 @@ Two gaps this ADR exposes but does not solve:
 
 ## Related
 
-[ADR-0001](0001-storage-and-scope-model.md),
+[ADR-0001](resolved/0001-storage-and-scope-model.md),
 [ADR-0002](0002-governance-deferred-guardrails-mandatory.md),
-[ADR-0006](0006-agent-native-write-path.md),
+[ADR-0006](resolved/0006-agent-native-write-path.md),
 [ADR-0008](0008-chatbot-integration-mechanism.md),
-[ADR-0011](0011-extraction-explicit-subject-uid.md),
+[ADR-0011](resolved/0011-extraction-explicit-subject-uid.md),
 [ADR-0012](0012-fact-relation-graph.md) (fact-to-fact links, distinct from
 `batch_id`),
 [ADR-0016](0016-document-ingestion-ui.md),
 [ADR-0021](0021-jev-typed-decision-provider.md),
 [ADR-0024](0024-annotations-integration-target-scoped-promotion.md),
-[ADR-0027](0027-entity-scope.md),
-[ADR-0028](0028-scope-type-plugin.md),
+[ADR-0027](resolved/0027-entity-scope.md),
+[ADR-0028](resolved/0028-scope-type-plugin.md),
 [ADR-0030](0030-fact-groups.md) (a durable, cross-scope `group`,
 distinct from per-turn `batch_id`; overlaps piece 5's case titles).

@@ -6,7 +6,7 @@
 ## Context
 
 Consolidation retires a superseded fact by setting `expires`, never by
-deleting it, to keep an audit trail ([ADR-0005](../0005-consolidation-algorithm.md)).
+deleting it, to keep an audit trail ([ADR-0005](./0005-consolidation-algorithm.md)).
 The vector index does not know `expires`, so retired facts stayed in it and
 `recall()` filtered them out in PHP after the index had already applied
 `range(0, $limit)`. They took result slots: 57 of the 115 rows in the

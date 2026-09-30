@@ -7,13 +7,13 @@ renamed to `user` (`aim_update_10001()`), and the collection column/index
 along with it (`idx_subject_uid` -> `idx_user`) - this ADR's title, file
 name, and body keep the old name throughout as the historical record of
 what was built and why; the mechanism itself is unchanged. See
-[ADR-0007](../0007-user-scope-requires-real-account.md)'s own addendum.
+[ADR-0007](./0007-user-scope-requires-real-account.md)'s own addendum.
 
 ## Context
 
 `recall()` (with `--subject-uid`) and `findNearestNeighbor()` (scope=user)
 cannot narrow by `subject_uid` in the query, because it is not an indexed
-Search API attribute. [ADR-0007](../0007-user-scope-requires-real-account.md)
+Search API attribute. [ADR-0007](./0007-user-scope-requires-real-account.md)
 shipped an over-fetch (`recall()` asks for 5x the limit, user-scope
 neighbor search asks for 20 instead of 5) plus a PHP-side equality check
 as the workaround. TODO.md carried "index `subject_uid` as a search_api

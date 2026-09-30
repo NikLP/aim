@@ -1,6 +1,6 @@
 # ADR-0003: Async processing via Queue API and a dedicated crontab, never `hook_cron`
 
-**Status:** Accepted
+**Status:** Accepted; the "never `hook_cron`" rule is amended by [ADR-0031](../0031-cron-fallback-for-queue-processing.md) (proposed)
 **Date:** 2026-09-09
 
 ## Context
@@ -88,7 +88,7 @@ enqueue happens, and a few pointers had gone stale.
   destinations set it on every entity they save, so migrated facts also
   skip consolidation. The flag is not exposed on any write path, so a
   caller cannot use it to keep a real fact out of consolidation - see
-  [ADR-0020](0020-verbatim-facts-consolidation-opt-out.md) for a
+  [ADR-0020](../0020-verbatim-facts-consolidation-opt-out.md) for a
   proposed explicit flag.
 - **Unchanged, re-checked against the code:** `AimConsolidateQueueWorker`
   still carries no `cron` key; `processItem()` still skips an
@@ -100,6 +100,6 @@ enqueue happens, and a few pointers had gone stale.
   section.
 - **Latency.** The "tighter cadence only if a feature needs it" clause
   above was explored as an immediate post-write path and deliberately
-  deferred: [ADR-0015](0015-immediate-consolidation-considered-deferred.md).
+  deferred: [ADR-0015](../0015-immediate-consolidation-considered-deferred.md).
 
 Checked by reading the code 2026-09-26, not by running the queue.

@@ -6,7 +6,7 @@ module, alongside the site shell) before this `adr/` structure existed.
 **Status:** Accepted as founding rationale, not as a live source of
 decisions. The binding architectural calls made here were subsequently split
 out into ADR-0001 through ADR-0009 in this directory, which supersede this
-document wherever they overlap - see [0000-index.md](0000-index.md). This
+document wherever they overlap - see [0000-index.md](../0000-index.md). This
 one is retained for the market comparison, risk analysis, and original
 context those are downstream of.
 
@@ -131,7 +131,7 @@ Memory Algorithm (April 2026)" - LoCoMo 71.4 to 92.5, LongMemEval 67.8 to
 94.4 - attributed to dropping per-pair LLM ADD/UPDATE/DELETE/NONE decisions
 for single-pass additive extraction plus entity linking and BM25 fusion
 (read directly from `mem0ai/mem0` @ `a488e19`, not taken from marketing
-copy - see [ADR-0012](0012-fact-relation-graph.md)). The README's own
+copy - see [ADR-0012](../0012-fact-relation-graph.md)). The README's own
 fine print: "Scores reflect Mem0's managed platform, which includes
 proprietary optimizations not available in the open-source SDK;
 open-source users should expect directionally similar gains but not
@@ -221,7 +221,7 @@ extracted entities pointing back at the facts that mention them. A team with
 that much more resourcing than `aim` converged on the same call this row
 already made - a lightweight entity/reference structure over a general
 document store beats standing up a separate graph engine. See
-[ADR-0012](0012-fact-relation-graph.md) for the retrieval-side mechanism.
+[ADR-0012](../0012-fact-relation-graph.md) for the retrieval-side mechanism.
 
 ### Scope model - four categories, mapped to Mem0's dimensions
 
@@ -671,11 +671,11 @@ this session against `drupal-code-query`'s MCP tools.
    what a spec-gathering Skill asks, in what order, per site archetype
    (commerce, brochure, LMS, ...). Real scope of work, not a byproduct of the
    storage/extraction plumbing. **Design landed 2026-09-14:** see
-   [0014](0014-usecase-archetype-starter-kits.md) (proposal only, not yet
+   [0014](../0014-usecase-archetype-starter-kits.md) (proposal only, not yet
    built).
 9. **Recipe-apply safety gate** - "needs a dry-run/review step before
    applying an AI-generated Recipe" is stated as a requirement above. Design
-   landed: see [0009](0009-recipe-apply-safety-gate.md) (design only, not
+   landed: see [0009](../0009-recipe-apply-safety-gate.md) (design only, not
    yet built).
 10. **CCC: adopt, integrate, or build a parallel site-memory layer?** - CCC's
     beta status means this can't be answered yet; revisit once it reaches a

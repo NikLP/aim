@@ -11,6 +11,6 @@ isn't a valid scope on this site. Case-scope access control
 (`checkViewAccess()`) is still unbuilt - the plugin stays neutral there,
 an already-acknowledged gap.
 
-Decision records: [ADR-0025](../../adr/0025-scope-access-plugin-type.md)
-(the access plugin type), [ADR-0026](../../adr/0026-pluggable-scope-submodules.md)
+Decision records: [ADR-0025](../../adr/resolved/0025-scope-access-plugin-type.md)
+(the access plugin type), [ADR-0026](../../adr/resolved/0026-pluggable-scope-submodules.md)
 (this submodule split).

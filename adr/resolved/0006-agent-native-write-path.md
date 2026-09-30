@@ -51,16 +51,11 @@ matching, not something to import.
 - A real gotcha specific to this path: drush runs as the anonymous user
   by default, and `ai_search`'s backend applies a real per-match entity
   access check - a match anonymous can't view is silently dropped, not
-  reported as an error. `recall()` account-switches to uid 1 for the
-  query duration rather than bypassing access entirely
-  (`search_api_bypass_access`), which was tried first and rejected on
-  review as a bad default to leave in committed code. This is a genuine
-  improvement over a blanket bypass, not a fully solved problem: it
-  trades "skip the check" for "uid 1 holds an `is_admin` role" - the
-  actually correct fix is ADR-0002's deferred governance layer (a real
-  `aim_fact`-specific permission plus a dedicated non-superuser service
-  account for CLI tooling).
-- This same account-switch gotcha and fix generalizes to any `search_api`
+  reported as an error. Fixed: for an anonymous caller, `recall()` sets
+  `search_api_bypass_access` (see the 2026-09-18 addendum below, which
+  reversed an earlier uid-1 account-switch). Documented in DEVELOPING.md's
+  "`checkViewAccess()`/anonymous drush callers".
+- This same gotcha generalizes to any `search_api`
   query against an access-controlled entity run from drush/cron context,
   not just this command.
 
@@ -145,4 +140,4 @@ behavior:
 
 The third is a real gap, not just a caveat. Proposed fix (a `verbatim`
 opt-out flag, not built) in
-[ADR-0020](0020-verbatim-facts-consolidation-opt-out.md).
+[ADR-0020](../0020-verbatim-facts-consolidation-opt-out.md).

@@ -420,7 +420,7 @@ this file's own config-entity convention.
 Claude.ai/Claude Desktop connector completed dynamic client registration,
 OAuth consent, and a live `aim_remember`/`aim_recall` call, over a
 Tailscale Funnel tunnel (not `ddev share` - see the reasoning in
-[aim_tool_oauth/DEVELOPING.md](../modules/aim_tool_oauth/DEVELOPING.md)).
+[aim_tool_oauth/DEVELOPING.md](../../modules/aim_tool_oauth/DEVELOPING.md)).
 Two more real bugs surfaced and were fixed getting there (a stale
 persisted `registration_endpoint`, and Funnel initially targeting the
 router's plain-HTTP entrypoint instead of its HTTPS one) - full runbook

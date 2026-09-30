@@ -10,7 +10,7 @@ is to not re-derive it, and to not re-litigate why it was shelved.
 
 Started from a real usability question: `remember()`/`createFactsFromCandidates()`
 already enqueue every new fact onto `aim_consolidate`
-([ADR-0003](0003-async-processing-dedicated-crontab.md)), but that queue is
+([ADR-0003](resolved/0003-async-processing-dedicated-crontab.md)), but that queue is
 only drained by the dedicated crontab (`* * * * * ddev exec drush
 queue:run aim_consolidate`, CLAUDE.md's "Consolidation" section) or a
 manual `queue_ui` click. A fact is not searchable via `recall()` until
