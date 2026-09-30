@@ -50,9 +50,11 @@ this list as exhaustive.
 - [ ] Close [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
       deferred governance gate before ship - the `trusted` field/
       `default_trusted` half is BUILT 2026-09-28 (see "PoC deviations"
-      below); still open: whether a per-scope `trust {scope} aim facts`
-      permission is worth generating, versus staying on the flat
-      `administer aim memory` gate.
+      below); per-scope `trust {scope} aim facts` permission BUILT
+      2026-09-30 (custom `trust` access operation, used by the Trust/
+      Untrust bulk actions). Still open: the `trusted` override on
+      `remember()` bypasses it - decide whether callers passing
+      `trusted: TRUE` should need the permission.
 - [x] Build MCP exposure for aim - DONE, via a different mechanism than
       first proposed here: not direct `#[Mcp]` plugins, but `aim_tool`'s
       `#[Tool]` plugins (`AimRemember`/`AimRecall`, backed by
@@ -94,6 +96,20 @@ this list as exhaustive.
       code-enforced - the model can ignore it, so "written via the
       chatbot" isn't the same reliability as "a human typed this into the
       admin form" even though both stay on the same `NULL` fallback here.
+
+- [ ] User-scope authorship gap (raised 2026-09-30): nothing checks that a
+      `scope=user` fact's `user` (who it is about) is the poster (`uid`,
+      who wrote it). `aim_tool`'s `AimRemember` only *defaults* `subject`
+      to the current user when omitted; a caller can pass any uid/username
+      and the fact is saved about that person, and `create user aim facts`
+      is the only gate. The tool description asking the model to confirm
+      first is prompt-level, not enforced. Proposed: in `remember()`,
+      reject `subject != currentUser` unless the caller has
+      `administer aim memory` or a new permission for writing about
+      others; later option, accept it but force `trusted=FALSE` so the
+      per-scope trust permission reviews it. Same class of gap as the
+      `trusted` override on `remember()` above. Not built.
+      [ADR-0007](adr/0007-user-scope-requires-real-account.md)
 
 ## ADR-0009 - Recipe/apply surface (design only, nothing built)
 

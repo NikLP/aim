@@ -21,6 +21,13 @@ class TrustAction extends AimFactActionBase {
   /**
    * {@inheritdoc}
    */
+  protected function accessOperation(): string {
+    return 'trust';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   protected function apply(AimFact $fact): bool {
     if ($fact->get('trusted')->value) {
       return FALSE;

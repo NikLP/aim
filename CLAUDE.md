@@ -223,7 +223,12 @@ duplicated here.
 
 `administer aim memory` (flat admin bypass, `restrict access: true`).
 Per-scope, dynamically generated via `BundlePermissionHandlerTrait`:
-`view {scope} aim facts` / `create {scope} aim facts`. Tool API/MCP:
+`view {scope} aim facts` / `create {scope} aim facts` /
+`trust {scope} aim facts` (`restrict access`; gates the custom `trust`
+entity access operation used only by the Trust/Untrust bulk actions, so
+a scope's reviewer can flip the `trusted` flag without update access to
+the fact's text; retire/unretire stay on `administer aim memory`).
+The `trusted` override on `remember()` is not gated by it yet. Tool API/MCP:
 `store aim memory` / `read aim memory` (`aim_tool`). A
 `user_scope_role_visibility` matrix (`/admin/config/aim/user-scope-access`)
 additionally grants `scope=user` visibility by viewer-role/subject-role

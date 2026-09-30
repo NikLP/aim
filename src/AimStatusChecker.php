@@ -87,7 +87,7 @@ final class AimStatusChecker {
       ->fetchField();
 
     $ok = $live === $vectorRows;
-    
+
     if ($ok) {
       $detail = "$live live fact(s), $vectorRows vector row(s)";
     }

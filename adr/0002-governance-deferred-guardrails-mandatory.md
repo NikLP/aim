@@ -143,10 +143,13 @@ if the audit-of-approver claim becomes load-bearing (e.g. for the
 public-sector/audit-trail pitch raised in an earlier discovery
 conversation), not preemptively.
 
-**Still open, not decided:** whether a per-scope `trust {scope} aim
-facts` permission is ever worth generating via
-`BundlePermissionHandlerTrait`, versus staying on the flat `administer
-aim memory` gate indefinitely.
+**Per-scope trust permission, BUILT 2026-09-30:** `trust {scope} aim
+facts` is generated via `BundlePermissionHandlerTrait` and checked by a
+custom `trust` operation in `AimFactAccessControlHandler`, used by the
+Trust/Untrust bulk actions. Motivating case: site editors approving
+site-scope facts but not user-scope ones, without update access to the
+fact text. `administer aim memory` still passes. Still open: the
+`trusted` override on `remember()` bypasses it.
 
 Promotion into Annotations ([ADR-0024](0024-annotations-integration-target-scoped-promotion.md))
 doesn't depend on any of this either way - `annotation` entities are

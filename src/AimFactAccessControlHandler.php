@@ -22,6 +22,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * this. update/delete are deliberately left on administer aim memory
  * only - not asked to be scoped, see CLAUDE.md.
  *
+ * The custom "trust" operation (trust/untrust bulk actions) is allowed by
+ * "trust {scope} aim facts" or the admin permission.
+ *
  * view additionally ORs in whatever AimScopeTypePluginManager returns for
  * the fact's own bundle (ADR-0025) - a scope with no registered plugin
  * (every bundle but user today) falls through to the flat permission
@@ -56,6 +59,13 @@ class AimFactAccessControlHandler extends EntityAccessControlHandler implements 
         }
       }
       return $access->orIf(parent::checkAccess($entity, $operation, $account));
+    }
+    if ($operation === 'trust') {
+      // Not a core operation: only the trust/untrust bulk actions ask for
+      // it, so a per-scope reviewer can flip the trusted flag without
+      // gaining update access to the fact's text.
+      return AccessResult::allowedIfHasPermission($account, 'trust ' . $entity->bundle() . ' aim facts')
+        ->orIf(AccessResult::allowedIfHasPermission($account, $this->entityType->getAdminPermission()));
     }
     return parent::checkAccess($entity, $operation, $account);
   }

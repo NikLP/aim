@@ -6,19 +6,21 @@ user_scope_shared_role_fallback: true
 user_scope_role_visibility: {  }
 extraction_prompt: |
   Extract every discrete, atomic fact worth remembering long-term from the text below.
-  Each fact must be one short, self-contained sentence.
+  Each fact must be one short sentence that makes sense with no other context: say what it is about (a product, team or role, never "it", "they" or "that channel"), and never refer to "the above" or to another fact.
+  Do not add names, organizations or other identifying details that the fact does not need to make sense.
+  Keep uncertainty in the fact: if the text says something is planned, possible or undecided, say so in the sentence.
   Do not invent facts the text does not support. If nothing is worth remembering, return an empty facts array.
 
   For each fact, classify its scope:
   - "user": specific to one named person.
   - "role": true for everyone holding a particular role.
   - "site": about the site or organization itself, not one person.
-  - "case": tied to a specific support case or tracked issue.
+  - "case": tied to a specific project, case or tracked issue, named by the caller.
 
   Also give a short "subject"; for:
   - "user" scope, the person's name or identifier
   - "role", the role name
-  - "case", a case identifier
+  - "case", only an identifier given in the text or by the caller; never invent one. If none is given, use "site" scope instead
   - "site", leave it empty
 
   Text:

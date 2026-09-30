@@ -29,6 +29,16 @@ abstract class AimFactActionBase extends ActionBase {
   abstract protected function apply(AimFact $fact): bool;
 
   /**
+   * Returns the entity access operation this action requires.
+   *
+   * @return string
+   *   'update' by default; the trust/untrust actions use 'trust'.
+   */
+  protected function accessOperation(): string {
+    return 'update';
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function execute($entity = NULL) {
@@ -41,7 +51,7 @@ abstract class AimFactActionBase extends ActionBase {
    * {@inheritdoc}
    */
   public function access($object, ?AccountInterface $account = NULL, $return_as_object = FALSE) {
-    $result = $object->access('update', $account, TRUE);
+    $result = $object->access($this->accessOperation(), $account, TRUE);
     return $return_as_object ? $result : $result->isAllowed();
   }
 

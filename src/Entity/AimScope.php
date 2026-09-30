@@ -124,4 +124,11 @@ class AimScope extends ConfigEntityBundleBase {
     return 'create ' . $this->id() . ' aim facts';
   }
 
+  /**
+   * Returns the permission machine name for trusting/untrusting facts.
+   */
+  public function getTrustPermission(): string {
+    return 'trust ' . $this->id() . ' aim facts';
+  }
+
 }

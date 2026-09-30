@@ -23,10 +23,11 @@ use Drupal\aim\Entity\AimScope;
  * from every role automatically instead of leaving a stale permission
  * string behind.
  *
- * Generates two permissions per scope:
+ * Generates three permissions per scope:
  *
  *   view {scope} aim facts
  *   create {scope} aim facts
+ *   trust {scope} aim facts
  */
 class AimPermissions implements ContainerInjectionInterface {
 
@@ -39,7 +40,7 @@ class AimPermissions implements ContainerInjectionInterface {
   ) {}
 
   /**
-   * Returns per-scope view/create permissions.
+   * Returns per-scope view/create/trust permissions.
    *
    * @return array
    *   Permission definitions keyed by machine name.
@@ -71,6 +72,11 @@ class AimPermissions implements ContainerInjectionInterface {
       ],
       $scope->getCreatePermission() => [
         'title' => $this->t('%label: create AIM facts', $params),
+      ],
+      $scope->getTrustPermission() => [
+        'title' => $this->t('%label: trust and untrust AIM facts', $params),
+        'description' => $this->t('Mark facts trusted so recall() returns them, or untrusted to withdraw them, via the bulk actions on the facts listing.'),
+        'restrict access' => TRUE,
       ],
     ];
   }
