@@ -24,6 +24,7 @@ Still carrying work, proposed, or deferred.
 | [0031](0031-cron-fallback-for-queue-processing.md) | Opt-in `hook_cron` fallback for queue processing, alongside the dedicated crontab | Proposed 2026-09-30 - design only, not built; amends 0003 |
 | [0032](0032-dated-category-listing-for-quick-notes.md) | No `event` scope for diary-style notes: category + `asserted` date, a non-vector list method, and tid-based capture in the Tool API | Proposed 2026-10-01 - design only, not built |
 | [0033](0033-plausibility-gate-processing-modes.md) | Plausibility gate on new facts: untrusted until scored, fail closed, and queued vs inline vs post-response processing | Proposed 2026-10-01 - design only, not built; measured against local Ollaya on the dev laptop |
+| [0034](0034-split-chat-assistants-read-only-public.md) | Split chat assistants: read-only public bot, staff bot with `remember`, gated by tool permission not block visibility | Proposed 2026-10-01 - design only, not built |
 
 ## Resolved
 

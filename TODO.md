@@ -55,6 +55,19 @@ this list as exhaustive.
 - [ ] #3 - local model choice + hardware sizing for the sovereign tier -
       not researched.
 - [ ] #4 - queue-runner cadence - untuned default ("every 1-5 min").
+      Reasoned from code 2026-10-01, not measured. An idle tick is one
+      `ddev exec` plus a Drupal bootstrap (about a second of CPU), so
+      every minute is cheap on a quiet queue. Per item: one local Ollama
+      embed in `reindex()` plus the neighbor search (a second embed,
+      cached by ADR-0017); the chat call only happens for pairs between
+      `auto_threshold` and `ambiguous_threshold`, and goes to the hosted
+      provider, not the laptop. The real laptop cost is memory, not heat:
+      Ollama keeps the embed model resident after each call (see the
+      laptop memory budget note). Recommendation: `*/5` day to day, queue_ui
+      "Run" for a burst, every minute only for the demo (the
+      save-then-recall beat needs the fact searchable quickly). Measure
+      before treating any of this as settled. Related: nothing records
+      each decision (see the `superseded_by_reason` item below).
 - [ ] #5 - retrieval latency at realistic scale: still not benchmarked at
       thousands of facts. Local-Ollama half done and confirmed 2026-09-10
       (`recall()` 33-35ms vs. 450-540ms hosted, ~15x faster, network-hop
@@ -74,7 +87,11 @@ questions" section)
 
 - [ ] Add a `superseded_by_reason` field on `aim_fact` (provenance-on-invalidation,
       ADR-0010 parity target #6 /
-      [ADR-0005](adr/resolved/0005-consolidation-algorithm.md)). Named to match the
+      [ADR-0005](adr/resolved/0005-consolidation-algorithm.md)). Today the
+      decision, score and model are returned by `decideAndApply()` and then
+      only printed by `drush aim:consolidate`; the queue path
+      (`AimConsolidateQueueWorker`) discards them and logs nothing, so an
+      automated merge leaves no trace of why. Persist them here. Named to match the
       2026-09-28 rename of `related` to `superseded_by` - see that ADR's
       addendum.
 - [ ] Extraction-input guardrailing, distinct from the existing output-side

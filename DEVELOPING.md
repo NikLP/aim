@@ -606,6 +606,56 @@ A Claude Pro/Max subscription cannot power an unattended `drupal/ai`
 provider (Anthropic prohibits subscription OAuth for third-party
 integrations) - needs a real Console API key, or stays on Ollama.
 
+**Running local model services on a small machine** (Ollama, and Ollaya
+for the plausibility spike, [ADR-0033](adr/0033-plausibility-gate-processing-modes.md)).
+Measured on the dev laptop (14 GB RAM, no GPU, 4 GB swap), where
+unbounded services OOM-killed the editor on 2026-09-28. Both run as
+systemd services; limit them with drop-ins (`sudo systemctl edit <unit>`),
+then check with `systemctl show <unit> -p MemoryPeak -p MemoryMax`.
+
+| | Ollama (`nomic-embed-text`) | Ollaya (`laya:en`) |
+| --- | --- | --- |
+| Measured working set | ~650 MB peak | ~3.8 GB resident, up to ~4.3 GB on full-context input |
+| `MemoryMax` | `1G` | `5G` |
+| `MemoryHigh` | not set | `4500M` |
+| `OOMScoreAdjust` | `500` | `500` |
+| Keep-alive | `OLLAMA_KEEP_ALIVE=30s` | `OLLAYA_KEEP_ALIVE=10m` while testing (default `5m`) |
+| Listens on | `0.0.0.0:11434` (DDEV needs it) | `127.0.0.1:11435` |
+
+- **`OOMScoreAdjust=500`** makes the kernel pick these services before
+  the editor when memory runs out. A `MemoryMax` hit kills only the
+  service.
+- **Set `MemoryHigh` from a measured peak, not a guess.** It is a soft
+  limit that throttles instead of killing, so a cap below the working
+  set does not fail, it just makes the model load slowly (Ollaya's cold
+  load was 36 s at 2G, 21 s at 2.5G, 7 s at 3.5G and above). A
+  `MemoryPeak` equal to the cap means the cap is binding.
+- **Apply one edit at a time and restart.** `systemctl set-property
+  --runtime` changes the limit live but does not unload the model, so a
+  timing test right after it measures a warm model. Restart the unit,
+  then time the first call.
+- **Do not use `systemd-zram-generator`** on the laptop: extra CPU, and
+  it interferes with suspend. The existing swap file is the backstop.
+- **Keep-alive trades load time for memory.** A short value frees RAM
+  between uses; a long one (10m+) avoids repeated cold loads during
+  testing. The memory cap, not keep-alive, is what protects the editor.
+- **CPU-bound without a GPU.** Parallel requests to Ollaya queue rather
+  than speed up, so one worker at a time is the right setting. Input
+  over the model's context window is rejected (`STATE_TRUNCATED`), so
+  bound fact length on write.
+- **Available, not free.** `free -h` "free" excludes disk cache; use the
+  "available" column to judge headroom.
+- **Browsers dominate.** On the same machine Brave used ~7.9 GB with many
+  tabs, more than either model service.
+
+Quick Ollaya check (host, not DDEV):
+
+```bash
+curl -s localhost:11435/v1/models
+curl -s localhost:11435/v1/systemone -H 'content-type: application/json' \
+  -d '{"model":"laya:en","state":"Some fact.","questions":{"q":{"type":"noul","instructions":"Is this plausible?"}}}'
+```
+
 **Gotchas:**
 
 - Anthropic's structured-output mode requires `additionalProperties:
