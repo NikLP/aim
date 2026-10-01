@@ -6,7 +6,6 @@ namespace Drupal\aim_tool\Plugin\tool\Tool;
 
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
-use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Service\AimMemoryManager;
@@ -15,6 +14,7 @@ use Drupal\tool\ExecutableResult;
 use Drupal\tool\Tool\ToolBase;
 use Drupal\tool\Tool\ToolOperation;
 use Drupal\tool\TypedData\InputDefinition;
+use Drupal\tool\TypedData\OutputDefinition;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -90,7 +90,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     ),
   ],
   output_definitions: [
-    'results' => new ContextDefinition(
+    'results' => new OutputDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Results'),
       description: new TranslatableMarkup('The matching facts, formatted as a list.'),

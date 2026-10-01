@@ -5,4 +5,4 @@ package: AIM
 core_version_requirement: ^11
 dependencies:
   - aim:aim
-  - tool:tool (>=1.0.0-beta8)
+  - tool:tool (>=1.0.0-beta10)

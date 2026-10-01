@@ -210,18 +210,3 @@ fresh site (untested so far, see its README).
 
 Full command reference and the developer API are in
 [DEVELOPING.md](DEVELOPING.md).
-
-## Status and open questions
-
-See [TODO.md](TODO.md) for the living backlog. The questions that block
-starting real (non-PoC) work, per
-[ADR-0010](adr/resolved/0010-drupal-native-agent-memory-rationale.md):
-
-1. What's the first concrete, sellable feature this unlocks?
-2. Consolidation conflict-resolution policy - threshold heuristics vs.
-   LLM-mediated merge decisions.
-3. Local model choice and hardware sizing for the sovereign tier.
-4. Relationship to `ai_agents`/`ai_search` - compose with them, or
-   standalone?
-
-Full list: [ADR-0010 § Open questions](adr/resolved/0010-drupal-native-agent-memory-rationale.md#open-questions).

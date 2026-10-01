@@ -7,7 +7,6 @@ namespace Drupal\aim_tool\Plugin\tool\Tool;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
-use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\AimScopeTypePluginManagerInterface;
@@ -21,6 +20,7 @@ use Drupal\tool\TypedData\InputDefinitionInterface;
 use Drupal\tool\TypedData\InputDefinitionRefinerInterface;
 use Drupal\tool\TypedData\ListInputDefinition;
 use Drupal\tool\TypedData\MapInputDefinition;
+use Drupal\tool\TypedData\OutputDefinition;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -155,19 +155,19 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     'scope_fields' => ['scope'],
   ],
   output_definitions: [
-    'fact_id' => new ContextDefinition(
+    'fact_id' => new OutputDefinition(
       data_type: 'integer',
       label: new TranslatableMarkup('Fact ID'),
       description: new TranslatableMarkup('The ID of the created aim_fact. Only set for a single-fact call.'),
       required: FALSE,
     ),
-    'results' => new ContextDefinition(
+    'results' => new OutputDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Results'),
       description: new TranslatableMarkup('Per-fact outcome, one line each. Only set for a facts batch call.'),
       required: FALSE,
     ),
-    'case_id' => new ContextDefinition(
+    'case_id' => new OutputDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Case ID'),
       description: new TranslatableMarkup('For scope=case: the case ID this fact was saved under - the one just given, or a newly minted one if none was given. Pass it as subject on later calls to add to the same case. Only set for a single-fact call.'),

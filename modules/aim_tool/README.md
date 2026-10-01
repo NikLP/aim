@@ -14,7 +14,7 @@ with `mcp_server_tool_bridge` 1.0.0-beta3). `aim_recall` drops facts past
 ## Requirements
 
 - `aim` (this module's parent)
-- `drupal/tool` (`>=1.0.0-beta8`)
+- `drupal/tool` (`>=1.0.0-beta10`)
 - Optional, for MCP exposure: `drupal/mcp_server_tool_bridge:^1.0.0-beta2`
   + `drupal/mcp_server:^2.0.0-beta3` + core's `serialization` module - see
   [DEVELOPING.md](DEVELOPING.md) for the version-constraint reasoning.
