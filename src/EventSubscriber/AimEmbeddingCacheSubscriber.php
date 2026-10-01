@@ -6,6 +6,7 @@ namespace Drupal\aim\EventSubscriber;
 
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\ai\Event\PostGenerateResponseEvent;
 use Drupal\ai\Event\PreGenerateResponseEvent;
@@ -69,11 +70,39 @@ class AimEmbeddingCacheSubscriber implements EventSubscriberInterface {
    */
   protected array $pendingTimers = [];
 
+  /**
+   * Constructs an AimEmbeddingCacheSubscriber.
+   *
+   * @param \Drupal\Core\Cache\CacheBackendInterface $cache
+   *   The embeddings cache bin.
+   * @param \Drupal\Component\Datetime\TimeInterface $time
+   *   The time service.
+   * @param \Drupal\Core\Logger\LoggerChannelInterface $logger
+   *   The aim logger channel.
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
+   *   The config factory, read for aim.settings:log_verbose, which gates
+   *   this class's debug logging.
+   */
   public function __construct(
     protected CacheBackendInterface $cache,
     protected TimeInterface $time,
     protected LoggerChannelInterface $logger,
+    protected ConfigFactoryInterface $configFactory,
   ) {}
+
+  /**
+   * Logs at debug level, if aim.settings:log_verbose is on.
+   *
+   * @param string $message
+   *   The log message, with placeholders.
+   * @param array $context
+   *   The placeholder values.
+   */
+  protected function logVerbose(string $message, array $context): void {
+    if ($this->configFactory->get('aim.settings')->get('log_verbose')) {
+      $this->logger->debug($message, $context);
+    }
+  }
 
   /**
    * {@inheritdoc}
@@ -125,14 +154,14 @@ class AimEmbeddingCacheSubscriber implements EventSubscriberInterface {
     $cached = $this->cache->get($key);
     if ($cached === FALSE) {
       $this->pendingTimers[$event->getRequestThreadId()] = microtime(TRUE);
-      $this->logger->debug('Embedding cache miss for %provider/%model.', [
+      $this->logVerbose('Embedding cache miss for %provider/%model.', [
         '%provider' => $event->getProviderId(),
         '%model' => $event->getModelId(),
       ]);
       return;
     }
 
-    $this->logger->debug('Embedding cache hit for %provider/%model.', [
+    $this->logVerbose('Embedding cache hit for %provider/%model.', [
       '%provider' => $event->getProviderId(),
       '%model' => $event->getModelId(),
     ]);
@@ -166,7 +195,7 @@ class AimEmbeddingCacheSubscriber implements EventSubscriberInterface {
     if (isset($this->pendingTimers[$threadId])) {
       $embedMs = (int) round((microtime(TRUE) - $this->pendingTimers[$threadId]) * 1000);
       unset($this->pendingTimers[$threadId]);
-      $this->logger->debug('Embedding call for %provider/%model took @ms ms.', [
+      $this->logVerbose('Embedding call for %provider/%model took @ms ms.', [
         '%provider' => $event->getProviderId(),
         '%model' => $event->getModelId(),
         '@ms' => $embedMs,

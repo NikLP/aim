@@ -72,6 +72,28 @@ final class AimSettingsForm extends ConfigFormBase {
       '#required' => TRUE,
     ];
 
+    $form['thresholds']['merge_verify'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Verify merged text with a model'),
+      '#description' => $this->t('Before an UPDATE merge is accepted, a model confirms every detail of both facts survives. A failing merge is downgraded to ADD (keep both). Checks faithfulness to the inputs, not real-world truth.'),
+      '#config_target' => 'aim.settings:merge_verify',
+    ];
+    $form['thresholds']['merge_verifier_model'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Verifier model'),
+      '#description' => $this->t('Provider and model as <code>provider__model</code>, so a different model can check the first (e.g. a local Ollama model). Empty uses the classification model.'),
+      '#config_target' => 'aim.settings:merge_verifier_model',
+    ];
+    $form['thresholds']['merge_max_distance'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Maximum merged-to-input distance'),
+      '#description' => $this->t('Cosine distance within which the merged text must sit from each input embedding, else the merge is downgraded to ADD. 0 disables. Unmeasured: leave at 0 until calibrated.'),
+      '#config_target' => 'aim.settings:merge_max_distance',
+      '#min' => 0,
+      '#max' => 1,
+      '#step' => 0.001,
+    ];
+
     $form['recall'] = [
       '#type' => 'details',
       '#title' => $this->t('Recall'),
@@ -99,6 +121,32 @@ final class AimSettingsForm extends ConfigFormBase {
       '#title' => $this->t('Trust new facts by default'),
       '#description' => $this->t('When off (recommended until the extraction/consolidation pipeline is vetted), a newly created fact starts untrusted and is excluded from recall() until someone reviews it at <code>/admin/content/aim-facts</code> and checks its Trusted box.'),
       '#config_target' => 'aim.settings:default_trusted',
+    ];
+
+    $form['logging'] = [
+      '#type' => 'details',
+      '#title' => $this->t('Logging'),
+      '#description' => $this->t('Warnings and errors (rejected writes, blocked merges, a suspended queue) are always logged to the <em>aim</em> channel. The two options below add info and debug entries. Fact text and recall query text are never logged.'),
+      '#open' => FALSE,
+    ];
+    $form['logging']['log_audit'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Log audit events'),
+      '#description' => $this->t('Writes, consolidation decisions, and trust, untrust, retire and unretire actions, as IDs, scope, user and decision.'),
+      '#config_target' => 'aim.settings:log_audit',
+    ];
+    $form['logging']['log_verbose'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Log verbose detail'),
+      '#description' => $this->t('Recall, embedding cache and extraction detail. Noisy on a busy site.'),
+      '#config_target' => 'aim.settings:log_verbose',
+    ];
+    $form['logging']['log_query_text'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Include recall query text in verbose logs'),
+      '#description' => $this->t('Adds the query to each recall entry, for diagnosing a poor or empty match. Queries can contain personal data and will be stored in the log: enable only while investigating, then turn off. Has no effect unless verbose logging is on. Fact text is never logged.'),
+      '#config_target' => 'aim.settings:log_query_text',
+      '#states' => ['disabled' => [':input[name="log_verbose"]' => ['checked' => FALSE]]],
     ];
 
     $form['prompts'] = [
@@ -131,6 +179,12 @@ final class AimSettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function validateForm(array &$form, FormStateInterface $form_state): void {
+    // Query text logging rides on the verbose tier; enforce that here
+    // rather than trusting #states, which is client-side only.
+    if (!$form_state->getValue('log_verbose')) {
+      $form_state->setValue('log_query_text', FALSE);
+    }
+
     parent::validateForm($form, $form_state);
 
     $auto = (float) $form_state->getValue('auto_threshold');

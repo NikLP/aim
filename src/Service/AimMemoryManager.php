@@ -18,6 +18,7 @@ use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
@@ -155,6 +156,10 @@ class AimMemoryManager {
    * @param \Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber $embeddingCache
    *   The query-embedding cache subscriber (ADR-0017), activated by
    *   executeSearchQuery() for the duration of a query's execute() call.
+   * @param \Drupal\Core\Logger\LoggerChannelInterface $logger
+   *   The aim logger channel. Warnings and errors are always logged; the
+   *   info and debug tiers are gated by aim.settings' log_audit and
+   *   log_verbose (see logAudit() and logVerbose()).
    */
   public function __construct(
     protected AiProviderPluginManager $aiProvider,
@@ -167,7 +172,41 @@ class AimMemoryManager {
     protected ConfigFactoryInterface $configFactory,
     protected AccountProxyInterface $currentUser,
     protected AimEmbeddingCacheSubscriber $embeddingCache,
+    protected LoggerChannelInterface $logger,
   ) {}
+
+  /**
+   * Logs an audit event at info level, if aim.settings:log_audit is on.
+   *
+   * Callers must pass IDs, scope, uid, subject and decision metadata only,
+   * never fact text or recall query text (personal data).
+   *
+   * @param string $message
+   *   The log message, with placeholders.
+   * @param array $context
+   *   The placeholder values.
+   */
+  public function logAudit(string $message, array $context = []): void {
+    if ($this->configFactory->get('aim.settings')->get('log_audit')) {
+      $this->logger->info($message, $context);
+    }
+  }
+
+  /**
+   * Logs detail at debug level, if aim.settings:log_verbose is on.
+   *
+   * Same data rules as logAudit().
+   *
+   * @param string $message
+   *   The log message, with placeholders.
+   * @param array $context
+   *   The placeholder values.
+   */
+  public function logVerbose(string $message, array $context = []): void {
+    if ($this->configFactory->get('aim.settings')->get('log_verbose')) {
+      $this->logger->debug($message, $context);
+    }
+  }
 
   /**
    * Returns the scope values aim_fact's declared bundles allow.
@@ -688,7 +727,26 @@ class AimMemoryManager {
 
     /** @var \Drupal\aim\Entity\AimFact $entity */
     $entity = $this->entityTypeManager->getStorage('aim_fact')->create($values);
-    $this->saveFact($entity);
+    try {
+      $this->saveFact($entity);
+    }
+    catch (\InvalidArgumentException $e) {
+      // The violation message can quote the rejected text, so it is not
+      // logged.
+      $this->logger->warning('Write rejected for scope @scope (uid @uid): failed validation or a guardrail.', [
+        '@scope' => $scope,
+        '@uid' => $this->currentUser->id(),
+      ]);
+      throw $e;
+    }
+
+    $this->logAudit('Fact @id written (scope @scope, subject @subject, uid @uid, trusted @trusted).', [
+      '@id' => $entity->id(),
+      '@scope' => $scope,
+      '@subject' => $values['user'] ?? $values['subject'] ?? '',
+      '@uid' => $this->currentUser->id(),
+      '@trusted' => $entity->get('trusted')->value ? 'yes' : 'no',
+    ]);
 
     return $entity;
   }
@@ -810,9 +868,24 @@ class AimMemoryManager {
       }
       catch (\InvalidArgumentException) {
         $blocked++;
+        $this->logger->warning('Extracted candidate rejected for scope @scope (uid @uid): failed validation or a guardrail.', [
+          '@scope' => $fact['scope'],
+          '@uid' => $this->currentUser->id(),
+        ]);
         continue;
       }
       $created[] = $entity;
+      $this->logAudit('Fact @id written from extraction (scope @scope, subject @subject, uid @uid, trusted @trusted).', [
+        '@id' => $entity->id(),
+        '@scope' => $fact['scope'],
+        '@subject' => $values['user'] ?? $values['subject'],
+        '@uid' => $this->currentUser->id(),
+        '@trusted' => $entity->get('trusted')->value ? 'yes' : 'no',
+      ]);
+    }
+
+    if ($skipped > 0) {
+      $this->logVerbose('Extraction skipped @skipped user-scope candidates: no subject-uid supplied.', ['@skipped' => $skipped]);
     }
 
     return ['created' => $created, 'skipped' => $skipped, 'blocked' => $blocked];
@@ -948,6 +1021,25 @@ class AimMemoryManager {
       }
     }
 
+    $this->logVerbose('Recall returned @count rows (scope @scope, subject @subject, subject uid @subject_uid, limit @limit, best score @best, untrusted included @untrusted, uid @uid).', [
+      '@count' => count($rows),
+      '@scope' => $scope ?: 'any',
+      '@subject' => $subject ?: 'any',
+      '@subject_uid' => $filter_account ? $filter_account->id() : 'any',
+      '@limit' => $limit,
+      '@best' => $rows ? round((float) $rows[0]['score'], 3) : 'none',
+      '@untrusted' => $includeUntrusted ? 'yes' : 'no',
+      '@uid' => $this->currentUser->id(),
+    ]);
+    if ($this->configFactory->get('aim.settings')->get('log_query_text')) {
+      // Opt-in personal data: the query can name people. Gated on
+      // logVerbose() so it never outlives the verbose tier.
+      $this->logVerbose('Recall query (best score @best): @query', [
+        '@best' => $rows ? round((float) $rows[0]['score'], 3) : 'none',
+        '@query' => $text,
+      ]);
+    }
+
     return $rows;
   }
 
@@ -960,7 +1052,9 @@ class AimMemoryManager {
    * is retired automatically, an ambiguous case gets a single classification
    * call (ADD/UPDATE/DELETE/NOOP), and anything past the ambiguous
    * threshold is left alone at zero cost. Retiring a fact sets its
-   * `expires` field rather than deleting it, to keep an audit trail. An
+   * `expires` field rather than deleting it, to keep an audit trail; an
+   * UPDATE creates a new merged fact and retires both inputs, and every
+   * retirement records its reason in `superseded_by_reason`. An
    * UPDATE whose merged text fails the aim_write_guardrails check (decision
    * 7) is downgraded to a synthetic BLOCKED decision instead: both facts
    * are left untouched, since a rejected merge should not still retire the
@@ -982,9 +1076,9 @@ class AimMemoryManager {
    *   If TRUE, decisions are computed but nothing is saved.
    *
    * @return array
-   *   An array with keys 'rows' (each a [kept id, candidate id, score,
-   *   decision] tuple) and 'has_facts' (bool, whether any un-expired facts
-   *   existed to sweep at all).
+   *   An array with keys 'rows' (each a [kept id, candidate id,
+   *   score, decision, merged text] tuple) and 'has_facts' (bool, whether
+   *   any un-expired facts existed to sweep at all).
    *
    * @throws \RuntimeException
    *   If the vector index does not exist, or a query cannot be run.
@@ -1030,11 +1124,11 @@ class AimMemoryManager {
       $kept = $fact->id() < $neighbor->id() ? $fact : $neighbor;
       $candidate = $fact->id() < $neighbor->id() ? $neighbor : $fact;
 
-      $decision = $this->decideAndApply($kept, $candidate, $score, $autoThreshold, $providerId, $modelId, $dryRun);
+      [$decision, $merged_text] = $this->decideAndApply($kept, $candidate, $score, $autoThreshold, $providerId, $modelId, $dryRun);
 
       $handled[$kept->id()] = TRUE;
       $handled[$candidate->id()] = TRUE;
-      $rows[] = [$kept->id(), $candidate->id(), round($score, 3), $decision];
+      $rows[] = [$kept->id(), $candidate->id(), round($score, 3), $decision, $merged_text];
     }
 
     return ['rows' => $rows, 'has_facts' => TRUE];
@@ -1065,8 +1159,8 @@ class AimMemoryManager {
    *   call. Above this, the fact is left alone.
    *
    * @return array|null
-   *   A [kept id, candidate id, score, decision] tuple, or NULL if no
-   *   eligible neighbor was found.
+   *   A [kept id, candidate id, score, decision, merged text] tuple, or
+   *   NULL if no eligible neighbor was found.
    *
    * @throws \RuntimeException
    *   If the vector index does not exist.
@@ -1090,9 +1184,9 @@ class AimMemoryManager {
     $kept = $fact->id() < $neighbor->id() ? $fact : $neighbor;
     $candidate = $fact->id() < $neighbor->id() ? $neighbor : $fact;
 
-    $decision = $this->decideAndApply($kept, $candidate, $score, $autoThreshold, $providerId, $modelId, FALSE);
+    [$decision, $merged_text] = $this->decideAndApply($kept, $candidate, $score, $autoThreshold, $providerId, $modelId, FALSE);
 
-    return [$kept->id(), $candidate->id(), round($score, 3), $decision];
+    return [$kept->id(), $candidate->id(), round($score, 3), $decision, $merged_text];
   }
 
   /**
@@ -1122,10 +1216,13 @@ class AimMemoryManager {
    * @param bool $dryRun
    *   If TRUE, the decision is computed but nothing is saved.
    *
-   * @return string
-   *   The decision: ADD, UPDATE, DELETE, NOOP, or the synthetic BLOCKED.
+   * @return array
+   *   A [decision, merged text] pair: the decision is ADD, UPDATE, DELETE,
+   *   NOOP, or the synthetic BLOCKED; the text is NULL unless the decision
+   *   is UPDATE, BLOCKED, or an ADD downgraded from a merge that failed
+   *   verification.
    */
-  protected function decideAndApply(AimFact $kept, AimFact $candidate, float $score, float $autoThreshold, string $providerId, string $modelId, bool $dryRun): string {
+  protected function decideAndApply(AimFact $kept, AimFact $candidate, float $score, float $autoThreshold, string $providerId, string $modelId, bool $dryRun): array {
     if ($score <= $autoThreshold) {
       $decision = 'NOOP';
       $merged_text = NULL;
@@ -1140,29 +1237,65 @@ class AimMemoryManager {
           $decision = 'BLOCKED';
         }
       }
+      // Guardrails check policy, not fidelity: a merge that does not
+      // demonstrably keep both inputs' details is downgraded to ADD (keep
+      // both), since merging is where nuance is lost.
+      $unfaithful = FALSE;
+      if ($decision === 'UPDATE') {
+        $failed = $this->verifyMerge($kept, $candidate, (string) $merged_text, $providerId, $modelId);
+        if ($failed !== NULL) {
+          $decision = 'ADD';
+          $unfaithful = TRUE;
+          $this->logAudit('Consolidation merge rejected by @check check (scope @scope, kept @kept, candidate @candidate), downgraded to ADD.', [
+            '@check' => $failed,
+            '@scope' => $kept->bundle(),
+            '@kept' => $kept->id(),
+            '@candidate' => $candidate->id(),
+          ]);
+        }
+      }
     }
+
+    // Only an UPDATE, a BLOCKED merge or a merge rejected as unfaithful has
+    // merged text worth reporting.
+    $reported_text = in_array($decision, ['UPDATE', 'BLOCKED'], TRUE) || !empty($unfaithful) ? $merged_text : NULL;
 
     if ($dryRun) {
-      return $decision;
+      return [$decision, $reported_text];
     }
 
+    $model = $score <= $autoThreshold ? NULL : [$providerId, $modelId];
+    $this->logConsolidation($kept, $candidate, $score, $decision, $model);
+
+    $reason = $this->buildSupersedeReason($decision, $score, $model);
     switch ($decision) {
       case 'UPDATE':
-        $kept->set('text', $merged_text);
+        // Non-destructive merge: a new fact carries the merged text and
+        // both inputs are retired pointing at it, so the old wording stays
+        // auditable and either input can be un-retired.
+        $merged = $this->createMergedFact($kept, $candidate, (string) $merged_text);
+        foreach ([$kept, $candidate] as $input) {
+          $input->set('expires', $this->time->getRequestTime());
+          $input->set('superseded_by', $merged->id());
+        }
+        $candidate->set('superseded_by_reason', $reason);
         $kept->save();
-        $candidate->set('expires', $this->time->getRequestTime());
-        $candidate->set('superseded_by', $kept->id());
         $candidate->save();
         break;
 
       case 'NOOP':
         $candidate->set('expires', $this->time->getRequestTime());
         $candidate->set('superseded_by', $kept->id());
+        $candidate->set('superseded_by_reason', $reason);
         $candidate->save();
         break;
 
       case 'DELETE':
-        $candidate->delete();
+        // Soft retire with no replacement: superseded_by stays empty, the
+        // reason records why. Reversible with the un-retire action.
+        $candidate->set('expires', $this->time->getRequestTime());
+        $candidate->set('superseded_by_reason', $reason);
+        $candidate->save();
         break;
 
       case 'ADD':
@@ -1175,7 +1308,305 @@ class AimMemoryManager {
         break;
     }
 
-    return $decision;
+    return [$decision, $reported_text];
+  }
+
+  /**
+   * Verifies that a merged text is faithful to both inputs.
+   *
+   * Two independent checks, either of which fails the merge. The model
+   * check asks a verifier model whether every detail of both inputs
+   * survives and nothing was invented; the verifier is
+   * aim.settings:merge_verifier_model (provider__model) when set, so a
+   * different model can check the first, else the classifier's own model.
+   * The distance check requires the merged text's embedding to sit within
+   * aim.settings:merge_max_distance of each input (0 disables it). Both
+   * check faithfulness to the inputs, not real-world truth. A verifier
+   * error counts as a failure: the safe outcome is keeping both facts.
+   *
+   * @param \Drupal\aim\Entity\AimFact $kept
+   *   The established fact.
+   * @param \Drupal\aim\Entity\AimFact $candidate
+   *   The newer fact.
+   * @param string $mergedText
+   *   The guardrail-checked merged text.
+   * @param string $providerId
+   *   The classifier's provider, the verifier fallback.
+   * @param string $modelId
+   *   The classifier's model, the verifier fallback.
+   *
+   * @return string|null
+   *   NULL if the merge passed, else the failed check: model, distance or
+   *   error.
+   */
+  protected function verifyMerge(AimFact $kept, AimFact $candidate, string $mergedText, string $providerId, string $modelId): ?string {
+    $config = $this->configFactory->get('aim.settings');
+
+    $max_distance = (float) $config->get('merge_max_distance');
+    if ($max_distance > 0) {
+      try {
+        $merged = $this->embedText($mergedText);
+        foreach ([$kept, $candidate] as $input) {
+          if ($this->cosineDistance($merged, $this->embedText((string) $input->get('text')->value)) > $max_distance) {
+            return 'distance';
+          }
+        }
+      }
+      catch (\Exception $e) {
+        $this->logger->warning('Merge distance check failed to run: @message', ['@message' => $e->getMessage()]);
+        return 'error';
+      }
+    }
+
+    if ($config->get('merge_verify') ?? TRUE) {
+      $verifier = (string) $config->get('merge_verifier_model');
+      if (str_contains($verifier, '__')) {
+        [$providerId, $modelId] = explode('__', $verifier, 2);
+      }
+      try {
+        if (!$this->modelConfirmsMerge($kept, $candidate, $mergedText, $providerId, $modelId)) {
+          return 'model';
+        }
+      }
+      catch (\Exception $e) {
+        $this->logger->warning('Merge verifier failed to run: @message', ['@message' => $e->getMessage()]);
+        return 'error';
+      }
+    }
+
+    return NULL;
+  }
+
+  /**
+   * Asks a model whether a merged text keeps every detail of both inputs.
+   *
+   * @param \Drupal\aim\Entity\AimFact $kept
+   *   The established fact.
+   * @param \Drupal\aim\Entity\AimFact $candidate
+   *   The newer fact.
+   * @param string $mergedText
+   *   The merged text to check.
+   * @param string $providerId
+   *   The AI provider plugin ID.
+   * @param string $modelId
+   *   The chat model ID.
+   *
+   * @return bool
+   *   TRUE if the model confirms the merge is faithful.
+   *
+   * @throws \RuntimeException
+   *   If the response is not the expected JSON shape.
+   */
+  protected function modelConfirmsMerge(AimFact $kept, AimFact $candidate, string $mergedText, string $providerId, string $modelId): bool {
+    $prompt = strtr($this->configFactory->get('aim.settings')->get('merge_verify_prompt'), [
+      '{kept_text}' => $kept->get('text')->value,
+      '{candidate_text}' => $candidate->get('text')->value,
+      '{merged_text}' => $mergedText,
+    ]);
+
+    $schema = new StructuredOutputSchema(
+      name: 'aim_merge_verification',
+      description: 'Whether a merged fact is faithful to the two facts it replaces.',
+      strict: TRUE,
+      json_schema: [
+        'type' => 'object',
+        'additionalProperties' => FALSE,
+        'properties' => [
+          'faithful' => ['type' => 'boolean'],
+        ],
+        'required' => ['faithful'],
+      ],
+    );
+
+    $input = new ChatInput([new ChatMessage('user', $prompt)]);
+    $input->setChatStructuredJsonSchema($schema);
+
+    $output = $this->aiProvider->createInstance($providerId)->chat($input, $modelId, ['aim_consolidate_verify']);
+    $response_text = $output->getNormalized()->getText();
+    $decoded = json_decode($response_text, TRUE);
+    if (!is_array($decoded) || !isset($decoded['faithful'])) {
+      throw new \RuntimeException("Verifier response was not the expected JSON shape: $response_text");
+    }
+    return $decoded['faithful'] === TRUE;
+  }
+
+  /**
+   * Embeds a text with the vector server's own embeddings engine.
+   *
+   * @param string $text
+   *   The text to embed.
+   *
+   * @return float[]
+   *   The embedding vector.
+   *
+   * @throws \RuntimeException
+   *   If the index or its embeddings engine is not configured.
+   */
+  protected function embedText(string $text): array {
+    $index = $this->loadVectorIndex();
+    $backend = $index?->getServerInstance()->getBackendConfig() ?? [];
+    $engine = (string) ($backend['embeddings_engine'] ?? '');
+    if (!str_contains($engine, '__')) {
+      throw new \RuntimeException('The vector server has no embeddings engine configured.');
+    }
+    [$provider_id, $model_id] = explode('__', $engine, 2);
+    $config = $backend['embeddings_engine_configuration'] ?? [];
+    $provider = $this->aiProvider->createInstance($provider_id);
+    if (!empty($config['set_dimensions']) && !empty($config['dimensions'])) {
+      $provider->setConfiguration(['dimensions' => (int) $config['dimensions']] + $provider->getConfiguration());
+    }
+    return $provider->embeddings($text, $model_id, ['aim_consolidate_verify'])->getNormalized();
+  }
+
+  /**
+   * Computes the cosine distance between two vectors.
+   *
+   * @param float[] $a
+   *   The first vector.
+   * @param float[] $b
+   *   The second vector.
+   *
+   * @return float
+   *   1 minus cosine similarity: 0 identical, larger less similar.
+   */
+  protected function cosineDistance(array $a, array $b): float {
+    $dot = 0.0;
+    $norm_a = 0.0;
+    $norm_b = 0.0;
+    foreach ($a as $i => $value) {
+      $dot += $value * ($b[$i] ?? 0.0);
+      $norm_a += $value * $value;
+      $norm_b += ($b[$i] ?? 0.0) ** 2;
+    }
+    if ($norm_a == 0.0 || $norm_b == 0.0) {
+      return 1.0;
+    }
+    return 1.0 - $dot / (sqrt($norm_a) * sqrt($norm_b));
+  }
+
+  /**
+   * Builds the provenance string stored in superseded_by_reason.
+   *
+   * Compact JSON, never fact text. Kept as one small helper alongside
+   * logConsolidation() so both move together if decideAndApply() changes.
+   *
+   * @param string $decision
+   *   UPDATE, DELETE or NOOP (the decisions that retire a fact).
+   * @param float $score
+   *   The similarity score between the pair.
+   * @param array|null $model
+   *   A [provider ID, model ID] pair if the model decided, NULL if the
+   *   auto threshold did.
+   *
+   * @return string
+   *   The JSON reason.
+   */
+  protected function buildSupersedeReason(string $decision, float $score, ?array $model): string {
+    return json_encode([
+      'decision' => $decision,
+      'by' => $model ? 'model' : 'auto',
+      'score' => round($score, 3),
+      'provider' => $model[0] ?? NULL,
+      'model' => $model[1] ?? NULL,
+    ], JSON_THROW_ON_ERROR);
+  }
+
+  /**
+   * Creates the new fact an UPDATE merge produces.
+   *
+   * Identity (scope, subject/user, target) comes from the kept fact, since
+   * both inputs share it. Metadata is reconciled deliberately: text is the
+   * guardrail-checked merge; asserted is the candidate's only; state and
+   * source prefer the candidate (the newer statement) and fall back to the
+   * kept fact;
+   * category is the union; trusted only if both inputs were; the owner is
+   * the kept fact's.
+   *
+   * @param \Drupal\aim\Entity\AimFact $kept
+   *   The established fact.
+   * @param \Drupal\aim\Entity\AimFact $candidate
+   *   The newer fact.
+   * @param string $mergedText
+   *   The guardrail-checked merged text.
+   *
+   * @return \Drupal\aim\Entity\AimFact
+   *   The saved merged fact.
+   */
+  protected function createMergedFact(AimFact $kept, AimFact $candidate, string $mergedText): AimFact {
+    $values = [
+      'scope' => $kept->bundle(),
+      'text' => $mergedText,
+      'uid' => $kept->getOwnerId(),
+      'trusted' => (bool) $kept->get('trusted')->value && (bool) $candidate->get('trusted')->value,
+    ];
+    // Copy whichever identity fields this fact has: subject/user always
+    // exist, target_* only where aim_scope_entity is installed.
+    foreach (['subject', 'user', 'target_type', 'target_id'] as $field) {
+      if ($kept->hasField($field)) {
+        $values[$field] = $kept->get($field)->getValue();
+      }
+    }
+    // The asserted field is the candidate's only: the kept fact's valid-time
+    // start belongs to the older wording, not the merged statement.
+    if (!$candidate->get('asserted')->isEmpty()) {
+      $values['asserted'] = $candidate->get('asserted')->value;
+    }
+    foreach (['state', 'source'] as $field) {
+      $source = !$candidate->get($field)->isEmpty() ? $candidate : $kept;
+      if (!$source->get($field)->isEmpty()) {
+        $values[$field] = $source->get($field)->value;
+      }
+    }
+    $categories = [];
+    foreach ([$kept, $candidate] as $input) {
+      foreach ($input->get('category') as $item) {
+        $categories[(int) $item->target_id] = ['target_id' => (int) $item->target_id];
+      }
+    }
+    if ($categories) {
+      $values['category'] = array_values($categories);
+    }
+
+    /** @var \Drupal\aim\Entity\AimFact $merged */
+    $merged = $this->entityTypeManager->getStorage('aim_fact')->create($values);
+    $this->saveFact($merged);
+    return $merged;
+  }
+
+  /**
+   * Logs one applied consolidation outcome.
+   *
+   * Kept as one small helper so decideAndApply() can be reworked without
+   * touching the logging. BLOCKED is a warning and always logged; every
+   * other decision is an audit event. Never logs fact text.
+   *
+   * @param \Drupal\aim\Entity\AimFact $kept
+   *   The established fact.
+   * @param \Drupal\aim\Entity\AimFact $candidate
+   *   The newer fact evaluated against it.
+   * @param float $score
+   *   The similarity score between the two.
+   * @param string $decision
+   *   ADD, UPDATE, DELETE, NOOP or BLOCKED.
+   * @param array|null $model
+   *   A [provider ID, model ID] pair if the model decided, NULL if the
+   *   auto threshold did.
+   */
+  protected function logConsolidation(AimFact $kept, AimFact $candidate, float $score, string $decision, ?array $model): void {
+    $message = 'Consolidation @decision (scope @scope, kept @kept, candidate @candidate, score @score, decided by @by).';
+    $context = [
+      '@decision' => $decision,
+      '@scope' => $kept->bundle(),
+      '@kept' => $kept->id(),
+      '@candidate' => $candidate->id(),
+      '@score' => round($score, 3),
+      '@by' => $model ? 'model ' . $model[0] . '/' . $model[1] : 'auto',
+    ];
+    if ($decision === 'BLOCKED') {
+      $this->logger->warning($message, $context);
+      return;
+    }
+    $this->logAudit($message, $context);
   }
 
   /**
@@ -1375,6 +1806,13 @@ class AimMemoryManager {
     if (!is_array($decoded) || !isset($decoded['facts']) || !is_array($decoded['facts'])) {
       throw new \RuntimeException("Model response was not the expected JSON shape: $response_text");
     }
+
+    $this->logVerbose('Extraction returned @count candidate facts (provider @provider, model @model, uid @uid).', [
+      '@count' => count($decoded['facts']),
+      '@provider' => $providerId,
+      '@model' => $modelId,
+      '@uid' => $this->currentUser->id(),
+    ]);
 
     return $decoded['facts'];
   }

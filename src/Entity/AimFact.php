@@ -144,6 +144,10 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
       ->setDescription(t('The aim_fact that replaced this one, set by consolidation when this fact is soft-retired.'))
       ->setSetting('target_type', 'aim_fact');
 
+    $fields['superseded_by_reason'] = BaseFieldDefinition::create('string_long')
+      ->setLabel(t('Retirement reason'))
+      ->setDescription(t('JSON provenance for the consolidation decision that retired this fact: decision, auto or model, similarity score, provider and model ID. Never holds fact text.'));
+
     $fields['category'] = BaseFieldDefinition::create('entity_reference')
       ->setLabel(t('Category'))
       ->setDescription(t('Optional classification tag(s).'))

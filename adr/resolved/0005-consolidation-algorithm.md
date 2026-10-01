@@ -137,3 +137,38 @@ Directionality is unchanged and was not revisited here: still one-way
 (retired fact points at its replacement), which is all the audit-trail
 use case needs - see ADR-0012's own "Directionality" open question for
 the discussion of what a reverse edge would take.
+
+## Addendum (2026-10-01): consolidation is non-destructive
+
+Changes this ADR's soft-supersede semantics. Originally NOOP retired the
+candidate, UPDATE overwrote the kept fact's text in place (losing the old
+wording, and never reconciling `asserted`, `state` or `category`), and
+DELETE hard-deleted the candidate. Now:
+
+- DELETE is a soft retire: `expires` set, `superseded_by` empty.
+- UPDATE creates a new merged fact and retires both inputs pointing at
+  it. Carry-over: identity and owner from the kept fact, `asserted` from
+  the candidate only, `state`/`source` candidate-else-kept, `category`
+  unioned, `trusted` only if both inputs were.
+- `superseded_by_reason` (JSON: decision, auto or model, score, provider,
+  model ID, no fact text) is stored on the retired candidate's row.
+- `drush aim:consolidate --dry-run` prints the merged text.
+
+Retired facts stay out of the vector index (ADR-0022), so no recall or
+index-size cost; no archive table, since retired facts about a person are
+still personal data (retention policy is the later answer).
+
+Finding: the auto path keeps the older fact. A 0.068-score pair that was
+really a knowledge update (a location change) was retired as NOOP with
+the stale fact left live; the model classified it UPDATE when forced. The
+auto threshold is therefore a correctness risk, not just a cost
+shortcut. Not changed yet: measure the extra hosted-call cost first.
+
+Merge verification (same day): an UPDATE's merged text, after the
+Guardrails policy check, must also be confirmed faithful by a verifier
+model (optionally a different one, `merge_verifier_model`) and, if
+enabled, sit within `merge_max_distance` of each input embedding. Failure
+downgrades to ADD. Live check on one pair: the model separated a faithful
+merge from a lossy one; embedding distance barely did (0.02/0.11 vs
+0.08/0.14), so that check ships disabled. Retention/prune of retired rows
+is deliberately not decided here: it needs its own ADR and sign-off.

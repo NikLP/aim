@@ -470,7 +470,7 @@ final class AimCommands extends DrushCommands {
       return;
     }
 
-    $this->io()->table(['Kept', 'Candidate', 'Score', 'Decision'], $result['rows']);
+    $this->io()->table(['Kept', 'Candidate', 'Score', 'Decision', 'Merged text'], $result['rows']);
     if (!empty($options['dry-run'])) {
       $this->io()->note(count($result['rows']) . ' decision(s) previewed, nothing saved. Omit --dry-run to apply.');
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\aim\Plugin\QueueWorker;
 
+use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Queue\Attribute\QueueWorker;
 use Drupal\Core\Queue\QueueWorkerBase;
@@ -40,12 +41,15 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
    *   The plugin implementation definition.
    * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
    *   The aim memory manager.
+   * @param \Drupal\Core\Logger\LoggerChannelInterface $logger
+   *   The aim logger channel.
    */
   public function __construct(
     array $configuration,
     string $pluginId,
     mixed $pluginDefinition,
     protected AimMemoryManager $memoryManager,
+    protected LoggerChannelInterface $logger,
   ) {
     parent::__construct($configuration, $pluginId, $pluginDefinition);
   }
@@ -59,6 +63,7 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
       $plugin_id,
       $plugin_definition,
       $container->get('aim.memory_manager'),
+      $container->get('logger.channel.aim'),
     );
   }
 
@@ -95,7 +100,9 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
       // draining this queue for the rest of the run, instead of failing
       // every remaining item one by one. Matches the CLI command's own
       // refusal to guess a provider.
-      throw new SuspendQueueException('No default chat provider configured; cannot consolidate fact ' . $fact_id . '.');
+      $cause = 'No default chat provider configured; cannot consolidate fact ' . $fact_id . '.';
+      $this->logger->error('Consolidation queue suspended: @cause', ['@cause' => $cause]);
+      throw new SuspendQueueException($cause);
     }
 
     $this->memoryManager->consolidateFact(

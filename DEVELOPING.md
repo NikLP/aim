@@ -117,6 +117,64 @@ genuinely distinct facts under another (hit live: 0.12 auto-merged two
 related-but-distinct facts under this embedding model; pulled back to
 0.09).
 
+**Nothing is destroyed** (ADR-0005 addendum, 2026-10-01). Every outcome
+that removes a fact from recall is a soft retire (`expires` set), so it
+is auditable and reversible with the Un-retire action (which also clears
+`superseded_by_reason`):
+
+- `NOOP` (and the auto path): candidate retired, `superseded_by` = kept.
+- `DELETE`: candidate retired, `superseded_by` left empty.
+- `UPDATE`: a **new merged fact** is created and both inputs are retired
+  pointing at it. The old wording survives on the retired rows. Metadata
+  carried over: scope, subject/user, target and owner from the kept fact;
+  `asserted` from the candidate only; `state`/`source` from the candidate
+  else the kept fact; `category` the union; `trusted` only if both inputs
+  were. The merged fact is queued for consolidation like any new fact.
+- `superseded_by_reason` (on the retired candidate's row only; JSON,
+  never fact text): `decision`, `by` (`auto` or `model`), `score`,
+  `provider`, `model`. Installed by `aim_update_10004()`.
+
+Retired facts stay out of the vector index (`aim_exclude_retired`), so
+history costs no recall precision or index size. They are still personal
+data: no parallel archive exists, the retention policy (TODO) is the later
+answer.
+
+**Merge verification** (2026-10-01). Guardrails check policy, not
+fidelity, so an UPDATE's merged text must also pass `verifyMerge()`
+before it is accepted; failure downgrades the pair to **ADD** (keep both)
+and logs an audit line (`@check` = `model`, `distance` or `error`, never
+text). Dry-run shows such rows as `ADD` with a non-empty "Merged text".
+Settings (`aim.settings`, `/admin/config/aim/settings`):
+
+- `merge_verify` (default on): a verifier model gets both inputs and the
+  merge (`merge_verify_prompt`) and must confirm every detail survives
+  and nothing is invented. Verifier errors count as failure.
+- `merge_verifier_model` (`provider__model`, empty = the classifier's own
+  model): set it to a different model so one checks the other. A local
+  Ollama model (Ollaya) is the intended candidate, but it is not
+  weight-compatible, so shadow it against the hosted verdicts first.
+- `merge_max_distance` (default 0 = off): merged embedding must sit within
+  this cosine distance of each input. Measured 2026-10-01 on one pair, it
+  barely separates a faithful merge (0.02 / 0.11) from a lossy one
+  (0.08 / 0.14), so it is a weak tripwire, not a verifier; calibrate
+  before enabling.
+
+Both check faithfulness to the inputs, not real-world truth. The shipped
+consolidation prompt also now says to choose ADD when unsure
+(`aim_update_10005()` adds that line to an unedited prompt and the new
+keys to an existing site).
+
+`--dry-run` still calls the model and prints the merged text in a
+"Merged text" column (also for `BLOCKED`), for reviewing UPDATE fidelity
+by hand. **Auto-path caveat:** the auto branch keeps the *older* fact and
+retires the newer one with no model check. A synthetic "coffee machine
+moved from the second to the third floor" pair scored 0.068 (under 0.09)
+and was retired as NOOP, leaving the stale statement live; with
+`--auto-threshold=0` the model classified it UPDATE correctly. Setting the
+shipped default to 0 is not applied yet: it needs the cost measurement
+(one hosted call per pair under `ambiguous_threshold`) from the TODO
+baseline work.
+
 **Automated path:** `AimConsolidateQueueWorker` (plugin ID
 `aim_consolidate`) - `remember()`/`createFactsFromCandidates()` enqueue
 each new fact right after save. Carries no `cron` key, so
@@ -797,6 +855,42 @@ count - trivial at PoC scale, a real line item at volume.
 
 ---
 
+## Logging
+
+Channel `aim` (service `logger.channel.aim`). Three tiers:
+
+- Standard, always on: warnings and errors only (guardrail/validation
+  rejections in `remember()` and `createFactsFromCandidates()`, `BLOCKED`
+  consolidation merges, the queue worker's suspend cause).
+- `aim.settings:log_audit` (info): writes, consolidation decisions,
+  trust/untrust/retire/unretire actions.
+- `aim.settings:log_verbose` (debug): recall, embedding cache, extraction.
+- `aim.settings:log_query_text` (debug, needs `log_verbose`): adds the
+  recall query text, for diagnosing poor or empty matches. Off by default;
+  the only place any user-supplied text is logged.
+
+Gate info/debug calls through `AimMemoryManager::logAudit()` /
+`logVerbose()`; the embedding cache subscriber reads `log_verbose` itself
+(the manager depends on it, so it cannot depend back). Never log fact text
+or, outside `log_query_text`, recall query text (personal data, and guardrail violation messages can
+quote it): IDs, scope, uid, subject, decision, score, auto-versus-model,
+provider and model ID only. Consolidation logging lives in the single
+helper `logConsolidation()`, so reworking `decideAndApply()` doesn't
+disturb it.
+
+Reading the log: `drush watchdog:show --type=aim`, or
+`/admin/reports/dblog` filtered by type `aim`. Each entry is one line of
+IDs and metadata, so join to the fact via `aim_fact` ID. `log_query_text`
+entries persist in watchdog (and any syslog or external aggregator)
+after the setting is turned off: delete them with `drush watchdog:delete
+--type=aim` if the queries were sensitive.
+
+Constructor note: `AimMemoryManager` takes the logger as its last argument, and
+action plugins now take the memory manager and current user (all built
+via the container, so only a hand-constructed instance is affected).
+
+---
+
 ## Admin UI
 
 - `/admin/content/aim-facts` (View `views.view.aim_facts`, gated
@@ -812,6 +906,7 @@ count - trivial at PoC scale, a real line item at volume.
 - `/admin/config/system/queue-ui` - manual consolidation-queue trigger.
 - `/admin/config/aim/settings` (`AimSettingsForm`, `#config_target`-backed)
   - consolidation thresholds, the chatbot recall cutoff,
+  the `log_audit`/`log_verbose` checkboxes (see "Logging"),
   `default_trusted` (the initial value a new fact's `trusted` field gets,
   ADR-0002), and the extraction/consolidation prompt text, all
   admin-editable, no code deploy needed. The requested output *shape*

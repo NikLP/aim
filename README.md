@@ -93,6 +93,11 @@ Four memory categories, composable at retrieval the way Mem0 composes
   (`setSyncing(TRUE)`, which core's Migrate destinations set on
   everything they save) skips both Guardrails and the consolidation
   queue - a migrated corpus is stored exactly as given.
+- **Non-destructive consolidation:** merging or discarding a fact never
+  deletes it. It is retired (kept for audit, excluded from recall) with a
+  recorded reason, and a merge creates a new fact rather than overwriting
+  one, so any decision can be reversed. A proposed merge must also pass a
+  faithfulness check by a second model, else both facts are kept.
 - **Sovereignty:** extraction/consolidation reasoning can run against a
   local model (Ollama, via `drupal/ai`'s provider support) for
   deployments where data can't leave the customer's infrastructure.
@@ -190,6 +195,14 @@ ones it wants. Each submodule has its own requirements and setup:
    [README.md](modules/aim_tool_oauth/README.md)/
    [DEVELOPING.md](modules/aim_tool_oauth/DEVELOPING.md) for the setup
    runbook.
+
+5. Optional logging, at `/admin/config/aim/settings`: warnings and errors
+   (rejected writes, blocked merges, a suspended queue) always go to the
+   `aim` log channel. `log_audit` adds writes, consolidation decisions and
+   trust/retire actions; `log_verbose` adds recall, embedding cache and
+   extraction detail. Both default off. Fact text is never logged. Recall
+   query text is logged only if you also tick `log_query_text` (personal
+   data, for short investigations).
 
 To see it working with a story already loaded, apply the
 [community library demo recipe](recipes/aim_demo_library/README.md) to a

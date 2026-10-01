@@ -160,7 +160,8 @@ duplicated here.
   [ADR-0028](adr/resolved/0028-scope-type-plugin.md) piece 1),
   `text` (Guardrails-validated), `source`, `state` (tri-state boolean),
   `category` (taxonomy, vocabulary `aim_category`), `asserted` (valid-time
-  start), `superseded_by`/`expires` (consolidation's supersede edge), `uid`
+  start), `superseded_by`/`expires`/`superseded_by_reason` (consolidation's
+  non-destructive supersede edge and its JSON provenance), `uid`
   (who wrote it), `trusted` (boolean, the draft-to-trusted gate - defaults
   to `aim.settings:default_trusted`, `recall()` excludes untrusted facts
   unless asked otherwise, see
@@ -258,6 +259,14 @@ look at other roles when a permission check unexpectedly fails.
   first; aim ships values under the provider's own config key names, never
   its own. Rule and per-override table in
   [ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md).
+- **Logging** goes through `logger.channel.aim`: warnings and errors
+  always, info/debug only via `AimMemoryManager::logAudit()` /
+  `logVerbose()` (gated by `aim.settings` `log_audit` / `log_verbose`).
+  Never log fact text or recall query text (personal data); IDs, scope,
+  uid, subject, decision, score, provider and model ID only. The one
+  exception is the opt-in `log_query_text`. A new write path, action or
+  decision point should add an audit line; see
+  [DEVELOPING.md](DEVELOPING.md)'s "Logging".
 - Hooks live in `src/Hook/AimHooks.php` (`#[Hook(...)]` attributes), not
   `aim.module` - core's OOP hook system, same shape as this codebase's
   sibling `annotations` module's `AnnotationsHooks`.

@@ -35,6 +35,7 @@ services:
       - '@config.factory'
       - '@current_user'
       - '@aim.embedding_cache_subscriber'
+      - '@logger.channel.aim'
 
   # Class alias so autowired consumers (the auto-registered AimHooks
   # service, src/Hook/AimHooks.php) can type-hint AimMemoryManager
@@ -78,6 +79,7 @@ services:
       - '@cache.aim_embeddings'
       - '@datetime.time'
       - '@logger.channel.aim'
+      - '@config.factory'
     tags:
       - { name: event_subscriber }
 

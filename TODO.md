@@ -85,15 +85,15 @@ questions" section)
 
 ## Concrete near-term fixes flagged in CLAUDE.md/DEVELOPING.md
 
-- [ ] Add a `superseded_by_reason` field on `aim_fact` (provenance-on-invalidation,
-      ADR-0010 parity target #6 /
-      [ADR-0005](adr/resolved/0005-consolidation-algorithm.md)). Today the
-      decision, score and model are returned by `decideAndApply()` and then
-      only printed by `drush aim:consolidate`; the queue path
-      (`AimConsolidateQueueWorker`) discards them and logs nothing, so an
-      automated merge leaves no trace of why. Persist them here. Named to match the
-      2026-09-28 rename of `related` to `superseded_by` - see that ADR's
-      addendum.
+- [x] `superseded_by_reason` built 2026-10-01 (ADR-0005 addendum).
+- [ ] Consolidation/recall baselines (none exist, so no improvement can be
+      claimed): merge-fidelity review of dry-run UPDATE/DELETE rows on a
+      snapshot copy; a disclosed LongMemEval slice (50-100 questions) for
+      recall precision, knowledge-update correctness and abstention (parity
+      targets 1, 4, 5); recall payload size vs. full-history tokens
+      (target 3); duplicate rate; then tune `recall_max_distance` (0.48),
+      `auto_threshold` (evaluate 0) and `ambiguous_threshold` against
+      them; `aim:benchmark` at thousands of facts (open question #5).
 - [ ] Extraction-input guardrailing, distinct from the existing output-side
       candidate-fact guardrails.
 - [ ] The whole module has no test infrastructure yet (no `tests/`

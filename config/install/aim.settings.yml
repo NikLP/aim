@@ -1,7 +1,13 @@
 auto_threshold: 0.09
 ambiguous_threshold: 0.45
+merge_verify: true
+merge_verifier_model: ''
+merge_max_distance: 0
 recall_max_distance: 0.45
 default_trusted: false
+log_audit: false
+log_verbose: false
+log_query_text: false
 user_scope_shared_role_fallback: true
 user_scope_role_visibility: {  }
 extraction_prompt: |
@@ -44,4 +50,19 @@ consolidation_prompt: |
   - "DELETE": the candidate fact should not exist as a memory at all
   (e.g. nonsensical or clearly erroneous). Use sparingly.
 
+  When unsure whether the candidate is a refinement or a distinct fact, choose "ADD":
+  merging is where nuance is lost, and keeping both facts is always safe.
+
   For any decision other than UPDATE, set merged_text to the existing fact's text unchanged.
+merge_verify_prompt: |
+  A memory system proposes replacing two facts with one merged fact.
+  Judge only faithfulness to the inputs, not whether they are true.
+
+  Fact A: "{kept_text}"
+  Fact B: "{candidate_text}"
+  Merged: "{merged_text}"
+
+  Set faithful to true only if every detail of Fact A and Fact B survives in
+  Merged (names, numbers, dates, conditions, negations) and Merged adds
+  nothing that neither fact states, except where Fact B plainly corrects or
+  supersedes a detail of Fact A. Otherwise set faithful to false.

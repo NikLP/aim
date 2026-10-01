@@ -7,6 +7,8 @@
 
 declare(strict_types=1);
 
+use Drupal\Component\Serialization\Yaml;
+use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\search_api\IndexInterface;
 
 /**
@@ -71,4 +73,40 @@ function aim_uninstall(): void {
   // with. Safe if the search_api_index delete (now handled by the config
   // dependency cascade above, not this hook) already dropped it.
   \Drupal::database()->schema()->dropTable('aim_fact_vectors');
+}
+
+/**
+ * Installs the superseded_by_reason base field on aim_fact.
+ */
+function aim_update_10004(): void {
+  $definition = BaseFieldDefinition::create('string_long')
+    ->setName('superseded_by_reason')
+    ->setTargetEntityTypeId('aim_fact')
+    ->setProvider('aim')
+    ->setLabel(t('Retirement reason'))
+    ->setDescription(t('JSON provenance for the consolidation decision that retired this fact: decision, auto or model, similarity score, provider and model ID. Never holds fact text.'));
+  \Drupal::entityDefinitionUpdateManager()->installFieldStorageDefinition('superseded_by_reason', 'aim_fact', 'aim', $definition);
+}
+
+/**
+ * Adds the merged-text verification settings.
+ */
+function aim_update_10005(): void {
+  $path = \Drupal::service('extension.path.resolver')->getPath('module', 'aim') . '/config/install/aim.settings.yml';
+  $defaults = Yaml::decode(file_get_contents($path));
+  $config = \Drupal::configFactory()->getEditable('aim.settings');
+  foreach (['merge_verify', 'merge_verifier_model', 'merge_max_distance', 'merge_verify_prompt'] as $key) {
+    if ($config->get($key) === NULL) {
+      $config->set($key, $defaults[$key]);
+    }
+  }
+  // The shipped prompt gained a bias-toward-ADD line; only add it to a
+  // prompt that still matches the shipped wording, never overwrite an
+  // admin's edits.
+  $prompt = (string) $config->get('consolidation_prompt');
+  if (!str_contains($prompt, 'choose "ADD"') && str_contains($prompt, 'For any decision other than UPDATE')) {
+    $line = "When unsure whether the candidate is a refinement or a distinct fact, choose \"ADD\":\nmerging is where nuance is lost, and keeping both facts is always safe.\n\n";
+    $config->set('consolidation_prompt', str_replace('For any decision other than UPDATE', $line . 'For any decision other than UPDATE', $prompt));
+  }
+  $config->save();
 }

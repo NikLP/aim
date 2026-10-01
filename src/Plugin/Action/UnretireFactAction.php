@@ -9,7 +9,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Entity\AimFact;
 
 /**
- * Reverses a retirement: clears expires and superseded_by.
+ * Reverses a retirement: clears expires, superseded_by and its reason.
  */
 #[Action(
   id: 'aim_fact_unretire',
@@ -27,6 +27,7 @@ class UnretireFactAction extends AimFactActionBase {
     }
     $fact->set('expires', NULL);
     $fact->set('superseded_by', NULL);
+    $fact->set('superseded_by_reason', NULL);
     return TRUE;
   }
 
