@@ -97,6 +97,29 @@ switch to inline mode for the session.
   error, not a degraded score, and it spends the model's full context
   window of memory on input that cannot be scored.
 
+## Addendum (2026-10-02): tev1 on Ollama, and what it changes
+
+Ollama 0.35 now serves decision models, so Ollaya is not required to
+host `/v1/systemone`. [ADR-0021](0021-jev-typed-decision-provider.md)'s
+2026-10-02 addendum has the measurements. For this ADR:
+
+- **`tev1:4b` is the candidate scorer, not `tev1:0.8b`.** On a small set
+  the 4B passed 31/31 true facts and rejected 6/6 blatant and 5/8
+  subtle falsehoods at 0.5; the 0.8B rejected 2/6 and 2/8.
+- **Inline mode is not viable on this laptop.** About 6.5-7 s per new
+  fact on CPU (the 0.8B is 0.9 s but cannot gate). Queued stays the
+  default; post-response is the only other realistic mode.
+- **General plausibility is not site agreement.** The scorer misses
+  site-specific contradictions because it sees only the fact. Sending
+  recalled facts as context would help but spends the roughly
+  2,050-token input limit; untested.
+- **A guardrail is the wrong home for the gate itself.** A guardrail
+  rejects the write; this ADR quarantines it. A guardrail can still
+  reject the clearly-bad tier (for example below 0.2).
+- **Wiring** goes through the core Decision API and the provider
+  manager, not the direct HTTP client suggested under Open questions.
+  `ai_provider_typesafeai` 1.1.0-beta1 is installed but not enabled.
+
 ## Open questions
 
 - **Threshold and questions.** What Noul questions to ask and where to

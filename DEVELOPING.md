@@ -671,11 +671,11 @@ unbounded services OOM-killed the editor on 2026-09-28. Both run as
 systemd services; limit them with drop-ins (`sudo systemctl edit <unit>`),
 then check with `systemctl show <unit> -p MemoryPeak -p MemoryMax`.
 
-| | Ollama (`nomic-embed-text`) | Ollaya (`laya:en`) |
+| | Ollama (`nomic-embed-text`, `tev1:4b`) | Ollaya (`laya:en`) |
 | --- | --- | --- |
-| Measured working set | ~650 MB peak | ~3.8 GB resident, up to ~4.3 GB on full-context input |
-| `MemoryMax` | `1G` | `5G` |
-| `MemoryHigh` | not set | `4500M` |
+| Measured working set | ~650 MB peak (embeddings); `tev1:4b` pinned at whatever `MemoryHigh` was (page cache), true working set not measured | ~3.8 GB resident, up to ~4.3 GB on full-context input |
+| `MemoryMax` | `7G` (was `1G` for embeddings only) | `5G` |
+| `MemoryHigh` | `6G` (5G probably enough, untested) | `4500M` |
 | `OOMScoreAdjust` | `500` | `500` |
 | Keep-alive | `OLLAMA_KEEP_ALIVE=30s` | `OLLAYA_KEEP_ALIVE=10m` while testing (default `5m`) |
 | Listens on | `0.0.0.0:11434` (DDEV needs it) | `127.0.0.1:11435` |
@@ -692,6 +692,14 @@ then check with `systemctl show <unit> -p MemoryPeak -p MemoryMax`.
   --runtime` changes the limit live but does not unload the model, so a
   timing test right after it measures a warm model. Restart the unit,
   then time the first call.
+- **A cap near a model file's size kills the pull.** Downloading a 4.5 GB
+  model writes it through the page cache, which is charged to the
+  service's cgroup, so a `MemoryMax` of 4.5G was OOM-killed mid-pull on
+  2026-10-01. Pull with headroom (file size plus about 1.5 GB) or with the
+  cap lifted, then restart so the first timing is a cold load. A unit
+  with `Restart=always` and a mistyped cap (`MemoryMax=7` is 7 bytes)
+  crash-loops from boot; the drop-in uses `Restart=on-failure`
+  with `StartLimitBurst=3`. Neither Ollama nor Ollaya is enabled at boot.
 - **Do not use `systemd-zram-generator`** on the laptop: extra CPU, and
   it interferes with suspend. The existing swap file is the backstop.
 - **Keep-alive trades load time for memory.** A short value frees RAM

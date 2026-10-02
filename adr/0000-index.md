@@ -17,14 +17,15 @@ Still carrying work, proposed, or deferred.
 | [0016](0016-document-ingestion-ui.md) | Document ingestion via a Drupal form: three modes, one shared core | Mode 1 accepted (build now); Mode 2 blocked on ADR-0002; Mode 3 out of scope |
 | [0019](0019-recall-abstention-distance-cutoff.md) | Recall abstention via a distance cutoff, and what bounds recall quality | Accepted - chatbot cutoff built 2026-09-19; follow-ups not built |
 | [0020](0020-verbatim-facts-consolidation-opt-out.md) | Verbatim facts: an explicit opt-out from consolidation | Proposed - analyzed, not built; build/no-build undecided |
-| [0021](0021-jev-typed-decision-provider.md) | Jev (TypeSafe AI) as a typed-decision provider: spike, not adoption; addendum on Laya, an open-source alternative | Deferred - Laya spikes first (self-hosted), post-DrupalCon; Jev queued behind it |
+| [0021](0021-jev-typed-decision-provider.md) | Jev (TypeSafe AI) as a typed-decision provider: spike, not adoption; addendum on Laya, an open-source alternative | Deferred, updated 2026-10-02 - Decision API now in core `drupal/ai` 1.6, Ollama serves decision models (tev1); no spike scheduled |
 | [0024](0024-annotations-integration-target-scoped-promotion.md) | Annotations integration: facts scoped to annotation targets, review as promotion | Proposed - blocker 2 (Annotations write path) done 2026-09-28; blocker 1 (trust gate) designed, not built; `scope: entity` + its ADR-0025 plugin now built ([ADR-0027](resolved/0027-entity-scope.md), 2026-09-29); the bridge module's own write path is still unbuilt |
 | [0029](0029-context-carrying-turns.md) | Context-carrying turns: mention tokens, an API-first console with context chips, `batch_id` provenance, one review pipeline | Accepted 2026-09-30 - design only, not built |
 | [0030](0030-fact-groups.md) | Fact groups: a scope-agnostic `group` field shipped as an `aim_group` submodule, plus a generic `recall()` filter seam | Accepted 2026-09-30 - design only, not built |
 | [0031](0031-cron-fallback-for-queue-processing.md) | Opt-in `hook_cron` fallback for queue processing, alongside the dedicated crontab | Proposed 2026-09-30 - design only, not built; amends 0003 |
 | [0032](0032-dated-category-listing-for-quick-notes.md) | No `event` scope for diary-style notes: category + `asserted` date, a non-vector list method, and tid-based capture in the Tool API | Proposed 2026-10-01 - design only, not built |
-| [0033](0033-plausibility-gate-processing-modes.md) | Plausibility gate on new facts: untrusted until scored, fail closed, and queued vs inline vs post-response processing | Proposed 2026-10-01 - design only, not built; measured against local Ollaya on the dev laptop |
+| [0033](0033-plausibility-gate-processing-modes.md) | Plausibility gate on new facts: untrusted until scored, fail closed, and queued vs inline vs post-response processing | Proposed 2026-10-01, addendum 2026-10-02 - design only, not built; measured on the dev laptop (laya:en, then tev1:4b) |
 | [0034](0034-split-chat-assistants-read-only-public.md) | Split chat assistants: read-only public bot, staff bot with `remember`, gated by tool permission not block visibility | Proposed 2026-10-01 - design only, not built |
+| [0035](0035-standing-constraints-action-gate.md) | Standing constraints: structured "don't build X until Y" facts enforced by a deterministic action-layer gate, semantic recall advisory only | Proposed 2026-10-01 - design only, not built |
 
 ## Resolved
 

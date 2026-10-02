@@ -15,6 +15,45 @@ this list as exhaustive.
       schema validation. Then confirm `aim:remember --file` loads all 31
       facts and the demo questions in the site repo's `demo/README.md`
       answer as before.
+## Decision models (raised 2026-10-02, ADR-0021/0033 addenda)
+
+- [ ] Move aim's model choices to the AI suite's `ai_provider_configuration`
+      element (one per activity: extraction, consolidation classifier,
+      merge verifier, decision), replacing the free-text
+      `merge_verifier_model` and the Drush-only `--provider`/`--model`.
+- [ ] Build `classifyPair()` and `verifyMerge()` on the core Decision API
+      through the provider manager, chat path staying the default, behind a
+      setting. Thresholds and question text as per-model config.
+- [ ] A separate decision guardrail set (not `aim_write_guardrails`, whose
+      2000-character limit and HTML regex would hit the serialized input).
+- [ ] Score `laya:en` with `modules/aim_benchmark/scripts/plausibility-benchmark.py`
+      so Ollaya and `tev1:4b` are compared on the same set; then decide
+      Ollaya removal (steps and doc impact are in the 2026-10-01 thread:
+      disable service, drop-ins, binary and models, DEVELOPING.md
+      "Running local model services", ADR-0033 text).
+- [ ] Raise `drupal/ai` to `^1.6` in aim's `composer.json` once 1.6.0 is
+      tagged (the site runs `1.6.x-dev` with `ai_provider_typesafeai`
+      1.1.0-beta1, installed but not enabled; enabling needs
+      `drush config:export` for `config/sync` parity).
+- [ ] Unverified, check before relying on any of it:
+  - Provider against Ollama end to end: `host` needs `/v1`, a placeholder
+    API key, and model discovery from `/v1/models` is unfiltered or falls
+    back to two Jev names. Read from the code, never configured or run.
+  - How a caller attaches a guardrail set to a Decision call, and that the
+    built-in length and regex plugins really run for Decision (docs say so;
+    plugin code not opened).
+  - `web/modules/contrib/ai_provider_typesafeai/tests/check-decision-api.php`
+    (offline class check) has not been run.
+  - The benchmark numbers are single runs on 31 true and 14 control facts,
+    not a calibration. No context (recalled facts) was sent; whether that
+    fixes the site-specific misses, within the roughly 2,050-token input
+    limit, is untested.
+  - The provider declares 255 choice options for every model; Ollama
+    rejects more than 26 and `tev1` inputs over about 2,050 tokens, which
+    its validator will not catch before sending.
+  - `tev1:4b` true resident memory and a lower `MemoryHigh` (5G) are
+    unmeasured.
+
 ## Governance
 
 - [ ] Close [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
@@ -48,6 +87,13 @@ this list as exhaustive.
       (beta, uninstalled, already exists in the ecosystem) satisfies the
       gate requirement before building one from scratch.
       [ADR-0009](adr/0009-recipe-apply-safety-gate.md)
+
+## ADR-0035 - Standing constraints (design only, nothing built)
+
+- [ ] Spike FlowDrop in a scratch site (approval/release flows, and as
+  ADR-0009's review gate); verify whether its entity triggers can veto.
+- [ ] Verify whether ECA exposes a blockable event for config-entity
+  creation (e.g. a content type), before relying on it as a second gate.
 
 ## Open questions, ADR-0010
 
@@ -210,6 +256,20 @@ questions" section)
       a reroll. Not worth hand-patching a live OAuth path against a
       moving demo deadline - revisit once a working reroll exists upstream,
       or write one properly with time to test it.
+
+## aim_tool: declare permissions on the tools (raised 2026-10-01, tool 1.0.0-beta11)
+
+- [ ] Add `permission: 'read aim memory'` to `AimRecall`'s `#[Tool]` and
+      `permission: 'store aim memory'` to `AimRemember`'s. Label-only
+      change: Tool API reads it without instantiating the plugin (Tool
+      Explorer, catalogs, `tool:info`, which shows `None` today) and
+      checks it before input is processed. **Keep both `checkAccess()`
+      overrides** - ToolBase's default only says "yes if a permission was
+      declared", and `AimRemember` may need its own extra rules. A typo'd
+      permission name denies every ordinary account but not admins, so
+      test as a non-admin. Denial now precedes input validation (different
+      error message when both apply): re-run `node demo/preflight.js`
+      afterward. Optional - safe to leave undone.
 
 ## Backlog - explicitly "wait for a trigger" per the docs' own framing
 

@@ -1,8 +1,8 @@
 # ADR-0021: Jev (TypeSafe AI) as a typed-decision provider - spike, not adoption
 
-**Status:** Deferred (2026-09-27) - Laya spikes first per the addendum
-below (self-hosted, no waitlist), post-DrupalCon; Jev stays queued behind
-Laya and its own waitlist. Neither spike is scheduled yet.
+**Status:** Deferred (2026-09-27), updated 2026-10-02 - the Decision API
+is in core `drupal/ai` 1.6 and Ollama serves decision models; see the
+2026-10-02 addendum. No spike is scheduled yet.
 **Date:** 2026-09-26
 
 ## Context
@@ -137,6 +137,90 @@ under Laya's roughly-20-option cardinality limit, so that limit does
 not rule it out. The fine-tuning requirement does change the spike's
 shape: it needs a labeled training set before Laya can be evaluated at
 all, which is more up front work than calling a hosted API.
+
+## Addendum (2026-10-02): the Decision API is in core, Ollama serves it
+
+Two things in the Context above have changed.
+
+**The Decision API merged into `drupal/ai` 1.6** (MR !2046; the site runs
+`1.6.x-dev`). There is no separate `ai_decision` module and no unmerged
+core patch any more. `ai_provider_typesafeai` 1.1.0-beta1 targets it and
+requires `drupal/ai ^1.6`. Callers build a `DecisionInput` of `NoulQuestion`/
+`ChoiceQuestion`/`ScoreQuestion` value objects and call the provider
+manager; answers are normalized (`getNoul()`, `getChoice()`,
+`isLikely()`, `isConfident()`). Decision guardrails
+(`DecisionGuardrailInterface`, `DecisionGuardrailRunner`) and AI Logging
+apply to calls made through the manager. Reference:
+`web/modules/contrib/ai/docs/developers/call_decision.md`.
+
+**Ollama 0.35 serves decision models** on `/v1/systemone` (port 11434):
+`nimble` (9B), `tev1` (4B) and `tev1:0.8b`. Ollaya is no longer needed
+to host the wire format. The provider's `host` setting can point at
+Ollama with `/v1` included (the client appends `/systemone` and
+`/models`), and `isUsable()` needs a non-empty API key (any placeholder).
+
+Measured 2026-10-01 on the dev laptop (CPU only, 14 GB), 31 true demo
+facts versus 6 blatant and 8 subtle falsehoods, pass mark 0.5, no
+context beyond the fact itself (script:
+`modules/aim_benchmark/scripts/plausibility-benchmark.py`):
+
+| | `tev1:0.8b` | `tev1:4b` |
+| --- | --- | --- |
+| Cold load | 3.2 s | 11-19 s |
+| Median per new fact | 0.9 s | 6.5-7.1 s |
+| True facts passed | 30/31 | 31/31 |
+| Blatant falsehoods rejected | 2/6 | 6/6 |
+| Subtle falsehoods rejected | 2/8 | 5/8 |
+
+The 0.8B cannot separate true from false and is not a gate candidate.
+The 4B separates the blatant cases cleanly; its misses are
+site-specific contradictions (opening hours, renewal counts) that need
+site context, not general plausibility. 16 requests took 62.6 s serial
+and 51.1 s parallel, so it is CPU-bound. These are single runs on small
+sets, not a calibration. `laya:en` was not scored on the same set.
+
+**Decisions**
+
+1. **Go through the provider manager, never raw HTTP.** That is what
+   brings Decision guardrails, AI Logging and events. The benchmark
+   script stays direct because it measures the model.
+2. **Use the AI suite's model selection, not a new aim mechanism.** The
+   `ai_provider_configuration` form element (with its "Default" option
+   resolving the site default for `decision`) is the standard way for a
+   module to let an admin pick provider and model for its own activity.
+   There is no central activity registry; each module stores the
+   element's value in its own config. aim's free-text
+   `merge_verifier_model` (`provider__model`) and the Drush
+   `--provider`/`--model` options predate this and should move to it.
+3. **Question wording and thresholds are config, not code.** Thresholds
+   are per model (the docs say to validate them per model), keyed to the
+   selected model, with admin-editable question text like
+   `consolidation_prompt`/`extraction_prompt`.
+4. **Chat stays the default and stays complete** for consolidation
+   (decision 5, sovereignty). The decision path sits behind a setting.
+5. **Target `drupal/ai ^1.6`** in `composer.json` once 1.6.0 is tagged
+   (it is `^1.4` today). No compatibility code for 1.5.
+6. **Guardrails.** A decision question could back a custom guardrail
+   plugin, but a guardrail's outcome is pass or stop (reject the
+   write), while ADR-0033 wants quarantine (save untrusted). Use a
+   guardrail only for the clearly-bad tier; the `trusted` flag stays the
+   quarantine. `aim_write_guardrails` should not be reused as is: its
+   2000-character limit would count the whole serialized Decision input
+   and its regex would scan question text. Use a separate decision set.
+
+**Known provider limits.** The provider declares one capability profile
+for every model, including 255 choice options, while Ollama rejects
+questions with more than 26 options and `tev1` rejects inputs over about
+2,050 tokens. The validator will not catch these before sending. Its
+model dropdown lists whatever `/v1/models` returns (unfiltered on
+Ollama) or falls back to two Jev names. Four-option ADD/UPDATE/DELETE/
+NOOP is well inside every limit.
+
+Open questions 3 and 4 above are partly answered: the module is now in
+core (4), and Decision guardrails exist, though attaching a set to a
+call is unverified (3). Question 1 (retention) and 2 (pass bar) stand.
+The spike's first real targets are `classifyPair()` and `verifyMerge()`,
+where the pair supplies the context; neither is built.
 
 ## Open questions
 
