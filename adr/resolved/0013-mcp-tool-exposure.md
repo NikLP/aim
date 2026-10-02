@@ -58,7 +58,7 @@ A fourth project, `mcp_tools` (+ its `mcp_tools_ai` submodule), bundles
 many pre-built `tool`-API plugins for other subsystems (search_api,
 JSON:API, webform, translate, Recipes - see
 `project_aim_mcp_tools_recipes` in the assistant's own memory, relevant
-to decision 8/ADR-0009) and a bridge that derives any `tool`-API plugin
+to decision 8/retired ADR-0009) and a bridge that derives any `tool`-API plugin
 into a `drupal/ai` FunctionCall automatically, so an `ai_agents` agent
 (including `aim_chatbot`'s own) could call it too. Real and potentially
 useful later, but the parent `mcp_tools` project is flagged **not

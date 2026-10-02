@@ -160,7 +160,7 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
 
     $fields['asserted'] = BaseFieldDefinition::create('timestamp')
       ->setLabel(t('Asserted'))
-      ->setDescription(t('When this fact became true in reality, if known and different from when it was recorded. Empty means "same as created" - only set this when a caller explicitly knows an earlier real-world date (e.g. "I moved three months ago").'))
+      ->setDescription(t('Valid time: when this fact became true in the world, if known and different from when it was recorded. Empty means "same as created" - only set this when a caller explicitly knows an earlier real-world date (e.g. "I moved three months ago"). Not when it was checked or proven: that is a separate, unbuilt verified date.'))
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['type' => 'datetime_timestamp', 'weight' => 40]);
 

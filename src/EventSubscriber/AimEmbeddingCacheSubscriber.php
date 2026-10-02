@@ -61,16 +61,6 @@ class AimEmbeddingCacheSubscriber implements EventSubscriberInterface {
   protected bool $bypassed = FALSE;
 
   /**
-   * Start time of a cache miss's provider call, keyed by request thread ID.
-   *
-   * Used to log embed time on the matching post-event; a hit never
-   * populates this, since no provider call is made.
-   *
-   * @var array<string, float>
-   */
-  protected array $pendingTimers = [];
-
-  /**
    * Constructs an AimEmbeddingCacheSubscriber.
    *
    * @param \Drupal\Core\Cache\CacheBackendInterface $cache
@@ -153,7 +143,6 @@ class AimEmbeddingCacheSubscriber implements EventSubscriberInterface {
     $key = $this->buildCacheKey($event->getProviderId(), $event->getModelId(), $event->getConfiguration(), $input->getPrompt());
     $cached = $this->cache->get($key);
     if ($cached === FALSE) {
-      $this->pendingTimers[$event->getRequestThreadId()] = microtime(TRUE);
       $this->logVerbose('Embedding cache miss for %provider/%model.', [
         '%provider' => $event->getProviderId(),
         '%model' => $event->getModelId(),
@@ -189,17 +178,6 @@ class AimEmbeddingCacheSubscriber implements EventSubscriberInterface {
     $output = $event->getOutput();
     if (!$output instanceof EmbeddingsOutput) {
       return;
-    }
-
-    $threadId = $event->getRequestThreadId();
-    if (isset($this->pendingTimers[$threadId])) {
-      $embedMs = (int) round((microtime(TRUE) - $this->pendingTimers[$threadId]) * 1000);
-      unset($this->pendingTimers[$threadId]);
-      $this->logVerbose('Embedding call for %provider/%model took @ms ms.', [
-        '%provider' => $event->getProviderId(),
-        '%model' => $event->getModelId(),
-        '@ms' => $embedMs,
-      ]);
     }
 
     $key = $this->buildCacheKey($event->getProviderId(), $event->getModelId(), $event->getConfiguration(), $input->getPrompt());

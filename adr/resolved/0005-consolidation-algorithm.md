@@ -172,3 +172,35 @@ downgrades to ADD. Live check on one pair: the model separated a faithful
 merge from a lossy one; embedding distance barely did (0.02/0.11 vs
 0.08/0.14), so that check ships disabled. Retention/prune of retired rows
 is deliberately not decided here: it needs its own ADR and sign-off.
+
+## Addendum (2026-10-02): current state, and top-k neighbors
+
+The body above describes the original design. What the code does now:
+
+- Thresholds are `DEFAULT_AUTO_THRESHOLD` 0.09 and
+  `DEFAULT_AMBIGUOUS_THRESHOLD` 0.45 (not 0.05/0.20).
+- UPDATE is non-destructive: a new merged fact is created and both inputs
+  are retired pointing at it, after Guardrails and a merge-fidelity check
+  (`verifyMerge()`); an unfaithful merge downgrades to ADD.
+- DELETE is a soft retire with no replacement (it only sets `expires`).
+  TODO.md carries the agreed rename to RETIRE.
+- `related` is now `superseded_by` (cardinality 1), see the 2026-09-28
+  addendum.
+
+**Fixed 2026-10-02: a fact is compared to its nearest `neighbor_limit`
+(setting, default 3) neighbors, not just the nearest one.** With one neighbor, a
+contradiction or duplicate that was not the single closest fact was never
+seen, and the one comparison could be spent on an unrelated-but-close ADD
+pair. `findNeighbors()` returns up to three neighbors inside the ambiguous
+band, nearest first, and `consolidateAgainstNeighbors()` decides each in
+turn: it carries on after an ADD or after retiring the neighbor, and stops
+once the fact itself is retired. The sweep tracks compared pairs (so A-B
+is not classified again from B's side) and retired ids itself, which also
+keeps `--dry-run` honest. Cost: at most three classification calls per
+fact, and only inside the 0.09-0.45 band; the auto band stays free.
+`consolidateFact()` now returns a list of decision tuples, not one.
+Measured with `aim:consolidate --dry-run` on the live site (limit 1 vs 3):
+40 decisions vs 86; UPDATEs 1 vs 3. Of the extra UPDATEs, one merged a
+temporary library-hours change into the permanent hours with its
+relative wording intact ("for two months starting from when this was
+noted"), which loses its date once merged; see ADR-0036's pinned note.

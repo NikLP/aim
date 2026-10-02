@@ -1,0 +1,123 @@
+# ADR-0037: Transient source passages, so a decision model can check a candidate fact against what was actually said
+
+**Status:** Proposed (2026-10-02) - design only, not built; blocked on the
+evaluation in [TODO.md](../TODO.md) "Decision models". Builds on
+[ADR-0033](0033-plausibility-gate-processing-modes.md)'s gate and
+[ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s `trusted`
+flag.
+**Date:** 2026-10-02
+
+## Context
+
+[ADR-0033](0033-plausibility-gate-processing-modes.md) proposed scoring a
+bare fact for plausibility. Measured 2026-10-02, that does not work with
+the small decision models available locally: `laya:en` scored true and
+false library facts almost identically (AUC 0.61 for the generic
+question, 0.77 at best for a reworded one), and `tev1:4b` only did well
+on blatant falsehoods. These models judge the state they are given, not
+the world. A fact on its own gives them nothing to judge.
+
+The real pollution risk in aim is also not "a false fact about the
+world". It is that `extractFacts()` (a chat model) turns source text into
+candidate facts and can hallucinate or misattribute ("the partner is
+vegetarian" from a text about the user being vegetarian). The question
+that matters is "does the source text support this candidate?", and that
+is a grounded question a decision or NLI model can answer, because the
+evidence is in the state.
+
+Today the source text is not kept. `extractFacts()` receives it, returns
+facts, and drops it; `aim_fact.source` is a short label string. A
+grounded check needs the text to still exist when the check runs, which
+is later, in the queue ([ADR-0003](resolved/0003-async-processing-dedicated-crontab.md)).
+
+The earlier "no conversation recording" constraint was a misconstrual
+(it meant audio only) and no longer applies, so keeping text for
+processing is a design choice on its merits: value against exposure.
+
+## Decision
+
+**1. A side table for source passages, with a pointer on the fact.**
+`aim_fact_source` (`id`, `text` longtext, `created`) is a plain
+database table, not an entity: no views data, no Search API index, no
+Tool API or MCP exposure, never returned by `recall()`. `aim_fact` gains
+a nullable integer `source_ref` pointing at it. The text never lands on
+the fact entity, where list builders, views, exports and recall could
+expose it. One passage serves every fact extracted from it.
+
+**2. The write path stores the passage.** `extractFacts()` callers
+(Drush, the ingestion form, the chat tools) write one passage row per
+extraction and set `source_ref` on each resulting fact. `remember()`
+and the Tool API/MCP `store` tool gain an optional `source_text`
+parameter for callers that have the evidence; without it `source_ref`
+stays null.
+
+**3. The grounded check runs in the queue worker, then the text goes.**
+A new worker (or a step in `AimConsolidateQueueWorker`) asks a decision
+model one Noul question per fact with state = passage plus candidate
+("The text states the candidate fact."). The verdict sets `trusted`
+(ADR-0033 decisions 1 and 2: fail closed, stay untrusted on error or
+truncation). When every fact pointing at a passage has a verdict, the
+passage row is deleted and `source_ref` is cleared.
+
+**4. A short retention backstop.** A sweep (the dedicated crontab,
+[ADR-0003](resolved/0003-async-processing-dedicated-crontab.md)) deletes
+passages older than a setting (default 7 days) whatever their state, so
+a stuck queue cannot hold personal data indefinitely. Facts whose
+passage expired unchecked stay untrusted.
+
+**5. No consolidation table, no failed table.** The queue is the work
+list, and a fact row with `trusted=false` is both "pending" and "failed
+the check" (ADR-0033 decision 1). Neither needs a table. The agreed
+`aim_rejection` quarantine (TODO.md "Lossy rejection") is a different
+thing: candidates that never became a fact row. A fact that fails the
+grounded check is a fact row and appears in the review queue as such.
+
+**6. Instant indexing is unaffected.** `index_directly` indexes a fact
+when it is saved, trusted or not; `recall()` filters on `trusted`.
+Only the flag flips later, so the vector index never waits on the gate.
+
+**7. Privacy controls.**
+- A permission, `view aim fact source` (`restrict access`), is
+  held by nobody by default; no UI lists passages in the first build.
+- Passage text is never logged (IDs only, the existing rule in
+  CLAUDE.md "Logging").
+- Sending passage text to a model is the real exposure, since a hosted
+  provider sees the raw conversation, which can contain more than the
+  extracted fact. A setting `source_check_allow_remote` defaults to
+  false: the grounded check refuses a non-local provider unless a site
+  opts in. The decision backend on a local Ollama keeps the text on the
+  machine.
+
+## Alternatives considered
+
+- **Source text as a field on `aim_fact`.** Simplest, but it puts raw
+  conversation on an entity that views, the admin list, exports and any
+  future recall change can expose, and it bloats the table that holds the
+  vector-adjacent hot path. Rejected.
+- **Passage in the queue item payload.** No new table, and the item is
+  deleted on success. Rejected: `queue_ui` (enabled) shows item data to
+  administrators, an unclaimed or stuck item has no retention limit of
+  its own, and extraction yields several facts per passage, so the text
+  would be copied once per item.
+- **A consolidation table / a failed-facts table.** Rejected: see
+  decision 5.
+- **Plausibility on the bare fact** (ADR-0033 as first written). Measured
+  weak above; kept only as the optional reject-the-obvious tier.
+
+## Open questions
+
+- **Which model.** Candidates are `laya:en`, an NLI model (`nli`) and
+  `tev1:4b`. A secondhand report (not reproduced here) found `laya:en`
+  separates clear supported/unsupported cases on a short conversation but
+  misattributes who a statement is about, and suggested NLI for that. The
+  grounded evaluation set in TODO.md decides it.
+- **Passage length.** `tev1` accepts about 2,050 tokens of state, so a
+  long conversation needs chunking and a way to pick the relevant chunk
+  per fact. Unsolved, and the biggest risk to this design.
+- **Direct writes.** `remember()` without `source_text` cannot be
+  grounded. Whether those stay on the per-caller `trusted` override, or
+  a trusted-caller policy applies, is open.
+- **Consolidation reuse.** Whether the pair check (ADD/UPDATE/NOOP/DELETE)
+  should also see the passage before it is deleted.
+- **Audit.** Whether to keep a hash of the passage on the fact so a
+  verdict can be tied to what was checked after the text is gone.

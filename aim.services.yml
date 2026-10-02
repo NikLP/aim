@@ -36,6 +36,7 @@ services:
       - '@current_user'
       - '@aim.embedding_cache_subscriber'
       - '@logger.channel.aim'
+      - '@aim.backend.decision'
 
   # Class alias so autowired consumers (the auto-registered AimHooks
   # service, src/Hook/AimHooks.php) can type-hint AimMemoryManager
@@ -82,6 +83,26 @@ services:
       - '@config.factory'
     tags:
       - { name: event_subscriber }
+
+  aim.activity_metrics_subscriber:
+    class: Drupal\aim\EventSubscriber\AimActivityMetricsSubscriber
+    arguments:
+      - '@database'
+      - '@datetime.time'
+      - '@uuid'
+    tags:
+      - { name: event_subscriber }
+
+  Drupal\aim\EventSubscriber\AimActivityMetricsSubscriber:
+    alias: aim.activity_metrics_subscriber
+
+  aim.backend.decision:
+    class: Drupal\aim\Backend\DecisionBackend
+    arguments: ['@ai.provider']
+
+  aim.backend.chat:
+    class: Drupal\aim\Backend\ChatBackend
+    arguments: ['@ai.provider']
 
   # Class alias, same reason as AimMemoryManager's above - aim_benchmark's
   # Drush commands type-hint this directly to toggle aim:benchmark's cache

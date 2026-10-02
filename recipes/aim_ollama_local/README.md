@@ -16,7 +16,7 @@ involved.
   fact told to the chat is searchable on the next question. Safe
   unconditionally for local embeddings; with a hosted provider each save
   would tie up a worker for seconds instead
-  ([ADR-0015](../../adr/0015-immediate-consolidation-considered-deferred.md)
+  ([ADR-0015](../../adr/resolved/0015-immediate-consolidation-considered-deferred.md)
   addendum).
 
 It does not set `recall_max_distance` or HNSW tuning (`M`/`ef_search`).

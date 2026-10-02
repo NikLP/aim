@@ -148,7 +148,7 @@ final class AimRecall extends ToolBase {
       );
     }
 
-    $lines = array_map(static fn (array $row): string => '- ' . $row['text'], $rows);
+    $lines = array_map(fn (array $row): string => $this->memoryManager->formatFactLine($row), $rows);
     return ExecutableResult::success(
       new TranslatableMarkup('Found @count relevant fact(s).', ['@count' => count($rows)]),
       ['results' => implode("\n", $lines)],

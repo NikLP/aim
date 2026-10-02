@@ -17,13 +17,54 @@ this list as exhaustive.
       answer as before.
 ## Decision models (raised 2026-10-02, ADR-0021/0033 addenda)
 
-- [ ] Move aim's model choices to the AI suite's `ai_provider_configuration`
+- [x] Move aim's model choices (BUILT 2026-10-02: extraction, consolidation, verifier; add a `decision` entry when classifyPair moves to the Decision API) to the AI suite's `ai_provider_configuration`
       element (one per activity: extraction, consolidation classifier,
       merge verifier, decision), replacing the free-text
       `merge_verifier_model` and the Drush-only `--provider`/`--model`.
-- [ ] Build `classifyPair()` and `verifyMerge()` on the core Decision API
+- [x] BUILT 2026-10-02 (`AimActivityMetricsSubscriber`, `src/Backend/`; Jev's token reporting still untested live): activity metrics subscriber (decided 2026-10-02): generalize
+      `AimEmbeddingCacheSubscriber`'s Pre/Post timer into a subscriber that,
+      for calls tagged `aim_*`, writes one row per call (activity, run ID,
+      provider, model, input/output tokens, ms), no prompt text. Replaces
+      the embedding timing log lines. `ai_logging` (stores prompts) and
+      `ai_observability` (no tokens/time outside OTel) were enabled, found
+      unsuitable, and uninstalled. Verified live: amazeeio and Ollama chat
+      both report token usage (shared `OpenAiBasedProviderClientBase`);
+      `tev1` is a decision model and must be sent decision-shaped input.
+      Then a replay harness in `aim_benchmark`: one fixed pair set through
+      each backend (frontier, local, Jev) for accuracy, time and tokens.
+- [x] BUILT 2026-10-02 (`activities.*.backend`; thresholds/question text still hardcoded, not per-model config): build `classifyPair()` and `verifyMerge()` on the core Decision API
       through the provider manager, chat path staying the default, behind a
       setting. Thresholds and question text as per-model config.
+- [ ] Decide the pass bar (ADR-0021 open question 2) before scoring, e.g.
+      "decision path within X points of chat accuracy at under Y s per pair".
+- [ ] Model eval sets (verified 2026-10-02; none built): (a) classifyPair
+      gold set, 15-25 (kept, candidate) pairs per ADD/UPDATE/DELETE/NOOP
+      with hard negatives, human-verified labels (`demo/seed-facts.json` has
+      only ~23 facts, so most pairs are hand-written); (b) verifyMerge set
+      from mutated good merges, also try split noul questions (keeps A,
+      keeps B, adds nothing); (c) extend `plausibility-controls.json` with
+      site-context contradictions. Synthetic data only for hosted Jev.
+- [ ] 2026-10-02 eval rework ([ADR-0037](adr/0037-transient-source-passages-for-grounding.md)):
+      `aim_benchmark/scripts/decision-eval.py` + `decision-eval-sets.json`
+      built (pairs/merges/gate; hand-written, labels unverified). Baselines
+      in the handoff: `laya:en` pairs 6/24, `tev1:4b` pairs 17/24 (14 s/pair).
+      Still to build: a groundedness set (passage + candidate, labeled
+      supported/unsupported/misattributed), real vector-neighbour pairs
+      pulled from the live table to replace the hand-written ADD/DELETE
+      cases, and an `nli` model run.
+- [ ] Generalize `plausibility-benchmark.py`: per-model scoring (`tev1:4b`,
+      `tev1:0.8b`, later `laya:en` after fine-tuning on these sets),
+      confusion matrix, accuracy by confidence bucket, cost-weighted
+      threshold sweep (a wrong UPDATE loses data, a missed merge is cheap).
+- [ ] PHP replay command in `aim_benchmark` running the same pairs through
+      `ChatBackend` (baseline: one-hot answers, so no confidence buckets)
+      and `DecisionBackend`, grouped by `setRunId()`.
+- [ ] Per-model thresholds and editable question text for the decision
+      backend (ADR-0021 decision 3); question text is hardcoded in
+      `AimMemoryManager` today. Limits: `tev1` input ~2,050 tokens, Ollama
+      max 26 options.
+- [ ] Verify Jev (`typesafeai`) reports token usage live; confirm the
+      Anthropic key in watchdog is rotated and the entries cleared.
 - [ ] A separate decision guardrail set (not `aim_write_guardrails`, whose
       2000-character limit and HTML regex would hit the serialized input).
 - [ ] Score `laya:en` with `modules/aim_benchmark/scripts/plausibility-benchmark.py`
@@ -54,6 +95,119 @@ this list as exhaustive.
   - `tev1:4b` true resident memory and a lower `MemoryHigh` (5G) are
     unmeasured.
 
+## Design review findings (raised 2026-10-02)
+
+Workflow diagram: [adr/workflow-diagram.md](adr/workflow-diagram.md).
+Decisions marked "agreed" were settled with Nik in that review; the rest
+are recommendations.
+
+**Identity and access**
+
+- [ ] Agreed: refuse new authored writes with uid 0 (Drush callers pass
+      `--uid`). Consolidation retirements and merged facts are exempt
+      (a merged fact copies `uid` and `user` from the kept fact). The
+      current database is disposable, so no `uid` backfill is needed.
+- [ ] Replace `isAnonymous()` as the trigger for
+      `search_api_bypass_access` in `AimMemoryManager::executeSearchQuery()`
+      with an explicit `$systemCaller` argument (default FALSE) that only
+      Drush commands and the queue worker pass as TRUE. Web and MCP always
+      get access checks, so an anonymous web caller gets nothing instead
+      of everything.
+- [ ] Docs: say "the fact is about this user" for `user` scope (`user` is
+      the subject, `uid` is the author; keep `uid`, it is Drupal's idiom).
+- [ ] Grill access: what exists is fine for now (Drush with `--uid`, or
+      MCP `aim_remember`). Do NOT build an `aim_extract` MCP tool: the
+      calling agent already does the extraction reasoning. Review later.
+      A web console ([ADR-0029](adr/0029-context-carrying-turns.md),
+      `aim_console`) needs its own chat model; point it at local Ollama to
+      stay sovereign.
+
+**Lossy rejection**
+
+- [ ] Agreed: a quarantine entity (e.g. `aim_rejection`) for every
+      candidate fact dropped without being stored, with a reason code:
+      guardrail/validation failure, user-scope candidate skipped for no
+      `--subject-uid`, unknown scope. Holds the text, scope, source,
+      caller, failed check and time. Not in the vector index or recall,
+      own permission, retention window (it is personal data), admin list.
+      Later feeds the review queue (approve a rejection into a fact).
+      Logs keep IDs only plus the rejection ID, so no `log_rejected_text`
+      setting is needed. Not in scope: consolidation downgrades (both
+      facts are kept), permission refusals (the caller was told).
+
+**Fact lifecycle**
+
+- [ ] Agreed: add a `retired` timestamp (set by consolidation and the
+      Retire action) and keep `expires` as a real sell-by date (nullable,
+      unused today). `ExcludeRetired` and the PHP safety nets key off
+      `retired`; a sweep sets `retired` once `expires` passes. Migrate
+      existing `expires` values to `retired` (base-field change: the
+      `subject_uid` rename needed three update hooks and silently broke a
+      View, check Views). Needed by ADR-0035's `release` and ADR-0032's
+      auto-expiry.
+- [ ] Agreed: rename the consolidation verb DELETE to RETIRE. It is a
+      soft retire. Touches the structured-output enum and prompt line in
+      `AimMemoryManager` (the model must answer with the new word),
+      dry-run output, any edited prompt override, and old
+      `superseded_by_reason` rows that say DELETE.
+- [ ] Call the `superseded_by_reason` field a "retirement note" in docs.
+      It is a JSON string in a `string_long` column, no fact text.
+- [ ] Guardrails on merged text run twice (`decideAndApply()`, then
+      `createMergedFact()`'s `saveFact()`). Checked 2026-10-02: leave
+      both. `saveFact()`'s `validate()` is the universal gate every write
+      route shares, so removing a pass there would leave routes unguarded;
+      the first pass is what yields the graceful BLOCKED decision and the
+      dry-run row, since the second would throw mid-sweep. Revisit only if
+      a guardrail becomes LLM-backed (then validate once and reuse the
+      result, without a skip flag on `saveFact()`).
+- [ ] Auto band (distance under 0.09, no model check): decide whether it
+      should go through the decision model or verifier. Revisit once a
+      decent decision model setup exists (one call per pair, see the cost
+      measurement under "Decision models").
+
+**Indexing and settings**
+
+- [ ] Expose `index_directly` on the AIM settings form (writes the index
+      entity, then needs `config:export`). Needed when embeddings move to
+      hosted (Jev). Warn when it is on with a hosted provider.
+- [ ] Open question: could Guardrails and the Decision API do the same
+      job (see "Decision models")? Not yet written down elsewhere.
+
+**Doc and code discrepancies found**
+
+- [ ] DEVELOPING.md says `remember()`/`createFactsFromCandidates()`
+      enqueue consolidation; the code enqueues in
+      `AimHooks::factInsert()` for every non-syncing insert (merged facts
+      re-enqueue themselves).
+- [x] (addendum 2026-10-02) [ADR-0005](adr/resolved/0005-consolidation-algorithm.md) body is
+      stale: thresholds 0.05/0.20 (code: 0.09/0.45), in-place UPDATE,
+      hard-delete DELETE. The 2026-10-01 addendum covers the last two.
+- [ ] Comments in `createFactsFromCandidates()` and `AimGuardrails` still
+      say Guardrails run in `hook_aim_fact_presave()`; they run in
+      `saveFact()` via `validate()`.
+- [ ] Decision-backend UPDATE writes its merged text with a separate
+      `writeMerge()` chat call on the site default provider, not the
+      consolidation model, and downgrades to ADD with no default. Not
+      documented.
+- [ ] Shipped vs this site: `default_trusted` false/true,
+      `index_directly` off/on, `recall_max_distance` 0.45/0.48. Only
+      partly stated in the docs.
+
+## Memory algorithm follow-ups (raised 2026-10-02, ADR-0036)
+
+- [x] Dates in `recall()` output (`created`/`asserted`, `formatFactLine()`).
+- [x] Consolidation compares top-N neighbors, `neighbor_limit` setting
+      (default 3); live dry run 40 vs 86 decisions.
+- [ ] Real (non-dry) run and queue-worker check of top-N consolidation;
+      no automated tests cover it yet.
+- [ ] Time-limited facts ("for two months from now") must not be UPDATE
+      merged into permanent facts; see ADR-0036 for options.
+- [ ] Pinned: `verified`/`verified_by` fields (not `trusted`), ADR-0036.
+- [ ] Pinned until the above is tested: recency/importance re-rank,
+      weights default 0, needs a gold set.
+- [ ] Later: access counter / last-recalled (after the `retired` split).
+- [ ] Later, on a real recall miss: RRF keyword path via `search_api_db`.
+
 ## Governance
 
 - [ ] Close [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
@@ -80,18 +234,10 @@ this list as exhaustive.
       `trusted` override on `remember()` above. Not built.
       [ADR-0007](adr/resolved/0007-user-scope-requires-real-account.md)
 
-## ADR-0009 - Recipe/apply surface (design only, nothing built)
-
-- [ ] Build the spec-to-Recipe generation/apply surface with a
-      dry-run/human-review gate. First check whether `mcp_tools_recipes`
-      (beta, uninstalled, already exists in the ecosystem) satisfies the
-      gate requirement before building one from scratch.
-      [ADR-0009](adr/0009-recipe-apply-safety-gate.md)
-
 ## ADR-0035 - Standing constraints (design only, nothing built)
 
 - [ ] Spike FlowDrop in a scratch site (approval/release flows, and as
-  ADR-0009's review gate); verify whether its entity triggers can veto.
+  a recipe-apply review gate, ex-ADR-0009); verify whether its entity triggers can veto.
 - [ ] Verify whether ECA exposes a blockable event for config-entity
   creation (e.g. a content type), before relying on it as a second gate.
 
@@ -140,6 +286,13 @@ questions" section)
       (target 3); duplicate rate; then tune `recall_max_distance` (0.48),
       `auto_threshold` (evaluate 0) and `ambiguous_threshold` against
       them; `aim:benchmark` at thousands of facts (open question #5).
+      Count hosted calls while doing it: the verifier adds one call only
+      per UPDATE (1 of 23 pairs on the live set, 2026-10-01), but it
+      compounds with `auto_threshold` 0, which sends more pairs to the
+      model and so yields more UPDATEs. Measure the two together.
+      Retention (the item further down) also needs the `getVdbIds()`
+      limit-10 shim (#3626257) re-verified before relying on deletes, and
+      its own ADR plus sign-off first.
 - [ ] Extraction-input guardrailing, distinct from the existing output-side
       candidate-fact guardrails.
 - [ ] The whole module has no test infrastructure yet (no `tests/`
@@ -234,6 +387,12 @@ questions" section)
       Still unmeasured: where the optimizer switches from the BTREE index to
       HNSW for a user, and whether MariaDB's 16 MB `mhnsw_max_cache_size`
       matters at larger sizes.
+- [ ] Measure whether `scope`, `subject`, `target_type` and `target_id` need
+      BTREE indexes on `aim_fact_vectors` (only `user` and `trusted` have
+      one, `AimHooks::BTREE_INDEXED_COLUMNS`). Matters when one scope is a
+      large share of the table, and for entity-scope lookups by target.
+      Same method as ADR-0018. `target_type`/`target_id` are not even
+      indexed attributes yet, check that first.
 - [ ] Retention/erasure policy for retired facts (prune or archive old
       `expires` rows out of `aim_fact`) - retired facts about a person are
       still personal data. Own ADR when needed, see ADR-0022's

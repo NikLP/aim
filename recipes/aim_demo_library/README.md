@@ -48,7 +48,7 @@ the settings above, and the facts are added on top of whatever is there.
 - **Never applied.** The recipe passes core's schema validation, nothing
   more. Apply it to an isolated scratch site first.
 - **`index_directly` suits local embeddings.** With hosted embeddings each
-  save ties up a worker for seconds ([ADR-0015](../../adr/0015-immediate-consolidation-considered-deferred.md)
+  save ties up a worker for seconds ([ADR-0015](../../adr/resolved/0015-immediate-consolidation-considered-deferred.md)
   addendum); remove that action.
 - **0.48 is calibrated to this dataset** with `nomic-embed-text`
   ([ADR-0019](../../adr/0019-recall-abstention-distance-cutoff.md)).

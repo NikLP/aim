@@ -100,6 +100,6 @@ enqueue happens, and a few pointers had gone stale.
   section.
 - **Latency.** The "tighter cadence only if a feature needs it" clause
   above was explored as an immediate post-write path and deliberately
-  deferred: [ADR-0015](../0015-immediate-consolidation-considered-deferred.md).
+  deferred: [ADR-0015](0015-immediate-consolidation-considered-deferred.md).
 
 Checked by reading the code 2026-09-26, not by running the queue.

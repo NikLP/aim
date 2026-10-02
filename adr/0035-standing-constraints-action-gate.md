@@ -2,7 +2,7 @@
 
 **Status:** Proposed (2026-10-01) - design only, not built. Builds on
 [ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s `trusted`
-flag and [ADR-0009](0009-recipe-apply-safety-gate.md)'s apply gate; the
+flag and retired [ADR-0009](resolved/0009-recipe-apply-safety-gate.md)'s apply gate; the
 authority rules below depend on [ADR-0033](0033-plausibility-gate-processing-modes.md)
 only for untrusted-by-default writes.
 **Date:** 2026-10-01
@@ -10,7 +10,7 @@ only for untrusted-by-default writes.
 ## Context
 
 `aim` memory is meant to inform, and eventually drive, site construction
-(Recipes per ADR-0009, Tool API plugins per ADR-0013). Some facts are not
+(Recipes, Tool API plugins per ADR-0013). Some facts are not
 descriptive but prohibitive: "don't add the blog content type until the
 client approves the editorial plan." If an agent acts on memory, it must
 not violate such a fact.
@@ -38,7 +38,7 @@ layer, and keep semantic recall as an advisory second pass only.
      Never "the agent decides".
    - The fact `text` stays, for humans, the review page and fuzzy matching.
 2. **The gate lives in the action layer.** Every construction-capable
-   tool (Tool API plugins, the ADR-0009 recipe apply path) calls one
+   tool (Tool API plugins, a recipe apply path) calls one
    service, `AimConstraintChecker::check($action, $args)`, before
    executing. A matching active constraint blocks the call and returns
    the constraint's text and ID as the reason. The check is a plain
@@ -63,6 +63,11 @@ layer, and keep semantic recall as an advisory second pass only.
    the checker itself errors, the action is blocked. If only the
    embedding provider is down, the structured gate still runs and the
    advisory pass is skipped with a warning logged.
+7. **Recipe apply is never offered unreviewed.** Carried over from retired
+   [ADR-0009](resolved/0009-recipe-apply-safety-gate.md): a recipe-apply
+   tool (e.g. `mcp_tools_recipes`' `ApplyRecipe`) is never exposed to an
+   LLM-driven caller without a dry-run and human review step in front of
+   it. A hard rule, not a grantable permission.
 
 ## Consequences
 
@@ -126,7 +131,7 @@ Neither owns the constraint data. Layering:
    reviewer and record who approved what and when; a flow that pauses and
    then flips a constraint's release state replaces a release-predicate
    language and supplies the audit trail. The same shape can serve as
-   ADR-0009's dry-run/review gate (generate recipe, validate, human
+   the recipe-apply dry-run/review gate (generate recipe, validate, human
    approval, apply). It is not an enforcer: it controls flows it runs,
    and whether its entity triggers can veto (versus react after the fact)
    is unverified.

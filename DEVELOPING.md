@@ -149,8 +149,19 @@ Settings (`aim.settings`, `/admin/config/aim/settings`):
 - `merge_verify` (default on): a verifier model gets both inputs and the
   merge (`merge_verify_prompt`) and must confirm every detail survives
   and nothing is invented. Verifier errors count as failure.
-- `merge_verifier_model` (`provider__model`, empty = the classifier's own
-  model): set it to a different model so one checks the other. A local
+- `activities.{extraction,consolidation,verifier}` = `{backend, provider,
+  model}` (settings form, AI suite's `ai_provider_configuration`; Drush
+  `--provider`/`--model` still override). Empty chat provider = the site
+  default chat model (verifier: the classifier's own). `backend: chat`
+  (default) runs the prompts above; `backend: decision` (consolidation and
+  verifier only, needs an explicit model on a provider implementing
+  `DecisionInterface`, today `typesafeai`) goes through `src/Backend/`:
+  `DecisionBackend` calls `decision()`, `ChatBackend` is the bridge that
+  renders the same `DecisionInput` as a structured-output chat prompt (one-hot
+  choice answers, stated noul probability; no score questions). A decision
+  classifier returns no merged text, so its UPDATE is downgraded to ADD.
+  The verifier is a noul `faithful` question, true at probability >= 0.5.
+  Set the verifier to a different model so one checks the other. A local
   Ollama model (Ollaya) is the intended candidate, but it is not
   weight-compatible, so shadow it against the hosted verdicts first.
 - `merge_max_distance` (default 0 = off): merged embedding must sit within
@@ -163,6 +174,11 @@ Both check faithfulness to the inputs, not real-world truth. The shipped
 consolidation prompt also now says to choose ADD when unsure
 (`aim_update_10005()` adds that line to an unedited prompt and the new
 keys to an existing site).
+
+**Testing gotcha:** `drush aim:consolidate --scope=site` (any scope) acts
+on every live fact in that scope, not just test facts you just wrote.
+Take a `ddev snapshot` first, or use `--dry-run`; restore the snapshot
+afterward (the apply path was live-tested this way 2026-10-01).
 
 `--dry-run` still calls the model and prints the merged text in a
 "Merged text" column (also for `BLOCKED`), for reviewing UPDATE fidelity
@@ -200,7 +216,7 @@ Search API processor (`src/Plugin/search_api/processor/ExcludeRetired.php`)
 rejects any fact with `expires` set, and Search API deletes a rejected
 item from the server. Retiring a fact is a plain `save()` that re-tracks
 it, so its row goes on the next `sapi-i` (`index_directly` is off), and
-clearing `expires` brings it back. `recall()`/`findNearestNeighbor()` keep
+clearing `expires` brings it back. `recall()`/`findNeighbors()` keep
 their PHP `expires` check as a safety net for that gap. Retired facts stay
 `aim_fact` entities (audit trail, `superseded_by` edges, admin views) but are not
 vector-searchable. Design, verification and rollout in
@@ -218,7 +234,7 @@ ddev drush sapi-i aim_vector_index
 **`user` is an indexed attribute with a BTREE index** (the field was
 named `subject_uid` until 2026-09-28, `aim_update_10001()` - ADR-0018's
 title and file name still say `subject_uid`, the field itself does not):
-`recall()` (with `--subject-uid`) and user-scope `findNearestNeighbor()`
+`recall()` (with `--subject-uid`) and user-scope `findNeighbors()`
 filter by a `user` query condition, not in PHP. The column's BTREE index
 (`idx_user`, added by `AimHooks::vectorIndexUpdate()` through
 `AimMariaDBProvider::ensureColumnIndex()` on every index save) is what
@@ -569,7 +585,7 @@ verified through the demo assistant). Search API does that work after the
 request, so a web visitor should not wait on it (verified in a drush
 process, not over HTTP). With **hosted** embeddings (roughly 500 ms per
 fact) a batch would tie up a PHP worker for seconds, which is why the
-module ships it off ([ADR-0015](adr/0015-immediate-consolidation-considered-deferred.md));
+module ships it off ([ADR-0015](adr/resolved/0015-immediate-consolidation-considered-deferred.md));
 turn it on only where embeddings are local. To change it:
 `$index->setOptions([...$index->getOptions(), 'index_directly' => TRUE])->save()`,
 then export the index config.
@@ -980,3 +996,12 @@ reindex after import is required regardless. Don't use
 `--with-dependencies` to carry `uid` through - the exporter includes the
 **pre-hashed password** on any exported user account. Anonymous
 authorship on re-import is accepted, not a problem to solve.
+
+## Activity metrics
+
+`AimActivityMetricsSubscriber` writes one `aim_activity_metrics` row per
+provider call tagged `aim_*` (`aim_extract`, `aim_consolidate`,
+`aim_consolidate_verify`): run ID, tag, operation type, provider, model,
+input/output tokens, milliseconds. No prompt or fact text. Group a replay with
+`setRunId()`; a failed call writes no row. Calls the vector index makes
+(untagged) are not recorded.

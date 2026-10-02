@@ -16,12 +16,26 @@ aim.settings:
         Range:
           min: 0
           max: 1
+    neighbor_limit:
+      type: integer
+      label: 'Neighbors compared per fact during consolidation'
+      constraints:
+        Range:
+          min: 1
+          max: 10
     merge_verify:
       type: boolean
       label: 'Verify merged text with a model before accepting an UPDATE'
-    merge_verifier_model:
-      type: string
-      label: 'Merge verifier model (provider__model), empty for the classifier model'
+    activities:
+      type: mapping
+      label: 'Backend, provider and model per activity, empty provider and model for the site default chat model'
+      mapping:
+        extraction:
+          type: aim.activity_choice
+        consolidation:
+          type: aim.activity_choice
+        verifier:
+          type: aim.activity_choice
     merge_max_distance:
       type: float
       label: 'Maximum merged-to-input embedding distance, 0 disables'
@@ -29,6 +43,9 @@ aim.settings:
         Range:
           min: 0
           max: 1
+    merge_prompt:
+      type: string
+      label: 'Merge writer prompt, used when the classifier is a decision model'
     merge_verify_prompt:
       type: string
       label: 'Merge verification prompt'
@@ -95,3 +112,19 @@ aim.aim_scope.*:
     settings:
       type: ignore
       label: 'Instance settings for plugin, shape defined by the plugin itself'
+
+aim.activity_choice:
+  type: mapping
+  label: 'An activity backend with its provider and model choice'
+  mapping:
+    backend:
+      type: string
+      label: 'Backend: chat or decision'
+      constraints:
+        Choice: [chat, decision]
+    provider:
+      type: string
+      label: 'Provider plugin ID'
+    model:
+      type: string
+      label: 'Model ID'

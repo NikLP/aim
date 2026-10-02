@@ -68,7 +68,7 @@ than deciding cron participation in its attribute.
   (ADR-0003 addendum) already stops the queue cleanly under cron, so an
   unconfigured site does not spin.
 - Interacts with
-  [ADR-0015](0015-immediate-consolidation-considered-deferred.md): that
+  [ADR-0015](resolved/0015-immediate-consolidation-considered-deferred.md): that
   ADR's immediate path is a separate, still-deferred latency option, not
   a substitute for a cron fallback.
 

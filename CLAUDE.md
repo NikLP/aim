@@ -74,8 +74,10 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
    part of the governance deferral above.
    ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md))
 8. **Generative/planning surface** (spec -> Recipe -> built site) is in
-   scope; no unattended `drush recipe apply` on an AI-generated recipe.
-   ([ADR-0009](adr/0009-recipe-apply-safety-gate.md))
+   scope; no recipe-apply tool is exposed to an LLM-driven caller without
+   a dry-run and human review.
+   ([ADR-0035](adr/0035-standing-constraints-action-gate.md); retired
+   [ADR-0009](adr/resolved/0009-recipe-apply-safety-gate.md))
 
 **PoC deviation from decision 3 (temporary, not abandoned):** no Content
 Moderation / draft-to-trusted gate - every fact is live the moment it's
@@ -127,7 +129,7 @@ submodules plus `aim_chatbot`/`aim_tool` as needed - no bundling recipe
 yet (ADR-0026 piece 6, unbuilt).
 
 `recipes/` holds hand-written Recipes (not AI-generated, so outside
-[ADR-0009](adr/0009-recipe-apply-safety-gate.md)'s gate); see
+[ADR-0035](adr/0035-standing-constraints-action-gate.md)'s gate); see
 [DEVELOPING.md](DEVELOPING.md)'s "Recipes". Each has its own README.md.
 
 Each submodule carries its own README.md/CLAUDE.md/DEVELOPING.md

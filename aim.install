@@ -95,7 +95,7 @@ function aim_update_10005(): void {
   $path = \Drupal::service('extension.path.resolver')->getPath('module', 'aim') . '/config/install/aim.settings.yml';
   $defaults = Yaml::decode(file_get_contents($path));
   $config = \Drupal::configFactory()->getEditable('aim.settings');
-  foreach (['merge_verify', 'merge_verifier_model', 'merge_max_distance', 'merge_verify_prompt'] as $key) {
+  foreach (['merge_verify', 'merge_max_distance', 'merge_verify_prompt'] as $key) {
     if ($config->get($key) === NULL) {
       $config->set($key, $defaults[$key]);
     }
@@ -109,4 +109,100 @@ function aim_update_10005(): void {
     $config->set('consolidation_prompt', str_replace('For any decision other than UPDATE', $line . 'For any decision other than UPDATE', $prompt));
   }
   $config->save();
+}
+
+/**
+ * Moves merge_verifier_model into the per-activity models map.
+ */
+function aim_update_10006(): void {
+  $config = \Drupal::configFactory()->getEditable('aim.settings');
+  $empty = ['provider' => '', 'model' => ''];
+  $verifier = $empty;
+  $old = (string) $config->get('merge_verifier_model');
+  if (str_contains($old, '__')) {
+    [$verifier['provider'], $verifier['model']] = explode('__', $old, 2);
+  }
+  $config->set('models', [
+    'extraction' => $empty,
+    'consolidation' => $empty,
+    'verifier' => $verifier,
+  ]);
+  $config->clear('merge_verifier_model');
+  $config->save();
+}
+
+/**
+ * Implements hook_schema().
+ */
+function aim_schema(): array {
+  return ['aim_activity_metrics' => _aim_activity_metrics_schema()];
+}
+
+/**
+ * Returns the aim_activity_metrics table definition.
+ *
+ * One row per tagged provider call, no prompt or fact text (CLAUDE.md's
+ * logging rule).
+ *
+ * @return array
+ *   A Schema API table definition.
+ */
+function _aim_activity_metrics_schema(): array {
+  return [
+    'description' => 'One row per aim_* provider call: activity, run, provider, model, tokens and time.',
+    'fields' => [
+      'id' => ['type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE],
+      'created' => ['type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0],
+      'run_id' => ['type' => 'varchar', 'length' => 64, 'not null' => TRUE, 'default' => ''],
+      'activity' => ['type' => 'varchar', 'length' => 64, 'not null' => TRUE, 'default' => ''],
+      'operation_type' => ['type' => 'varchar', 'length' => 32, 'not null' => TRUE, 'default' => ''],
+      'provider' => ['type' => 'varchar', 'length' => 128, 'not null' => TRUE, 'default' => ''],
+      'model' => ['type' => 'varchar', 'length' => 255, 'not null' => TRUE, 'default' => ''],
+      'input_tokens' => ['type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE],
+      'output_tokens' => ['type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE],
+      'duration_ms' => ['type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0],
+    ],
+    'primary key' => ['id'],
+    'indexes' => [
+      'run_id' => ['run_id'],
+      'activity_created' => ['activity', 'created'],
+    ],
+  ];
+}
+
+/**
+ * Creates aim_activity_metrics and moves models into activities.
+ *
+ * Each activity becomes {backend, provider, model}; every existing choice
+ * keeps the chat backend.
+ */
+function aim_update_10007(): void {
+  $schema = \Drupal::database()->schema();
+  if (!$schema->tableExists('aim_activity_metrics')) {
+    $schema->createTable('aim_activity_metrics', _aim_activity_metrics_schema());
+  }
+  $config = \Drupal::configFactory()->getEditable('aim.settings');
+  $activities = [];
+  foreach (['extraction', 'consolidation', 'verifier'] as $name) {
+    $choice = $config->get('models.' . $name) ?? [];
+    $activities[$name] = [
+      'backend' => 'chat',
+      'provider' => (string) ($choice['provider'] ?? ''),
+      'model' => (string) ($choice['model'] ?? ''),
+    ];
+  }
+  $config->set('activities', $activities);
+  $config->clear('models');
+  $config->save();
+}
+
+/**
+ * Adds the merge_prompt setting.
+ */
+function aim_update_10008(): void {
+  $defaults = Yaml::decode(file_get_contents(\Drupal::service('extension.list.module')->getPath('aim') . '/config/install/aim.settings.yml'));
+  $config = \Drupal::configFactory()->getEditable('aim.settings');
+  if ($config->get('merge_prompt') === NULL) {
+    $config->set('merge_prompt', $defaults['merge_prompt'])->save();
+  }
 }

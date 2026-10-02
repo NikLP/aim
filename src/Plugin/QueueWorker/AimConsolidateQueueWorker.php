@@ -92,7 +92,7 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
     // not on a web request.
     $this->memoryManager->reindex();
 
-    $provider = $this->memoryManager->getDefaultChatProvider();
+    $provider = $this->memoryManager->getModelFor('consolidation');
     if (empty($provider['provider_id']) || empty($provider['model_id'])) {
       // No default chat provider configured - a queue-wide precondition,
       // not a problem with this one item. SuspendQueueException is core's

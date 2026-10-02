@@ -69,7 +69,7 @@ preference:
 | --- | --- | --- | --- |
 | Queued (default) | Save enqueues a job; a worker scores it. Drained by the dedicated crontab ([ADR-0003](resolved/0003-async-processing-dedicated-crontab.md)), optionally the `hook_cron` fallback ([ADR-0031](0031-cron-fallback-for-queue-processing.md)) | Next worker run (up to a minute on a one-minute cron) | Nothing in the request path. Needs a running worker, which is not installed on this site today |
 | Inline | Score synchronously inside `remember()` before the write commits | Immediately | Blocks the save for the scoring time (about 0.5 s warm here, several seconds for an extraction batch) |
-| Post-response | Score in `kernel.terminate` after the response is sent, the mechanism prototyped in [ADR-0015](0015-immediate-consolidation-considered-deferred.md) | Seconds after the save | Holds a PHP worker after the response; fragile if the process dies before scoring |
+| Post-response | Score in `kernel.terminate` after the response is sent, the mechanism prototyped in [ADR-0015](resolved/0015-immediate-consolidation-considered-deferred.md) | Seconds after the save | Holds a PHP worker after the response; fragile if the process dies before scoring |
 
 Queued is the default because it matches the existing architecture and
 keeps scoring out of the request path. Inline is the right choice for a

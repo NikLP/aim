@@ -1,7 +1,11 @@
 # ADR-0015: Immediate post-write consolidation via kernel.terminate - considered, deferred
 
-**Status:** Proposed - designed and prototyped 2026-09-14, then deliberately
-reverted the same session. Not built. The design below is complete enough
+**Status:** Deferred (re-evaluated 2026-10-02) - the problem is closed on
+this site by `index_directly` (see the 2026-09-26 addendum); the design is
+retained as the reference for hosted-embedding sites and for
+[ADR-0033](../0033-plausibility-gate-processing-modes.md)'s post-response
+mode. Designed and prototyped 2026-09-14, then deliberately reverted the
+same session. Not built. The design below is complete enough
 to build from directly if this gets picked back up; the point of this ADR
 is to not re-derive it, and to not re-litigate why it was shelved.
 **Date:** 2026-09-14
@@ -10,7 +14,7 @@ is to not re-derive it, and to not re-litigate why it was shelved.
 
 Started from a real usability question: `remember()`/`createFactsFromCandidates()`
 already enqueue every new fact onto `aim_consolidate`
-([ADR-0003](resolved/0003-async-processing-dedicated-crontab.md)), but that queue is
+([ADR-0003](0003-async-processing-dedicated-crontab.md)), but that queue is
 only drained by the dedicated crontab (`* * * * * ddev exec drush
 queue:run aim_consolidate`, CLAUDE.md's "Consolidation" section) or a
 manual `queue_ui` click. A fact is not searchable via `recall()` until
@@ -111,7 +115,7 @@ and stay on the crontab exactly as before, same as they always have.
   regardless - this only speeds up the chatbot/MCP-over-HTTP path, a
   narrower win than it first sounds.
 - **PoC status makes the urgency lower than it feels in the moment.**
-  Nothing written today is trusted data yet - [ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s
+  Nothing written today is trusted data yet - [ADR-0002](../0002-governance-deferred-guardrails-mandatory.md)'s
   draft-to-trusted gate is still deferred, every fact is live the moment
   it's saved regardless of how fast it's indexed. Shaving 30-60s off
   searchability doesn't change that risk picture either way (see the
@@ -133,7 +137,7 @@ and stay on the crontab exactly as before, same as they always have.
   specifically (this stack's post-response continuation was confirmed by
   reading how `Response::send()`/FPM behave, not by an actual live
   request/response timing test) before relying on it.
-- Worth reconsidering together with [ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s
+- Worth reconsidering together with [ADR-0002](../0002-governance-deferred-guardrails-mandatory.md)'s
   draft-to-trusted gate whenever that gets built: once facts are no longer
   live the instant they're saved, "how fast does it become searchable"
   and "how fast is it reviewed" become two different clocks worth

@@ -1,6 +1,10 @@
 # ADR-0009: No unattended `drush recipe apply` on an AI-generated recipe
 
-**Status:** Accepted (design only - this surface is not yet built)
+**Status:** Retired 2026-10-02 - subsumed by [ADR-0035](../0035-standing-constraints-action-gate.md)'s
+action gate plus ordinary tool availability/permissions. The one rule worth
+keeping (never expose a recipe-apply tool to an LLM-driven caller without
+a dry-run and human review) is folded into ADR-0035. Originally: Accepted
+(design only - this surface was never built)
 **Date:** 2026-09-08
 
 ## Context

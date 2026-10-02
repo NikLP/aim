@@ -675,7 +675,7 @@ this session against `drupal-code-query`'s MCP tools.
    built).
 9. **Recipe-apply safety gate** - "needs a dry-run/review step before
    applying an AI-generated Recipe" is stated as a requirement above. Design
-   landed: see [0009](../0009-recipe-apply-safety-gate.md) (design only, not
+   landed: see [0009](0009-recipe-apply-safety-gate.md) (design only, not
    yet built).
 10. **CCC: adopt, integrate, or build a parallel site-memory layer?** - CCC's
     beta status means this can't be answered yet; revisit once it reaches a

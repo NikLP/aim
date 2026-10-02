@@ -75,7 +75,7 @@ final class AimCommands extends DrushCommands {
       return;
     }
 
-    $provider = $this->resolveChatProvider($options);
+    $provider = $this->resolveChatProvider($options, 'extraction');
     if ($provider === NULL) {
       return;
     }
@@ -383,8 +383,9 @@ final class AimCommands extends DrushCommands {
       $row['source'],
       $row['state'] === NULL ? '' : ($row['state'] ? 'true' : 'false'),
       $row['trusted'] ? 'true' : 'false',
+      gmdate('Y-m-d', (int) ($row['asserted'] ?: $row['created'])),
     ], $rows);
-    $this->io()->table(['ID', 'Distance', 'Scope', 'Subject', 'Text', 'Source', 'State', 'Trusted'], $table_rows);
+    $this->io()->table(['ID', 'Distance', 'Scope', 'Subject', 'Text', 'Source', 'State', 'Trusted', 'Date'], $table_rows);
   }
 
   /**
@@ -392,14 +393,14 @@ final class AimCommands extends DrushCommands {
    *
    * Runs entirely against facts already in the store, independent of any
    * particular write path (see CLAUDE.md's consolidation design notes).
-   * Each fact is compared to its nearest vector neighbor within the same
-   * scope/subject: an obvious near-duplicate is retired automatically, an
-   * ambiguous case gets a single classification call (ADD/UPDATE/DELETE/
-   * NOOP, Mem0's vocabulary), and anything past the ambiguous threshold is
-   * left alone at zero cost. Retiring a fact sets its `expires` field
-   * rather than deleting it, to keep an audit trail - a hard DELETE only
-   * happens when the model explicitly says the candidate should not exist
-   * as a memory at all.
+   * Each fact is compared to its nearest vector neighbors (up to three)
+   * within the same scope/subject: an obvious near-duplicate is retired
+   * automatically, an ambiguous case gets a classification call (ADD/UPDATE/
+   * DELETE/NOOP, Mem0's vocabulary), and anything past the ambiguous
+   * threshold is left alone at zero cost. Retiring a fact sets its
+   * `expires` field rather than deleting it, to keep an audit trail - a
+   * hard DELETE only happens when the model explicitly says the candidate
+   * should not exist as a memory at all.
    *
    * The two thresholds default to the live aim.settings config
    * (/admin/config/aim/settings), not a hardcoded value - --auto-threshold/
@@ -438,7 +439,7 @@ final class AimCommands extends DrushCommands {
       'dry-run' => FALSE,
     ],
   ): void {
-    $provider = $this->resolveChatProvider($options);
+    $provider = $this->resolveChatProvider($options, 'consolidation');
     if ($provider === NULL) {
       return;
     }
@@ -513,29 +514,33 @@ final class AimCommands extends DrushCommands {
   }
 
   /**
-   * Resolves --provider/--model options, falling back to the site default.
+   * Resolves --provider/--model options, falling back to the activity's model.
    *
    * Deliberately does not hardcode a fallback provider/model: a literal
    * default here would be exactly the kind of value that already had to be
    * hand-edited twice this project when the site's working provider
-   * changed. Resolving `ai.settings`' own default chat provider instead
-   * means these commands automatically follow it.
+   * changed. Resolving the activity's configured model (which itself falls
+   * back to `ai.settings`' default chat provider) means these commands
+   * automatically follow the settings form.
    *
    * @param array $options
    *   The command options array, read for 'provider' and 'model'.
+   * @param string $activity
+   *   The activity whose configured model is the fallback: extraction or
+   *   consolidation.
    *
    * @return array|null
    *   A [provider_id, model_id] pair, or NULL if neither option was given
    *   and no default chat provider is configured (an error has already
    *   been printed to the user in that case).
    */
-  protected function resolveChatProvider(array $options): ?array {
+  protected function resolveChatProvider(array $options, string $activity): ?array {
     if (!empty($options['provider']) && !empty($options['model'])) {
       return [$options['provider'], $options['model']];
     }
 
-    $default = $this->memoryManager->getDefaultChatProvider();
-    if (empty($default['provider_id']) || empty($default['model_id'])) {
+    $default = $this->memoryManager->getModelFor($activity);
+    if ($default === NULL) {
       $this->io()->error('No --provider/--model given, and no default chat provider is configured. Set one at /admin/config/ai/settings, or pass --provider and --model explicitly.');
       return NULL;
     }

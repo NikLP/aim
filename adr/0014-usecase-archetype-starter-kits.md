@@ -28,11 +28,11 @@ set). Both are the same unanswered question seen from different angles -
 this ADR is the first attempt at an actual shape, folding both in rather
 than tracking them as two separate loose ends.
 
-[ADR-0009](0009-recipe-apply-safety-gate.md) already settled the *safety*
+retired [ADR-0009](resolved/0009-recipe-apply-safety-gate.md) (now [ADR-0035](0035-standing-constraints-action-gate.md)) already settled the *safety*
 question for applying an AI-generated Recipe (dry-run/review gate, no
 unattended `drush recipe apply`). It says nothing about what recipes get
 offered or how discovery differs per use case - that's this ADR's
-territory, and it assumes ADR-0009's gate applies unchanged to any Recipe
+territory, and it assumes that gate applies unchanged to any Recipe
 a starter kit ships.
 
 ## Decision (best-guess proposal - not committed)
@@ -54,7 +54,7 @@ case tracking, commerce catalog assistant - each as a bundle of:
    (admin-curated per CLAUDE.md's existing stance - a starter kit
    *proposes* terms, it doesn't change categories from curated to
    auto-created).
-4. **An optional Recipe**, gated by ADR-0009, only for archetypes that
+4. **An optional Recipe**, gated by ADR-0035's recipe-apply rule, only for archetypes that
    need real site structure beyond `aim_fact` itself (e.g. a case-
    tracking archetype provisioning a supporting content type). Not every
    archetype needs one - a personal-assistant archetype may need nothing
@@ -99,7 +99,7 @@ assuming one needs to be written from scratch.
   config entities means a Recipe could plausibly provision the whole
   kit - Guardrail set, category terms, and all - in one
   `drush recipe apply`, not just the archetype-specific content-type case
-  under (4). Not evaluated against ADR-0009's gate for this narrower,
+  under (4). Not evaluated against that gate for this narrower,
   lower-risk case (provisioning config, not generating it from an AI
   pass).
 

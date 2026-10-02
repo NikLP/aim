@@ -84,7 +84,7 @@ final class AimRecall extends FunctionCallBase implements ExecutableFunctionCall
       return;
     }
 
-    $lines = array_map(static fn (array $row): string => '- ' . $row['text'], $rows);
+    $lines = array_map(fn (array $row): string => $this->memoryManager->formatFactLine($row), $rows);
     $this->setOutput("Relevant facts:\n" . implode("\n", $lines));
   }
 

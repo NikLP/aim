@@ -153,7 +153,7 @@ scaffolded directly from the conversation. Higher-stakes than
 retrospective memory: an AI-generated Recipe mutates live site structure,
 so it requires a dry-run/human-review gate before `drush recipe apply`,
 same principle as the human-review gate on memory facts. Design only, not
-yet built - see [ADR-0009](adr/0009-recipe-apply-safety-gate.md).
+yet built - see [ADR-0035](adr/0035-standing-constraints-action-gate.md).
 
 ## Requirements
 

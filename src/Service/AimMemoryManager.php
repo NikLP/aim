@@ -14,6 +14,9 @@ use Drupal\ai\Guardrail\Result\RewriteInputResult;
 use Drupal\ai\Guardrail\Result\StopResult;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
+use Drupal\ai\OperationType\Decision\DecisionInput;
+use Drupal\ai\OperationType\Decision\Value\ChoiceQuestion;
+use Drupal\ai\OperationType\Decision\Value\NoulQuestion;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
@@ -23,6 +26,7 @@ use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\aim\AimScopeTypePluginManagerInterface;
+use Drupal\aim\Backend\ActivityBackendInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
 use Drupal\search_api\IndexInterface;
@@ -100,6 +104,17 @@ class AimMemoryManager {
   public const DEFAULT_AMBIGUOUS_THRESHOLD = 0.45;
 
   /**
+   * Shipped default for aim.settings' neighbor_limit, and a fallback.
+   *
+   * How many nearest neighbors consolidation compares a fact against, read
+   * via getNeighborLimit(). Each neighbor inside the ambiguous band can
+   * cost one classification call, so this bounds the worst-case cost per
+   * fact. Measured 2026-10-02 on the live site: 1 found 40 decisions, 3
+   * found 86, including two merges 1 never saw.
+   */
+  public const DEFAULT_NEIGHBOR_LIMIT = 3;
+
+  /**
    * Shipped default for aim.settings' recall_max_distance, and a fallback.
    *
    * See DEFAULT_AUTO_THRESHOLD - same relationship to the live config value,
@@ -160,6 +175,9 @@ class AimMemoryManager {
    *   The aim logger channel. Warnings and errors are always logged; the
    *   info and debug tiers are gated by aim.settings' log_audit and
    *   log_verbose (see logAudit() and logVerbose()).
+   * @param \Drupal\aim\Backend\ActivityBackendInterface $decisionBackend
+   *   The Decision API backend, used for an activity whose
+   *   aim.settings:activities backend is "decision".
    */
   public function __construct(
     protected AiProviderPluginManager $aiProvider,
@@ -173,6 +191,7 @@ class AimMemoryManager {
     protected AccountProxyInterface $currentUser,
     protected AimEmbeddingCacheSubscriber $embeddingCache,
     protected LoggerChannelInterface $logger,
+    protected ActivityBackendInterface $decisionBackend,
   ) {}
 
   /**
@@ -270,6 +289,19 @@ class AimMemoryManager {
   public function getAmbiguousThreshold(): float {
     $value = $this->configFactory->get('aim.settings')->get('ambiguous_threshold');
     return $value !== NULL ? (float) $value : self::DEFAULT_AMBIGUOUS_THRESHOLD;
+  }
+
+  /**
+   * Returns how many nearest neighbors consolidation compares a fact to.
+   *
+   * See getAutoThreshold() - same fallback behavior.
+   *
+   * @return int
+   *   At least 1.
+   */
+  public function getNeighborLimit(): int {
+    $value = $this->configFactory->get('aim.settings')->get('neighbor_limit');
+    return $value !== NULL ? max(1, (int) $value) : self::DEFAULT_NEIGHBOR_LIMIT;
   }
 
   /**
@@ -554,6 +586,48 @@ class AimMemoryManager {
    */
   public function getDefaultChatProvider(): ?array {
     return $this->aiProvider->getDefaultProviderForOperationType('chat');
+  }
+
+  /**
+   * Resolves the backend and model configured for an activity.
+   *
+   * Reads aim.settings:activities.{activity}; an empty chat choice falls
+   * back to the site default chat provider. A decision backend has no site
+   * default, so it needs an explicit choice.
+   *
+   * @param string $activity
+   *   One of extraction, consolidation or verifier.
+   *
+   * @return array|null
+   *   An array with keys 'provider_id', 'model_id' and 'backend', or NULL if
+   *   neither a choice nor a usable default is configured.
+   */
+  public function getModelFor(string $activity): ?array {
+    $choice = $this->configFactory->get('aim.settings')->get('activities.' . $activity) ?? [];
+    $backend = ($choice['backend'] ?? 'chat') === 'decision' && $activity !== 'extraction' ? 'decision' : 'chat';
+    if (!empty($choice['provider']) && !empty($choice['model'])) {
+      return ['provider_id' => $choice['provider'], 'model_id' => $choice['model'], 'backend' => $backend];
+    }
+    if ($backend === 'decision') {
+      return NULL;
+    }
+    $default = $this->getDefaultChatProvider();
+    return !empty($default['provider_id']) && !empty($default['model_id']) ? $default + ['backend' => 'chat'] : NULL;
+  }
+
+  /**
+   * Returns the decision-backend model for an activity, if it uses one.
+   *
+   * @param string $activity
+   *   One of consolidation or verifier.
+   *
+   * @return array|null
+   *   A [provider_id, model_id] pair, or NULL when the activity uses the
+   *   chat backend or has no decision model chosen.
+   */
+  protected function decisionModelFor(string $activity): ?array {
+    $choice = $this->getModelFor($activity);
+    return ($choice['backend'] ?? NULL) === 'decision' ? [$choice['provider_id'], $choice['model_id']] : NULL;
   }
 
   /**
@@ -892,6 +966,29 @@ class AimMemoryManager {
   }
 
   /**
+   * Formats a recall() row as one line of text for a model or a person.
+   *
+   * Adds the fact's date so a reader can tell a recent fact from an old
+   * one: "true since" when `asserted` was set, otherwise "recorded" with
+   * the creation date.
+   *
+   * @param array $row
+   *   A row from recall().
+   *
+   * @return string
+   *   For example "- Nik lives in Leeds (recorded 2026-09-14)".
+   */
+  public function formatFactLine(array $row): string {
+    if (!empty($row['asserted'])) {
+      $date = '(true since ' . gmdate('Y-m-d', (int) $row['asserted']) . ')';
+    }
+    else {
+      $date = '(recorded ' . gmdate('Y-m-d', (int) $row['created']) . ')';
+    }
+    return '- ' . $row['text'] . ' ' . $date;
+  }
+
+  /**
    * Runs a semantic query against the vector index.
    *
    * @param string $text
@@ -919,7 +1016,9 @@ class AimMemoryManager {
    *
    * @return array
    *   A list of rows, each with keys id, score, scope, subject, text,
-   *   source, state, trusted. score is what search_api reports for the
+   *   source, state, trusted, created, asserted (a timestamp, or NULL when
+   *   never set; see formatFactLine()). Retired facts are never returned, so
+   *   there is no expires key. score is what search_api reports for the
    *   match, which for ai_vdb_provider_mariadb is MariaDB's
    *   VEC_DISTANCE_COSINE value: a cosine distance, 0.0 for an identical
    *   embedding and larger the less similar the fact is, so lower is a
@@ -1014,6 +1113,8 @@ class AimMemoryManager {
         'source' => $fact->get('source')->value,
         'state' => $fact->get('state')->value,
         'trusted' => (bool) $fact->get('trusted')->value,
+        'created' => (int) $fact->get('created')->value,
+        'asserted' => $fact->get('asserted')->isEmpty() ? NULL : (int) $fact->get('asserted')->value,
       ];
 
       if (count($rows) >= $limit) {
@@ -1101,49 +1202,39 @@ class AimMemoryManager {
       return ['rows' => [], 'has_facts' => FALSE];
     }
 
-    $handled = [];
+    // Pairs already compared (so A-B is not classified again from B's side)
+    // and facts retired so far this sweep (a dry run changes nothing in the
+    // database, so the sweep tracks retirements itself).
+    $handled_pairs = [];
+    $retired = [];
     $rows = [];
 
     foreach ($fact_storage->loadMultiple($ids) as $fact) {
-      if (isset($handled[$fact->id()])) {
+      if (isset($retired[$fact->id()])) {
         continue;
       }
 
-      $neighbor_result = $this->findNearestNeighbor($index, $fact, $handled);
-      if ($neighbor_result === NULL) {
-        continue;
-      }
-
-      [$neighbor, $score] = $neighbor_result;
-      if ($score > $ambiguousThreshold) {
-        continue;
-      }
-
-      // Lower id is the established fact, higher id the newer restatement
-      // being evaluated against it.
-      $kept = $fact->id() < $neighbor->id() ? $fact : $neighbor;
-      $candidate = $fact->id() < $neighbor->id() ? $neighbor : $fact;
-
-      [$decision, $merged_text] = $this->decideAndApply($kept, $candidate, $score, $autoThreshold, $providerId, $modelId, $dryRun);
-
-      $handled[$kept->id()] = TRUE;
-      $handled[$candidate->id()] = TRUE;
-      $rows[] = [$kept->id(), $candidate->id(), round($score, 3), $decision, $merged_text];
+      $rows = array_merge($rows, $this->consolidateAgainstNeighbors($index, $fact, $providerId, $modelId, $autoThreshold, $ambiguousThreshold, $dryRun, $handled_pairs, $retired));
     }
 
     return ['rows' => $rows, 'has_facts' => TRUE];
   }
 
   /**
-   * Runs a single fact against its nearest neighbor and applies a decision.
+   * Runs a single fact against its nearest neighbors and applies decisions.
    *
    * The per-fact counterpart to consolidate()'s sweep: used by
    * AimConsolidateQueueWorker to process one newly-written fact, enqueued
    * by enqueueForConsolidation() (decision 4's Queue API automation). No
-   * $handled registry is needed here the way consolidate()'s sweep needs
+   * pair registry is needed here the way consolidate()'s sweep needs
    * one - each queue item is processed and saved independently, so a later
-   * item sees an already-`expires`-set fact and findNearestNeighbor()
+   * item sees an already-`expires`-set fact and findNeighbors()
    * already filters those out.
+   *
+   * Up to NEIGHBOR_LIMIT neighbors are checked, nearest first: a
+   * contradiction is not always the single nearest fact, so stopping at
+   * one let it through unseen. Checking stops early once the fact itself
+   * is retired.
    *
    * @param \Drupal\aim\Entity\AimFact $fact
    *   The fact to consolidate.
@@ -1158,35 +1249,92 @@ class AimMemoryManager {
    *   Score at or below which an ambiguous neighbor gets a classification
    *   call. Above this, the fact is left alone.
    *
-   * @return array|null
-   *   A [kept id, candidate id, score, decision, merged text] tuple, or
-   *   NULL if no eligible neighbor was found.
+   * @return array
+   *   A list of [kept id, candidate id, score, decision, merged text]
+   *   tuples, one per neighbor compared; empty if no eligible neighbor
+   *   was found.
    *
    * @throws \RuntimeException
    *   If the vector index does not exist.
    */
-  public function consolidateFact(AimFact $fact, string $providerId, string $modelId, float $autoThreshold, float $ambiguousThreshold): ?array {
+  public function consolidateFact(AimFact $fact, string $providerId, string $modelId, float $autoThreshold, float $ambiguousThreshold): array {
     $index = $this->loadVectorIndex();
     if (!$index) {
       throw new \RuntimeException('The aim_vector_index search index does not exist.');
     }
 
-    $neighbor_result = $this->findNearestNeighbor($index, $fact, []);
-    if ($neighbor_result === NULL) {
-      return NULL;
+    $handled_pairs = [];
+    $retired = [];
+    return $this->consolidateAgainstNeighbors($index, $fact, $providerId, $modelId, $autoThreshold, $ambiguousThreshold, FALSE, $handled_pairs, $retired);
+  }
+
+  /**
+   * Compares one fact to its nearest neighbors and applies each decision.
+   *
+   * Shared by consolidate()'s sweep and consolidateFact(). Neighbors are
+   * fetched once, nearest first, so a retirement part-way through cannot
+   * change the list; the loop stops as soon as the fact itself is retired
+   * (a retired fact has nothing left to compare), and carries on after an
+   * ADD or after retiring the neighbor.
+   *
+   * @param \Drupal\search_api\IndexInterface $index
+   *   The vector index.
+   * @param \Drupal\aim\Entity\AimFact $fact
+   *   The fact to compare.
+   * @param string $providerId
+   *   The AI provider plugin ID to use for ambiguous cases.
+   * @param string $modelId
+   *   The chat model ID to use for ambiguous cases.
+   * @param float $autoThreshold
+   *   Score at or below which a neighbor is retired automatically.
+   * @param float $ambiguousThreshold
+   *   Score above which a neighbor is not compared at all.
+   * @param bool $dryRun
+   *   If TRUE, decisions are computed but nothing is saved.
+   * @param array $handledPairs
+   *   Pair keys ("lowid:highid") already compared; updated by reference.
+   * @param array $retired
+   *   Fact IDs retired so far, as keys; updated by reference.
+   *
+   * @return array
+   *   A list of [kept id, candidate id, score, decision, merged text]
+   *   tuples.
+   */
+  protected function consolidateAgainstNeighbors(IndexInterface $index, AimFact $fact, string $providerId, string $modelId, float $autoThreshold, float $ambiguousThreshold, bool $dryRun, array &$handledPairs, array &$retired): array {
+    $rows = [];
+
+    $neighbors = $this->findNeighbors($index, $fact, $retired, $ambiguousThreshold, $this->getNeighborLimit());
+    foreach ($neighbors as [$neighbor, $score]) {
+      $ids = [(int) $fact->id(), (int) $neighbor->id()];
+      sort($ids);
+      $pair = implode(':', $ids);
+      if (isset($handledPairs[$pair])) {
+        continue;
+      }
+      $handledPairs[$pair] = TRUE;
+
+      // Lower id is the established fact, higher id the newer restatement
+      // being evaluated against it.
+      $kept = $fact->id() < $neighbor->id() ? $fact : $neighbor;
+      $candidate = $fact->id() < $neighbor->id() ? $neighbor : $fact;
+
+      [$decision, $merged_text] = $this->decideAndApply($kept, $candidate, $score, $autoThreshold, $providerId, $modelId, $dryRun);
+      $rows[] = [$kept->id(), $candidate->id(), round($score, 3), $decision, $merged_text];
+
+      if (in_array($decision, ['NOOP', 'DELETE'], TRUE)) {
+        $retired[$candidate->id()] = TRUE;
+      }
+      elseif ($decision === 'UPDATE') {
+        $retired[$kept->id()] = TRUE;
+        $retired[$candidate->id()] = TRUE;
+      }
+
+      if (isset($retired[$fact->id()])) {
+        break;
+      }
     }
 
-    [$neighbor, $score] = $neighbor_result;
-    if ($score > $ambiguousThreshold) {
-      return NULL;
-    }
-
-    $kept = $fact->id() < $neighbor->id() ? $fact : $neighbor;
-    $candidate = $fact->id() < $neighbor->id() ? $neighbor : $fact;
-
-    [$decision, $merged_text] = $this->decideAndApply($kept, $candidate, $score, $autoThreshold, $providerId, $modelId, FALSE);
-
-    return [$kept->id(), $candidate->id(), round($score, 3), $decision, $merged_text];
+    return $rows;
   }
 
   /**
@@ -1317,8 +1465,8 @@ class AimMemoryManager {
    * Two independent checks, either of which fails the merge. The model
    * check asks a verifier model whether every detail of both inputs
    * survives and nothing was invented; the verifier is
-   * aim.settings:merge_verifier_model (provider__model) when set, so a
-   * different model can check the first, else the classifier's own model.
+   * aim.settings:activities.verifier when set, so a different model can check
+   * the first, else the classifier's own model.
    * The distance check requires the merged text's embedding to sit within
    * aim.settings:merge_max_distance of each input (0 disables it). Both
    * check faithfulness to the inputs, not real-world truth. A verifier
@@ -1359,9 +1507,10 @@ class AimMemoryManager {
     }
 
     if ($config->get('merge_verify') ?? TRUE) {
-      $verifier = (string) $config->get('merge_verifier_model');
-      if (str_contains($verifier, '__')) {
-        [$providerId, $modelId] = explode('__', $verifier, 2);
+      $verifier = $config->get('activities.verifier');
+      if (($verifier['backend'] ?? 'chat') === 'chat' && !empty($verifier['provider']) && !empty($verifier['model'])) {
+        $providerId = $verifier['provider'];
+        $modelId = $verifier['model'];
       }
       try {
         if (!$this->modelConfirmsMerge($kept, $candidate, $mergedText, $providerId, $modelId)) {
@@ -1398,6 +1547,20 @@ class AimMemoryManager {
    *   If the response is not the expected JSON shape.
    */
   protected function modelConfirmsMerge(AimFact $kept, AimFact $candidate, string $mergedText, string $providerId, string $modelId): bool {
+    $decision_model = $this->decisionModelFor('verifier');
+    if ($decision_model !== NULL) {
+      $input = new DecisionInput(
+        [
+          'fact_a' => (string) $kept->get('text')->value,
+          'fact_b' => (string) $candidate->get('text')->value,
+          'merged' => $mergedText,
+        ],
+        ['faithful' => new NoulQuestion('Every detail of fact_a and fact_b (names, numbers, dates, conditions, negations) survives in merged, and merged adds nothing the two facts do not say. Judge faithfulness to the inputs, not whether they are true.')],
+      );
+      $response = $this->decisionBackend->run('verifier', $input, $decision_model[0], $decision_model[1]);
+      return $response->getNoul('faithful')->isLikely();
+    }
+
     $prompt = strtr($this->configFactory->get('aim.settings')->get('merge_verify_prompt'), [
       '{kept_text}' => $kept->get('text')->value,
       '{candidate_text}' => $candidate->get('text')->value,
@@ -1610,19 +1773,23 @@ class AimMemoryManager {
   }
 
   /**
-   * Finds the closest indexed neighbor to a fact, excluding handled ids.
+   * Finds the closest indexed neighbors to a fact, nearest first.
    *
    * @param \Drupal\search_api\IndexInterface $index
    *   The vector index to query.
    * @param \Drupal\aim\Entity\AimFact $fact
-   *   The fact to find a neighbor for.
+   *   The fact to find neighbors for.
    * @param array $handled
-   *   Fact IDs already consumed by a decision this run, keyed by ID.
+   *   Fact IDs to skip (already retired this run), keyed by ID.
+   * @param float $maxScore
+   *   Neighbors scoring above this distance are left out.
+   * @param int $limit
+   *   The most neighbors to return.
    *
-   * @return array|null
-   *   A [neighbor fact, score] pair, or NULL if no eligible neighbor exists.
+   * @return array
+   *   A list of [neighbor fact, score] pairs, possibly empty.
    */
-  protected function findNearestNeighbor(IndexInterface $index, AimFact $fact, array $handled): ?array {
+  protected function findNeighbors(IndexInterface $index, AimFact $fact, array $handled, float $maxScore, int $limit): array {
     $scope = $fact->bundle();
     $is_user_scope = $this->scopeRequiresAccount($scope);
 
@@ -1633,7 +1800,7 @@ class AimMemoryManager {
       if ($user === NULL) {
         // A scope that requires a real account with no account set has no
         // neighbors to compare.
-        return NULL;
+        return [];
       }
       $query->addCondition('user', (int) $user);
     }
@@ -1645,10 +1812,17 @@ class AimMemoryManager {
     }
     // Headroom for the fact itself and already-handled ids, which are
     // skipped below.
-    $query->range(0, $is_user_scope ? 20 : 5);
+    $query->range(0, $is_user_scope ? max(20, $limit + 4) : $limit + 4);
 
+    $neighbors = [];
     $results = $this->executeSearchQuery($query);
     foreach ($results as $result) {
+      // Rows arrive nearest-first, so the first one past the cutoff ends
+      // the useful part of the list.
+      if ((float) $result->getScore() > $maxScore) {
+        break;
+      }
+
       try {
         $original = $result->getOriginalObject();
       }
@@ -1674,10 +1848,13 @@ class AimMemoryManager {
         continue;
       }
 
-      return [$candidate, (float) $result->getScore()];
+      $neighbors[] = [$candidate, (float) $result->getScore()];
+      if (count($neighbors) >= $limit) {
+        break;
+      }
     }
 
-    return NULL;
+    return $neighbors;
   }
 
   /**
@@ -1702,6 +1879,36 @@ class AimMemoryManager {
    *   DELETE, NOOP. merged_text is only meaningful for UPDATE.
    */
   protected function classifyPair(AimFact $kept, AimFact $candidate, string $providerId, string $modelId): array {
+    $decision_model = $this->decisionModelFor('consolidation');
+    if ($decision_model !== NULL) {
+      $input = new DecisionInput(
+        [
+          'existing' => (string) $kept->get('text')->value,
+          'candidate' => (string) $candidate->get('text')->value,
+        ],
+        [
+          'decision' => new ChoiceQuestion('Decide what to do with the candidate fact relative to the existing fact. When unsure, choose ADD: keeping both facts is always safe.', [
+            'ADD' => 'The facts are genuinely different; keep both.',
+            'UPDATE' => 'The candidate refines, corrects or supersedes the existing fact.',
+            'NOOP' => 'The candidate restates the existing fact with no new information.',
+            'DELETE' => 'The candidate should not exist as a memory at all (nonsensical or clearly erroneous). Use sparingly.',
+          ]),
+        ],
+      );
+      $choice = $this->decisionBackend->run('consolidation', $input, $decision_model[0], $decision_model[1])->getChoice('decision')->getChoice();
+      if ($choice === 'UPDATE') {
+        // A decision model only judges; a chat model writes the merge, and
+        // the verifier then checks it like any other merge.
+        $merged = $this->writeMerge($kept, $candidate);
+        if ($merged === NULL) {
+          $this->logger->warning('Decision classifier chose UPDATE but no default chat provider can write the merge; keeping both facts.');
+          return ['ADD', NULL];
+        }
+        return [$choice, $merged];
+      }
+      return [$choice, NULL];
+    }
+
     $prompt = strtr($this->configFactory->get('aim.settings')->get('consolidation_prompt'), [
       '{kept_text}' => $kept->get('text')->value,
       '{candidate_text}' => $candidate->get('text')->value,
@@ -1738,6 +1945,53 @@ class AimMemoryManager {
     }
 
     return [$decoded['decision'], $decoded['merged_text'] ?? NULL];
+  }
+
+  /**
+   * Asks the site default chat model to merge two facts into one sentence.
+   *
+   * Used when the classifier is a decision model, which cannot write text.
+   * The result is checked by the guardrails and verifier like any merge.
+   *
+   * @param \Drupal\aim\Entity\AimFact $kept
+   *   The established fact.
+   * @param \Drupal\aim\Entity\AimFact $candidate
+   *   The newer fact.
+   *
+   * @return string|null
+   *   The merged text, or NULL if no default chat provider is configured.
+   *
+   * @throws \RuntimeException
+   *   If the reply is malformed.
+   */
+  protected function writeMerge(AimFact $kept, AimFact $candidate): ?string {
+    $default = $this->getDefaultChatProvider();
+    if (empty($default['provider_id']) || empty($default['model_id'])) {
+      return NULL;
+    }
+    $prompt = strtr($this->configFactory->get('aim.settings')->get('merge_prompt'), [
+      '{kept_text}' => $kept->get('text')->value,
+      '{candidate_text}' => $candidate->get('text')->value,
+    ]);
+    $schema = new StructuredOutputSchema(
+      name: 'aim_merge_text',
+      description: 'The merged fact text.',
+      strict: TRUE,
+      json_schema: [
+        'type' => 'object',
+        'additionalProperties' => FALSE,
+        'properties' => ['merged_text' => ['type' => 'string']],
+        'required' => ['merged_text'],
+      ],
+    );
+    $input = new ChatInput([new ChatMessage('user', $prompt)]);
+    $input->setChatStructuredJsonSchema($schema);
+    $output = $this->aiProvider->createInstance($default['provider_id'])->chat($input, $default['model_id'], ['aim_consolidate_merge']);
+    $decoded = json_decode($output->getNormalized()->getText(), TRUE);
+    if (!is_array($decoded) || !is_string($decoded['merged_text'] ?? NULL) || trim($decoded['merged_text']) === '') {
+      throw new \RuntimeException('Merge writer reply was not the expected JSON shape.');
+    }
+    return trim($decoded['merged_text']);
   }
 
   /**
