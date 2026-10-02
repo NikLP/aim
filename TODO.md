@@ -24,8 +24,7 @@ this list as exhaustive.
       then let consolidation dedupe across chunks. A small local extractor
       has a much smaller window, so chunk size should be per model
       (see `adr/model-call-budget.md`).
-- [ ] Ingest form (ADR-0016 Mode 1): see `HANDOFF-ingest-form.md` in the
-      site root.
+- [x] Ingest form (ADR-0016 Mode 1) BUILT 2026-10-02: Batch API for large files is the follow-up.
 
 ## Decision models (raised 2026-10-02, ADR-0021/0033 addenda)
 

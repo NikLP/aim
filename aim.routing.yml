@@ -29,3 +29,11 @@ aim.status:
     _title: 'AIM status'
   requirements:
     _permission: 'administer aim memory'
+
+aim.ingest:
+  path: '/admin/content/aim-facts/ingest'
+  defaults:
+    _form: '\Drupal\aim\Form\AimIngestForm'
+    _title: 'Ingest'
+  requirements:
+    _permission: 'ingest aim memory'

@@ -32,3 +32,10 @@ aim.status:
   parent: aim.admin_config
   route_name: aim.status
   weight: -10
+
+aim.ingest:
+  title: 'Ingest'
+  description: 'Upload a document or fact file for AIM to remember.'
+  parent: views_view:views.aim_facts.page_1
+  route_name: aim.ingest
+  weight: 1

@@ -81,18 +81,16 @@ final class AimCommands extends DrushCommands {
     }
     [$provider_id, $model_id] = $provider;
 
-    $facts = $this->memoryManager->extractFacts($text, $provider_id, $model_id);
-    if (empty($facts)) {
-      $this->io()->note('The model returned no facts worth remembering.');
-      return;
-    }
-
     $source = $options['source'] ?? ('extract:' . basename($file));
     try {
-      $result = $this->memoryManager->createFactsFromCandidates($facts, $source, $options['subject-uid'] ?: NULL);
+      $result = $this->memoryManager->ingestText($text, $source, $options['subject-uid'] ?: NULL, $provider_id, $model_id);
     }
-    catch (\InvalidArgumentException $e) {
+    catch (\InvalidArgumentException | \RuntimeException $e) {
       $this->io()->error($e->getMessage());
+      return;
+    }
+    if ($result['extracted'] === 0) {
+      $this->io()->note('The model returned no facts worth remembering.');
       return;
     }
 
@@ -192,7 +190,7 @@ final class AimCommands extends DrushCommands {
     }
 
     try {
-      [$state, $category, $asserted] = $this->parseRememberFields($options);
+      [$state, $category, $asserted] = $this->memoryManager->parseFactFields($options);
       $fact = $this->memoryManager->remember($text, $options['scope'], $options['subject'], $options['source'], $state, $category, $asserted, NULL, $options['target-type'], $options['target-id']);
     }
     catch (\InvalidArgumentException $e) {
@@ -210,9 +208,8 @@ final class AimCommands extends DrushCommands {
   /**
    * Saves every fact object in a JSON file, one bootstrap for the batch.
    *
-   * Mirrors createFactsFromCandidates()'s per-item resilience: one bad
-   * entry (missing text, invalid scope, a rejected guardrail) is reported
-   * and skipped rather than aborting the rest of the file.
+   * One bad entry is reported and skipped rather than aborting the rest of
+   * the file (see AimMemoryManager::rememberBatch()).
    *
    * @param string $file
    *   Path to a JSON file containing an array of fact objects. Each object
@@ -233,88 +230,19 @@ final class AimCommands extends DrushCommands {
       return;
     }
 
-    $created = 0;
-    foreach ($entries as $i => $entry) {
-      if (empty($entry['text'])) {
-        $this->io()->warning("Entry $i: missing text, skipped.");
-        continue;
-      }
-
-      if (empty($entry['scope'])) {
-        // No default here - see aim:remember's own --scope error for why.
-        $this->io()->warning("Entry $i: missing scope, skipped.");
-        continue;
-      }
-
-      try {
-        [$state, $category, $asserted] = $this->parseRememberFields($entry);
-        $fact = $this->memoryManager->remember(
-          $entry['text'],
-          $entry['scope'],
-          $entry['subject'] ?? NULL,
-          $entry['source'] ?? NULL,
-          $state,
-          $category,
-          $asserted,
-          NULL,
-          $entry['target_type'] ?? NULL,
-          $entry['target_id'] ?? NULL,
-        );
-      }
-      catch (\InvalidArgumentException $e) {
-        $this->io()->warning("Entry $i: " . $e->getMessage());
-        continue;
-      }
-
+    $result = $this->memoryManager->rememberBatch($entries);
+    foreach ($result['errors'] as $i => $message) {
+      $this->io()->warning("Entry $i: $message" . (str_starts_with($message, 'missing') ? ', skipped.' : ''));
+    }
+    foreach ($result['created'] as $i => $fact) {
       $entry_message = "Entry $i: created aim_fact " . $fact->id() . '.';
       if ($fact->bundle() === 'case') {
         $entry_message .= ' Case ID: ' . $fact->get('subject')->value . '.';
       }
       $this->io()->success($entry_message);
-      $created++;
     }
 
-    $this->io()->note("Created $created of " . count($entries) . ' fact(s).');
-  }
-
-  /**
-   * Parses aim:remember's shared state/category/asserted fields.
-   *
-   * @param array $fields
-   *   Raw state/category/asserted values, as given on the command line or
-   *   decoded from a --file entry.
-   *
-   * @return array
-   *   [$state, $category, $asserted], typed as AimMemoryManager::remember()
-   *   expects them.
-   *
-   * @throws \InvalidArgumentException
-   *   If state or asserted cannot be parsed.
-   */
-  private function parseRememberFields(array $fields): array {
-    $state = NULL;
-    if (($fields['state'] ?? NULL) !== NULL) {
-      $state = filter_var($fields['state'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-      if ($state === NULL) {
-        throw new \InvalidArgumentException('Invalid state "' . $fields['state'] . '", expected true or false.');
-      }
-    }
-
-    $category = [];
-    if (!empty($fields['category'])) {
-      $category = is_array($fields['category']) ? $fields['category'] : explode(',', $fields['category']);
-      $category = array_map('trim', $category);
-    }
-
-    $asserted = NULL;
-    if (($fields['asserted'] ?? NULL) !== NULL) {
-      $asserted = strtotime($fields['asserted']);
-      if ($asserted === FALSE) {
-        throw new \InvalidArgumentException('Invalid asserted "' . $fields['asserted'] . '", expected a date strtotime() can parse.');
-      }
-    }
-
-    return [$state, $category, $asserted];
+    $this->io()->note('Created ' . count($result['created']) . ' of ' . count($entries) . ' fact(s).');
   }
 
   /**

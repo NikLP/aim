@@ -230,8 +230,10 @@ duplicated here.
 ## Permissions
 
 `administer aim memory` (flat admin bypass, `restrict access: true`);
-`ingest aim memory` (the Content > AIM > Ingest form, `restrict access: true`;
-admin-only until the form exists, see [ADR-0016](adr/0016-document-ingestion-ui.md)).
+`ingest aim memory` (the Content > AIM > Ingest form at
+`/admin/content/aim-facts/ingest`, `restrict access: true`; implies write
+access to every scope, no per-scope check, see
+[ADR-0016](adr/0016-document-ingestion-ui.md)).
 Per-scope, dynamically generated via `BundlePermissionHandlerTrait`:
 `view {scope} aim facts` / `create {scope} aim facts` /
 `trust {scope} aim facts` (`restrict access`; gates the custom `trust`

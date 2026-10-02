@@ -189,7 +189,9 @@ ones it wants. Each submodule has its own requirements and setup:
    working provider - this step is required on every fresh install.
 3. Try it: `drush aim:remember "some fact" --scope=site`, then
    `drush aim:recall "some fact"`. For an unattended pipeline,
-   `drush aim:extract <file>` classifies and stores facts from raw text.
+   `drush aim:extract <file>` classifies and stores facts from raw text; the
+   Content > AIM facts > Ingest form (`ingest aim memory`) does the same, plus
+   one-fact-per-line and JSON imports without a model.
 4. For a remote MCP client (Claude.ai/Claude Desktop, no Drupal session),
    enable `aim_tool_oauth` - see its own
    [README.md](modules/aim_tool_oauth/README.md)/

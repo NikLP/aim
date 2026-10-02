@@ -42,21 +42,28 @@ thin wrapper over it, same as it already is a thin wrapper over
 `extractFacts()`/`createFactsFromCandidates()` today. Both drush and the
 new form call this same method - no duplicated extraction logic.
 
-**Mode 1 - ephemeral upload (build now).** A plain Drupal form: file
-upload (or a textarea for the smallest first cut), `scope`/`subject`/
-`category` fields matching `aim:remember`'s options, submits to
-`ingestText()`. The uploaded file is never saved to a managed File/Media
+**Mode 1 - ephemeral upload (built 2026-10-02).** A plain Drupal form
+(`AimIngestForm`): a file upload or a textarea, with three input modes.
+*One fact per line* (no model): scope, subject and `target_type`/`target_id`
+chosen once on the form, each non-empty line goes to `remember()`.
+*Extract with a model* (prose): `ingestText()`, one call per file, the model
+picks scope, an optional uid attaches user-scope facts. *JSON* (advanced, no
+model): the `aim:remember --file` shape, via `rememberBatch()`, for mixed
+scopes, case IDs or entity targets. Uploads are capped at 100 KB (no
+chunking yet). The uploaded file is never saved to a managed File/Media
 entity - read into memory and discarded, same as `aim:extract` already
 does. `source` is tagged `upload:<filename>`
 (or `form:<timestamp>` for pasted text), extending `aim:extract`'s
 existing `extract:<filename>` convention rather than inventing a new one.
 
-Route: `/admin/content/aim-facts/ingest`, reached via a local-action
-button ("Ingest document") on the existing `views.view.aim_facts` listing
+Route: `/admin/content/aim-facts/ingest`, reached via a menu link under
+Content and a local-action button ("Ingest") on the existing `views.view.aim_facts` listing
 (`/admin/content/aim-facts`) - same `menu.type: normal` pattern CLAUDE.md's
 Admin UI section already documents for that View, not a tab. Permission:
-`store aim memory` (the existing write permission `aim_tool` already
-split out), not the admin-only `administer aim memory`.
+`ingest aim memory` (core `aim`, `restrict access`), not `store aim memory`
+(that lives in the optional `aim_tool`) and not `administer aim memory`.
+It implies write access to every scope: an import is a deliberate bulk load
+by a trusted operator, with no per-scope `create {scope} aim facts` check.
 
 Text only for this first cut, per the scope given for this ADR - no
 PDF/office-format parsing. A future format-conversion step is a separate,

@@ -92,6 +92,16 @@ match the model's own freeform subject text against the accounts table.
 See [ADR-0011](adr/resolved/0011-extraction-explicit-subject-uid.md) for why the
 match can't be model-guessed.
 
+### Ingest form
+
+`/admin/content/aim-facts/ingest` (`AimIngestForm`, permission `ingest aim
+memory`) shares one code path with drush: `AimMemoryManager::ingestText()`
+(`aim:extract`), `rememberBatch()` (`aim:remember --file`, and the form's
+one-fact-per-line and JSON modes), `parseFactFields()`. Uploads are read
+from the request and never saved as a File entity; capped at 100 KB
+(`AimIngestForm::MAX_BYTES`). Submit is synchronous; consolidation stays
+queued. Test data: `demo/ingest-test/`.
+
 **Skill:** `.claude/skills/aim-discovery/` ("the grill") - a structured
 discovery interview that distills each topic into a summary and runs it
 through `aim:extract`, mostly `scope: site`.

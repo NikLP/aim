@@ -966,6 +966,141 @@ class AimMemoryManager {
   }
 
   /**
+   * Extracts facts from prose with a model and saves them.
+   *
+   * Shared by aim:extract and the ingest form (ADR-0016, mode 1).
+   *
+   * @param string $text
+   *   The document text. Sent whole in one prompt, no chunking.
+   * @param string $source
+   *   Provenance tag stored on every created fact.
+   * @param string|null $subjectUid
+   *   A uid of a real account to attach scope=user candidates to. NULL skips
+   *   them.
+   * @param string|null $providerId
+   *   The chat provider, or NULL for the extraction activity's configured one.
+   * @param string|null $modelId
+   *   The chat model, or NULL for the extraction activity's configured one.
+   *
+   * @return array
+   *   The createFactsFromCandidates() result plus 'extracted' (int, how many
+   *   candidates the model returned).
+   *
+   * @throws \InvalidArgumentException
+   *   If $subjectUid does not resolve to a real account.
+   * @throws \RuntimeException
+   *   If no provider/model is given and none is configured.
+   */
+  public function ingestText(string $text, string $source, ?string $subjectUid = NULL, ?string $providerId = NULL, ?string $modelId = NULL): array {
+    if (empty($providerId) || empty($modelId)) {
+      $default = $this->getModelFor('extraction');
+      if ($default === NULL) {
+        throw new \RuntimeException('No extraction model is configured. Set one at /admin/config/ai/settings or in the AIM settings.');
+      }
+      $providerId = $default['provider_id'];
+      $modelId = $default['model_id'];
+    }
+
+    $facts = $this->extractFacts(trim($text), $providerId, $modelId);
+    if (empty($facts)) {
+      return ['created' => [], 'skipped' => 0, 'blocked' => 0, 'extracted' => 0];
+    }
+    $result = $this->createFactsFromCandidates($facts, $source, $subjectUid ?: NULL);
+    $result['extracted'] = count($facts);
+    return $result;
+  }
+
+  /**
+   * Saves a list of fact entries through remember(), one failure at a time.
+   *
+   * Shared by aim:remember --file and the ingest form's JSON and one-fact-
+   * per-line modes. One bad entry (missing text or scope, an invalid value,
+   * a rejected guardrail) is recorded and skipped, never aborting the rest.
+   *
+   * @param array $entries
+   *   Fact objects with the keys text, scope, subject, source, state,
+   *   category (string or array), asserted, target_type, target_id. Unknown
+   *   keys are ignored.
+   * @param string|null $defaultSource
+   *   The source for entries that name none.
+   *
+   * @return array
+   *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[] keyed by
+   *   entry index) and 'errors' (string messages keyed by entry index).
+   */
+  public function rememberBatch(array $entries, ?string $defaultSource = NULL): array {
+    $created = [];
+    $errors = [];
+    foreach ($entries as $i => $entry) {
+      if (!is_array($entry) || empty($entry['text'])) {
+        $errors[$i] = 'missing text';
+        continue;
+      }
+      if (empty($entry['scope'])) {
+        $errors[$i] = 'missing scope';
+        continue;
+      }
+      try {
+        [$state, $category, $asserted] = $this->parseFactFields($entry);
+        $created[$i] = $this->remember(
+          $entry['text'],
+          $entry['scope'],
+          $entry['subject'] ?? NULL,
+          $entry['source'] ?? $defaultSource,
+          $state,
+          $category,
+          $asserted,
+          NULL,
+          $entry['target_type'] ?? NULL,
+          $entry['target_id'] ?? NULL,
+        );
+      }
+      catch (\InvalidArgumentException $e) {
+        $errors[$i] = $e->getMessage();
+      }
+    }
+    return ['created' => $created, 'errors' => $errors];
+  }
+
+  /**
+   * Parses the state/category/asserted fields of a fact entry.
+   *
+   * @param array $fields
+   *   Raw values, from a command line or a decoded JSON entry.
+   *
+   * @return array
+   *   [$state, $category, $asserted], typed as remember() expects them.
+   *
+   * @throws \InvalidArgumentException
+   *   If state or asserted cannot be parsed.
+   */
+  public function parseFactFields(array $fields): array {
+    $state = NULL;
+    if (($fields['state'] ?? NULL) !== NULL) {
+      $state = filter_var($fields['state'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+      if ($state === NULL) {
+        throw new \InvalidArgumentException('Invalid state "' . $fields['state'] . '", expected true or false.');
+      }
+    }
+
+    $category = [];
+    if (!empty($fields['category'])) {
+      $category = is_array($fields['category']) ? $fields['category'] : explode(',', $fields['category']);
+      $category = array_map('trim', $category);
+    }
+
+    $asserted = NULL;
+    if (($fields['asserted'] ?? NULL) !== NULL) {
+      $asserted = strtotime($fields['asserted']);
+      if ($asserted === FALSE) {
+        throw new \InvalidArgumentException('Invalid asserted "' . $fields['asserted'] . '", expected a date strtotime() can parse.');
+      }
+    }
+
+    return [$state, $category, $asserted];
+  }
+
+  /**
    * Formats a recall() row as one line of text for a model or a person.
    *
    * Adds the fact's date so a reader can tell a recent fact from an old
