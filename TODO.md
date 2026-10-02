@@ -46,12 +46,12 @@ this list as exhaustive.
       site-context contradictions. Synthetic data only for hosted Jev.
 - [ ] 2026-10-02 eval rework ([ADR-0037](adr/0037-transient-source-passages-for-grounding.md)):
       `aim_benchmark/scripts/decision-eval.py` + `decision-eval-sets.json`
-      built (pairs/merges/gate; hand-written, labels unverified). Baselines
-      in the handoff: `laya:en` pairs 6/24, `tev1:4b` pairs 17/24 (14 s/pair).
-      Still to build: a groundedness set (passage + candidate, labeled
+      built (pairs/merges/gate; hand-written, labels human-verified 2026-10-02). Baselines
+      in the handoff: `laya:en` pairs 6/24, `tev1:4b` 17/24 (14 s/pair), hosted `jev-latest`/`jev-preview` 22/24 (0.4 s/call); merges and gate AUC 0.96/1.00 on `tev1:4b`, 1.00/1.00 on Jev.
+      Real pairs: 25 live near-neighbour pairs (all ADD, human-verified) in `decision-eval-real-pairs.json`, `jev-latest` 25/25, 0 unsafe; they cannot test UPDATE/NOOP recall. Still to build: a groundedness set (passage + candidate, labeled
       supported/unsupported/misattributed), real vector-neighbour pairs
       pulled from the live table to replace the hand-written ADD/DELETE
-      cases, and an `nli` model run.
+      cases, and an `nli` model run (an Ollaya model, not an Ollama tag).
 - [ ] Generalize `plausibility-benchmark.py`: per-model scoring (`tev1:4b`,
       `tev1:0.8b`, later `laya:en` after fine-tuning on these sets),
       confusion matrix, accuracy by confidence bucket, cost-weighted

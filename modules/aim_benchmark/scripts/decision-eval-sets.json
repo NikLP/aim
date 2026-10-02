@@ -1,5 +1,5 @@
 {
- "_note": "Hand-written, labels NOT yet human-verified. Synthetic Harbourside facts only (safe for hosted Jev). pairs: classifyPair; merges: verifyMerge; gate: reframed plausibility (consistent with context and worth storing).",
+ "_note": "Hand-written; labels human-verified by Nik 2026-10-02 (pairs, merges, gate, no changes). Synthetic Harbourside facts only (safe for hosted Jev). pairs: classifyPair; merges: verifyMerge; gate: reframed plausibility (consistent with context and worth storing).",
  "pairs": [
   {
    "label": "ADD",

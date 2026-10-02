@@ -74,7 +74,7 @@ final class AimScopeUserAccessForm extends ConfigFormBase {
     $form['user_scope_shared_role_fallback'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Also allow viewing when the viewer and the subject share at least one role'),
-      '#description' => $this->t('Applies on top of the matrix below, not instead of it. With nothing checked below and this on, visibility is exactly the previous default: any shared role is enough. While this is on, a same-role diagonal cell below is greyed out because it already grants nothing the fallback does not - the "authenticated" row/column is the one exception, since the fallback deliberately ignores that shared role to avoid matching any two logged-in users.'),
+      '#description' => $this->t('Applies on top of the matrix below, not instead of it. With nothing checked below and this on, visibility is exactly the previous default: any shared role is enough. While this is on, same-role cells below (editor viewing editor, for example) are greyed out because the fallback already grants them. The "authenticated" cell is not greyed out: the fallback deliberately ignores that role, since every logged-in user has it, so checking that cell is the only way to let any logged-in user see another's facts.'),
       '#default_value' => $config->get('user_scope_shared_role_fallback') ?? TRUE,
     ];
 

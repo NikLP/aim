@@ -14,8 +14,9 @@ Sequential, one request at a time, per-call timeout; stdlib only.
   decision-eval.py pairs tev1:4b
   decision-eval.py all laya:en --host http://localhost:11435
 """
-import argparse, collections, json, pathlib, statistics as st, time, urllib.request
+import argparse, collections, json, os, pathlib, statistics as st, time, urllib.request
 
+AUTH = {}  # set by --key-env
 HERE = pathlib.Path(__file__).resolve().parent
 OPTIONS = {
     "ADD": "The facts are genuinely different; keep both.",
@@ -34,9 +35,9 @@ GATE_Q = ("Is the candidate a sensible fact about this library that is consisten
 def call(host, model, state, questions):
     body = json.dumps({"model": model, "state": state, "questions": questions}).encode()
     req = urllib.request.Request(host.rstrip("/") + "/v1/systemone", body,
-                                 {"content-type": "application/json"})
+                                 {"content-type": "application/json", **AUTH})
     start = time.time()
-    answers = json.load(urllib.request.urlopen(req, timeout=120))["answers"]
+    answers = json.load(urllib.request.urlopen(req, timeout=300))["answers"]
     return time.time() - start, answers
 
 
@@ -100,8 +101,11 @@ def main():
     ap.add_argument("model")
     ap.add_argument("--host", default="http://localhost:11434")
     ap.add_argument("--sets", default=str(HERE / "decision-eval-sets.json"))
+    ap.add_argument("--key-env", help="env var holding a bearer token (hosted Jev)")
     ap.add_argument("--limit", type=int, default=0, help="cap items per task (smoke test)")
     args = ap.parse_args()
+    if args.key_env:
+        AUTH["Authorization"] = "Bearer " + os.environ[args.key_env]
     sets = json.load(open(args.sets))
     cut = lambda xs: xs[:args.limit] if args.limit else xs
     times = []
