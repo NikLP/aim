@@ -29,7 +29,9 @@ class DecisionBackend implements ActivityBackendInterface {
    */
   public function run(string $activity, DecisionInput $input, string $providerId, string $modelId): DecisionResponse {
     $provider = $this->aiProvider->createInstance($providerId);
-    if (!$provider instanceof DecisionInterface) {
+    // createInstance() returns a ProviderProxy, so test the wrapped plugin
+    // (core's DecisionProviderFormHelper does the same).
+    if (!$provider->getPlugin() instanceof DecisionInterface) {
       throw new \RuntimeException("Provider $providerId does not implement the Decision operation type.");
     }
     return $provider->decision($input, $modelId, [self::TAGS[$activity]])->getNormalized();

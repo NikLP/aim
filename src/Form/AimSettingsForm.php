@@ -200,6 +200,18 @@ final class AimSettingsForm extends ConfigFormBase {
           '#states' => ['visible' => [$selector => ['value' => 'decision']]],
         ];
       }
+      if ($activity === 'verifier') {
+        $form['models'][$activity]['threshold'] = [
+          '#type' => 'number',
+          '#title' => $this->t('Decision confirmation threshold'),
+          '#description' => $this->t('A decision model confirms a merge only when its probability is above this value. Empty or 0 uses 0.5. Model-specific: a model that scores faulty merges high needs a higher value, calibrate it with the aim_benchmark eval scripts (hosted Jev separated cleanly at about 0.8 on a small 20-merge set, not a proven value).'),
+          '#default_value' => $choice['threshold'] ?? NULL,
+          '#min' => 0,
+          '#max' => 1,
+          '#step' => 0.01,
+          '#states' => ['visible' => [$selector => ['value' => 'decision']]],
+        ];
+      }
     }
 
     $form['recall'] = [
@@ -306,6 +318,9 @@ final class AimSettingsForm extends ConfigFormBase {
         'provider' => $use_default ? '' : (string) ($picked['provider'] ?? ''),
         'model' => $use_default ? '' : (string) ($picked['model'] ?? ''),
       ];
+      if ($activity === 'verifier' && !empty($value['threshold'])) {
+        $activities[$activity]['threshold'] = (float) $value['threshold'];
+      }
     }
     $this->configFactory()->getEditable('aim.settings')->set('activities', $activities)->save();
     parent::submitForm($form, $form_state);

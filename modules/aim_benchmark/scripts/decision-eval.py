@@ -95,9 +95,32 @@ def run_noul(name, host, model, items, good, question, state_of):
     return times
 
 
+SPLIT_QS = {
+    "a": "Does the merged text state every detail of the kept fact?",
+    "b": "Does the merged text state every detail of the candidate fact?",
+    "c": "Is every detail in the merged text present in the kept or candidate fact?",
+}
+
+
+def run_split(host, model, items):
+    """verifyMerge as three small questions; a merge is good only if all pass."""
+    pos, neg, times = [], [], []
+    for it in items:
+        t, a = call(host, model, {"kept": it["kept"], "candidate": it["candidate"], "merged": it["merged"]},
+                    {k: {"type": "noul", "instructions": q} for k, q in SPLIT_QS.items()})
+        (pos if it["label"] == "good" else neg).append(min(a[k]["noul"] for k in SPLIT_QS))
+        times.append(t)
+    acc, thr = best_threshold(pos, neg)
+    at_half = (sum(p >= 0.5 for p in pos) + sum(n < 0.5 for n in neg)) / (len(pos) + len(neg))
+    print("merges-split: AUC %.2f, accuracy @0.50 %.2f, best balanced %.2f @ %.2f" % (auc(pos, neg), at_half, acc, thr))
+    print("  good n=%d min %.2f med %.2f | bad n=%d med %.2f max %.2f"
+          % (len(pos), min(pos), st.median(pos), len(neg), st.median(neg), max(neg)))
+    return times
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("task", choices=["pairs", "merges", "gate", "all"])
+    ap.add_argument("task", choices=["pairs", "merges", "merges-split", "gate", "all"])
     ap.add_argument("model")
     ap.add_argument("--host", default="http://localhost:11434")
     ap.add_argument("--sets", default=str(HERE / "decision-eval-sets.json"))
@@ -116,6 +139,8 @@ def main():
     if args.task in ("merges", "all"):
         times += run_noul("merges", args.host, args.model, cut(sets["merges"]), "good", MERGE_Q,
                           lambda i: {"kept": i["kept"], "candidate": i["candidate"], "merged": i["merged"]})
+    if args.task == "merges-split":
+        times += run_split(args.host, args.model, cut(sets["merges"]))
     if args.task in ("gate", "all"):
         times += run_noul("gate", args.host, args.model, cut(sets["gate"]), "ok", GATE_Q,
                           lambda i: {"existing_facts": i["context"], "candidate": i["candidate"]})

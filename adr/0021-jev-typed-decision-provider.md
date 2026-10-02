@@ -236,3 +236,32 @@ where the pair supplies the context; neither is built.
    AI module. Building on the dev API may need rework.
 5. **Vendor risk.** A weeks-old vendor with hosted-only access, and
    pricing that reporters could not confirm is unsubsidized.
+
+## Addendum 2026-10-02: hosted Jev is the live decision path
+
+Measured on hand-written, human-verified sets (24 pairs, 14 merges, 20
+gate items) plus 25 real near-neighbour pairs from this site's facts:
+`jev-latest` and `jev-preview` scored identically, pairs 22/24 (1 unsafe
+error, NOOP read as UPDATE) and 25/25 on the real pairs, merges and gate
+AUC 1.00, 0.41 s per call. Local models measured on the same sets:
+`tev1:4b` pairs 17/24, 10-14 s per call, and the RAM pressure exhausted
+this laptop's swap; `laya:en` pairs 6/24. The sets are easy, so the scores
+overstate real accuracy; harder UPDATE/NOOP pairs and a groundedness set
+are still to build.
+
+Decision: this site runs `consolidation` and `verifier` on
+`typesafeai`/`jev-latest` (`backend: decision`), API key via the Key
+module's file provider outside the web root. Local decision models are
+set aside, not removed: the chat path, the provider-agnostic
+`DecisionBackend` and the eval harness (`aim_benchmark/scripts/`) all
+stay, so a local decision model (Ollama or Ollaya) can be switched back
+in per activity with a settings change. This is a temporary deviation
+from CLAUDE.md decision 5 (sovereignty): only synthetic or demo fact text
+may reach hosted Jev until a local decision model is good enough, or the
+data owner accepts the hosted path. Revisit when local models improve or
+before any real data goes in.
+
+First live run found a bug in `DecisionBackend`: `createInstance()`
+returns a `ProviderProxy`, so `instanceof DecisionInterface` always
+failed; it now tests `getPlugin()`, as core's own
+`DecisionProviderFormHelper` does. The backend had never run before.

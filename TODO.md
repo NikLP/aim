@@ -59,6 +59,7 @@ this list as exhaustive.
 - [ ] PHP replay command in `aim_benchmark` running the same pairs through
       `ChatBackend` (baseline: one-hot answers, so no confidence buckets)
       and `DecisionBackend`, grouped by `setRunId()`.
+- [ ] Hard merge set `decision-eval-merges-hard.json` (20 subtle faults, 2026-10-02): `jev-latest` AUC 1.00 but at the live 0.5 cutoff one bad merge (max 0.68) passes; perfect split at 0.81-0.86. `verifyMerge` uses `isLikely()` default 0.5: BUILT 2026-10-02: `activities.verifier.threshold` (settings form + schema; empty/0 = 0.5, live site 0.8). Still open: per-activity `concurrency` (default 1; the AI module calls are synchronous, so pooling needs HTTP-level work or parallel queue workers) Extra cross-check questions TESTED and DROPPED 2026-10-02 (3 noul: same/new/conflict next to the choice, 55 pairs): neither of the 2 misses is fixed (the noul answers agree with the wrong choice) and "same" does not separate NOOP (median 0.49). Concurrency judged nice-to-have: consolidation runs per fact via the queue (about 3 decisions, ~1 s), so only a bulk backfill is slow. `merges-split` mode added (3 small noul questions, min score).
 - [ ] Per-model thresholds and editable question text for the decision
       backend (ADR-0021 decision 3); question text is hardcoded in
       `AimMemoryManager` today. Limits: `tev1` input ~2,050 tokens, Ollama

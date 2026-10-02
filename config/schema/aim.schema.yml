@@ -128,3 +128,10 @@ aim.activity_choice:
     model:
       type: string
       label: 'Model ID'
+    threshold:
+      type: float
+      label: 'Verifier only: probability above which a decision model confirms a merge, 0 or absent for 0.5'
+      constraints:
+        Range:
+          min: 0
+          max: 1

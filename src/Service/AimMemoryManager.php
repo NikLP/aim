@@ -1558,7 +1558,8 @@ class AimMemoryManager {
         ['faithful' => new NoulQuestion('Every detail of fact_a and fact_b (names, numbers, dates, conditions, negations) survives in merged, and merged adds nothing the two facts do not say. Judge faithfulness to the inputs, not whether they are true.')],
       );
       $response = $this->decisionBackend->run('verifier', $input, $decision_model[0], $decision_model[1]);
-      return $response->getNoul('faithful')->isLikely();
+      $threshold = (float) ($this->configFactory->get('aim.settings')->get('activities.verifier.threshold') ?? 0);
+      return $response->getNoul('faithful')->isLikely($threshold > 0 ? $threshold : 0.5);
     }
 
     $prompt = strtr($this->configFactory->get('aim.settings')->get('merge_verify_prompt'), [

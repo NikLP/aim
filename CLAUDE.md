@@ -66,6 +66,11 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
 5. **Sovereignty** - extraction/consolidation must support Ollama; hosted
    providers are additional options, not replacements.
    ([ADR-0004](adr/resolved/0004-sovereignty-and-poc-build-order.md))
+   **Temporary deviation (2026-10-02):** this site's consolidation and
+   verifier run on hosted Jev (synthetic/demo data only); the chat path and
+   `DecisionBackend` stay so a local decision model can be switched back
+   in per activity. ([ADR-0021](adr/0021-jev-typed-decision-provider.md)
+   addendum)
 6. **Build order** - prove schema/logic with interactive Claude Code +
    local embeddings before any unattended provider.
    ([ADR-0004](adr/resolved/0004-sovereignty-and-poc-build-order.md))

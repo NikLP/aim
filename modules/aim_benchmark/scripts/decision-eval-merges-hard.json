@@ -1,0 +1,147 @@
+{
+ "_note": "Subtle merge faults, synthetic Harbourside facts; labels by construction (good = faithful rephrase, bad = one qualifier/number/scope changed).",
+ "pairs": [],
+ "merges": [
+  {
+   "label": "good",
+   "kept": "Only assistance dogs are allowed inside the library.",
+   "candidate": "Assistance dogs must wear their harness or jacket while in the building.",
+   "merged": "Only assistance dogs are allowed inside the library, and they must wear their harness or jacket.",
+   "note": "faithful"
+  },
+  {
+   "label": "good",
+   "kept": "The makerspace has two 3D printers.",
+   "candidate": "Users must complete a 20-minute induction before using the 3D printers.",
+   "merged": "The makerspace has two 3D printers, and users must complete a 20-minute induction before using them.",
+   "note": "faithful"
+  },
+  {
+   "label": "good",
+   "kept": "Community groups can book a meeting room for free, for up to 4 hours at a time.",
+   "candidate": "Meeting room bookings must be made at least 48 hours ahead.",
+   "merged": "Community groups can book a meeting room for free, for up to 4 hours at a time, with at least 48 hours' notice.",
+   "note": "faithful"
+  },
+  {
+   "label": "good",
+   "kept": "Free Wi-Fi is available on the network Harbourside_Public.",
+   "candidate": "The Wi-Fi network needs no password.",
+   "merged": "Free Wi-Fi is available on the network Harbourside_Public, with no password needed.",
+   "note": "faithful"
+  },
+  {
+   "label": "good",
+   "kept": "Borrowing history is deleted 30 days after an item is returned.",
+   "candidate": "Members can opt in to keep their borrowing history.",
+   "merged": "Borrowing history is deleted 30 days after an item is returned, unless the member opts in to keep it.",
+   "note": "faithful"
+  },
+  {
+   "label": "good",
+   "kept": "Items not returned after 8 weeks are billed at replacement cost.",
+   "candidate": "The library stopped charging overdue fines in 2022.",
+   "merged": "The library stopped charging overdue fines in 2022, but items not returned after 8 weeks are billed at replacement cost.",
+   "note": "faithful"
+  },
+  {
+   "label": "good",
+   "kept": "Code Club meets every Thursday at 4pm.",
+   "candidate": "Code Club is for ages 9 to 13 and is held in the makerspace.",
+   "merged": "Code Club for ages 9 to 13 meets every Thursday at 4pm in the makerspace.",
+   "note": "faithful"
+  },
+  {
+   "label": "good",
+   "kept": "Children under 16 need a parent or guardian to sign up for membership.",
+   "candidate": "Membership is free for residents of the borough.",
+   "merged": "Membership is free for residents of the borough, and children under 16 need a parent or guardian to sign up.",
+   "note": "faithful"
+  },
+  {
+   "label": "bad",
+   "kept": "Members can borrow up to 20 items at a time.",
+   "candidate": "Items can be renewed twice online, unless another member has reserved the item.",
+   "merged": "Members can borrow up to 20 items at a time and can renew them twice online.",
+   "note": "drops a condition"
+  },
+  {
+   "label": "bad",
+   "kept": "The makerspace has two 3D printers.",
+   "candidate": "Users must complete a 20-minute induction before using the 3D printers.",
+   "merged": "The makerspace has two 3D printers, and users should complete an induction before using them.",
+   "note": "softens must to should, drops duration"
+  },
+  {
+   "label": "bad",
+   "kept": "Only assistance dogs are allowed inside the library.",
+   "candidate": "Assistance dogs must wear their harness or jacket while in the building.",
+   "merged": "Dogs are allowed inside the library and must wear a harness or jacket.",
+   "note": "generalizes only assistance dogs"
+  },
+  {
+   "label": "bad",
+   "kept": "Community groups can book a meeting room for free, for up to 4 hours at a time.",
+   "candidate": "Meeting room bookings must be made at least 48 hours ahead.",
+   "merged": "Community groups can book a meeting room for free for 4 hours, with at least 48 hours' notice.",
+   "note": "up to becomes exactly"
+  },
+  {
+   "label": "bad",
+   "kept": "Borrowing history is deleted 30 days after an item is returned.",
+   "candidate": "Members can opt in to keep their borrowing history.",
+   "merged": "Borrowing history is deleted 30 days after an item is returned.",
+   "note": "drops the opt-in exception"
+  },
+  {
+   "label": "bad",
+   "kept": "Items not returned after 8 weeks are billed at replacement cost.",
+   "candidate": "The library stopped charging overdue fines in 2022.",
+   "merged": "The library stopped charging overdue fines in 2022 because items not returned after 8 weeks are billed at replacement cost.",
+   "note": "invents a causal link"
+  },
+  {
+   "label": "bad",
+   "kept": "Code Club meets every Thursday at 4pm.",
+   "candidate": "Code Club is for ages 9 to 13 and is held in the makerspace.",
+   "merged": "Code Club for ages 9 to 13 meets most Thursdays at 4pm in the makerspace.",
+   "note": "every becomes most"
+  },
+  {
+   "label": "bad",
+   "kept": "Children under 16 need a parent or guardian to sign up for membership.",
+   "candidate": "Membership is free for residents of the borough.",
+   "merged": "Membership is free for children and residents of the borough, and children under 16 need a parent or guardian to sign up.",
+   "note": "widens eligibility"
+  },
+  {
+   "label": "bad",
+   "kept": "Free Wi-Fi is available on the network Harbourside_Public.",
+   "candidate": "The Wi-Fi network needs no password.",
+   "merged": "Free Wi-Fi is available on the network Harbourside_Public.",
+   "note": "drops candidate detail"
+  },
+  {
+   "label": "bad",
+   "kept": "Baby Rhyme Time runs every Tuesday at 10:30am.",
+   "candidate": "It is held in the Children's Room and is for babies up to 18 months.",
+   "merged": "Baby Rhyme Time runs every Tuesday at 10:30am in the Children's Room, for babies and toddlers.",
+   "note": "audience widened"
+  },
+  {
+   "label": "bad",
+   "kept": "The library is open Monday to Friday from 9am to 8pm.",
+   "candidate": "It is closed on the last Friday of every month for staff training.",
+   "merged": "The library is open Monday to Friday from 9am to 8pm and is closed on the last Friday of the month.",
+   "note": "drops the reason"
+  },
+  {
+   "label": "bad",
+   "kept": "Public computers can be booked for 60 minutes at a time.",
+   "candidate": "Printing costs 10p per black-and-white page.",
+   "merged": "Public computers can be booked for 60 minutes at a time, and printing costs 10p per page.",
+   "note": "drops black-and-white"
+  }
+ ],
+ "gate": []
+}
