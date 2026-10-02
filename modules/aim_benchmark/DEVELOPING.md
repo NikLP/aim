@@ -55,22 +55,28 @@ e.g. from `drush php:eval`:
 
 `aim:benchmark-cleanup zzpar` removes it again afterward.
 
-## `scripts/plausibility-benchmark.py` - decision-model scorer
+## `scripts/decision-eval.py` - decision-model scorer
 
-Measures a `/v1/systemone` decision model (Ollama 0.35+ `tev1`/`nimble`,
-or Ollaya) as a fact-plausibility scorer for the gate in
-[ADR-0033](../../adr/0033-plausibility-gate-processing-modes.md). Host
-side, standard library only, no Drupal needed:
+Scores any `/v1/systemone` decision model (hosted Jev, or a local Ollama
+or Ollaya host) on the aim decision points. Host side, standard library
+only, no Drupal needed. The sets are hand-written synthetic Harbourside
+facts with human-verified labels, so they are safe to send to a hosted
+model:
 
 ```bash
-python3 scripts/plausibility-benchmark.py tev1:4b
-python3 scripts/plausibility-benchmark.py laya:en --host http://localhost:11435 --parallel 16
+# local model
+python3 scripts/decision-eval.py all tev1:4b --host http://localhost:11434
+# hosted Jev (token read from an env var, never the command line)
+python3 scripts/decision-eval.py all jev-latest --host https://api.typesafe.ai --key-env JEV_KEY
 ```
 
-It reports cold load, per-fact latency, score ranges for the demo's true
-facts versus `scripts/plausibility-controls.json` (blatant and subtle
-falsehoods), and how many each side the `--threshold` (default 0.5)
-classifies correctly. Each fact is sent with no surrounding context, so
-it measures general plausibility only, not agreement with what the site
-already knows. Restart the model service first for a true cold load and
-watch `systemctl show <unit> -p MemoryCurrent -p MemoryPeak` for memory.
+Tasks: `pairs` (`classifyPair()`, 24 hand-written pairs; also run
+`--sets scripts/decision-eval-real-pairs.json` for 25 real near-neighbour
+pairs), `merges` (`verifyMerge()`; `--sets
+scripts/decision-eval-merges-hard.json` for 20 subtle faults),
+`merges-split` (the same as three small questions) and `gate`
+(plausibility). It reports accuracy, a confusion matrix, unsafe errors
+(a data-losing UPDATE/DELETE), AUC and a best threshold (tuned on the
+set, so optimistic) and per-call time. Use the threshold to set
+`activities.verifier.threshold` for a model. Local-model results and
+service setup: [ADR-0038](../../adr/0038-local-decision-models-parked.md).

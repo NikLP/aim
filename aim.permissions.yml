@@ -3,5 +3,10 @@ administer aim memory:
   description: 'Create, edit, and delete memory facts.'
   restrict access: true
 
+ingest aim memory:
+  title: 'Ingest documents into AIM memory'
+  description: 'Upload a document or fact file on the AIM ingest form, which extracts facts with a model and saves them in any scope the file names.'
+  restrict access: true
+
 permission_callbacks:
   - \Drupal\aim\AimPermissions::permissions

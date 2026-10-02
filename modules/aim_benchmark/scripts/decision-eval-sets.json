@@ -64,7 +64,7 @@
   {
    "label": "NOOP",
    "existing": "Free Wi-Fi is available in the building on the network Harbourside_Public, and it needs no password.",
-   "candidate": "The library's Wi-Fi network is Harbourside_Public and has no password."
+   "candidate": "The Wi-Fi in the building is on the network Harbourside_Public and needs no password."
   },
   {
    "label": "NOOP",

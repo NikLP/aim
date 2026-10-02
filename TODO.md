@@ -15,6 +15,18 @@ this list as exhaustive.
       schema validation. Then confirm `aim:remember --file` loads all 31
       facts and the demo questions in the site repo's `demo/README.md`
       answer as before.
+## Ingestion
+
+- [ ] Chunking for `aim:extract` and the ingest form: today the whole file
+      goes into one extraction prompt (`AimMemoryManager::extractFacts()`),
+      so a file larger than the chat model's context fails. Split on
+      paragraph/heading boundaries with a small overlap, extract per chunk,
+      then let consolidation dedupe across chunks. A small local extractor
+      has a much smaller window, so chunk size should be per model
+      (see `adr/model-call-budget.md`).
+- [ ] Ingest form (ADR-0016 Mode 1): see `HANDOFF-ingest-form.md` in the
+      site root.
+
 ## Decision models (raised 2026-10-02, ADR-0021/0033 addenda)
 
 - [x] Move aim's model choices (BUILT 2026-10-02: extraction, consolidation, verifier; add a `decision` entry when classifyPair moves to the Decision API) to the AI suite's `ai_provider_configuration`
@@ -42,20 +54,19 @@ this list as exhaustive.
       with hard negatives, human-verified labels (`demo/seed-facts.json` has
       only ~23 facts, so most pairs are hand-written); (b) verifyMerge set
       from mutated good merges, also try split noul questions (keeps A,
-      keeps B, adds nothing); (c) extend `plausibility-controls.json` with
+      keeps B, adds nothing); (c) add to the `gate` set in `decision-eval-sets.json`
       site-context contradictions. Synthetic data only for hosted Jev.
 - [ ] 2026-10-02 eval rework ([ADR-0037](adr/0037-transient-source-passages-for-grounding.md)):
       `aim_benchmark/scripts/decision-eval.py` + `decision-eval-sets.json`
-      built (pairs/merges/gate; hand-written, labels human-verified 2026-10-02). Baselines
-      in the handoff: `laya:en` pairs 6/24, `tev1:4b` 17/24 (14 s/pair), hosted `jev-latest`/`jev-preview` 22/24 (0.4 s/call); merges and gate AUC 0.96/1.00 on `tev1:4b`, 1.00/1.00 on Jev.
-      Real pairs: 25 live near-neighbour pairs (all ADD, human-verified) in `decision-eval-real-pairs.json`, `jev-latest` 25/25, 0 unsafe; they cannot test UPDATE/NOOP recall. Still to build: a groundedness set (passage + candidate, labeled
-      supported/unsupported/misattributed), real vector-neighbour pairs
-      pulled from the live table to replace the hand-written ADD/DELETE
-      cases, and an `nli` model run (an Ollaya model, not an Ollama tag).
-- [ ] Generalize `plausibility-benchmark.py`: per-model scoring (`tev1:4b`,
-      `tev1:0.8b`, later `laya:en` after fine-tuning on these sets),
-      confusion matrix, accuracy by confidence bucket, cost-weighted
-      threshold sweep (a wrong UPDATE loses data, a missed merge is cheap).
+      built (pairs/merges/gate; hand-written, labels human-verified
+      2026-10-02). Results (hosted Jev 23/24 pairs, 25/25 real pairs,
+      merges and gate AUC 1.00; local models parked): ADR-0038 and the
+      ADR-0021 addendum. Still to build: a groundedness set (passage +
+      candidate, labeled supported/unsupported/misattributed), harder
+      UPDATE/NOOP pairs, and an `nli` model run (an Ollaya model).
+- [ ] Extend `decision-eval.py`: confusion matrix by confidence bucket and
+      a cost-weighted threshold sweep (a wrong UPDATE loses data, a missed
+      merge is cheap).
 - [ ] PHP replay command in `aim_benchmark` running the same pairs through
       `ChatBackend` (baseline: one-hot answers, so no confidence buckets)
       and `DecisionBackend`, grouped by `setRunId()`.
@@ -68,33 +79,16 @@ this list as exhaustive.
       Anthropic key in watchdog is rotated and the entries cleared.
 - [ ] A separate decision guardrail set (not `aim_write_guardrails`, whose
       2000-character limit and HTML regex would hit the serialized input).
-- [ ] Score `laya:en` with `modules/aim_benchmark/scripts/plausibility-benchmark.py`
-      so Ollaya and `tev1:4b` are compared on the same set; then decide
-      Ollaya removal (steps and doc impact are in the 2026-10-01 thread:
-      disable service, drop-ins, binary and models, DEVELOPING.md
-      "Running local model services", ADR-0033 text).
 - [ ] Raise `drupal/ai` to `^1.6` in aim's `composer.json` once 1.6.0 is
       tagged (the site runs `1.6.x-dev` with `ai_provider_typesafeai`
       1.1.0-beta1, installed but not enabled; enabling needs
       `drush config:export` for `config/sync` parity).
 - [ ] Unverified, check before relying on any of it:
-  - Provider against Ollama end to end: `host` needs `/v1`, a placeholder
-    API key, and model discovery from `/v1/models` is unfiltered or falls
-    back to two Jev names. Read from the code, never configured or run.
   - How a caller attaches a guardrail set to a Decision call, and that the
     built-in length and regex plugins really run for Decision (docs say so;
     plugin code not opened).
   - `web/modules/contrib/ai_provider_typesafeai/tests/check-decision-api.php`
     (offline class check) has not been run.
-  - The benchmark numbers are single runs on 31 true and 14 control facts,
-    not a calibration. No context (recalled facts) was sent; whether that
-    fixes the site-specific misses, within the roughly 2,050-token input
-    limit, is untested.
-  - The provider declares 255 choice options for every model; Ollama
-    rejects more than 26 and `tev1` inputs over about 2,050 tokens, which
-    its validator will not catch before sending.
-  - `tev1:4b` true resident memory and a lower `MemoryHigh` (5G) are
-    unmeasured.
 
 ## Design review findings (raised 2026-10-02)
 

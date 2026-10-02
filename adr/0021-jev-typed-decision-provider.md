@@ -107,36 +107,9 @@ until the spike has a result.**
 
 ## Addendum (2026-09-27): Laya, an open-source alternative
 
-Convai Innovations released Laya on 2026-09-18, three days after Jev:
-Apache 2.0, weights and code public. Same shape as Jev - a state plus
-typed questions, calibrated probabilities back - but self-hosted: a
-ModernBERT-large checkpoint (about 421M parameters) run via ONNX
-Runtime, no waitlist, no per-token cost. A Node/TypeScript runner
-exists (`receptron/laya` on GitHub). As with the Jev findings above,
-this comes from public coverage and a third-party benchmark, not from
-running it against `aim`.
-
-The third-party numbers (not vendor-run, not head-to-head with Jev on
-the same suite): about 33ms per call on a T4 GPU, 7ms batched; a
-fine-tuned accuracy of 0.766 against Jev's reported 0.727; a
-calibration error of 0.081 after per-question temperature refitting
-against Jev's reported 0.246. The zero-shot base model scores 0.362,
-below a 0.461 majority-class baseline, so fine-tuning on labeled data
-is required before it is usable at all, not optional. Accuracy drops
-sharply past about 20 answer options on a Choice question, and the
-English checkpoint's context is 512 tokens.
-
-This changes the spike's priority, not the decision. Laya fits
-[ADR-0004](resolved/0004-sovereignty-and-poc-build-order.md)'s sovereignty
-requirement directly, self-hosted with no hosted-provider dependency,
-where Jev is hosted-only and still waitlisted. Spike Laya first, on the
-same benchmark harness and the same synthetic/hand-labeled fact pairs
-already specified above; keep Jev queued behind waitlist access as a
-comparison, not a blocker. `classifyPair()`'s four-way decision is
-under Laya's roughly-20-option cardinality limit, so that limit does
-not rule it out. The fine-tuning requirement does change the spike's
-shape: it needs a labeled training set before Laya can be evaluated at
-all, which is more up front work than calling a hosted API.
+Laya (Convai, Apache 2.0, self-hosted) is a Jev-shaped open model that
+fits the sovereignty requirement. It was measured and set aside; see
+[ADR-0038](0038-local-decision-models-parked.md).
 
 ## Addendum (2026-10-02): the Decision API is in core, Ollama serves it
 
@@ -159,25 +132,7 @@ to host the wire format. The provider's `host` setting can point at
 Ollama with `/v1` included (the client appends `/systemone` and
 `/models`), and `isUsable()` needs a non-empty API key (any placeholder).
 
-Measured 2026-10-01 on the dev laptop (CPU only, 14 GB), 31 true demo
-facts versus 6 blatant and 8 subtle falsehoods, pass mark 0.5, no
-context beyond the fact itself (script:
-`modules/aim_benchmark/scripts/plausibility-benchmark.py`):
-
-| | `tev1:0.8b` | `tev1:4b` |
-| --- | --- | --- |
-| Cold load | 3.2 s | 11-19 s |
-| Median per new fact | 0.9 s | 6.5-7.1 s |
-| True facts passed | 30/31 | 31/31 |
-| Blatant falsehoods rejected | 2/6 | 6/6 |
-| Subtle falsehoods rejected | 2/8 | 5/8 |
-
-The 0.8B cannot separate true from false and is not a gate candidate.
-The 4B separates the blatant cases cleanly; its misses are
-site-specific contradictions (opening hours, renewal counts) that need
-site context, not general plausibility. 16 requests took 62.6 s serial
-and 51.1 s parallel, so it is CPU-bound. These are single runs on small
-sets, not a calibration. `laya:en` was not scored on the same set.
+Local measurements are in [ADR-0038](0038-local-decision-models-parked.md).
 
 **Decisions**
 

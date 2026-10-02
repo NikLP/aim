@@ -161,9 +161,10 @@ Settings (`aim.settings`, `/admin/config/aim/settings`):
   choice answers, stated noul probability; no score questions). A decision
   classifier returns no merged text, so its UPDATE is downgraded to ADD.
   The verifier is a noul `faithful` question, true at probability >= 0.5.
-  Set the verifier to a different model so one checks the other. A local
-  Ollama model (Ollaya) is the intended candidate, but it is not
-  weight-compatible, so shadow it against the hosted verdicts first.
+  Set the verifier to a different model so one checks the other. The
+  decision backend's confirmation cutoff is `activities.verifier.threshold`
+  (empty or 0 means 0.5; this site uses 0.8 for Jev). A local decision
+  model is parked, see [ADR-0038](adr/0038-local-decision-models-parked.md).
 - `merge_max_distance` (default 0 = off): merged embedding must sit within
   this cosine distance of each input. Measured 2026-10-01 on one pair, it
   barely separates a faithful merge (0.02 / 0.11) from a lossy one
@@ -680,63 +681,10 @@ A Claude Pro/Max subscription cannot power an unattended `drupal/ai`
 provider (Anthropic prohibits subscription OAuth for third-party
 integrations) - needs a real Console API key, or stays on Ollama.
 
-**Running local model services on a small machine** (Ollama, and Ollaya
-for the plausibility spike, [ADR-0033](adr/0033-plausibility-gate-processing-modes.md)).
-Measured on the dev laptop (14 GB RAM, no GPU, 4 GB swap), where
-unbounded services OOM-killed the editor on 2026-09-28. Both run as
-systemd services; limit them with drop-ins (`sudo systemctl edit <unit>`),
-then check with `systemctl show <unit> -p MemoryPeak -p MemoryMax`.
-
-| | Ollama (`nomic-embed-text`, `tev1:4b`) | Ollaya (`laya:en`) |
-| --- | --- | --- |
-| Measured working set | ~650 MB peak (embeddings); `tev1:4b` pinned at whatever `MemoryHigh` was (page cache), true working set not measured | ~3.8 GB resident, up to ~4.3 GB on full-context input |
-| `MemoryMax` | `7G` (was `1G` for embeddings only) | `5G` |
-| `MemoryHigh` | `6G` (5G probably enough, untested) | `4500M` |
-| `OOMScoreAdjust` | `500` | `500` |
-| Keep-alive | `OLLAMA_KEEP_ALIVE=30s` | `OLLAYA_KEEP_ALIVE=10m` while testing (default `5m`) |
-| Listens on | `0.0.0.0:11434` (DDEV needs it) | `127.0.0.1:11435` |
-
-- **`OOMScoreAdjust=500`** makes the kernel pick these services before
-  the editor when memory runs out. A `MemoryMax` hit kills only the
-  service.
-- **Set `MemoryHigh` from a measured peak, not a guess.** It is a soft
-  limit that throttles instead of killing, so a cap below the working
-  set does not fail, it just makes the model load slowly (Ollaya's cold
-  load was 36 s at 2G, 21 s at 2.5G, 7 s at 3.5G and above). A
-  `MemoryPeak` equal to the cap means the cap is binding.
-- **Apply one edit at a time and restart.** `systemctl set-property
-  --runtime` changes the limit live but does not unload the model, so a
-  timing test right after it measures a warm model. Restart the unit,
-  then time the first call.
-- **A cap near a model file's size kills the pull.** Downloading a 4.5 GB
-  model writes it through the page cache, which is charged to the
-  service's cgroup, so a `MemoryMax` of 4.5G was OOM-killed mid-pull on
-  2026-10-01. Pull with headroom (file size plus about 1.5 GB) or with the
-  cap lifted, then restart so the first timing is a cold load. A unit
-  with `Restart=always` and a mistyped cap (`MemoryMax=7` is 7 bytes)
-  crash-loops from boot; the drop-in uses `Restart=on-failure`
-  with `StartLimitBurst=3`. Neither Ollama nor Ollaya is enabled at boot.
-- **Do not use `systemd-zram-generator`** on the laptop: extra CPU, and
-  it interferes with suspend. The existing swap file is the backstop.
-- **Keep-alive trades load time for memory.** A short value frees RAM
-  between uses; a long one (10m+) avoids repeated cold loads during
-  testing. The memory cap, not keep-alive, is what protects the editor.
-- **CPU-bound without a GPU.** Parallel requests to Ollaya queue rather
-  than speed up, so one worker at a time is the right setting. Input
-  over the model's context window is rejected (`STATE_TRUNCATED`), so
-  bound fact length on write.
-- **Available, not free.** `free -h` "free" excludes disk cache; use the
-  "available" column to judge headroom.
-- **Browsers dominate.** On the same machine Brave used ~7.9 GB with many
-  tabs, more than either model service.
-
-Quick Ollaya check (host, not DDEV):
-
-```bash
-curl -s localhost:11435/v1/models
-curl -s localhost:11435/v1/systemone -H 'content-type: application/json' \
-  -d '{"model":"laya:en","state":"Some fact.","questions":{"q":{"type":"noul","instructions":"Is this plausible?"}}}'
-```
+**Running a local model service on a small machine** (Ollama for
+embeddings; local decision models are parked): the memory-cap and
+systemd settings that worked on the 14 GB dev laptop are in
+[ADR-0038](adr/0038-local-decision-models-parked.md).
 
 **Gotchas:**
 

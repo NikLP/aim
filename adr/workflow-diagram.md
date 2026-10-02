@@ -5,7 +5,8 @@ How a fact moves through the module, as the code stands on 2026-10-02
 `AimGuardrailsConstraint`, `aim_tool`, `aim_chatbot`). Not a decision
 record: for the reasoning see [0000-index.md](0000-index.md).
 
-Three diagrams: write path (1), consolidation (2), recall (3). The
+Four diagrams: write path (1), consolidation (2), recall (3), and
+call counts for a sample round (4). The
 write path ends by enqueuing a fact for consolidation, which is the
 hand-off into diagram 2. Diagram 3 reads what diagrams 1 and 2 left in
 the vector table.
@@ -32,12 +33,16 @@ flowchart TD
     A2["MCP / Tool API aim_remember<br/>needs 'store aim memory' plus<br/>per-scope 'create {scope} aim facts'<br/>source default tool:aim_remember"]
     A3["Chatbot FunctionCall AimRemember<br/>scope forced to site<br/>source chatbot:aim_chatbot"]
     A4["drush aim:extract file<br/>aim-discovery skill runs this<br/>(not aim:remember)"]
+    A5["Ingest form, mode 1: extract (planned)<br/>upload prose (.txt), needs<br/>'ingest aim memory'<br/>same path as aim:extract"]
+    A6["Ingest form, mode 2: one fact per line (planned)<br/>no model call, scope and subject<br/>chosen once on the form<br/>each line goes to remember()"]
   end
 
   A1 --> R["AimMemoryManager::remember()"]
   A2 --> R
   A3 --> R
 
+  A5 --> X
+  A6 --> R
   A4 --> X["extractFacts()<br/>structured-output chat call<br/>returns scope, subject, text list"]:::llm
   X --> C["createFactsFromCandidates()<br/>per candidate, one bad one<br/>does not abort the batch"]:::code
   C -->|"scope=user and no<br/>--subject-uid"| SK["skipped, counted"]:::bad
@@ -71,6 +76,12 @@ flowchart TD
 
 Notes on diagram 1:
 
+- The ingest form (planned, ADR-0016 Mode 1) has two plain-text modes:
+  prose goes through extraction (one frontier call per file, the model
+  picks scope and subject); one fact per line skips the model entirely
+  (scope and subject set once on the form, deterministic, free). A JSON
+  file in the `aim:remember --file` shape stays as an advanced option for
+  case IDs and entity targets, which extraction cannot set.
 - Indexed fields: `text` is the embedded content. `scope`, `subject`,
   `source`, `user` and `trusted` are stored as attributes. The filterable
   ones used by code are `scope`, `subject`, `user` (BTREE index) and
@@ -247,3 +258,46 @@ Notes on diagram 3:
 - **Recall.** Embed the query (cached), find nearest vectors with
   attribute filters, then drop anything the caller may not see, is too
   far away, is retired or has gone missing.
+
+## 4. Calls per round: 100 new facts and 20 direct queries
+
+Estimates from the code and one dry run (63 facts gave 94 consolidation
+decisions, about 1.5 per fact), not a measurement. "Frontier" is the
+frontier chat model (the site default chat model); "Jev" is whichever
+decision backend `activities.consolidation` and `activities.verifier`
+use; "embed" is the local embeddings model.
+
+```mermaid
+flowchart LR
+  classDef llm fill:#cfe3ff,stroke:#2b6cb0,color:#102a43
+  classDef vec fill:#ffe2c2,stroke:#c05621,color:#3d1f00
+  classDef code fill:#eceff1,stroke:#607d8b,color:#1f2a30
+
+  IN100["100 new facts"]:::code
+  Q20["20 direct queries"]:::code
+
+  IN100 -->|"from text (aim:extract)"| EX["Frontier: 1 call per text blob<br/>whole file in one prompt, no chunking"]:::llm
+  IN100 -->|"directly: remember, JSON,<br/>or the form's one-fact-per-line mode"| NOEX["no extraction call"]:::code
+  EX --> EMB1["embed: 100"]:::vec
+  NOEX --> EMB1
+  EMB1 --> CONS["consolidation: up to 3 neighbors each<br/>only pairs between 0.09 and 0.45 distance"]:::code
+  CONS --> JEV["Jev decision: about 150 to 300 calls<br/>0.4 s each, tiny inputs"]:::llm
+  JEV -->|"UPDATE, rare"| MERGE["Frontier merge writer: 1 per UPDATE<br/>then Jev verify: 1, embed: 1"]:::llm
+
+  Q20 -->|"aim:recall, MCP, Tool API"| QR["embed: 20, no LLM"]:::vec
+  Q20 -->|"through the chat assistant"| QC["embed: 20<br/>Frontier: about 2 per turn, about 40"]:::llm
+```
+
+Notes on diagram 4:
+
+- **Extraction is one call per input, not per fact.** `aim:extract` reads
+  the whole file into one prompt (no chunking), so a file larger than the
+  frontier model's context fails; split big files first.
+- **Jev limits** (secondhand, from TypeSafe's public docs summary, not
+  verified against the live API): 64k context, 32k tokens for the state
+  plus the longest question; 40 requests/s and 100k tokens/s. A pair of
+  facts is about 100 tokens (a fact is capped at 2000 characters by the
+  write guardrail, about 500 tokens), far inside every limit.
+- Cost: Jev is $0.042 per million input tokens, so 300 calls are well
+  under a cent; the amazeeio frontier model is free.
+

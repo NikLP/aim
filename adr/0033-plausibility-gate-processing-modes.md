@@ -27,18 +27,10 @@ first. The second only moves latency around.
 
 ## Measurements
 
-Taken 2026-09-30 on the dev laptop (14 GB RAM, no GPU), `laya:en`:
-
-- Working set about 3.8 GB resident. Cold load 7-36 s depending on the
-  memory cap, then 0.4-0.7 s per warm call. Caps in use: `MemoryHigh`
-  4500M, `MemoryMax` 5G (an earlier 2-2.5G cap throttled the load).
-- CPU-bound: 16 parallel requests finished no faster than the same
-  requests serially. A GPU (vendor figure 89 ms for five questions on an
-  RTX 4090) removes this constraint; none of the numbers below are a
-  property of the design.
-- Real fact text is short: 63 facts, 92 characters average, 214 maximum.
-  Input beyond the model's context window is rejected with
-  `STATE_TRUNCATED`, not scored.
+Local-model timings and memory (Laya, `tev1`) are in
+[ADR-0038](0038-local-decision-models-parked.md). Real fact text is short
+(63 facts, 92 characters average, 214 maximum); input beyond a model's
+context window is rejected, not scored.
 
 ## Decision
 
@@ -97,28 +89,25 @@ switch to inline mode for the session.
   error, not a degraded score, and it spends the model's full context
   window of memory on input that cannot be scored.
 
-## Addendum (2026-10-02): tev1 on Ollama, and what it changes
+## Addendum (2026-10-02): decision models
 
-Ollama 0.35 now serves decision models, so Ollaya is not required to
-host `/v1/systemone`. [ADR-0021](0021-jev-typed-decision-provider.md)'s
-2026-10-02 addendum has the measurements. For this ADR:
+Ollama serves decision models, so Ollaya is not required. What it changes
+for this ADR (numbers in [ADR-0038](0038-local-decision-models-parked.md)):
 
-- **`tev1:4b` is the candidate scorer, not `tev1:0.8b`.** On a small set
-  the 4B passed 31/31 true facts and rejected 6/6 blatant and 5/8
-  subtle falsehoods at 0.5; the 0.8B rejected 2/6 and 2/8.
-- **Inline mode is not viable on this laptop.** About 6.5-7 s per new
-  fact on CPU (the 0.8B is 0.9 s but cannot gate). Queued stays the
-  default; post-response is the only other realistic mode.
-- **General plausibility is not site agreement.** The scorer misses
-  site-specific contradictions because it sees only the fact. Sending
-  recalled facts as context would help but spends the roughly
-  2,050-token input limit; untested.
+- **Inline mode was not viable on the dev laptop** (CPU only, no GPU, not a
+  yardstick for local hosting). Queued stays the default;
+  post-response is the only other realistic mode. Hosted Jev (0.4 s) makes
+  inline possible again, at the data-sharing cost in
+  [ADR-0021](0021-jev-typed-decision-provider.md).
+- **Bare-fact plausibility is the wrong test.** It misses site-specific
+  contradictions; the grounded check of
+  [ADR-0037](0037-transient-source-passages-for-grounding.md) is the
+  redesign.
 - **A guardrail is the wrong home for the gate itself.** A guardrail
   rejects the write; this ADR quarantines it. A guardrail can still
   reject the clearly-bad tier (for example below 0.2).
-- **Wiring** goes through the core Decision API and the provider
-  manager, not the direct HTTP client suggested under Open questions.
-  `ai_provider_typesafeai` 1.1.0-beta1 is installed but not enabled.
+- **Wiring** goes through the core Decision API and the provider manager,
+  not a direct HTTP client. `ai_provider_typesafeai` is enabled.
 
 ## Open questions
 
