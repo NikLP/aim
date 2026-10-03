@@ -27,6 +27,9 @@ Still carrying work, proposed, or deferred.
 | [0036](0036-memory-algorithm-appraisal.md) | Memory algorithm appraisal: what to borrow from the literature (recency/importance re-rank, RRF, decay), and what aim does badly | Proposed 2026-10-02 - research only, nothing built |
 | [0037](0037-transient-source-passages-for-grounding.md) | Transient source passages (side table + pointer, deleted after the check) so a decision model can check a candidate against what was actually said | Proposed 2026-10-02 - design only, not built; blocked on the grounded evaluation set |
 | [0038](0038-local-decision-models-parked.md) | Local decision models: measured, parked, and how to bring one back (Laya, `tev1`, memory-capped services) | Parked |
+| [0039](0039-token-scope-live-config-values.md) | `scope: token`: label-only facts whose value resolves live from a `config_pages` token at recall, access delegated to the config page, never consolidated | Proposed 2026-10-03 - design only, not built |
+| [0040](0040-memory-driven-site-building-webform-spec.md) | Memory-driven site building: a discovery interview skill that emits a portable Webform (speculative) | Proposed 2026-10-03 - design only, not built |
+| [0040](0040-literals-probabilistic-lookup-of-exact-values.md) | Literals: probabilistic lookup of exact values - a `literal` field type, pluggable kinds, and a `literal` scope that subsumes `entity` and `token` | Proposed 2026-10-03 - design only, not built; generalizes 0039, would replace built 0027 |
 
 ## Resolved
 

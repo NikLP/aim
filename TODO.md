@@ -63,6 +63,7 @@ this list as exhaustive.
       ADR-0021 addendum. Still to build: a groundedness set (passage +
       candidate, labeled supported/unsupported/misattributed), harder
       UPDATE/NOOP pairs, and an `nli` model run (an Ollaya model).
+- [ ] Grounded check build (ADR-0037, decisions 2026-10-03): `aim_fact_source` (hash-keyed, text nulled after the check), `source_ref` on `aim_fact`, `source_text` on `remember()`, `ingest_max_chars` (about 100 KB, chunking parked), `grounding` activity (Jev only; `nli` gone), shadow mode first, then `default_trusted: false`. Eval set first.
 - [ ] Extend `decision-eval.py`: confusion matrix by confidence bucket and
       a cost-weighted threshold sweep (a wrong UPDATE loses data, a missed
       merge is cheap).

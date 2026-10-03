@@ -37,7 +37,8 @@ processing is a design choice on its merits: value against exposure.
 ## Decision
 
 **1. A side table for source passages, with a pointer on the fact.**
-`aim_fact_source` (`id`, `text` longtext, `created`) is a plain
+`aim_fact_source` (`id`, `hash` unique, `text` longtext nullable,
+`created`) is a plain
 database table, not an entity: no views data, no Search API index, no
 Tool API or MCP exposure, never returned by `recall()`. `aim_fact` gains
 a nullable integer `source_ref` pointing at it. The text never lands on
@@ -57,11 +58,15 @@ model one Noul question per fact with state = passage plus candidate
 ("The text states the candidate fact."). The verdict sets `trusted`
 (ADR-0033 decisions 1 and 2: fail closed, stay untrusted on error or
 truncation). When every fact pointing at a passage has a verdict, the
-passage row is deleted and `source_ref` is cleared.
+passage `text` is set to NULL. The row stays, so the fact's `source_ref`
+and the passage `hash` remain as an audit trail ("checked against
+passage X") without keeping the personal data. A passage with a known
+`hash` is reused rather than stored twice, and a repeat ingest of the
+same file can skip re-extraction.
 
 **4. A short retention backstop.** A sweep (the dedicated crontab,
-[ADR-0003](resolved/0003-async-processing-dedicated-crontab.md)) deletes
-passages older than a setting (default 7 days) whatever their state, so
+[ADR-0003](resolved/0003-async-processing-dedicated-crontab.md)) clears the
+text of passages older than a setting (default 7 days) whatever their state, so
 a stuck queue cannot hold personal data indefinitely. Facts whose
 passage expired unchecked stay untrusted.
 
@@ -106,18 +111,19 @@ Only the flag flips later, so the vector index never waits on the gate.
 
 ## Open questions
 
-- **Which model.** Candidates are `laya:en`, an NLI model (`nli`) and
-  `tev1:4b`. A secondhand report (not reproduced here) found `laya:en`
-  separates clear supported/unsupported cases on a short conversation but
-  misattributes who a statement is about, and suggested NLI for that. The
-  grounded evaluation set in TODO.md decides it.
-- **Passage length.** `tev1` accepts about 2,050 tokens of state, so a
-  long conversation needs chunking and a way to pick the relevant chunk
-  per fact. Unsolved, and the biggest risk to this design.
-- **Direct writes.** `remember()` without `source_text` cannot be
-  grounded. Whether those stay on the per-caller `trusted` override, or
-  a trusted-caller policy applies, is open.
-- **Consolidation reuse.** Whether the pair check (ADD/UPDATE/NOOP/DELETE)
-  should also see the passage before it is deleted.
-- **Audit.** Whether to keep a hash of the passage on the fact so a
-  verdict can be tied to what was checked after the text is gone.
+- **Passage length.** Parked (2026-10-03): no chunking for now. A site
+  setting `ingest_max_chars` (default about 100 KB, about 25k tokens)
+  caps what `aim:extract` and the ingest form accept, with a "split this
+  file" error. A passage longer than the check model's window fails
+  closed (facts stay untrusted, ADR-0033). Revisit with chunking.
+- **Direct writes.** Decided (2026-10-03): `remember()` without
+  `source_text` cannot be grounded and stays on the per-caller `trusted`
+  override. Worth trying: the chat tools pass the visitor's message as
+  `source_text`, so chat writes become groundable.
+- **Consolidation reuse.** Deferred: the pair check does not see the
+  passage (real pairs already score 25/25 on Jev).
+- **Audit.** Decided (2026-10-03): the `hash` lives on `aim_fact_source`,
+  not on the fact, and the row outlives the text. Open edge: whether a
+  known hash with cleared text re-runs the check (leaning no).
+- **Model.** Decided (2026-10-03): `nli` is no longer available, so hosted
+  Jev is the only candidate; the groundedness eval set decides it.
