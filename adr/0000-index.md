@@ -28,8 +28,9 @@ Still carrying work, proposed, or deferred.
 | [0037](0037-transient-source-passages-for-grounding.md) | Transient source passages (side table + pointer, deleted after the check) so a decision model can check a candidate against what was actually said | Proposed 2026-10-02 - design only, not built; blocked on the grounded evaluation set |
 | [0038](0038-local-decision-models-parked.md) | Local decision models: measured, parked, and how to bring one back (Laya, `tev1`, memory-capped services) | Parked |
 | [0039](0039-token-scope-live-config-values.md) | `scope: token`: label-only facts whose value resolves live from a `config_pages` token at recall, access delegated to the config page, never consolidated | Proposed 2026-10-03 - design only, not built |
-| [0040](0040-memory-driven-site-building-webform-spec.md) | Memory-driven site building: a discovery interview skill that emits a portable Webform (speculative) | Proposed 2026-10-03 - design only, not built |
-| [0040](0040-literals-probabilistic-lookup-of-exact-values.md) | Literals: probabilistic lookup of exact values - a `literal` field type, pluggable kinds, and a `literal` scope that subsumes `entity` and `token` | Proposed 2026-10-03 - design only, not built; generalizes 0039, would replace built 0027 |
+| [0040](0040-literals-probabilistic-lookup-of-exact-values.md) | Literals: a `literal` field type (key, value, optional gist), found by vector shortlist then a Jev choice; standalone or as an `aim` scope that subsumes `entity` and `token` | Proposed 2026-10-03, revised 2026-10-04 - design only, not built; generalizes 0039, would replace built 0027 |
+| [0041](0041-annotation-guided-webform-prefill.md) | Annotation-guided Webform pre-fill: annotations describe each field, an agent fills it from recalled facts and literals as the viewing account | Proposed 2026-10-04 - design only, not built; replaces the 2026-10-03 interview-to-Webform draft |
+| [0042](0042-fact-compiled-briefs.md) | Fact-compiled briefs: a readable per-subject document compiled from trusted facts, following the `annotations_docs` pattern (draft, edit, lock, publish) | Proposed 2026-10-04 - design only, not built; prompted by the "agents need documentation" critique |
 
 ## Resolved
 

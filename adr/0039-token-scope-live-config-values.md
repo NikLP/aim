@@ -3,6 +3,8 @@
 **Status:** Proposed 2026-10-03 - design only, not built.
 **Date:** 2026-10-03
 
+**See also:** [ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md) proposes generalizing this scope into a *kind* of `literal`. Whether to amend or supersede this ADR is an open question there; nothing here is built.
+
 ## Context
 
 A visitor asks the chat bot "what is the phone number?". The answer may

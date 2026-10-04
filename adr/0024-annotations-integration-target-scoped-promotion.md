@@ -147,3 +147,7 @@ promote into, not run alongside it as a second, separate gate.
 None of the above is validated against real code paths on either module -
 this captures what's known and where the real blockers are, not a spec to
 build against as-is.
+
+## Addendum 2026-10-04: a second consumer, literal gists
+
+[ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md) (Literals) reads the same mapping the other way: Annotations describes a field and asks what goes there, Literals describes a value and asks where it lives. An annotation's `value` can serve as a literal's gist (singleton hosts such as `config_pages` pages), and Annotations' target discovery can supply the entity/bundle/field picker. That is a separate optional bridge from the one proposed above, with the same review-as-promotion shape; the two may share work. Annotations attaches at bundle and field granularity, never an entity instance, which limits the gist use to singletons. Nothing here changes this ADR's status or blockers.
