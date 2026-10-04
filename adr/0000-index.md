@@ -31,6 +31,7 @@ Still carrying work, proposed, or deferred.
 | [0040](0040-literals-probabilistic-lookup-of-exact-values.md) | Literals: a `literal` field type (key, value, optional gist), found by vector shortlist then a Jev choice; standalone or as an `aim` scope that subsumes `entity` and `token` | Proposed 2026-10-03, revised 2026-10-04 - design only, not built; generalizes 0039, would replace built 0027 |
 | [0041](0041-annotation-guided-webform-prefill.md) | Annotation-guided Webform pre-fill: annotations describe each field, an agent fills it from recalled facts and literals as the viewing account | Proposed 2026-10-04 - design only, not built; replaces the 2026-10-03 interview-to-Webform draft |
 | [0042](0042-fact-compiled-briefs.md) | Fact-compiled briefs: a readable per-subject document compiled from trusted facts, following the `annotations_docs` pattern (draft, edit, lock, publish) | Proposed 2026-10-04 - design only, not built; prompted by the "agents need documentation" critique |
+| [0043](0043-content-truth-drift-audit.md) | Content-versus-truth drift audit: live facts as an independent reference, a typed decision flags published content that contradicts them, human resolves | Proposed 2026-10-04 - design only, not built; needs a content index and a measured false-positive rate |
 
 ## Resolved
 
