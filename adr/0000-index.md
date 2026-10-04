@@ -32,6 +32,10 @@ Still carrying work, proposed, or deferred.
 | [0041](0041-annotation-guided-webform-prefill.md) | Annotation-guided Webform pre-fill: annotations describe each field, an agent fills it from recalled facts and literals as the viewing account | Proposed 2026-10-04 - design only, not built; replaces the 2026-10-03 interview-to-Webform draft |
 | [0042](0042-fact-compiled-briefs.md) | Fact-compiled briefs: a readable per-subject document compiled from trusted facts, following the `annotations_docs` pattern (draft, edit, lock, publish) | Proposed 2026-10-04 - design only, not built; prompted by the "agents need documentation" critique |
 | [0043](0043-content-truth-drift-audit.md) | Content-versus-truth drift audit: live facts as an independent reference, a typed decision flags published content that contradicts them, human resolves | Proposed 2026-10-04 - design only, not built; needs a content index and a measured false-positive rate |
+| [0044](0044-tool-api-method-attributes.md) | Tool API method attributes (drupal/tool MR 162): watch upstream, design new tools as typed service methods with explicit value objects | Proposed 2026-10-04 - watching brief, nothing built |
+| [0045](0045-memory-kinds-episodic-semantic-procedural.md) | Memory kinds (semantic/episodic/procedural): `aim_fact` is semantic by design; defer a `kind` field until a real non-semantic consumer exists | Proposed 2026-10-04 - design only |
+| [0046](0046-core-cutoff-time-axis-and-shared-gist-finder.md) | Where core stops: time as a retrieval axis instead of a `kind`, sibling modules for other semantics, literals standalone, one shared gist finder (literals + tool picker) | Proposed 2026-10-04 - design only |
+| [0046](0046-gist-shared-vocabulary.md) | "Gist" as a separate searchable field, shared by annotations and literals: definition, provenance (fuzzy-trace, ReadAgent), find-by-gist, factoring the finder | Proposed 2026-10-04 - design only, not built; duplicated from annopm ADR-028 |
 
 ## Resolved
 

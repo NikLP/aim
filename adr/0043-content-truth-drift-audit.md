@@ -81,6 +81,13 @@ disagreements to a human. It never edits content.
 - **Content index.** A new dependency: a Search API index over published
   content, kept in sync. `ai_search` may already provide one on a given
   site; core `aim` should not require it.
+- **Findings can point at literals.** A flagged fact that is a bare value
+  (a rate, an email address, a loan limit, a hold period) is a copy of a
+  number that lives on an authoritative page, so it will drift again.
+  Besides dismiss and update, a finding can offer "convert to literal"
+  ([ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md)): store
+  a pointer to the exact value instead of the number. The audit then also
+  surfaces facts that should never have been facts.
 - **Where findings surface.** Open. Candidates: a Views-backed report, a
   queue-style admin list, or (via [ADR-0024](0024-annotations-integration-target-scoped-promotion.md)'s
   bridge, if built) an annotation on the offending target.
@@ -91,8 +98,93 @@ disagreements to a human. It never edits content.
   affects both recall of the contradiction and cost.
 - Whether a `contradicts` verdict needs the grounding check (does the
   passage really say that) before a finding is raised.
-- Time-aware verdicts: "closed 14 March" does not contradict "open Monday
-  to Friday" on 13 March. The decision input must carry the fact's
-  `asserted`/`expires` window and the evaluation date.
+- Time windows: **the model never reasons about dates.** Validity
+  (`asserted`/`expires`) is chosen by a person with a date picker in the
+  console and filtered by code before any pair is built, so an expired or
+  not-yet-valid fact never reaches the classifier. Inferring a window from
+  prose is deliberately out of scope. This needs `expires` to mean "valid
+  until" rather than only "retired" (today any non-empty value retires a
+  fact, see TODO.md).
+- Detecting literal candidates: a separate typed question, "is this fact a
+  single exact value that lives in one authoritative place?", asked per
+  fact (no passage needed), so it can run over the whole fact store, not
+  only on findings. Value-shaped facts (rates, contact details, limits,
+  periods) say yes; policy-shaped ones ("alcohol needs Town Council
+  permission") say no. Needs its own labelled set and precision check
+  before it is trusted, and is independent of the drift classifier.
 - Entity-scope target resolution when the target is a paragraph or other
   embedded entity rather than the node a human edits.
+
+## Prototype result (2026-10-04)
+
+A throwaway eval task, `decision-eval.py drift`, with 48 hand-labelled
+synthetic (fact, passage) pairs
+(`aim_benchmark/scripts/decision-eval-drift.json`: 32 clear, 16 hard),
+hosted `jev-latest`, one typed choice per pair:
+
+- The 32 clear pairs: 32/32 correct.
+- Adding the 16 hard pairs (implied contradictions, multi-tier rules,
+  different branch or group): 17/18 contradictions found, 2 false alarms in
+  30 non-contradicting pairs, about 0.4 s a call.
+- Both false alarms are arguably label errors, not model errors: a fact
+  "closes at 6pm on 14 March" against a page saying "open until 8pm" is
+  exactly the drift this audit exists to catch, and a pilot early-opening
+  fact against a page listing 9am is a real discrepancy. That points at the
+  main risk: the boundary between "exception" and "contradiction" is a
+  human judgment, so findings need a dismiss path.
+- Weak evidence: 48 pairs, labels written by the same author as the
+  prompt, synthetic data, no real pages. It shows the classifier is
+  viable for the check, not that the audit is precise on a real site.
+  Next: real page passages and independently labelled pairs before any
+  build decision.
+
+## Addendum: real-passage validation (2026-10-04)
+
+Set: `modules/aim_benchmark/scripts/decision-eval-drift-real.json`, 62 pairs
+(28 contradicts, 17 supports, 17 unrelated; 24 marked HARD) built from
+real public pages (US/UK libraries, a town council hall booking page, a
+community centre, charity shop pages). Source URL and quoted passage on
+every item; passages are short quotes taken via WebFetch, so they carry
+less surrounding context than a full page would. Facts were written by
+the prototype author. Run: `decision-eval.py drift jev-latest --drift-set
+...decision-eval-drift-real.json`.
+
+Labels: a second model (Opus, separate subagent, shown only fact and
+passage, none of the author's intent or the prompt) labelled blind. It
+agreed with the author on 62/62. Not human-independent: same model
+family as the author, and a unanimous result on 24 deliberately hard
+items is itself a reason for suspicion. The labeller flagged 15 items
+below full confidence (ids 8, 9, 14, 16, 19, 20, 27, 34, 37, 38, 39, 44,
+48, 58, 62), the genuinely borderline being 14 (25 items out is within a
+limit of 60), 37 (8-day hold vs "a week"), 39 (a hire rate "starting at"
+17.50 vs 25) and 48 (an email address vs a second one). Human
+adjudication of those four is still outstanding.
+
+Result (hosted jev-latest, 0.3 s a call):
+
+- Contradictions: recall 28/28, precision 28/28, false alarms 0 of 34
+  non-contradicting pairs.
+- Three misses, all UNRELATED labelled SUPPORTS (never flagged, so
+  harmless to the audit): regular-hirer deposit against a non-regular
+  fee rule (Sheringham), non-residents paying vs "residents get a free
+  account" (Knox), Newport Pagnell opening time vs a three-branch
+  training-day rule (Milton Keynes).
+- The model passed every HARD contradiction: implied, tiered, branch,
+  exception. It also found all four borderline items (labelled CONTRADICTS), so those
+  four are where a human may overrule the label.
+
+Limits of the evidence: author-written facts skew toward crisp numeric
+or time contradictions; real staff facts will be vaguer. The set has no
+long pages, only quoted passages, so retrieval of the right passage (the
+part this ADR leaves to the content index) is untested. A reviewer's
+tolerance for false alarms will be set by real data, not this set.
+
+Decision: BUILD, provisional. The suggested bar (at most 1 false alarm in
+10 findings) is met with room (0 in 28). Conditions before the content
+index work starts: (1) the four borderline labels (ids 14, 37, 39, 48)
+were adjudicated 2026-10-04 as worth human review, so they stay
+CONTRADICTS; all are value-shaped facts and literal candidates (see
+Consequences),
+(2) a smaller run on facts written by someone other than the prototype
+author, (3) the dismiss path and the date-picker/expiry prerequisite stay
+as already specified above.

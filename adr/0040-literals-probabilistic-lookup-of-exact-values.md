@@ -5,10 +5,10 @@ built. Generalizes [ADR-0039](0039-token-scope-live-config-values.md)
 (also unbuilt) and, if accepted, replaces the built `entity` scope
 ([ADR-0027](resolved/0027-entity-scope.md)). Settle the amend-or-supersede
 question on 0039 before any code (see Open questions). **The
-three 2026-10-04 addenda at the end narrow the direction (the second
+four 2026-10-04 addenda at the end narrow the direction (the second
 reverses the first on the value's home, the third on Annotations as the
-host); where they conflict with pieces 1, 2, 10 and 11 above, the later
-addendum wins.**
+host, the fourth simplifies the finder and drops alias machinery); where
+they conflict with pieces 1 to 11 above, the later addendum wins.**
 **Date:** 2026-10-03
 
 ## Context
@@ -339,6 +339,11 @@ create storage schema or enter values**, which keeps the poisoning surface
 small and matches ADR-0035. Humans create the underlying field and value.
 A decision model is optional for the tool to run (see piece 2's fallback)
 and is what makes it reliable.
+
+Build the logic as typed service methods (`LiteralFinder`/`LiteralChooser`)
+returning an explicit value object, with the tool plugin a thin wrapper, so
+it can adopt upstream's method-attribute tooling if that lands
+([ADR-0044](0044-tool-api-method-attributes.md)).
 
 ### 10. Annotations
 
@@ -771,4 +776,225 @@ module requires the other.
 - Whether the review queue for proposals shares a screen with the
   moderation queue or sits on its own.
 - Token provider: core's entity tokens need the Token module; confirm
-  whether to depend on it or hand-write `[literal:key]`.
+  whether to depend on it or hand-write `[literal:key]`. (Settled in
+  Addendum 4: tokens are in v1, with the Token module as a soft
+  dependency.)
+
+## Addendum 4 2026-10-04: tiered finder, no vector DB for small pools, tokens in v1
+
+Refines Addendum 3's standalone `literal` entity. Where it conflicts with
+pieces 2, 3, 5 and 8 above, this wins.
+
+### Anatomy of a literal
+
+- **Value:** the exact thing returned. A plain string, or a live pointer
+  of some kind (token, entity-field path, route). A token is one value
+  kind, not the definition of a value.
+- **Gist:** the semantic description, and the only part matched.
+- **Name:** the human label (the entity label).
+- **Key:** a machine name auto-generated from the name, editable, unique
+  per pool. It is not semantic. It is the option ID handed to the Decision
+  API, the tier 0 exact-lookup handle, and the stable identifier in audit
+  lines (which cannot log text).
+- **Pool:** the bundle. It controls who can view the literal.
+
+### The Decision API is the chooser
+
+`drupal/ai` already ships a Decision operation type
+(`ai/src/OperationType/Decision`: `ChoiceQuestion::fromOptions()` returns a
+`ChoiceAnswer` with per-option probabilities and a confidence). Checked in
+the installed checkout, which reports `1.3.1-317` (not confirmed as the
+`1.6.0-dev` line). `LiteralChooser` uses it directly, so there is nothing
+to propose upstream for a "choice" operation. What is worth contributing
+is the finder interface and the access-before-chooser contract (view
+access is filtered before any candidate reaches the model).
+
+### Tiered finder: the model is the last resort
+
+| Tier | Handles | Cost |
+| --- | --- | --- |
+| 0. Exact key (or alias) match | Callers who know the key: tokens, `literal_get key=...`, templates | No model |
+| 1. Outcome cache | Repeated questions | No model |
+| 2. Top hit clears a margin over the second | The easy majority; also the no-decision-model fallback | One embedding (vector) or none (full-text) |
+| 3. Chooser over the shortlist | The ambiguous middle | One model call |
+| 3b. Staged choice (group, then literal) | Pools too big for one flat menu, no vector DB | Two model calls |
+
+- **Small and medium pools skip the vector step entirely.** Filter the
+  pool by the caller's view access, put the whole menu (key plus gist per
+  literal) into one `ChoiceQuestion`, and cache the outcome. About 20
+  tokens per gist puts 200 literals near 4k tokens, and the static menu is
+  prompt-cacheable. Search API and `ai_search` become an optional scale
+  feature (a shortlist pre-filter for large pools), not a requirement; the
+  core dependency becomes `drupal/ai` alone. This also makes the standalone
+  contribution lighter.
+- **Unmeasured:** whether the Decision API's per-option probabilities stay
+  reliable with hundreds of options. Measure before relying on it, and set
+  the "show everything" threshold from the result.
+- **Why the vector tier needs an embedding:** gists are embedded once at
+  index time, but the query is a new string and must be embedded before it
+  can be compared. That is the one model call in the vector path; tiers 0
+  and 1 never make it. A full-text top hit with a margin is a model-free
+  tier 2 alternative, less reliable on natural-language questions.
+
+### Staged choice: a model-only answer to large pools
+
+When one flat menu fails the measurement above, split the choice instead
+of adding a vector DB (keeps the `drupal/ai`-only dependency). Not built;
+use only past the measured flat-menu threshold.
+
+- **Group, then literal (preferred).** Round 1 is a `ChoiceQuestion` over
+  group descriptions (a pool, or a finer topic group such as "contact",
+  "hours", "policies"). Round 2 is a `ChoiceQuestion` over that group's
+  literals only (key plus gist, plus `none`). Menus stay small, so
+  per-option probabilities should stay reliable and prefill stays cheap,
+  and each group's menu is static and prompt-cacheable.
+- **Access first.** Filter groups and literals by the caller's view access
+  before round 1, so an inaccessible pool is never in any menu. Pools
+  already are the access boundary, so a pool is the coarsest group.
+- **Failure mode.** A wrong round 1 makes the right literal unreachable.
+  Mitigate by letting round 1 return its top two groups (run round 2 on
+  both, then take the better result), or by falling through to the flat
+  menu or `none` when round 1's confidence is low. Never guess.
+- **Cost.** Two sequential model calls on an uncached query, so the
+  outcome cache (keyed as above) matters more.
+- **Needs a grouping layer.** Pools alone may be too few or too coarse.
+  An optional `group` on the literal (the open "Grouping" question, now
+  load-bearing for this tier) with a gist of its own, authored and vetted
+  like a literal gist. Group gists get the same one-intent discipline.
+- **Alternative: chunked flat menu.** Split the menu into chunks, run one
+  `ChoiceQuestion` per chunk (each with `none`, parallelizable), then a
+  final choice among the winners. No grouping layer, but N+1 calls and
+  each chunk's probabilities are relative to its own options, so only the
+  final round is a real decision. Second choice to group-then-literal.
+- Measure both against the flat menu in the evaluation below (add them as
+  setups) before building either.
+
+### Privacy: values never go to the chooser
+
+The chooser needs only key and gist per candidate, so **values are never
+sent to it**. This corrects the "Hosted-model caution" in piece 5, which
+listed values as chooser input. Only the write-time match check needs the
+value. A local decision model removes the per-call money cost and the
+exposure of gists, and lets the match check run on values too; it does not
+remove latency (a CPU-only host pays prefill time on every uncached call,
+and a larger menu makes that worse), and ADR-0037/0038 found small local
+models weak on plausibility-style decisions. Cost moves from API spend to
+latency and RAM; caching and the tiers matter either way.
+
+### Caching
+
+- **Key:** normalized query, pool or permission set, and language. Never
+  serve across permission sets.
+- **Invalidation:** the literal's cache tags (any published edit, delete or
+  pool change).
+- **Misses:** cache `none` with a short TTL.
+- **Exact versus semantic:** exact-string hits are rare in free chat. A
+  nearest-cached-query hit repeats more but is itself probabilistic, so it
+  needs a tight distance threshold and is a later optimization.
+- **Where it pays:** public FAQ-style queries repeat heavily. Measure the
+  hit rate from the audit log instead of assuming one.
+
+### Aliases: a field and a view, not machinery
+
+Piece 8's loop stays; its mechanism shrinks. An alias is a whole example
+question (not a word synonym) attached to one literal and indexed or
+matched beside the gist. It earns its place for organization-specific
+vocabulary an embedding does not know ("the Hub", "the bursar") and for
+pinning a query that wrongly matched a neighbouring literal. It is a
+multi-value text field on the literal, a Views list of logged misses, and
+the existing chat-model proposer with human approval. No bespoke alias
+subsystem. Aliases also serve as the regression and gold set: each is a
+known query-to-literal pair. Add them only after a logged miss; do not
+pre-fill.
+
+### Derived pointers ("dreaming")
+
+A nightly pass can derive a pointer from trusted data instead of a human
+typing it, and serve it as a static pointer at read time (cheap, vetted,
+access-checked). It only ever creates a draft revision a human approves
+(ADR-0035; the poisoning surface is the same as piece 7's proposer, and
+only trusted-source facts may feed it).
+
+- **Prefer stable identities.** "The returns policy" mapped to the node
+  titled "Returns and refunds", "contact us" to a route, "opening hours"
+  to a config-page field. These fail visibly: if the pointer stops
+  resolving, or the access or published check fails, the lookup returns
+  `none` with an audit line.
+- **Role-holders go stale silently.** "The CEO" pointing at a user stays
+  valid after the person changes. If supported, the pass must re-derive
+  and diff on a schedule and propose a draft revision when the answer
+  moves (this is the "re-check on a schedule" option in the computed
+  literals open question). Prefer not to ship role-holder literals first.
+
+### Languages: a conditional win
+
+A multilingual embedding model can match a query in one language against
+a gist in another with no translation; many local models are English-
+centric, so verify with a second-language gold set before claiming it. On
+the no-vector path the same question applies to the chooser model. The
+value comes back in the visitor's language through entity translation if
+the literal is a translatable entity.
+
+### Tokens are in v1
+
+The Token module is a **soft dependency** (very common, and not needed for
+semantic lookup). Chained tokens, pool in the path:
+
+| Token | Returns |
+| --- | --- |
+| `[literal:pool:key]` | Resolved value, sanitized for output, access-checked |
+| `[literal:pool:key:raw]` | The same value unsanitized; never place in HTML unescaped |
+| `:gist`, `:name`, `:key`, `:pool` | Metadata (admin and debug use) |
+| `:url` | Resolved URL for route and entity kinds, after an access check |
+| `:entity:...` | Chains into the target entity's tokens (entity-pointer kinds only) |
+| `:updated` | Changed date, chainable into core date formats |
+| `:pointer` | The unresolved pointer expression (`[user:uid:5:name]`), admin and debug |
+
+`:pointer` is deliberately not `:raw`: Drupal's `:raw` convention means
+"unsanitized", and overloading it would confuse. Piece 1's `raw()` on a
+pointer kind is exposed as `:pointer`; a plain value's `raw()` is `:raw`.
+
+Handler rules:
+
+- **Access:** every resolve checks view access itself (ADR-0039 recorded
+  that `config_pages`' handler does not). An inaccessible or missing
+  literal returns nothing and the token stays unreplaced.
+- **Cacheability:** add `user.permissions` (or the pool's access context)
+  and the literal's cache tags to the bubbleable metadata. Without it a
+  cached page leaks a staff value to another user.
+- **Revisions:** only the published revision resolves. Drafts never
+  render.
+- **Language:** honor the `langcode` token option.
+- **Pool is required:** keys are unique per pool, so a bare
+  `[literal:key]` is ambiguous and is not offered.
+- **Rejected:** a semantic token such as `[literal:ask:...]`. Token
+  rendering sits on hot, cached page-render paths; a model call there is
+  slow, nondeterministic and uncacheable. Semantic lookup stays in the
+  tool.
+- The token output is a human-author convenience for placing existing
+  values; it plays no part in the lookup.
+
+### Evaluation before commitment
+
+Build a gold set of queries per literal (`aim_benchmark` already
+generates facts) and compare three setups on recall@1, miss rate and
+wrong-confident rate, plus the share of queries each tier absorbs:
+(1) full-text with hand-written synonyms, (2) vector only, (3) vector or
+full-menu plus chooser. The design only pays off if tiers 0 to 2 absorb
+most traffic. Where the pool is small and synonyms are well kept, the
+keyword baseline may win everywhere except unanticipated phrasing; that
+is a legitimate outcome and the chooser stays optional.
+
+**Open questions added:**
+
+- Decision API reliability and latency at 50, 200 and 500 options, hosted
+  and local.
+- The "show everything" pool-size threshold, from the measurement above.
+- Staged choice: does group-then-literal beat the flat menu past that
+  threshold, how often does round 1 misroute, and are pools enough as
+  groups or is a `group` field needed?
+- Whether a semantic cache (nearest cached query) is worth the risk of a
+  wrong hit.
+- Whether role-holder derived pointers ship at all in v1.
+- Whether the Token provider declares dynamic tokens per literal in
+  `hook_token_info()` (fine for small pools) or only the generic chain.

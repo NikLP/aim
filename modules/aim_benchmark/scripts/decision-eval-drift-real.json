@@ -1,0 +1,501 @@
+{
+ "_note": "Real public passages (quoted via WebFetch 2026-10-04); facts written by the prototype author. 'label' is the author's intent; 'final' (added after independent blind labelling and adjudication) is what the eval scores.",
+ "drift": [
+  {
+   "id": 1,
+   "source": "https://www.surreycc.gov.uk/libraries/your-library/library-policies-and-procedures/planned-closures-for-public-holidays-and-emergency-situations",
+   "passage": "Surrey County libraries are closed on all Public Holidays.",
+   "fact": "The libraries stay open on bank holidays.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 2,
+   "source": "https://www.surreycc.gov.uk/libraries/your-library/library-policies-and-procedures/planned-closures-for-public-holidays-and-emergency-situations",
+   "passage": "libraries close at 1pm on Christmas Eve and are closed on the day following Boxing Day.",
+   "fact": "Libraries close at 4pm on Christmas Eve.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 3,
+   "source": "https://www.surreycc.gov.uk/libraries/your-library/library-policies-and-procedures/planned-closures-for-public-holidays-and-emergency-situations",
+   "passage": "Libraries also close at 5pm (at the latest) on New Year's Eve.",
+   "fact": "On New Year's Eve the libraries close no later than 5pm.",
+   "label": "SUPPORTS",
+   "category": "clear"
+  },
+  {
+   "id": 4,
+   "source": "https://www.surreycc.gov.uk/libraries/your-library/library-policies-and-procedures/planned-closures-for-public-holidays-and-emergency-situations",
+   "passage": "At Easter, Surrey county libraries are closed on Good Friday, Easter Sunday and Easter Monday, but open as normal on Easter Saturday.",
+   "fact": "The libraries are closed on Easter Saturday.",
+   "label": "CONTRADICTS",
+   "category": "HARD exception"
+  },
+  {
+   "id": 5,
+   "source": "https://www.surreycc.gov.uk/libraries/your-library/library-policies-and-procedures/planned-closures-for-public-holidays-and-emergency-situations",
+   "passage": "At Easter, Surrey county libraries are closed on Good Friday, Easter Sunday and Easter Monday, but open as normal on Easter Saturday.",
+   "fact": "The library offers free wifi.",
+   "label": "UNRELATED",
+   "category": "clear"
+  },
+  {
+   "id": 6,
+   "source": "https://www.scottsdalelibrary.org/using-the-library/borrowing",
+   "passage": "A regular library card allows you to have up to 30 items at a time checked out.",
+   "fact": "A standard card lets you borrow up to 30 items.",
+   "label": "SUPPORTS",
+   "category": "clear"
+  },
+  {
+   "id": 7,
+   "source": "https://www.scottsdalelibrary.org/using-the-library/borrowing",
+   "passage": "A regular library card allows you to have up to 30 items at a time checked out.",
+   "fact": "Members can have a maximum of 10 items out.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 8,
+   "source": "https://www.scottsdalelibrary.org/using-the-library/borrowing",
+   "passage": "Items, excluding New, Most Wanted and Video Games, check out for 3 weeks at a time.",
+   "fact": "New books go out for three weeks, like everything else.",
+   "label": "CONTRADICTS",
+   "category": "HARD exception"
+  },
+  {
+   "id": 9,
+   "source": "https://www.scottsdalelibrary.org/using-the-library/borrowing",
+   "passage": "Up to 4 renewals are available for each item if there are no holds on the item.",
+   "fact": "Items can be renewed twice.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 10,
+   "source": "https://www.scottsdalelibrary.org/using-the-library/borrowing",
+   "passage": "We are a fine free library, meaning there are no late fees for items returned past their due date.",
+   "fact": "Late items are charged 20p a day.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 11,
+   "source": "https://www.scottsdalelibrary.org/using-the-library/borrowing",
+   "passage": "Visitor cards are not eligible for digital checkouts.",
+   "fact": "Visitor card holders can borrow ebooks.",
+   "label": "CONTRADICTS",
+   "category": "HARD implied"
+  },
+  {
+   "id": 12,
+   "source": "https://www.scottsdalelibrary.org/using-the-library/borrowing",
+   "passage": "Visitor cards are not eligible for digital checkouts.",
+   "fact": "The cafe opens at 8am.",
+   "label": "UNRELATED",
+   "category": "clear"
+  },
+  {
+   "id": 13,
+   "source": "https://www.saclibrary.org/about-us/policies/borrowing-policy",
+   "passage": "Most items check out for 21 days. There is no charge to check out library materials.",
+   "fact": "Loans are normally three weeks.",
+   "label": "SUPPORTS",
+   "category": "HARD implied equivalence"
+  },
+  {
+   "id": 14,
+   "source": "https://www.saclibrary.org/about-us/policies/borrowing-policy",
+   "passage": "Library patrons may have up to 60 borrowed items on their account at any given time.",
+   "fact": "Borrowers can have 25 items out.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 15,
+   "source": "https://www.saclibrary.org/about-us/policies/borrowing-policy",
+   "passage": "Most library materials, unless reserved for another patron, may be renewed for up to ten additional loan periods.",
+   "fact": "Renewals are unlimited.",
+   "label": "CONTRADICTS",
+   "category": "HARD implied"
+  },
+  {
+   "id": 16,
+   "source": "https://www.saclibrary.org/about-us/policies/borrowing-policy",
+   "passage": "If a card has amassed over $5.00 in unpaid fines or fees, it cannot be used to check out library materials until the fines or fees are paid.",
+   "fact": "A card with $3 in unpaid fines can still be used to borrow.",
+   "label": "SUPPORTS",
+   "category": "HARD implied"
+  },
+  {
+   "id": 17,
+   "source": "https://sheringhamtowncouncil.gov.uk/sheringham-community-centre-booking-terms-and-conditions",
+   "passage": "Cancellations will be refunded by the Council when 7 or more days' cancellation notice is supplied.",
+   "fact": "No refunds are given on cancellations.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 18,
+   "source": "https://sheringhamtowncouncil.gov.uk/sheringham-community-centre-booking-terms-and-conditions",
+   "passage": "Cancellations will be refunded by the Council when 7 or more days' cancellation notice is supplied.",
+   "fact": "A booking cancelled with 10 days' notice is refunded.",
+   "label": "SUPPORTS",
+   "category": "clear"
+  },
+  {
+   "id": 19,
+   "source": "https://sheringhamtowncouncil.gov.uk/sheringham-community-centre-booking-terms-and-conditions",
+   "passage": "Alcohol shall not be consumed on the Centre premises except with the permission of the Town Council.",
+   "fact": "Alcohol is strictly banned at the centre.",
+   "label": "CONTRADICTS",
+   "category": "HARD exception"
+  },
+  {
+   "id": 20,
+   "source": "https://sheringhamtowncouncil.gov.uk/sheringham-community-centre-booking-terms-and-conditions",
+   "passage": "All letting fees for non-regular bookings must be paid in full at the time of booking.",
+   "fact": "Regular weekly hirers pay a deposit and settle the balance later.",
+   "label": "UNRELATED",
+   "category": "HARD different group"
+  },
+  {
+   "id": 21,
+   "source": "https://www.savethechildren.org.uk/about-us/faq/shop-faqs",
+   "passage": "If you are an individual donating, you can drop it off at our stores (contact your local store for opening times).",
+   "fact": "Donors may bring items to the shop.",
+   "label": "SUPPORTS",
+   "category": "clear"
+  },
+  {
+   "id": 22,
+   "source": "https://www.savethechildren.org.uk/about-us/faq/shop-faqs",
+   "passage": "Lines are open 9 - 6, Monday to Friday.",
+   "fact": "The phone line is open at weekends.",
+   "label": "CONTRADICTS",
+   "category": "HARD implied"
+  },
+  {
+   "id": 23,
+   "source": "https://www.savethechildren.org.uk/about-us/faq/shop-faqs",
+   "passage": "Lines are open 9 - 6, Monday to Friday.",
+   "fact": "The supporter line opens at 9am on weekdays.",
+   "label": "SUPPORTS",
+   "category": "clear"
+  },
+  {
+   "id": 24,
+   "source": "https://www.milton-keynes.gov.uk/libraries/library-info/library-hours",
+   "passage": "All libraries will be closed on the following dates: Friday 25 December 2026, Monday 28 December 2026, Friday 1 January 2027",
+   "fact": "Libraries are open on 28 December.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 25,
+   "source": "https://www.milton-keynes.gov.uk/libraries/library-info/library-hours",
+   "passage": "All libraries will be closed on the following dates: Friday 25 December 2026, Monday 28 December 2026, Friday 1 January 2027",
+   "fact": "Libraries open at 9am on Saturdays.",
+   "label": "UNRELATED",
+   "category": "clear"
+  },
+  {
+   "id": 26,
+   "source": "https://www.milton-keynes.gov.uk/libraries/library-info/library-hours",
+   "passage": "Central Library, Bletchley Library and Wolverton Library will open at 11.30am on staff training closure dates.",
+   "fact": "On staff training days every library opens at 9am.",
+   "label": "CONTRADICTS",
+   "category": "HARD branch"
+  },
+  {
+   "id": 27,
+   "source": "https://www.milton-keynes.gov.uk/libraries/library-info/library-hours",
+   "passage": "Central Library, Bletchley Library and Wolverton Library will open at 11.30am on staff training closure dates.",
+   "fact": "Newport Pagnell Library opens at 11.30am on staff training days.",
+   "label": "UNRELATED",
+   "category": "HARD different branch"
+  },
+  {
+   "id": 28,
+   "source": "https://libraries.oc.gov/about-ocpl/borrowing-privileges-and-policies",
+   "passage": "50 total Items per Card: Any combination of including but not limited to: Books, Best Seller, Lucky Day Books, Boardgames, Magazines, DVDs, CDs & Audiobooks.",
+   "fact": "The limit is 50 items per card.",
+   "label": "SUPPORTS",
+   "category": "clear"
+  },
+  {
+   "id": 29,
+   "source": "https://libraries.oc.gov/about-ocpl/borrowing-privileges-and-policies",
+   "passage": "1 each per Card: Chromebooks, Hotspots, Library of Things items (excluding Boardgames, and toys in backpacks), and State Park Passes",
+   "fact": "You can borrow three hotspots at once.",
+   "label": "CONTRADICTS",
+   "category": "HARD tiered"
+  },
+  {
+   "id": 30,
+   "source": "https://libraries.oc.gov/about-ocpl/borrowing-privileges-and-policies",
+   "passage": "Overdue fines are no longer accrued. Patrons are still responsible for items that are not returned or returned damaged.",
+   "fact": "There are no overdue fines, but lost items must be paid for.",
+   "label": "SUPPORTS",
+   "category": "clear"
+  },
+  {
+   "id": 31,
+   "source": "https://www.cityofpasadena.net/library/loan-periods-and-fines/",
+   "passage": "Adults - 100 items checked out limit. DVDs - A maximum of 20 DVDs can be out on one library card at any time.",
+   "fact": "Adults may borrow up to 100 items, but no more than 20 of them DVDs.",
+   "label": "SUPPORTS",
+   "category": "HARD tiered"
+  },
+  {
+   "id": 32,
+   "source": "https://www.cityofpasadena.net/library/loan-periods-and-fines/",
+   "passage": "Adults - 100 items checked out limit. DVDs - A maximum of 20 DVDs can be out on one library card at any time.",
+   "fact": "Borrowers may take out as many DVDs as they like.",
+   "label": "CONTRADICTS",
+   "category": "HARD tiered"
+  },
+  {
+   "id": 33,
+   "source": "https://www.cityofpasadena.net/library/loan-periods-and-fines/",
+   "passage": "Material is assumed lost if not returned within 28 days of the due date.",
+   "fact": "Items are treated as lost after 14 days overdue.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 34,
+   "source": "https://www.cityofpasadena.net/library/loan-periods-and-fines/",
+   "passage": "Renewals - 3 per item if there are no holds pending",
+   "fact": "An item with a hold on it can be renewed three times.",
+   "label": "CONTRADICTS",
+   "category": "HARD exception"
+  },
+  {
+   "id": 35,
+   "source": "https://www.knoxcountylibrary.org/policies/borrowing-and-late-fines",
+   "passage": "Most items are loaned for three weeks and may be renewed three times unless there are holds.",
+   "fact": "Books can be renewed up to three times.",
+   "label": "SUPPORTS",
+   "category": "clear"
+  },
+  {
+   "id": 36,
+   "source": "https://www.knoxcountylibrary.org/policies/borrowing-and-late-fines",
+   "passage": "Overdue fines: BOOKS (PRINT) .20 per day up to $5.00",
+   "fact": "Overdue print books cost 50 cents a day.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 37,
+   "source": "https://www.knoxcountylibrary.org/policies/borrowing-and-late-fines",
+   "passage": "Holds are held at the pickup location for 8 days.",
+   "fact": "Holds wait on the shelf for a week.",
+   "label": "CONTRADICTS",
+   "category": "HARD near miss"
+  },
+  {
+   "id": 38,
+   "source": "https://www.knoxcountylibrary.org/policies/borrowing-and-late-fines",
+   "passage": "All residents or property owners in Knox County are eligible for a free library account.",
+   "fact": "Non-residents must pay for a card.",
+   "label": "UNRELATED",
+   "category": "HARD silent"
+  },
+  {
+   "id": 39,
+   "source": "https://redhallcommunitycentre.org/room-hire/",
+   "passage": "Prices start at £17.50 per hour per room but reduce every subsequent hour.",
+   "fact": "Room hire is 25 pounds an hour.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 40,
+   "source": "https://redhallcommunitycentre.org/room-hire/",
+   "passage": "These rates are specifically for groups or services that use the centre regularly. To obtain these rates you will need to make a block booking.",
+   "fact": "One-off casual hirers get the discounted rates.",
+   "label": "CONTRADICTS",
+   "category": "HARD implied"
+  },
+  {
+   "id": 41,
+   "source": "https://redhallcommunitycentre.org/room-hire/",
+   "passage": "1 hour £17.50. 2 hours £31.50.",
+   "fact": "Two hours costs less than double the one-hour rate.",
+   "label": "SUPPORTS",
+   "category": "HARD arithmetic"
+  },
+  {
+   "id": 42,
+   "source": "https://www.worcestershire.gov.uk/news/library-christmas-and-new-year-opening-times",
+   "passage": "Christmas Eve: Open until 1:00pm",
+   "fact": "On Christmas Eve libraries close at 1pm.",
+   "label": "SUPPORTS",
+   "category": "clear"
+  },
+  {
+   "id": 43,
+   "source": "https://www.worcestershire.gov.uk/news/library-christmas-and-new-year-opening-times",
+   "passage": "New Year's Eve: Open until 5:00pm (Wythall Library will close at 3:00pm)",
+   "fact": "Wythall Library closes at 5pm on New Year's Eve.",
+   "label": "CONTRADICTS",
+   "category": "HARD branch"
+  },
+  {
+   "id": 44,
+   "source": "https://www.worcestershire.gov.uk/news/library-christmas-and-new-year-opening-times",
+   "passage": "New Year's Eve: Open until 5:00pm (Wythall Library will close at 3:00pm)",
+   "fact": "Redditch Library closes at 5pm on New Year's Eve.",
+   "label": "SUPPORTS",
+   "category": "HARD branch"
+  },
+  {
+   "id": 45,
+   "source": "https://www.worcestershire.gov.uk/news/library-christmas-and-new-year-opening-times",
+   "passage": "Christmas Day and 26 December: Closed",
+   "fact": "Libraries are open on Boxing Day.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 46,
+   "source": "https://www.crisis.org.uk/shop/find-our-charity-shops/",
+   "passage": "Archway: Monday to Friday 11am-6pm, Saturday 10.30am-6pm, Sunday 11-5pm",
+   "fact": "The Archway shop is closed on Sundays.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 47,
+   "source": "https://www.crisis.org.uk/shop/find-our-charity-shops/",
+   "passage": "Archway: Monday to Friday 11am-6pm, Saturday 10.30am-6pm, Sunday 11-5pm",
+   "fact": "The Archway shop opens at 11am on weekdays.",
+   "label": "SUPPORTS",
+   "category": "clear"
+  },
+  {
+   "id": 48,
+   "source": "https://www.crisis.org.uk/shop/find-our-charity-shops/",
+   "passage": "archway.shop@crisis.org.uk or telephone 020 728 15171",
+   "fact": "The shop's email address is info@crisis.org.uk.",
+   "label": "CONTRADICTS",
+   "category": "clear"
+  },
+  {
+   "id": 49,
+   "source": "https://www.redcross.org.uk/shop",
+   "passage": "You can donate at your local shop or by post. Most of our Red Cross charity shops are open all week, including some on Sundays",
+   "fact": "Red Cross shops are closed on Sundays.",
+   "label": "CONTRADICTS",
+   "category": "HARD exception"
+  },
+  {
+   "id": 50,
+   "source": "https://www.redcross.org.uk/shop",
+   "passage": "You can donate at your local shop or by post. Most of our Red Cross charity shops are open all week, including some on Sundays",
+   "fact": "We accept donations by post.",
+   "label": "SUPPORTS",
+   "category": "clear"
+  },
+  {
+   "id": 51,
+   "source": "https://www.redcross.org.uk/shop",
+   "passage": "You can donate at your local shop or by post. Most of our Red Cross charity shops are open all week, including some on Sundays",
+   "fact": "The shop sells furniture.",
+   "label": "UNRELATED",
+   "category": "clear"
+  },
+  {
+   "id": 52,
+   "source": "https://www.crisis.org.uk/shop/find-our-charity-shops/",
+   "passage": "Our shops rely on volunteers to help run them every day.",
+   "fact": "The shop takes on volunteers.",
+   "label": "SUPPORTS",
+   "category": "clear"
+  },
+  {
+   "id": 53,
+   "source": "https://www.surreycc.gov.uk/libraries/your-library/library-policies-and-procedures/planned-closures-for-public-holidays-and-emergency-situations",
+   "passage": "libraries close at 1pm on Christmas Eve and are closed on the day following Boxing Day.",
+   "fact": "The library runs a baby rhyme time on Tuesday mornings.",
+   "label": "UNRELATED",
+   "category": "clear"
+  },
+  {
+   "id": 54,
+   "source": "https://www.saclibrary.org/about-us/policies/borrowing-policy",
+   "passage": "Library patrons may have up to 60 borrowed items on their account at any given time.",
+   "fact": "Printing costs 10 cents a page.",
+   "label": "UNRELATED",
+   "category": "clear"
+  },
+  {
+   "id": 55,
+   "source": "https://libraries.oc.gov/about-ocpl/borrowing-privileges-and-policies",
+   "passage": "50 total Items per Card: Any combination of including but not limited to: Books, Best Seller, Lucky Day Books, Boardgames, Magazines, DVDs, CDs & Audiobooks.",
+   "fact": "Children's cards are free.",
+   "label": "UNRELATED",
+   "category": "HARD silent"
+  },
+  {
+   "id": 56,
+   "source": "https://sheringhamtowncouncil.gov.uk/sheringham-community-centre-booking-terms-and-conditions",
+   "passage": "Cancellations will be refunded by the Council when 7 or more days' cancellation notice is supplied.",
+   "fact": "The main hall holds 80 people.",
+   "label": "UNRELATED",
+   "category": "clear"
+  },
+  {
+   "id": 57,
+   "source": "https://www.worcestershire.gov.uk/news/library-christmas-and-new-year-opening-times",
+   "passage": "Christmas Day and 26 December: Closed",
+   "fact": "The mobile library visits the village on Thursdays.",
+   "label": "UNRELATED",
+   "category": "clear"
+  },
+  {
+   "id": 58,
+   "source": "https://www.knoxcountylibrary.org/policies/borrowing-and-late-fines",
+   "passage": "Overdue fines: BOOKS (PRINT) .20 per day up to $5.00",
+   "fact": "Lost books must be paid for in full.",
+   "label": "UNRELATED",
+   "category": "HARD silent"
+  },
+  {
+   "id": 59,
+   "source": "https://www.cityofpasadena.net/library/loan-periods-and-fines/",
+   "passage": "Renewals - 3 per item if there are no holds pending",
+   "fact": "Items can be renewed online or by phone.",
+   "label": "UNRELATED",
+   "category": "HARD silent"
+  },
+  {
+   "id": 60,
+   "source": "https://www.redcross.org.uk/shop",
+   "passage": "You can donate at your local shop or by post. Most of our Red Cross charity shops are open all week, including some on Sundays",
+   "fact": "Donated electrical items must have a safety label.",
+   "label": "UNRELATED",
+   "category": "clear"
+  },
+  {
+   "id": 61,
+   "source": "https://www.crisis.org.uk/shop/find-our-charity-shops/",
+   "passage": "archway.shop@crisis.org.uk or telephone 020 728 15171",
+   "fact": "The Archway shop has step-free access.",
+   "label": "UNRELATED",
+   "category": "clear"
+  },
+  {
+   "id": 62,
+   "source": "https://www.milton-keynes.gov.uk/libraries/library-info/library-hours",
+   "passage": "All libraries will be closed on the following dates: Friday 25 December 2026, Monday 28 December 2026, Friday 1 January 2027",
+   "fact": "Libraries are open on 27 December.",
+   "label": "UNRELATED",
+   "category": "HARD silent"
+  }
+ ]
+}

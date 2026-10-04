@@ -1,0 +1,293 @@
+{
+ "_note": "Synthetic library data, hand-labelled, unverified. Dates are never part of the model's job: the code filters facts by validity window before any pair is built.",
+ "drift": [
+  {
+   "label": "CONTRADICTS",
+   "fact": "The Central branch is closed on Mondays.",
+   "passage": "Central Library is open seven days a week, 9am to 5pm, including Mondays.",
+   "note": "hours"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "The library's phone number is 01632 960 999.",
+   "passage": "Call us on 01632 960 123 or email hello@harbourside-library.example.",
+   "note": "phone"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "Late fees were abolished for all members.",
+   "passage": "A fee of 20p per day applies to every overdue item, up to a maximum of 4 pounds.",
+   "note": "fees"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "Members can borrow up to 10 items at a time.",
+   "passage": "Members can borrow up to 20 items at a time for 3 weeks.",
+   "note": "limit"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "Baby Rhyme Time now runs on Wednesdays at 10am.",
+   "passage": "Baby Rhyme Time runs every Tuesday at 10:30am in the Children's Room.",
+   "note": "event moved"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "Room hire for the main hall is free for registered charities.",
+   "passage": "The main hall can be hired for 40 pounds an hour. No discounts are available.",
+   "note": "pricing"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "The car park is now closed to the public.",
+   "passage": "Free parking is available for library visitors in the car park behind the building.",
+   "note": "parking"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "Dogs are allowed in the reading room.",
+   "passage": "Only assistance dogs are allowed inside the library.",
+   "note": "policy"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "The annual book sale has moved to the first weekend of September.",
+   "passage": "The annual book sale is held on the first weekend of June in the main hall.",
+   "note": "event moved"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "The library director is Priya Nair.",
+   "passage": "Our director, Tom Ellis, welcomes you to Harbourside Community Library.",
+   "note": "person"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "Wi-Fi is no longer free; a pass is needed from the desk.",
+   "passage": "Free Wi-Fi is available throughout the building. No password is required.",
+   "note": "service"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "The printing service has been discontinued.",
+   "passage": "Black and white printing costs 10p a page; colour is 30p. Ask at the main desk.",
+   "note": "service"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "The library opens Monday to Friday from 9am to 8pm.",
+   "passage": "Opening hours: Monday to Friday 9am to 8pm, Saturday 10am to 5pm, Sunday 12pm to 4pm.",
+   "note": "hours"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "The library's phone number is 01632 960 123.",
+   "passage": "Call us on 01632 960 123 or email hello@harbourside-library.example.",
+   "note": "phone"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "Only assistance dogs are allowed inside the library.",
+   "passage": "Please note that only assistance dogs are allowed inside the library.",
+   "note": "policy paraphrase"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "The building is step-free with a hearing loop at the main desk.",
+   "passage": "Access: the building is step-free and there is a hearing loop at the main desk. Large-print books are by the entrance.",
+   "note": "access"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "Members can borrow up to 20 items for 3 weeks.",
+   "passage": "Members can borrow up to 20 items at a time for 3 weeks.",
+   "note": "limit"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "Printing costs 10p a page in black and white.",
+   "passage": "Black and white printing costs 10p a page; colour is 30p.",
+   "note": "printing"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "The annual book sale is in June.",
+   "passage": "The annual book sale is held on the first weekend of June in the main hall.",
+   "note": "event"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "The library is closed on public holidays.",
+   "passage": "The library is closed on public holidays and on the last Friday of every month for staff training.",
+   "note": "closure, partial"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "Baby Rhyme Time is on Tuesdays.",
+   "passage": "Baby Rhyme Time runs every Tuesday at 10:30am in the Children's Room.",
+   "note": "event"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "The library has free Wi-Fi.",
+   "passage": "Free Wi-Fi is available throughout the building.",
+   "note": "service"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "The library's phone number is 01632 960 123.",
+   "passage": "The annual book sale is held on the first weekend of June in the main hall.",
+   "note": "topic"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "The library is closed on public holidays.",
+   "passage": "Members can borrow up to 20 items at a time for 3 weeks.",
+   "note": "topic"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "The library website is maintained by Northlight Digital.",
+   "passage": "Baby Rhyme Time runs every Tuesday at 10:30am in the Children's Room.",
+   "note": "topic"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "Printing costs 10p a page in black and white.",
+   "passage": "Only assistance dogs are allowed inside the library.",
+   "note": "topic"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "The library's writing style is warm and plain English.",
+   "passage": "The main hall can be hired for 40 pounds an hour.",
+   "note": "topic"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "The Central branch is closed on Mondays.",
+   "passage": "Baby Rhyme Time runs every Tuesday at 10:30am in the Children's Room.",
+   "note": "near-miss day, no claim on opening"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "Free Wi-Fi is available throughout the building.",
+   "passage": "Free parking is available for library visitors in the car park behind the building.",
+   "note": "near-miss free"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "The main hall can be hired for 40 pounds an hour.",
+   "passage": "The library is open Monday to Friday from 9am to 8pm.",
+   "note": "near-miss hall vs hours"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "The library director is Priya Nair.",
+   "passage": "Members can borrow up to 20 items at a time for 3 weeks.",
+   "note": "topic"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "Late fees are 20p per day.",
+   "passage": "The building is step-free and there is a hearing loop at the main desk.",
+   "note": "topic"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "The Central branch is closed on Mondays.",
+   "passage": "Harbourside Community Library is open Monday to Friday from 9am to 8pm.",
+   "note": "HARD implied by weekday range"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "Borrowing is limited to 10 items.",
+   "passage": "Borrow as many items as you like with a Gold membership; standard members can take up to 20.",
+   "note": "HARD multi-tier"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "Room hire is by invitation only.",
+   "passage": "To hire the main hall, fill in the online booking form. Rates start at 40 pounds an hour.",
+   "note": "HARD implied"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "The Eastside branch has closed permanently.",
+   "passage": "Visit any of our three branches: Central, Eastside and Harbourside.",
+   "note": "HARD list membership"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "Under-12s must be accompanied by an adult at all times.",
+   "passage": "Children aged 8 and over may use the library unaccompanied.",
+   "note": "HARD age threshold"
+  },
+  {
+   "label": "CONTRADICTS",
+   "fact": "Overdue fines are 50p per day.",
+   "passage": "Overdue items cost 20p per day, capped at 4 pounds.",
+   "note": "HARD number change"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "Standard members can borrow up to 20 items.",
+   "passage": "Borrow as many items as you like with a Gold membership; standard members can take up to 20.",
+   "note": "HARD tiered, consistent"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "The Central branch is open on Saturdays.",
+   "passage": "Harbourside Community Library is open Monday to Friday 9am to 8pm and Saturday 10am to 5pm.",
+   "note": "HARD implied by listing"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "Children under 8 need an adult with them.",
+   "passage": "Children aged 8 and over may use the library unaccompanied.",
+   "note": "HARD implied, converse"
+  },
+  {
+   "label": "SUPPORTS",
+   "fact": "Room hire starts at 40 pounds an hour.",
+   "passage": "To hire the main hall, fill in the online booking form. Rates start at 40 pounds an hour.",
+   "note": "HARD consistent subset"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "The Eastside branch is closed on Mondays.",
+   "passage": "Harbourside Community Library is open Monday to Friday from 9am to 8pm.",
+   "note": "HARD different branch"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "Gold members get free room hire.",
+   "passage": "To hire the main hall, rates start at 40 pounds an hour.",
+   "note": "HARD claims about different group"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "The library will close at 6pm on 14 March.",
+   "passage": "Harbourside Community Library is open Monday to Friday from 9am to 8pm.",
+   "note": "HARD date exception, not a contradiction in general"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "The mobile library visits the village on Thursdays.",
+   "passage": "Harbourside Community Library is open Monday to Friday from 9am to 8pm.",
+   "note": "HARD different service"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "The 8am Tuesday early opening is a pilot.",
+   "passage": "Opening hours: Monday to Friday 9am to 8pm.",
+   "note": "HARD pilot not stated"
+  },
+  {
+   "label": "UNRELATED",
+   "fact": "Late fees will be reviewed next year.",
+   "passage": "Overdue items cost 20p per day, capped at 4 pounds.",
+   "note": "HARD future review"
+  }
+ ]
+}
