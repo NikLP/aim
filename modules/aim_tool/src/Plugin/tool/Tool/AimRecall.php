@@ -26,7 +26,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * them, or vice versa. Unlike aim_chatbot's aim_chatbot:recall, this is
  * not locked to scope=site - see AimRemember's docblock for why a Tool
  * API caller (a real, authenticated Drupal account) is a different trust
- * level from an anonymous chat visitor. scope=user omitting subject_uid
+ * level from an anonymous chat visitor. scope=user omitting user
  * defaults to the calling account rather than every user's facts,
  * matching AimRemember's same default and keeping "recall my facts" the
  * ergonomic no-argument case for scope=user.
@@ -69,7 +69,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
       description: new TranslatableMarkup('Restrict results to one subject. Not used for scope=user.'),
       required: FALSE,
     ),
-    'subject_uid' => new InputDefinition(
+    'user' => new InputDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Subject account'),
       description: new TranslatableMarkup('Restrict results to one user, by uid or username. Only meaningful with scope=user; omit to default to the calling account.'),
@@ -119,9 +119,9 @@ final class AimRecall extends ToolBase {
    * {@inheritdoc}
    */
   protected function doExecute(array $values): ExecutableResult {
-    $subjectUid = $values['subject_uid'] ?? NULL;
-    if (($values['scope'] ?? NULL) === 'user' && empty($subjectUid)) {
-      $subjectUid = (string) $this->currentUser->id();
+    $userFilter = $values['user'] ?? NULL;
+    if (($values['scope'] ?? NULL) === 'user' && empty($userFilter)) {
+      $userFilter = (string) $this->currentUser->id();
     }
 
     try {
@@ -129,7 +129,7 @@ final class AimRecall extends ToolBase {
         $values['text'],
         $values['scope'] ?? NULL,
         $values['subject'] ?? NULL,
-        $subjectUid,
+        $userFilter,
         (int) ($values['limit'] ?? 10),
         isset($values['max_distance']) ? (float) $values['max_distance'] : $this->memoryManager->getRecallMaxDistance(),
       );

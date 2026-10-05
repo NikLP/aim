@@ -1,14 +1,19 @@
 # ADR-0040: Literals - a `literal` field type with an optional gist, found by vector shortlist and a Jev choice
 
-**Status:** Proposed 2026-10-03, revised 2026-10-04 - design only, nothing
-built. Generalizes [ADR-0039](0039-token-scope-live-config-values.md)
+**Status:** Proposed 2026-10-03, revised 2026-10-04 and 2026-10-05 - Phase 1
+(entity, types, kinds, audience access, list UI) built; the finder, tokens and
+tool are not. Generalizes [ADR-0039](0039-token-scope-live-config-values.md)
 (also unbuilt) and, if accepted, replaces the built `entity` scope
 ([ADR-0027](resolved/0027-entity-scope.md)). Settle the amend-or-supersede
 question on 0039 before any code (see Open questions). **The
-four 2026-10-04 addenda at the end narrow the direction (the second
-reverses the first on the value's home, the third on Annotations as the
-host, the fourth simplifies the finder and drops alias machinery); where
-they conflict with pieces 1 to 11 above, the later addendum wins.**
+seven addenda at the end (2026-10-04 and 2026-10-05) narrow the direction
+(the second reverses the first on the value's home, the third on
+Annotations as the host, the fourth simplifies the finder and drops alias
+machinery, the fifth removes the `aim` mirror and `aim_scope_literal` and
+adds the build plan, the sixth fixes terms and replaces the vector index
+with a stored-embedding gate, the seventh replaces pools with types, kinds
+and an audience); where they conflict with pieces 1 to 12
+above, the later addendum wins.**
 **Date:** 2026-10-03
 
 ## Context
@@ -998,3 +1003,304 @@ is a legitimate outcome and the chooser stays optional.
 - Whether role-holder derived pointers ship at all in v1.
 - Whether the Token provider declares dynamic tokens per literal in
   `hook_token_info()` (fine for small pools) or only the generic chain.
+
+## Addendum 5 2026-10-04: no mirror, no `aim_scope_literal`; the build plan
+
+Removes piece 6's bridge and the "replaces the `entity` scope" claim, and
+sets the order of work. Where it conflicts with pieces 6 and 12 and the
+"Mirror sync" open question, this wins.
+
+### The mirror is dropped
+
+Piece 6 copied a literal's gist into an `aim_fact` with `scope=literal`.
+That is a second copy of the gist with its own embedding, and it needs
+sync code on every save, delete, draft and access change. Resaving the
+fact when the gist changes is cheap (one embedding call, a row write and
+a vector upsert; gists change rarely), and deriving an index from a source
+of truth is how Search API works. But hand-rolling that is a small Search
+API, and the cost that matters is the standing duplicate invariant, not
+the timing. The stale window between a literal save and the fact resave is
+bounded (the old gist is used briefly, never a wrong value, since values
+are never in a fact), but it is avoidable by having one copy.
+
+The earlier claim that the bridge avoids a second vector index only moved
+the duplication from the index to the fact table. It is withdrawn.
+
+### Scope means "what the fact is about"
+
+An `aim_scope` says what a fact is about (user, case, entity). A literal is
+an exact value with a fuzzy address, not a fact. So:
+
+- **There is no `literal` scope and no `aim_scope_literal`.** A scope named
+  `literal` would also collide with the pool bundles (`literal_public`,
+  `literal_staff`) of the literal entity.
+- **A pointer-only fact adds nothing to lookup.** It has no text and no
+  embedding, so recall could not search it and would have to hand the
+  question to the finder, which can be called directly.
+- **`entity` scope stays** (ADR-0027). A fact about a literal ("the
+  switchboard number changed on 3 Oct, the old one was X") is an ordinary
+  `scope=entity` fact with `target_type=literal` and `target_id` set. The
+  built `entity` scope is not retired, and the `target_type`/`target_id`
+  migration in the Consequences and Open questions no longer applies.
+
+### The gist lives on the literal
+
+Standalone: the literal row holds name, key, value, gist and aliases, and
+the finder reads them (full menu first, piece 3 and Addendum 4).
+
+`aim` integration is a **finder consumer, not a store**: an `aim_chatbot`
+and `aim_tool` tool calls `LiteralFinder` beside `aim_recall`, and the chat
+agent chooses between them. Nothing is mirrored into `aim_fact`, and
+`aim_vector` is not shared with the literal gist index (when a vector tier
+exists at all, it is the literal module's own Search API index).
+
+**Deferred option: an aim-stored gist backend.** With `aim` installed the
+gist could live only as a `scope=entity` fact targeting the literal, with
+no gist column on the literal. That is one copy, not a mirror, and the
+finder returns the same candidates (key, gist, access-checked pointer)
+whichever backend supplies them, so the interface already allows it. Not
+built, because it costs:
+
+- two storage modes to test and document (gist on the literal versus on a
+  fact);
+- the literal form writing another entity's text;
+- draft gists, regenerate and moderation (piece 7) live on literal
+  revisions, while a fact has only the `trusted` flag, so aim mode would
+  lose them or need its own gate;
+- deleting a literal must retire its fact (one-way lifecycle linkage, much
+  smaller than a mirror);
+- consolidation must skip these facts (the `isConsolidatable()` seam
+  exists for this).
+
+Decide after Phase 4's measurements show whether the full-menu path
+suffices; build standalone first.
+
+### Convert a fact to a literal stays, one-way
+
+Piece 12 is unchanged and is the only `aim`-specific build: a form that
+creates a literal with a `source_fact` back-reference. It needs the
+`retired`/`expires` split in TODO.md for its cool-off.
+
+### Build plan
+
+No commits until asked. Each phase ends at a checkable result; lint per
+CLAUDE.md.
+
+0. **Decisions (no code).** This addendum. Settle ADR-0039 as amend or
+   supersede. Check `literals` for a clash on drupal.org (the name is still
+   open). Pick the module's home: it is a standalone project, so a sibling
+   of `aim` under `web/modules/custom/`, not nested in the `aim` repo.
+1. **Throwaway spike** (Addendum 3's gate). `literal` entity, pool bundle,
+   Views list, moderation. Result: thin UI stays under a few hundred custom
+   lines (go standalone) or fall back to Addendum 2's annotation-type host.
+2. **Core, no model.** Revisionable `literal` entity with a pool bundle,
+   per-bundle permissions (`BundlePermissionHandlerTrait`) and an access
+   handler. Fields: name, key (unique per pool), value (plain string only),
+   gist, aliases. Typed Data constraint on the value. Guardrails on gist,
+   value and aliases at save. Tier 0 exact key or alias lookup.
+   `[literal:pool:key]` tokens with access check and cache metadata. Tool
+   API `literal_get` by key. Audit logging per CLAUDE.md. Result: a usable
+   settings store with no AI.
+3. **Finder and chooser.** `LiteralFinder` and `LiteralChooser` behind
+   interfaces. Full-menu backend: filter by view access, key plus gist menu,
+   one Decision API `ChoiceQuestion`. Outcomes `match`, `ambiguous`, `none`.
+   Margin fallback without a decision model. Outcome cache keyed by
+   permission set and tagged to the literal. Values never sent to the
+   chooser. `literal_get` gains the by-question mode. Result: natural-language
+   lookup over a small pool.
+4. **Evaluation** (run in a separate thread). Gold queries per literal;
+   compare keyword, vector and chooser setups; measure at 50, 200 and 500
+   options, hosted and local. Result: the "show everything" threshold, and
+   whether the vector or staged tiers are needed at all. Brings numbers back
+   here before anything past Phase 3 is built.
+5. **`aim` integration.** The finder tool in `aim_chatbot`/`aim_tool`, and
+   convert-a-fact (piece 12).
+
+Deferred, no phase yet: write-time one-intent, neighbour and match checks
+(piece 5), the probe box, the alias loop and proposer (pieces 7 and 8),
+value kinds beyond a plain string (token, entity-field, route), the vector
+and staged tiers, the aim-stored gist backend above, the Annotations gist
+bridge (piece 10), computed literals.
+
+Production use of the chooser stays demo-data-only until a local decision
+model or a data-handling decision exists (Addendum 4's privacy note).
+
+## Addendum 6 2026-10-05: terms, a stored-embedding gate, chooser latency
+
+Refines Addendums 4 and 5. Where it conflicts with them or with piece 2's
+requirement of Search API and `ai_search`, this wins.
+
+### Terms (used consistently from here on)
+
+- **Finder:** the whole lookup. It filters candidates by view access, runs
+  the cheap steps, and returns `match`, `ambiguous` or `none`.
+- **Chooser:** only the model call inside the finder (the Decision API
+  `ChoiceQuestion`).
+- **Gate:** the cheap check inside the finder, before the chooser, that
+  decides whether the question is close to any literal at all.
+
+### The gate: embeddings stored on the literal row, compared in PHP
+
+The gate's default is not a vector index.
+
+- At save, the literal's gist (and aliases) is embedded and the vector is
+  stored on the literal itself, with the embedding model's ID beside it. It
+  is derived data on the same row, written in the literal's own save, so
+  there is no second entity to keep in sync.
+- At query time, embed the question (one embedding call), then compare it
+  with the access-filtered pool's stored vectors in PHP (cosine).
+- Nothing close: return `none` with no chooser call. One candidate clearly
+  ahead by the margin: `match`, no chooser call. Otherwise the top few go to
+  the chooser. This is Addendum 4's tier 3, without Search API.
+- Requires only `drupal/ai`'s embedding operation. No `search_api`,
+  `ai_search` or vector DB provider. A real vector index (Search API plus a
+  provider) is needed only past a few thousand literals; the threshold is
+  unmeasured.
+- A vector whose model ID differs from the configured embedding model is
+  ignored by the gate and re-embedded by a queue worker (the stale-vector
+  rule).
+- It is cheap to run and, unlike a Search API index, cheap to set up on a
+  standalone site.
+
+The same embed-and-compare step over cached past questions is the semantic
+cache. It stays deferred (Addendum 4): needs a tight threshold, is keyed by
+permission set, and "reservations phone" versus "main phone" is the failure
+to guard against.
+
+### Chooser latency: what is known
+
+- **Measured here:** hosted Jev 0.41 s per call including the network, on
+  small prompts (ADR-0021, ADR-0038). Local `tev1:4b` on this CPU-only laptop
+  10-14 s per call (ADR-0038).
+- **Supplied figures, unsourced and unverified:** typical single-pass
+  classification on a warm GPU or vLLM endpoint, p50 15-80 ms, p99 120-250 ms,
+  300-1,200+ decisions per second on one GPU, and 25x to 200x faster than a
+  generative text judge. These describe short inputs. A menu of hundreds of
+  gists is a long input with per-option output, so treat them as a lower
+  bound until measured in Phase 4 on the actual model and hardware.
+
+### Decided
+
+- The module is named `literals` (Nik's decision 2026-10-05; the
+  drupal.org clash check has not been run and is still needed before
+  release) and lives as a
+  sibling of `aim` under `web/modules/custom/`, not nested in the `aim` repo.
+- [ADR-0039](0039-token-scope-live-config-values.md) is superseded by this
+  ADR, not amended. What carried over is listed in its header.
+- Pool sets (a literal in several pools) are skipped. If revisited: a
+  bundle is one per entity, so it would need a separate many-to-many
+  grouping, and access across sets (any versus most restrictive) must be
+  stated. This is the "Grouping" open question.
+- Bundles stay as pools, for access only.
+
+**Open questions added:**
+
+- Cosine compare time in PHP at 200, 2,000 and 10,000 vectors, to set the
+  point where a real vector index is needed.
+- Vector storage format (a blob or JSON on a field), and whether revisions
+  each carry a vector or only the published one.
+
+## Addendum 7 2026-10-05: types, kinds and audience replace pools (Phase 1 built)
+
+Records what the Phase 1 build settled. Where it conflicts with pieces 1
+to 12 or Addendums 1 to 6 (pools as bundles, per-pool permissions,
+`[literal:pool:key]`, a `value_pattern` on the pool), this wins. The
+module is built and live on the dev site; see its `HANDOFF-literals.md`
+for the current state.
+
+### Bundle is the type, not the pool
+
+- The bundle is a `literal_type` config entity (fieldable, Field UI on
+  its edit form, like `config_pages_type`). A type names a **kind** (a
+  `LiteralKind` plugin: `text`, `token`, `entity`, `url`) and carries that
+  kind's settings (text: `validate_as` of any text, whole number, phone,
+  email or URL). A site defines its own types, for example "Phone number"
+  (text, validated as phone) and "Page link" (url).
+- A literal still holds exactly one value. A kind plugin validates it on
+  save and `resolve($account)` reads it at read time, so the finder, the
+  token handler and the tool all call one `$literal->resolve()` and never
+  read `value` directly. Rejected: letting a literal hold several fields
+  of mixed kinds (the `config_pages` model), because the finder would have
+  to understand arbitrary field types.
+- `entity` values are stored as `entity_type:id` and resolve to the
+  entity's URL after a view-access check. `url` values are **internal
+  paths only** (start with a slash, access checked for the viewer):
+  external URLs cannot be access checked, so they stay out until there is
+  a reason, then an "allow external" setting on the type. A `token` value
+  must contain at least one known token.
+
+### Access is one column: audience
+
+- Pools are removed. Each literal has an `audience`: `anonymous`
+  (everyone), `authenticated` (any signed-in account) or `restricted`
+  (accounts with the `view restricted literals` permission, granted to
+  roles on the normal permissions page). The default is `authenticated`,
+  so a literal whose audience is forgotten is hidden, not published.
+- `LiteralAudience::visibleTo($account)` returns the audience values the
+  account can see. The same set answers a single access check and a list
+  query (`audience IN (...)`), applied by the access handler and by a
+  `hook_query_alter` for entity queries and Views. **The finder must
+  filter candidates this way before the gate or chooser sees any gist.**
+- The other permissions are flat: `administer literals`, `create`, `edit`
+  and `delete literals`. Unpublished (draft) literals are visible only to
+  those who can edit.
+- Not built, and the likely first extension when a case needs it: per-type
+  "restricted" permissions (so "staff only" and "contractors only"
+  differ), and a scope-plugin interface (`checkViewAccess()` plus a
+  query-condition method, aligned with aim's scope types) once a second
+  scope type exists.
+
+### Changes to the tokens and the key
+
+- Keys are unique across all literals, so the token form is
+  `[literal:key]`, not `[literal:pool:key]`. Everything else in
+  Addendum 4's token rules (access check, cacheability, published revision
+  only, soft Token dependency) stands.
+
+### Progressive enhancement
+
+The module needs no model: `user` and `views` only, and nothing calls an
+AI service. Exact-key lookup (tokens, the tool, PHP) is a complete product;
+the finder adds a chooser, then an embedding gate, then optionally a vector
+index, each only when the step before stops being enough. See
+`web/modules/custom/literals/adr/progressive-enhancement.md`.
+
+**Open questions added:**
+
+- Per-type restricted permissions versus a scope-plugin interface: build
+  neither until a second case appears.
+- Where the literals-only ADRs live once they move into the module (two
+  files currently share the number 0046).
+
+## Addendum 8 2026-10-05: pinned, merge a missed question into the gist
+
+Pinned, not built, not scheduled. A different answer to piece 8's alias
+loop and the "Aliases: a field and a view" section of Addendum 4: instead
+of a side list of example questions, fold what a miss reveals into the gist
+itself, the way consolidation folds a candidate fact into an existing one.
+
+- **Trigger.** A question that returned `none` or `ambiguous` and that a
+  person points at the literal it should have found. For example "how do I
+  contact you" missing a literal whose gist is "main telephone number".
+- **Proposal.** A model writes a refined gist that covers both ("main
+  telephone contact number"). Same shape as aim's consolidation UPDATE:
+  the model only judges and proposes, and the result is checked before it
+  is used.
+- **Verification.** A faithfulness check that the new gist still describes
+  the same single value (the one-intent rule of piece 5), and that it does
+  not drift toward a neighbouring literal. A distance check against the old
+  gist and against neighbours, as `modelConfirmsMerge()` does for facts.
+- **Approval.** A person approves, and the change lands as a draft revision
+  under the existing moderation, so it can be reviewed and rolled back.
+  The old gist stays in revision history.
+- **Why it may beat aliases.** One description per literal, no second field
+  to keep in step, no separate matching path, and the gate and chooser need
+  no change. The risk is the same one aliases showed in a quick trial on the
+  dev site (removed afterwards): widening a gist pulls the literal toward
+  vague neighbours, so a vague "phone number" can start to pick one phone
+  literal over a tie. The verifier's neighbour check is the guard, and the
+  eval's near-neighbour pairs are the test.
+- **Open.** Needs the opt-in query-text logging (question text is personal
+  data) to see misses at all; whether repeated merges converge or bloat a
+  gist; whether the proposer is the decision model or a chat model (aim
+  splits these: a decision model judges, a chat model writes).

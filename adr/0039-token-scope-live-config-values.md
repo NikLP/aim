@@ -1,9 +1,18 @@
 # ADR-0039: `scope: token` - facts whose value is a live config page field
 
-**Status:** Proposed 2026-10-03 - design only, not built.
+**Status:** Superseded 2026-10-05 by [ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md) - design only, never built.
 **Date:** 2026-10-03
 
-**See also:** [ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md) proposes generalizing this scope into a *kind* of `literal`. Whether to amend or supersede this ADR is an open question there; nothing here is built.
+**Superseded.** The `token` scope is a pointer-only fact (a label plus a
+token), which ADR-0040 Addendum 5 rejected: it has no searchable text of its
+own, and the finder can be called directly. There is no `token` scope, no
+`token` base field on `aim_fact`, and no `renderText()` or
+`isConsolidatable()` scope seams. What carried over into ADR-0040: a token
+as a value kind (v2, with `config_pages` as the optional dependency), the
+view-access check at resolve (the `config_pages` token handler has none),
+the human-gated "add setting" and propose-candidates-from-facts flows (now
+convert-a-fact, piece 12), and a literal being verbatim by nature so never
+consolidated. The text below is kept as the record of the original design.
 
 ## Context
 
