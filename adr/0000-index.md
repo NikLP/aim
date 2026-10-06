@@ -36,6 +36,11 @@ Still carrying work, proposed, or deferred.
 | [0045](0045-memory-kinds-episodic-semantic-procedural.md) | Memory kinds (semantic/episodic/procedural): `aim_fact` is semantic by design; defer a `kind` field until a real non-semantic consumer exists | Proposed 2026-10-04 - design only |
 | [0046](0046-core-cutoff-time-axis-and-shared-gist-finder.md) | Where core stops: time as a retrieval axis instead of a `kind`, sibling modules for other semantics, literals standalone, one shared gist finder (literals + tool picker) | Proposed 2026-10-04 - design only |
 | [0046](0046-gist-shared-vocabulary.md) | "Gist" as a separate searchable field, shared by annotations and literals: definition, provenance (fuzzy-trace, ReadAgent), find-by-gist, factoring the finder | Proposed 2026-10-04 - design only, not built; duplicated from annopm ADR-028 |
+| [0047](0047-literal-candidates-and-tracked-gists.md) | Literal candidates (suggest, approve, edit, save; never bulk-create from tokens) and tracked gists (reference an annotation, local override wins, optional `literals_annotations` bridge) | Proposed 2026-10-05 - design only, not built; amends ADR-0040 Addendum 3's copy-the-gist |
+| [0048](0048-token-literal-access-and-entity-targets.md) | Token literals resolve for the asking account (no session leak, built); entity tokens via an explicit, access-checked entity target (proposed) | Part A built 2026-10-05; Part B proposed |
+| [0049](0049-everything-finder-widget.md) | The everything finder: an inline `@` picker over pluggable providers (entities, tokens, literals), with path traversal and uniform insert modes; no AI | Proposed 2026-10-05 - design only, not built |
+| [0050](0050-meaning-navigator.md) | The meaning navigator: Jev walks the finder's tree choosing a child by gist at each node, from an enumerated list, access-filtered before the model | Proposed 2026-10-05 - design only, not built; blocked on annotations carrying gists |
+| [0051](0051-tool-picker.md) | The tool picker: Jev chooses tools by description (grouped by module, two levels at most, no vectors), `tool_find` returns top-k ids, access-filtered before the model | Proposed 2026-10-06 - design only, not built |
 
 ## Resolved
 

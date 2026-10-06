@@ -1304,3 +1304,35 @@ itself, the way consolidation folds a candidate fact into an existing one.
   data) to see misses at all; whether repeated merges converge or bloat a
   gist; whether the proposer is the decision model or a chat model (aim
   splits these: a decision model judges, a chat model writes).
+
+## Addendum 9 2026-10-06: aliases reconsidered, the gist convention
+
+Reconsider piece 8 and Addendum 4's "Aliases: a field and a view" sections:
+a separate alias field (and its UI, guardrails and review queue) is not
+needed to get aliases.
+
+- **Measured 2026-10-05, hosted Jev, 14 queries on the dev pool.** Arbitrary
+  house names (not guessable from the gist) written into the gist after a
+  plain-text `ALSO`, e.g. "Main telephone number, ALSO the Beacon Line": 9/9
+  answerable hits, against 4/9 for the same gists without them, 0 wrong
+  picks. Adding an instruction line explaining `ALSO` changed nothing; the
+  model reads it as synonyms unprompted. One false positive in 5 no-match
+  queries, where an alias overlapped an ordinary phrase ("the Open Doors").
+  Natural synonyms (switchboard, reception) needed no alias at all.
+- **Decided.** No alias field, no `ALSO` parser, no structured option
+  rendering. TypeSafe's Choice does accept structured option descriptions
+  (`{what, not_for, examples}`, field names free), and drupal/ai's
+  `ChoiceQuestion` passes them through, but a send-time parse of the gist
+  would add failure modes (typos, commas, case) for no measured gain. The
+  gist stays one free-text field; `ALSO` is an optional author habit.
+- **Gist length stays 255.** A gist is the answer to a one-shot question,
+  not a document. Jev's limits (64k tokens per request, 32k for state plus
+  the longest question; its docs advise concise descriptions and warn that
+  lengthy descriptions of similar options confuse it) and the small local
+  models' budgets (about 125 options in 512 tokens) both favor short.
+- **Addendum 8 is the way to grow wording.** Folding a missed question into
+  the gist, with a person's approval, replaces hand-kept aliases.
+- **Open: groups.** Chopping a large pool (narrow before the chooser) and
+  access control both want a grouping of literals. Audience is per row
+  today; per-item access is more than needed. A group that carries the
+  audience, and that a call can narrow by, would give both. Not designed.

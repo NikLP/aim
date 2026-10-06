@@ -425,6 +425,37 @@ questions" section)
       error message when both apply): re-run `node demo/preflight.js`
       afterward. Optional - safe to leave undone.
 
+## aim_tool: schema discoverability and typed output (raised 2026-10-05, from Matt Glaman's "Define the capability once, call it anywhere")
+
+Source: https://mglaman.dev/blog/define-capability-once-call-it-anywhere.
+The post's claims about fixes (tool 1.0.0-beta3 `tool:run` failure
+masking, `mcp_server_tool_bridge` 1.0.0-beta1 empty-input fix) and the
+open Tool API issue #3582943 (`tool:info` flattens inputs to data types:
+no enum constraints, no required permissions) are **unverified** against
+the released tags and issue queue - check before building on them.
+Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
+2.0.0-beta5.
+
+- [ ] Stale/hardcoded scope lists: `AimRecall`'s `scope` description and
+      `AimRemember`'s batch-entry `scope` description say "user, role,
+      site, case" (no `entity`, ignores which scope submodules are
+      installed, ADR-0028). Build the description from the installed
+      `aim_scope` entities, as the refiner already does for
+      `scope_fields`.
+- [ ] Constrain `scope` to an enum if Tool API supports one on
+      `InputDefinition` (check first; #3582943 suggests `tool:info` may
+      drop it even when declared). Otherwise the description is the only
+      discovery channel.
+- [ ] Typed output for `aim_recall`: today one formatted `results` string.
+      A structured list (id, text, scope, distance, asserted) lets agents
+      chain on it. Trade-off: MCP clients may render the string better;
+      could return both.
+- [ ] Optional: use `drush tool:run aim_recall` / `aim_remember` as a
+      smoke test of the tool layer without an MCP client.
+- [x] `aim_recall`'s `subject_uid` input renamed `user` 2026-10-05, to
+      match the field renamed 2026-09-28. No alias kept; a caller still
+      passing `subject_uid` has it ignored.
+
 ## Backlog - explicitly "wait for a trigger" per the docs' own framing
 
 - [ ] Fact verification as a user-facing feature - now reinforced twice
