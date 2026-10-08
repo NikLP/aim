@@ -2,6 +2,35 @@
 
 Architecture Decision Records for the `aim` module.
 
+## Clusters (reading map, 2026-10-08)
+
+The Active table is one list; these are the threads running through it.
+
+- **Literals and the finder** - [0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md),
+  [0047](../../literals/adr/0047-literal-candidates-and-tracked-gists.md),
+  [0048](../../literals/adr/0048-token-literal-access-and-entity-targets.md),
+  [0052](../../literals/adr/0052-what-literals-is-for.md) (how aim uses
+  literals, answer modes), [0053](0053-gist-shared-vocabulary.md),
+  [0046](0046-core-cutoff-time-axis-and-shared-gist-finder.md); parked
+  extensions in [0049](0049-finder-family-parked.md).
+- **Annotations bridge** (blocked on the Annotations write path and trust
+  gate; the WebMCP direction may supersede much of it) -
+  [0024](0024-annotations-integration-target-scoped-promotion.md),
+  [0041](0041-annotation-guided-webform-prefill.md),
+  [0042](0042-fact-compiled-briefs.md),
+  [0043](0043-content-truth-drift-audit.md).
+- **Write-path gate and decision models** -
+  [0002](0002-governance-deferred-guardrails-mandatory.md),
+  [0033](0033-plausibility-gate-processing-modes.md) with
+  [0037](0037-transient-source-passages-for-grounding.md) (the live design),
+  [0021](0021-jev-typed-decision-provider.md),
+  [0038](0038-local-decision-models-parked.md) (parked),
+  [0035](0035-standing-constraints-action-gate.md),
+  [0036](0036-memory-algorithm-appraisal.md) (research).
+- **Chat, tools and front ends** - [0008](0008-chatbot-integration-mechanism.md)
+  (with the split-assistants addendum), [0044](0044-tool-api-method-attributes.md),
+  [0016](0016-document-ingestion-ui.md), [0029](0029-context-carrying-turns.md).
+
 ## Active
 
 Still carrying work, proposed, or deferred.
@@ -9,9 +38,9 @@ Still carrying work, proposed, or deferred.
 | ADR | Title | Status |
 | --- | --- | --- |
 | [0002](0002-governance-deferred-guardrails-mandatory.md) | Governance deferred for PoC; Guardrails mandatory from day one | Accepted; draft-to-trusted resolved as a lightweight flag (not Content Moderation) 2026-09-28, built 2026-09-28; the `trusted` override on `remember()` is still ungated (TODO.md) |
-| [0008](0008-chatbot-integration-mechanism.md) | Chatbot integration: `ai_agents` tools, not a CCC content source | Accepted |
-| [0012](0012-fact-relation-graph.md) | Fact-to-fact relation graph and multi-hop retrieval | Proposed - exploratory estimate, not built |
-| [0014](0014-usecase-archetype-starter-kits.md) | Use-case archetype starter kits via Recipes | Proposed - exploratory estimate, not built |
+| [0008](0008-chatbot-integration-mechanism.md) | Chatbot integration: `ai_agents` tools, not a CCC content source; addendum 2026-10-08 holds the former 0034 (split public read-only and staff write assistants, gated by tool permission) | Accepted; addendum proposed, not built |
+| [0012](0012-fact-relation-graph.md) | Fact-to-fact relation graph and multi-hop retrieval | Parked 2026-10-08 - no consumer; kept as reference |
+| [0014](0014-usecase-archetype-starter-kits.md) | Use-case archetype starter kits via Recipes | Parked 2026-10-08 - two Recipes exist; catalog not pursued |
 | [0016](0016-document-ingestion-ui.md) | Document ingestion via a Drupal form: three modes, one shared core | Mode 1 accepted (build now); Mode 2 blocked on ADR-0002; Mode 3 out of scope |
 | [0019](0019-recall-abstention-distance-cutoff.md) | Recall abstention via a distance cutoff, and what bounds recall quality | Accepted - chatbot cutoff built 2026-09-19; follow-ups not built |
 | [0020](0020-verbatim-facts-consolidation-opt-out.md) | Verbatim facts: an explicit opt-out from consolidation | Proposed - analyzed, not built; build/no-build undecided |
@@ -22,26 +51,22 @@ Still carrying work, proposed, or deferred.
 | [0031](0031-cron-fallback-for-queue-processing.md) | Opt-in `hook_cron` fallback for queue processing, alongside the dedicated crontab | Proposed 2026-09-30 - design only, not built; amends 0003 |
 | [0032](0032-dated-category-listing-for-quick-notes.md) | No `event` scope for diary-style notes: category + `asserted` date, a non-vector list method, and tid-based capture in the Tool API | Proposed 2026-10-01 - design only, not built |
 | [0033](0033-plausibility-gate-processing-modes.md) | Plausibility gate on new facts: untrusted until scored, fail closed, and queued vs inline vs post-response processing | Proposed 2026-10-01, addendum 2026-10-02 - design only, not built; measured on the dev laptop (laya:en, then tev1:4b) |
-| [0034](0034-split-chat-assistants-read-only-public.md) | Split chat assistants: read-only public bot, staff bot with `remember`, gated by tool permission not block visibility | Proposed 2026-10-01 - design only, not built |
 | [0035](0035-standing-constraints-action-gate.md) | Standing constraints: structured "don't build X until Y" facts enforced by a deterministic action-layer gate, semantic recall advisory only | Proposed 2026-10-01 - design only, not built |
 | [0036](0036-memory-algorithm-appraisal.md) | Memory algorithm appraisal: what to borrow from the literature (recency/importance re-rank, RRF, decay), and what aim does badly | Proposed 2026-10-02 - research only, nothing built |
 | [0037](0037-transient-source-passages-for-grounding.md) | Transient source passages (side table + pointer, deleted after the check) so a decision model can check a candidate against what was actually said | Proposed 2026-10-02 - design only, not built; blocked on the grounded evaluation set |
 | [0038](0038-local-decision-models-parked.md) | Local decision models: measured, parked, and how to bring one back (Laya, `tev1`, memory-capped services) | Parked |
-| [0039](../../literals/adr/0039-token-scope-live-config-values.md) | `scope: token`: label-only facts whose value resolves live from a `config_pages` token at recall, access delegated to the config page, never consolidated | Superseded 2026-10-05 by 0040 - design only, never built |
 | [0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md) | Literals: a standalone `literal` entity (name, key, value, gist, type, audience) found by a decision-model chooser over the whole menu; values never reach the model; `aim` consumes the finder, no scope or mirror | Accepted, built through finder/tool/search; rewritten 2026-10-07 as current state (history in git); supersedes 0039 |
 | [0041](0041-annotation-guided-webform-prefill.md) | Annotation-guided Webform pre-fill: annotations describe each field, an agent fills it from recalled facts and literals as the viewing account | Proposed 2026-10-04 - design only, not built; replaces the 2026-10-03 interview-to-Webform draft |
 | [0042](0042-fact-compiled-briefs.md) | Fact-compiled briefs: a readable per-subject document compiled from trusted facts, following the `annotations_docs` pattern (draft, edit, lock, publish) | Proposed 2026-10-04 - design only, not built; prompted by the "agents need documentation" critique |
 | [0043](0043-content-truth-drift-audit.md) | Content-versus-truth drift audit: live facts as an independent reference, a typed decision flags published content that contradicts them, human resolves | Proposed 2026-10-04 - design only, not built; needs a content index and a measured false-positive rate |
 | [0044](0044-tool-api-method-attributes.md) | Tool API method attributes (drupal/tool MR 162): watch upstream, design new tools as typed service methods with explicit value objects | Proposed 2026-10-04 - watching brief, nothing built |
-| [0045](0045-memory-kinds-episodic-semantic-procedural.md) | Memory kinds (semantic/episodic/procedural): `aim_fact` is semantic by design; defer a `kind` field until a real non-semantic consumer exists | Proposed 2026-10-04 - design only |
-| [0046](0046-core-cutoff-time-axis-and-shared-gist-finder.md) | Where core stops: time as a retrieval axis instead of a `kind`, sibling modules for other semantics, literals standalone, one shared gist finder (literals + tool picker) | Proposed 2026-10-04 - design only |
+| [0046](0046-core-cutoff-time-axis-and-shared-gist-finder.md) | Where core stops: time as a retrieval axis instead of a `kind`, sibling modules for other semantics, literals standalone; absorbs the former 0045 (memory kinds: `aim_fact` is semantic by design, defer a `kind` field) | Proposed 2026-10-04, updated 2026-10-08 - pieces 1-3 design only; 4 done, 5 became `literals_finder` + 0049 |
 | [0047](../../literals/adr/0047-literal-candidates-and-tracked-gists.md) | Literal candidates (suggest, approve, edit, save; never bulk-create from tokens) and tracked gists (reference an annotation, local override wins, optional `literals_annotations` bridge) | Proposed 2026-10-05 - design only, not built; amends ADR-0040 Addendum 3's copy-the-gist |
 | [0048](../../literals/adr/0048-token-literal-access-and-entity-targets.md) | Token literals resolve for the asking account (no session leak, built); entity tokens via an explicit, access-checked entity target (proposed) | Part A built 2026-10-05; Part B proposed |
-| [0049](0049-everything-finder-widget.md) | The everything finder: an inline `@` picker over pluggable providers (entities, tokens, literals), with path traversal and uniform insert modes; no AI | Proposed 2026-10-05 - design only, not built |
-| [0050](0050-meaning-navigator.md) | The meaning navigator: Jev walks the finder's tree choosing a child by gist at each node, from an enumerated list, access-filtered before the model | Proposed 2026-10-05 - design only, not built; blocked on annotations carrying gists |
-| [0051](0051-tool-picker.md) | The tool picker: Jev chooses tools by description (grouped by module, two levels at most, no vectors), `tool_find` returns top-k ids, access-filtered before the model | Proposed 2026-10-06 - design only, not built |
-| [0052](../../literals/adr/0052-what-literals-is-for.md) | What literals is for and not: find-and-gate layer for things, not a chat-cost trick; build and measure the one-shot gate first; menu/page candidates instead of a second sitemap; `{label, url}` results | Proposed 2026-10-06 - decision record; `{label, url}` results built 2026-10-07, the rest unbuilt |
+| [0049](0049-finder-family-parked.md) | The finder family (merged 2026-10-08 from 0049/0050/0051): an inline `@` picker over pluggable providers, a Jev-driven meaning navigator choosing by gist, and a tool picker; model only picks from an enumerated, access-filtered list | Parked 2026-10-08 - design only, nothing built; WebMCP may supersede the widget half |
+| [0052](../../literals/adr/0052-what-literals-is-for.md) | What literals is for and not: find-and-gate layer for things, not a chat-cost trick; build and measure the one-shot gate first; menu/page candidates instead of a second sitemap; `{label, url}` results | Proposed 2026-10-06 - decision record; `{label, url}` results built 2026-10-07; addendum 2026-10-08: how aim uses literals (convert-a-fact retires the fact, finder as live recall source and gate, answer modes), unbuilt |
 | [0053](0053-gist-shared-vocabulary.md) | "Gist" as a separate searchable field, shared by annotations and literals: definition, provenance (fuzzy-trace, ReadAgent), find-by-gist, factoring the finder | Proposed 2026-10-04 - design only, not built; duplicated from annopm ADR-028 |
+| [0054](../../literals/adr/0054-demo-the-scottish-play.md) | Demoing literals: "break a leg" (metadata does the work) and the Scottish play (a literal whose value, "Macbeth", the model never sees); script, claims, prerequisites | Proposed 2026-10-08 - demo plan, nothing built |
 
 ## Resolved
 
@@ -58,6 +83,7 @@ remains binding, it just has nothing left to build.
 | [0006](resolved/0006-agent-native-write-path.md) | Agent-native write path bypassing extraction's LLM call | Accepted - built |
 | [0007](resolved/0007-user-scope-requires-real-account.md) | User-scope facts must reference a real Drupal account | Accepted - built; extraction mechanism superseded by 0011 |
 | [0009](resolved/0009-recipe-apply-safety-gate.md) | No unattended `drush recipe apply` on an AI-generated recipe | Retired 2026-10-02 - subsumed by 0035's action gate; never built |
+| [0039](../../literals/adr/0039-token-scope-live-config-values.md) | `scope: token`: label-only facts whose value resolves live from a `config_pages` token at recall, access delegated to the config page, never consolidated | Superseded 2026-10-05 by 0040 - design only, never built |
 | [0010](resolved/0010-drupal-native-agent-memory-rationale.md) | Original rationale, market appraisal, and risk analysis (folded in from repo root 2026-09-10) | Founding rationale; binding decisions superseded by 0001-0009; open questions live in TODO.md |
 | [0011](resolved/0011-extraction-explicit-subject-uid.md) | Extraction never guesses scope=user account matches; requires explicit `--subject-uid` | Accepted - built |
 | [0013](resolved/0013-mcp-tool-exposure.md) | MCP tool exposure via Tool API (`tool`/`mcp_server`/`mcp_server_tool_bridge`) | Accepted - built and OAuth-authenticated, 2026-09-12/13 |

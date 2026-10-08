@@ -1,6 +1,6 @@
 # ADR-0014: Use-case archetype starter kits via Recipes
 
-**Status:** Proposed - exploratory best-guess estimate, not an accepted
+**Status:** Parked 2026-10-08. Two Recipes exist (`recipes/aim_demo_library`, `recipes/aim_ollama_local`); the archetype catalog is not being pursued beyond them. Was: Proposed - exploratory best-guess estimate, not an accepted
 design and not built. Written to scope the idea and flag open questions
 before any Skill/config work starts, not to lock in a mechanism.
 **Date:** 2026-09-14

@@ -83,7 +83,7 @@ the same Search API index (needed for BM25-style fusion).
    and feeds the retirement sweep already planned in TODO.md
    ("sell-by" `expires`). Cost: a write on a read path. Do it in
    `kernel.terminate` or the queue, never inline. Skip for anonymous
-   read-only callers (ADR-0034).
+   read-only callers (ADR-0008 addendum).
 4. **Consolidate against top-k neighbors, not top-1** (mem0 does top-k).
    A fact contradicted by the second-nearest fact is never seen today.
    Cost is more classification calls in the ambiguous band only.

@@ -6,6 +6,13 @@ nothing; builds on [ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'
 addendum.
 **Date:** 2026-10-01
 
+**Update 2026-10-08:** the gate semantics (decisions 1-3: untrusted until
+scored, fail closed, bounded input) and the processing modes (decision 4)
+stay binding. The *check* it proposed (bare-fact plausibility) was measured
+weak and is superseded by the grounded check in
+[ADR-0037](0037-transient-source-passages-for-grounding.md), which is the
+design with build items in TODO.md. Read the two together.
+
 ## Context
 
 The goal is protection against memory pollution, as strong as a

@@ -86,3 +86,37 @@ taxonomy config that's a separate decision from the chatbot migration).
   up: nothing partitions *within* `scope: site` by audience/sensitivity
   today (see CLAUDE.md's "Ideas raised, not designed",
   sub-scope visibility control).
+
+## Addendum 2026-10-08: split public and staff assistants (formerly ADR-0034, proposed, not built)
+
+The chat front end is a demo and a short- to medium-term non-console way
+in, not a settled product surface (the literals chat module is likely to be
+scrapped). This is the one design note kept from the split-assistants
+proposal.
+
+`aim_chatbot` exposes `aim_chatbot:recall` and `aim_chatbot:remember`
+(hardcoded `scope: site`) to one assistant that answers public visitors and
+also writes site-wide facts. With no draft-to-trusted gate, a visitor's
+claim is live when saved and recalled to the next visitor as fact: a
+poisoning vector. Proposal: two assistants over the same memory.
+
+- **Public assistant:** `recall` only, no save wording in its persona.
+- **Staff assistant:** `recall` and `remember`, persona "record what staff
+  tell you", chat block visible to a staff role only. Each is its own
+  `ai_agent`, `ai_assistant` and block.
+- **Block visibility is not the gate.** `access deepchat api` is global, so
+  a user who sees no staff block may still call the staff endpoint (to be
+  verified: how the endpoint selects the assistant). The real gate is the
+  tool: `AimRemember::execute()` currently calls `remember()` with no
+  permission check; it must run as the current user and require
+  `create site aim facts`, granted only to staff. That check fixes the hole
+  for any assistant and is the prerequisite.
+- Consequences: the demo's write story moves to the staff assistant and to
+  MCP (`aim:remember` via OAuth); `allow_history: session` can be dropped
+  from the public assistant (only confirm-before-save needs it);
+  `demo/seed.php` and `seed-facts.json` need two agents, a staff role and
+  demo user, and a trimmed public persona. Staff writes still pass
+  Guardrails and, once built, the plausibility gate (ADR-0033).
+- Open: can the endpoint select any assistant by ID, and is a
+  per-assistant access check worth adding upstream; should staff `remember`
+  stay `scope: site` or take a scope as `aim_tool` does.
