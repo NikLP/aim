@@ -243,6 +243,19 @@ final class AimSettingsForm extends ConfigFormBase {
       '#config_target' => 'aim.settings:default_trusted',
     ];
 
+    $form['debug'] = [
+      '#type' => 'details',
+      '#title' => $this->t('Debugging'),
+      '#description' => $this->t('Switches that trade safety for visibility while building or demonstrating. Leave all off in production. Query-text logging is the related switch under Logging.'),
+      '#open' => FALSE,
+    ];
+    $form['debug']['show_redacted_facts'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Show redacted facts (debug)'),
+      '#description' => $this->t('A fact that names a literal the viewer cannot read is normally withheld from recall() whole. When on, it is returned with <code>[redacted]</code> in place of the value, so you can see what is being hidden and why. Leave off in production: the gap reveals that a restricted value exists.'),
+      '#config_target' => 'aim.settings:show_redacted_facts',
+    ];
+
     $form['logging'] = [
       '#type' => 'details',
       '#title' => $this->t('Logging'),

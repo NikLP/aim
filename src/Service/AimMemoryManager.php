@@ -29,6 +29,9 @@ use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Backend\ActivityBackendInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
+use Drupal\literals\LiteralReader;
+use Drupal\literals_finder\Finder\LiteralFinderInterface;
+use Drupal\literals_finder\Finder\LiteralFindResult;
 use Drupal\search_api\IndexInterface;
 use Drupal\search_api\Query\QueryInterface as SearchApiQueryInterface;
 use Drupal\search_api\Query\ResultSetInterface;
@@ -178,6 +181,12 @@ class AimMemoryManager {
    * @param \Drupal\aim\Backend\ActivityBackendInterface $decisionBackend
    *   The Decision API backend, used for an activity whose
    *   aim.settings:activities backend is "decision".
+   * @param \Drupal\literals\LiteralReader $literalReader
+   *   The literals reader. recall() uses it to replace [literal:key] tokens
+   *   in fact text as the viewing account.
+   * @param \Drupal\literals_finder\Finder\LiteralFinderInterface $literalFinder
+   *   The literal finder. recallLiterals() asks it for a live literal beside
+   *   vector recall.
    */
   public function __construct(
     protected AiProviderPluginManager $aiProvider,
@@ -192,6 +201,8 @@ class AimMemoryManager {
     protected AimEmbeddingCacheSubscriber $embeddingCache,
     protected LoggerChannelInterface $logger,
     protected ActivityBackendInterface $decisionBackend,
+    protected LiteralReader $literalReader,
+    protected LiteralFinderInterface $literalFinder,
   ) {}
 
   /**
@@ -1101,6 +1112,68 @@ class AimMemoryManager {
   }
 
   /**
+   * Asks the literal finder for the literal a question is looking for.
+   *
+   * Beside vector recall, not part of it: the literal is a live, exact value
+   * kept in the literals store, so nothing is copied into aim and its gist
+   * exists once, on the literal. Returns the match as a fact-shaped row
+   * flagged `live`, with the raw value and its label as text (the caller or
+   * its model chooses how to present it). An ambiguous or empty result, or
+   * a literal the current user cannot read, gives no row. The finder is
+   * access checked for the current user and never guesses.
+   *
+   * @param string $text
+   *   The search text.
+   * @param array $rows
+   *   The vector recall rows, to skip a literal a fact already carries as a
+   *   [literal:key] token.
+   *
+   * @return array
+   *   Zero or one recall()-shaped rows.
+   */
+  public function recallLiterals(string $text, array $rows = []): array {
+    $result = $this->literalFinder->find($text, $this->currentUser);
+    $resolved = $this->literalReader->resolveFound($result->outcome, $result->literals, $this->currentUser);
+    $this->logAudit('Literal recall: outcome @outcome (finder @finder, tier @tier, reason @reason), uid @uid.', [
+      '@outcome' => $resolved['outcome'],
+      '@finder' => $result->outcome,
+      '@tier' => $result->tier,
+      '@reason' => $result->reason ?: 'none',
+      '@uid' => $this->currentUser->id(),
+    ]);
+    if ($this->configFactory->get('aim.settings')->get('log_query_text')) {
+      // Opt-in personal data, same gate as recall(): verbose and
+      // log_query_text both on.
+      $this->logVerbose('Literal recall question: @query', ['@query' => $text]);
+    }
+    if ($resolved['outcome'] !== LiteralFindResult::MATCH) {
+      return [];
+    }
+    $key = (string) array_key_first($resolved['items']);
+    foreach ($rows as $row) {
+      if (in_array($key, $row['literal_keys'] ?? [], TRUE)) {
+        return [];
+      }
+    }
+    $item = reset($resolved['items']);
+    return [[
+      'id' => 'literal:' . $key,
+      'score' => NULL,
+      'scope' => 'site',
+      'subject' => 'literal',
+      'text' => $item->label . ': ' . $item->value,
+      'source' => 'literal',
+      'state' => NULL,
+      'trusted' => TRUE,
+      'created' => $this->time->getRequestTime(),
+      'asserted' => NULL,
+      'live' => TRUE,
+      'literal_keys' => [$key],
+    ],
+    ];
+  }
+
+  /**
    * Formats a recall() row as one line of text for a model or a person.
    *
    * Adds the fact's date so a reader can tell a recent fact from an old
@@ -1111,9 +1184,13 @@ class AimMemoryManager {
    *   A row from recall().
    *
    * @return string
-   *   For example "- Nik lives in Leeds (recorded 2026-09-14)".
+   *   For example "- Nik lives in Leeds (recorded 2026-09-14)", or
+   *   "- Sign in: https://... (current value)" for a live literal.
    */
   public function formatFactLine(array $row): string {
+    if (!empty($row['live'])) {
+      return '- ' . $row['text'] . ' (current value)';
+    }
     if (!empty($row['asserted'])) {
       $date = '(true since ' . gmdate('Y-m-d', (int) $row['asserted']) . ')';
     }
@@ -1239,17 +1316,28 @@ class AimMemoryManager {
         continue;
       }
 
+      // Tokens resolve as the viewing account at read time, so the value is
+      // never stored in the fact. A fact naming a literal this viewer cannot
+      // read is withheld whole: a sentence with a hole in it misleads, and
+      // its presence would hint at the restricted value. The
+      // show_redacted_facts debug setting shows it with [redacted] instead.
+      $text = $this->literalReader->replaceTokens((string) $fact->get('text')->value, $this->currentUser, NULL, !$this->configFactory->get('aim.settings')->get('show_redacted_facts'));
+      if ($text === NULL) {
+        continue;
+      }
+
       $rows[] = [
         'id' => $fact->id(),
         'score' => $result->getScore(),
         'scope' => $fact->bundle(),
         'subject' => $this->scopeRequiresAccount($fact->bundle()) ? $fact->get('user')->target_id : $fact->get('subject')->value,
-        'text' => $fact->get('text')->value,
+        'text' => $text,
         'source' => $fact->get('source')->value,
         'state' => $fact->get('state')->value,
         'trusted' => (bool) $fact->get('trusted')->value,
         'created' => (int) $fact->get('created')->value,
         'asserted' => $fact->get('asserted')->isEmpty() ? NULL : (int) $fact->get('asserted')->value,
+        'literal_keys' => $this->literalReader->tokenKeys((string) $fact->get('text')->value),
       ];
 
       if (count($rows) >= $limit) {

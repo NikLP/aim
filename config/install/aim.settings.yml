@@ -9,6 +9,7 @@ activities:
 merge_max_distance: 0
 recall_max_distance: 0.45
 default_trusted: false
+show_redacted_facts: false
 log_audit: false
 log_verbose: false
 log_query_text: false

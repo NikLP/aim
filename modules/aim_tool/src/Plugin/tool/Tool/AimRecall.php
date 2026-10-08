@@ -141,6 +141,12 @@ final class AimRecall extends ToolBase {
       );
     }
 
+    // A literal is site-wide, so it fits an unscoped or site recall that is
+    // not narrowed to one subject or user.
+    if (in_array($values['scope'] ?? NULL, [NULL, 'site'], TRUE) && empty($values['subject']) && empty($userFilter)) {
+      $rows = array_merge($this->memoryManager->recallLiterals($values['text'], $rows), $rows);
+    }
+
     if (empty($rows)) {
       return ExecutableResult::success(
         new TranslatableMarkup('No relevant facts found.'),

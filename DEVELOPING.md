@@ -485,6 +485,48 @@ Central service backing every write/read path. Key public methods:
   `--provider`/`--model` options default to `NULL` and fall through to
   this, so they follow whatever the site default is.
 
+### Exact values from `literals` in recall
+
+`literals` (a hard dependency) is the "this means this" store: exact values
+(a phone number, a URL) that must never be paraphrased. `aim` reaches them
+two ways, and the work lives here, in `AimMemoryManager`, because aim is the
+caller; `literals` itself is unchanged by it.
+
+- **Tokens in fact text.** A fact may contain `[literal:key]` (the value) or
+  `[literal:key:link]` (a Markdown link where the value has a safe one).
+  `recall()` replaces them at read time as the *recalling* account, via
+  `LiteralReader::replaceTokens()`: the value is never stored in the fact,
+  and a viewer sees only what their own account may see. A fact naming a
+  literal the viewer cannot read is withheld whole (a sentence with a hole
+  misleads, and its presence would hint a restricted value exists);
+  `aim.settings:show_redacted_facts` (Debugging section, default off)
+  returns it with `LiteralReader::REDACTED` (`[redacted]`) in place of the
+  value instead. Replacement is one pass, so a resolved value is never
+  scanned for further tokens.
+- **Live lookup.** `recallLiterals($text, $rows)` asks
+  `literals_finder.finder` (a hard dependency for now, see below) for the
+  literal the question is looking for, as
+  the current user, and returns zero or one `recall()`-shaped row flagged
+  `live` (text `Label: raw value`; `formatFactLine()` ends it "(current
+  value)"). Nothing is copied into aim. It runs beside `recall()`, not
+  inside it, so consolidation and the benchmark are unaffected: `aim_tool`'s
+  `aim_recall` (unscoped or `site`, not narrowed by subject or user) and
+  `aim_chatbot`'s `aim_recall` call it. A match is skipped when a recalled
+  fact already carries the same `[literal:key]` token. The finder is the
+  only fuzzy step (a chooser model call, cached); it returns a match, an
+  ambiguity or nothing, never a guess, and ambiguity yields no row. With no
+  decision model configured (reason `no_backend`), no live row appears and
+  literals still reach recall exactly through tokens.
+  `literals_finder` is a hard dependency of `aim` for now: it needs
+  `drupal/ai`, which aim already requires, and a missing optional service
+  would only add a null branch. It could be made optional again (the
+  manager's argument nullable, `@?literals_finder.finder`, an early return
+  in `recallLiterals()`) if a site wants literals tokens without any
+  decision model; that is not needed today. Audit: one line per lookup (outcome, tier,
+  reason, uid); the question text is logged only under `log_query_text`.
+  The finder caps the question length itself
+  (`literals_finder.settings:max_question_length`, 300).
+
 ### Guardrails (`aim_write_guardrails` set)
 
 `aim_max_length` (`input_length_limit`, 2000 chars) and `aim_no_markup`
@@ -849,7 +891,9 @@ Channel `aim` (service `logger.channel.aim`). Three tiers:
 - `aim.settings:log_verbose` (debug): recall, embedding cache, extraction.
 - `aim.settings:log_query_text` (debug, needs `log_verbose`): adds the
   recall query text, for diagnosing poor or empty matches. Off by default;
-  the only place any user-supplied text is logged.
+  the only place any user-supplied text is logged. It also adds the
+  question of each live literal lookup (see "Exact values from `literals`
+  in recall").
 
 Gate info/debug calls through `AimMemoryManager::logAudit()` /
 `logVerbose()`; the embedding cache subscriber reads `log_verbose` itself

@@ -59,6 +59,9 @@ aim.settings:
     default_trusted:
       type: boolean
       label: 'Trust new facts by default'
+    show_redacted_facts:
+      type: boolean
+      label: 'Show a fact with [redacted] in place of a literal the viewer cannot read, instead of withholding it (debug)'
     log_audit:
       type: boolean
       label: 'Log audit events (writes, consolidation decisions, trust and retire actions)'

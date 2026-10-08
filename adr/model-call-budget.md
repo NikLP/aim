@@ -27,6 +27,35 @@ mode extracts.
 | Chat assistant (`aim_chatbot`, `aim_console`) | Answers a visitor, calls the recall tool | Reasoning, tool use | Yes | Stays frontier (or a strong local model) |
 | Plausibility gate, grounded check | Not wired (ADR-0033, ADR-0037) | A typed probability | n/a | Decision model |
 | Recall, embeddings | Vectors only, no chat | Embeddings | No (local Ollama) | Already local |
+| Literal finder (`literals_finder`, behind `aim_recall`, the literals tool and the literals chat) | Picks the one literal a question asks for, from a menu of gists | A typed choice | No (hosted Jev here) | Decision model (live: Jev) |
+| Convert a fact to a literal | Splits an extracted fact into gist and value | Generative or typed | Not built | Small chat model or decision model |
+
+## Sovereignty by call
+
+How much leaves the building in each call as this site runs today. The
+bar is the exposure: how much text, how raw, and to whom. Cells 1 to 3 are
+green (stays on infrastructure you control), 4 to 6 amber (short, curated
+text to a hosted decision model), 7 to 9 red (raw or complete text to a
+hosted frontier model). An empty bar is nothing leaving, the sovereign
+goal. Scores are judgments from what each call sends, not measurements.
+
+| Call | Today | What leaves | Local equivalent |
+| --- | --- | --- | --- |
+| Embeddings (index and query) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | Nothing: local Ollama | Already local |
+| Guardrails (length, markup) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | Nothing: code, no model | n/a |
+| Pair classification | 🟩🟩🟩🟨⬜⬜⬜⬜⬜ | Two short facts to Jev | Local decision model (parked, ADR-0038) |
+| Merge verifier | 🟩🟩🟩🟨⬜⬜⬜⬜⬜ | Two short facts and a merge to Jev | Local decision model |
+| Literal finder | 🟩🟩🟩🟨🟨⬜⬜⬜⬜ | The visitor's question and the gist menu to Jev; no values | Local decision model |
+| Merge writer | 🟩🟩🟩🟨🟨🟨⬜⬜⬜ | Two facts to the frontier model | Small local chat model (untested) |
+| Convert a fact (planned) | 🟩🟩🟩🟨🟨🟨⬜⬜⬜ | One fact, which may hold the value | Small local chat model |
+| Chat assistant | 🟩🟩🟩🟨🟨🟨🟥⬜⬜ | Visitor questions plus recalled facts to the frontier model | Strong local chat model |
+| Grounded check (planned, ADR-0037) | 🟩🟩🟩🟨🟨🟨🟥⬜⬜ | A fact and its source passage | Local decision model |
+| Extraction | 🟩🟩🟩🟨🟨🟨🟥🟥🟥 | Whole source documents to the frontier model | Small local chat model (untested) |
+
+Reading it: extraction is the single largest exposure, and the one place
+where chunking and a local model both still have to be built. The finder
+is cheap on exposure because literal values never reach it, and in answer
+mode 1 (literal only) never reach a chat model either.
 
 ## Measured per call (`aim_activity_metrics`, 2026-10-02)
 

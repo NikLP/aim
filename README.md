@@ -93,6 +93,12 @@ Four memory categories, composable at retrieval the way Mem0 composes
   (`setSyncing(TRUE)`, which core's Migrate destinations set on
   everything they save) skips both Guardrails and the consolidation
   queue - a migrated corpus is stored exactly as given.
+- **Exact values:** a fact can point at a `literals` entry with
+  `[literal:key]`, and recall also asks the literal finder for the exact
+  value a question wants. The value is read live as the person asking, so
+  it is never stale or copied, and a fact naming a value they may not see is
+  withheld. See [DEVELOPING.md](DEVELOPING.md)'s "Exact values from
+  `literals` in recall".
 - **Non-destructive consolidation:** merging or discarding a fact never
   deletes it. It is retired (kept for audit, excluded from recall) with a
   recorded reason, and a merge creates a new fact rather than overwriting

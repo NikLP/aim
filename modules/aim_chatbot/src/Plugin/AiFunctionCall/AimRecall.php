@@ -79,6 +79,8 @@ final class AimRecall extends FunctionCallBase implements ExecutableFunctionCall
       return;
     }
 
+    $rows = array_merge($this->memoryManager->recallLiterals($text, $rows), $rows);
+
     if (empty($rows)) {
       $this->setOutput('No relevant facts found.');
       return;

@@ -67,6 +67,7 @@ Still carrying work, proposed, or deferred.
 | [0052](../../literals/adr/0052-what-literals-is-for.md) | What literals is for and not: find-and-gate layer for things, not a chat-cost trick; build and measure the one-shot gate first; menu/page candidates instead of a second sitemap; `{label, url}` results | Proposed 2026-10-06 - decision record; `{label, url}` results built 2026-10-07; addendum 2026-10-08: how aim uses literals (convert-a-fact retires the fact, finder as live recall source and gate, answer modes), unbuilt |
 | [0053](0053-gist-shared-vocabulary.md) | "Gist" as a separate searchable field, shared by annotations and literals: definition, provenance (fuzzy-trace, ReadAgent), find-by-gist, factoring the finder | Proposed 2026-10-04 - design only, not built; duplicated from annopm ADR-028 |
 | [0054](../../literals/adr/0054-demo-the-scottish-play.md) | Demoing literals: "break a leg" (metadata does the work) and the Scottish play (a literal whose value, "Macbeth", the model never sees); script, claims, prerequisites | Proposed 2026-10-08 - demo plan, nothing built |
+| [0055](0055-decision-rationale-as-entity-scope-facts.md) | Decision rationale as entity-scope facts: validate against grep with existing `aim_fact` features before building a `decision` entity (from annopm ADR-022) | Proposed 2026-10-08 - validation test only, nothing built |
 
 ## Resolved
 

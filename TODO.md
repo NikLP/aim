@@ -8,6 +8,76 @@ open items already on record in the ADRs and [CLAUDE.md](CLAUDE.md)/
 Expect entries folded in from other threads independently - don't treat
 this list as exhaustive.
 
+## Literals (raised 2026-10-08, from the literals session; design in [ADR-0052](../literals/adr/0052-what-literals-is-for.md) addendum, module notes in [literals/CLAUDE.md](../literals/CLAUDE.md))
+
+The literals side is built (store, resolvers, tokens including `:link`,
+finder, tool, search). What remains is aim's side. Order is a suggestion.
+
+- [x] **Token replacement on recall.** `aim` replaces `[literal:key]` and
+      `[literal:key:link]` in fact text at recall time as the viewing
+      account, in code it controls (no text-format filter, no page cache
+      involved). Built 2026-10-08: `LiteralReader::replaceTokens()`, a fact naming
+      an unreadable literal is withheld whole (`show_redacted_facts` debug
+      setting shows `[redacted]` instead). `literals` is now a hard dependency.
+- [x] **Shared helper in `literals`** (small): find result to resolved
+      items (`resolveItem()`, skip null or empty values, downgrade a match
+      that resolves to nothing to `none`). The chat responder and the
+      tool's `byQuestion()` repeat that loop today; move both onto it, then
+      use it from `aim_recall`.
+- [x] **Finder as a live recall source.** `aim_recall` asks
+      `literals_finder.finder` (optional service, progressive enhancement)
+      beside vector recall and returns the literal as a fact-shaped live
+      result. Nothing is stored in aim; the gist exists once, on the
+      literal. De-duplicate by literal key if a pointer fact also exists.
+      Add an audit line when the finder errors.
+- [ ] **Make `literals_finder` optional again (low priority).** It is a
+      hard dependency of `aim` for now. The finder is the only fuzzy step
+      and needs a decision model; token replacement is exact and needs
+      none. Revisit if a site wants tokens without a model: make the
+      manager's finder argument nullable, wire `@?literals_finder.finder`,
+      return early in `recallLiterals()`.
+- [ ] **Convert-a-fact retires the fact.** Promoting an extracted one-shot
+      fact to a literal supersedes it via `superseded_by`; the literal's
+      gist is then the only description. Short form, never one click: a
+      model splits the fact into gist and value, a human picks the type,
+      the literal carries a `source_fact` back-reference. Depends on the
+      `retired`/`expires` split under "Design review findings".
+- [ ] **Answer modes (a setting).** Mode 1, literal only: fixed reply, no
+      large model, the value never reaches a model. Mode 2, literal plus
+      smoothing: the large model writes the reply around the resolved
+      value; default to public (anonymous) values only. Escalation: a
+      "think harder" control on a mode 1 answer re-runs the question
+      through mode 2 or full recall. The audience rule is a trade-off to
+      keep and revisit, not a settled principle.
+- [ ] **Optional pre-gate.** A tiny "is this a lookup?" question with no menu
+      in its prompt, ahead of the finder, so non-lookup traffic does not pay
+      for a menu-sized prompt (about 4,000 tokens at 200 literals). Its
+      failures are safe. Keep only if measured to pay (share of traffic
+      removed against its own latency). The finder itself is already the
+      gate for whether a literal fits.
+- [ ] **Measure the gate end to end:** cost and latency of gate-then-literal
+      against the large model doing the same lookup, on the same questions.
+      This decides whether literals saves anything (ADR-0052 decision 3).
+- [ ] **Copy controls** ("copy value", "copy link") on chat answers, shown by
+      role or audience: front-end work; the chat items already carry value,
+      label and kind.
+- [ ] **Pointer fact with a tracked gist** (alternative to the live source,
+      only if the live source proves insufficient): a fact with no text
+      whose index entry is computed from the literal's gist.
+- [ ] **A blind question set written by Nik** (about 15 to 40 questions,
+      without looking at `eval/gold.seed.yml`), then re-check
+      `chooser_context` and the thresholds. All numbers so far are
+      in-sample.
+- [ ] **Demo** ([ADR-0054](../literals/adr/0054-demo-the-scottish-play.md)):
+      theater seed set, on-screen decision-request viewer, a miss fallback,
+      a local fallback. Target: DrupalCon or a Drupal camp in Scotland,
+      early 2027.
+- Parked, with reasons in ADR-0040 "Deferred and pinned": staged choice,
+  groups, keyword fallback, per-medium context registry, local-model
+  re-measure, `search_api`, tokens in body copy. The `literals_chat` module
+  is likely to be scrapped; aim's own chat is a demo that survives for now
+  as a non-console way in.
+
 ## Recipes (raised 2026-09-27)
 
 - [ ] Apply `recipes/aim_demo_library` to an isolated scratch site (its
