@@ -1,14 +1,14 @@
-# ADR-0046: "Gist" as a separate searchable field, shared by annotations and literals
+# ADR-0053: "Gist" as a separate searchable field, shared by annotations and literals
 
 **Date:** 2026-10-04
-**Status:** Proposed - design only, nothing built. Revised 2026-10-04: the first draft proposed renaming the annotation `value` field to `gist`; discussion replaced that with adding `gist` as a second field. The body is duplicated from ADR-028 in the `annopm` repo (inter-repo links are not reliable); keep the two bodies in step. The addenda differ: annopm's covers annotations, this one covers literals. The annotations changes are dotdev-repo work, not aim work. **The addendum at the end narrows the body where they conflict; for literal mechanics, [ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md) and its addenda still govern.**
+**Status:** Proposed - design only, nothing built. Revised 2026-10-04: the first draft proposed renaming the annotation `value` field to `gist`; discussion replaced that with adding `gist` as a second field. The body is duplicated from ADR-028 in the `annopm` repo (inter-repo links are not reliable); keep the two bodies in step. The addenda differ: annopm's covers annotations, this one covers literals. The annotations changes are dotdev-repo work, not aim work. **The addendum at the end narrows the body where they conflict; for literal mechanics, [ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md) and its addenda still govern.**
 
 ## Context
 
 Two modules need a word for one concept.
 
 - **Annotations** (the separate dotdev suite) attaches guidance to a field (a target). Its main text field is named `value`, which is vague and collides with Drupal's own `value` column property on `string_long` and `text_long`.
-- **Literals** (designed in [ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md) and its four addenda, not built) is a keyed pointer to an exact value the system knows but does not expose as such: "phone number" -> 1111, "contact page" -> a URL. A literal has a key, a **value** (the exact thing returned) and a **gist** (a natural-language description, the only part matched). The ADR's design: shortlist or full menu by gist, a Decision API chooser picks the key, an access-checked resolve returns the value. Values are never embedded, paraphrased or sent to the chooser.
+- **Literals** (designed in [ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md) and its four addenda, not built) is a keyed pointer to an exact value the system knows but does not expose as such: "phone number" -> 1111, "contact page" -> a URL. A literal has a key, a **value** (the exact thing returned) and a **gist** (a natural-language description, the only part matched). The ADR's design: shortlist or full menu by gist, a Decision API chooser picks the key, an access-checked resolve returns the value. Values are never embedded, paraphrased or sent to the chooser.
 
 Annotations are already used to find things by what they say. ADR-013 in the annopm repo (`adr/ADR-013-migration-inference-context-export.md`; migration-time field matching: for each incoming source field, pick the destination field whose annotation text fits) is a find-a-field-by-its-annotation operation, currently framed only as a bulk export for an external caller to rank.
 
@@ -109,7 +109,7 @@ Renaming `value` to something clearer is now an independent, optional step (cand
 - **Rename `value` to `gist` (the first draft).** Rejected. It forces the annotation gist to be both payload and address, leaves "gist implies short" unresolved for long guidance, loses the verbatim-versus-gist contrast, and carries the full breaking-migration cost.
 - **Keep `value` and add nothing.** Rejected: leaves no shared vocabulary and no good field for find-by-gist.
 - **Make the gist an ordinary configurable field per annotation type.** Rejected: finders need one known field, so a base field is simpler.
-- **Literals depends on annotations, or the reverse.** Rejected by ADR-0040 Addendum 3.
+- **Literals depends on annotations, or the reverse.** Rejected by ADR-0040 ("A standalone `literal` content entity").
 
 ## Consequences
 
@@ -123,7 +123,7 @@ Renaming `value` to something clearer is now an independent, optional step (cand
 ## Open questions
 
 - Should the gist be derived automatically on save when empty, or only on request from the editing UI? What stops a stale derived gist after the guidance changes?
-- Does the finder embed gists (vector) or send the whole menu to the chooser, per ADR-0040 Addendum 4 (small and medium pools skip the vector step)? Annotation corpora may be larger than literal pools.
+- Does the finder embed gists (vector) or send the whole menu to the chooser, per ADR-0040 (the whole menu goes to the chooser, no vector step)? Annotation corpora may be larger than literal pools.
 - Is the annotation entity revisionable (matters only if the optional rename goes ahead)?
 - Does any LGD pilot or recipe-distributed content (ADR-023 sync) need a compatibility shim for the new optional key?
 - Name and home of the shared module, versus contributing the finder interface to `drupal/ai`.
@@ -135,7 +135,7 @@ The annotations side of the discussion is in annopm ADR-028's addendum. This is 
 
 ### 1. The lane, as it applies here
 
-A literal's `gist` is an optional plain text field on the `literal` entity, next to `value`. It is authored, short, and stored on the literal row. It is not derived by default, not a separate entity or annotation type, and not a config value. This matches ADR-0040 Addendum 4's anatomy (value, gist, name, key, pool); nothing there changes. One difference from annotations worth keeping straight: here the gist is the only matched part and the value is the payload, so a literal with no gist cannot be found semantically (it is still reachable by key, tier 0). On annotations the gist is optional and falls back to the main text; here an empty gist means "not findable by question".
+A literal's `gist` is an optional plain text field on the `literal` entity, next to `value`. It is authored, short, and stored on the literal row. It is not derived by default, not a separate entity or annotation type, and not a config value. This matches ADR-0040's anatomy (value, gist, name, key, pool); nothing there changes. One difference from annotations worth keeping straight: here the gist is the only matched part and the value is the payload, so a literal with no gist cannot be found semantically (it is still reachable by key, tier 0). On annotations the gist is optional and falls back to the main text; here an empty gist means "not findable by question".
 
 ### 2. The gist is a delta on the stack's context
 
@@ -143,12 +143,12 @@ The stack already knows the pool, the key, the name and, for pointer kinds, the 
 
 ### 3. Context is assembled at read time and at write time
 
-- **Read (the chooser):** each candidate is presented as key, pool context and gist. This is already the chooser's input in Addendum 4 ("key plus gist per literal"); the addition is that the pool and name context are assembled next to the gist, not baked into it. **Values are still never sent to the chooser.**
+- **Read (the chooser):** each candidate is presented as key, pool context and gist. This is already the chooser's input in ADR-0040 ("key plus gist per literal"); the addition is that the pool and name context are assembled next to the gist, not baked into it. **Values are still never sent to the chooser.**
 - **Write (authoring):** the editing form, and the write path of any tool, show the same assembled context beside the gist field, so an author writes only the delta. The write-time match check (ADR-0040 piece 5) is the one step that sees the value; assembling context for authoring must not add the value to anything sent to a hosted model beyond what that step already does.
 
 ### 4. Annotations bridge, now with a shared word
 
-Where a literal points at an entity field, its default gist may be copied from the annotation gist on that field (Addendum 3's optional bridge), a direct gist-to-gist copy. Neither module requires the other. Because the annotation gist describes the field and the literal gist describes the value held there, an inherited gist may need a one-line tweak ("main switchboard line" for the value, versus "telephone number" for the field); treat inheritance as a prefill, not a live link.
+Where a literal points at an entity field, its default gist may be copied from the annotation gist on that field (ADR-0040's optional Annotations bridge), a direct gist-to-gist copy. Neither module requires the other. Because the annotation gist describes the field and the literal gist describes the value held there, an inherited gist may need a one-line tweak ("main switchboard line" for the value, versus "telephone number" for the field); treat inheritance as a prefill, not a live link.
 
 ### 5. Derived gists: optional, suggestion only
 
@@ -156,7 +156,7 @@ Suggesting a gist (from the pool, key, name and, for pointer kinds, the target f
 
 ### 6. Config versus database: no extra cost for literals
 
-ADR-0040 Addendum 3 already settled that literal values are content (pools are config, literal rows are content), so editing a phone number never needs a config import. The gist is a field on that same row and follows it, so it adds no new storage trade-off here. The config-versus-database cost discussed in annopm ADR-028 applies to annotations, where help text would otherwise live in field config.
+ADR-0040 already settled that literal values are content (pools are config, literal rows are content), so editing a phone number never needs a config import. The gist is a field on that same row and follows it, so it adds no new storage trade-off here. The config-versus-database cost discussed in annopm ADR-028 applies to annotations, where help text would otherwise live in field config.
 
 ### 7. Factoring the finder
 

@@ -2,8 +2,8 @@
 
 **Status:** Proposed 2026-10-05 - design only, nothing built. Splits the
 autocomplete idea out of `literals`; builds on
-[ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md) (literals
-stay the first provider) and [ADR-0048](0048-token-literal-access-and-entity-targets.md)
+[ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md) (literals
+stay the first provider) and [ADR-0048](../../literals/adr/0048-token-literal-access-and-entity-targets.md)
 (per-account access on resolve). Sibling of
 [ADR-0050](0050-meaning-navigator.md), which is deliberately separate.
 **Date:** 2026-10-05

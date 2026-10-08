@@ -2,7 +2,7 @@
 
 **Status:** Proposed 2026-10-04 - design only, nothing built. Follows from
 [ADR-0045](0045-memory-kinds-episodic-semantic-procedural.md); amends
-[ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md) (see
+[ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md) (see
 piece 4).
 **Date:** 2026-10-04
 
@@ -21,7 +21,7 @@ four further points:
 3. The aim is a generic module, and it is drifting toward over-complication.
    A PoC may be broad, but "extensible" needs a stated cutoff for what
    belongs in core.
-4. Literals ([ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md))
+4. Literals ([ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md))
    have value on their own, but are reachable today only through aim. The
    "gist" idea (a short description embedded so a thing can be shortlisted)
    may apply beyond literals, e.g. to choosing among tools.

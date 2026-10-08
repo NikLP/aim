@@ -85,7 +85,7 @@ disagreements to a human. It never edits content.
   (a rate, an email address, a loan limit, a hold period) is a copy of a
   number that lives on an authoritative page, so it will drift again.
   Besides dismiss and update, a finding can offer "convert to literal"
-  ([ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md)): store
+  ([ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)): store
   a pointer to the exact value instead of the number. The audit then also
   surfaces facts that should never have been facts.
 - **Where findings surface.** Open. Candidates: a Views-backed report, a

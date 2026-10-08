@@ -19,7 +19,7 @@ Two pieces already exist or are designed, and meet at the form:
   says what the field wants. With the annotation type's `in_ai_context`
   setting on, an agent can read it through `annotations_tool`
   (`annotations_read`) or `/api/annotations/{target_id}`. This is the
-  "in" direction in [ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md)'s
+  "in" direction in [ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)'s
   framing.
 - **`aim` supplies the value.** General facts and, if ADR-0040 is built,
   literals. Facts are atomic and form-agnostic: "lives at 12 Mill Lane,

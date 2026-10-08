@@ -20,7 +20,7 @@ keyword matching in a Drush command, not callable by an agent;
 fixed list. No semantic tool picker was found in installed contrib or the
 code index (drupal.org itself not searched).
 
-A tool's description is already a gist ([ADR-0046](0046-gist-shared-vocabulary.md)),
+A tool's description is already a gist ([ADR-0053](0053-gist-shared-vocabulary.md)),
 so this does not wait on Annotations carrying gists, the main blocker for
 the rest of ADR-0050.
 

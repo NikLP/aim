@@ -68,7 +68,7 @@ yet, so a pass there says nothing about the module.
    untested for extraction and merge writing; decides whether any step
    can leave the frontier model.
 
-### Literals (ADR-0040 Addendums 4 to 6)
+### Literals (ADR-0040)
 
 Run these before anything past Phase 3 of the build plan. All are type A
 unless noted; synthetic data only for hosted Jev.
@@ -161,7 +161,7 @@ should cover, in this order:
 ## Literals: automated tests (C), when the module exists
 
 - No candidate the caller cannot view reaches the chooser or the result
-  (access filter runs first, ADR-0040 piece 3).
+  (access filter runs first, ADR-0040 "The finder and the chooser").
 - Tokens check view access and carry cache contexts and tags; a cached page
   never serves a staff value to another user; only the published revision
   resolves.

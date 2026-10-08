@@ -2,7 +2,7 @@
 
 **Status:** Proposed 2026-10-05 - design only, nothing built; blocked on
 annotations carrying gists (see Dependencies). Generalizes the choose-
-from-a-list step of [ADR-0040](0040-literals-probabilistic-lookup-of-exact-values.md)'s
+from-a-list step of [ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)'s
 finder. Shares the tree with [ADR-0049](0049-everything-finder-widget.md)
 but is a separate decision: that one is a deterministic widget, this one
 calls a model.
@@ -13,7 +13,7 @@ calls a model.
 [ADR-0049](0049-everything-finder-widget.md) lets a person walk the
 site's structure by hand: entity types, bundles, entities, fields,
 tokens, literals. If each node also carries a semantic description (a
-**gist**, [ADR-0046](0046-gist-shared-vocabulary.md), supplied by
+**gist**, [ADR-0053](0053-gist-shared-vocabulary.md), supplied by
 Annotations), the same walk can be done on a person's behalf: at each
 node, show the model the children's gists and let it choose one, and
 repeat until a leaf. The answer is "find the thing that means this",
@@ -95,7 +95,7 @@ the temporary hosted deviation applies: synthetic data only on hosted).
 ## Dependencies and blockers
 
 - **Annotations carry gists.** Per [ADR-0024](0024-annotations-integration-target-scoped-promotion.md)
-  and [ADR-0047](0047-literal-candidates-and-tracked-gists.md), the
+  and [ADR-0047](../../literals/adr/0047-literal-candidates-and-tracked-gists.md), the
   bridge's write path and the trust gate are not fully built. Until
   annotations supply gists, only literals have them, and the navigable
   tree is label-only.
@@ -158,7 +158,7 @@ All are "a description in words, no knowledge of where it lives":
 - **Finding:** exact values ("the page where members sign in" returns
   `[site:login-url]`), content discovery, config and settings locations.
 - **Agents:** tool picking by gist at each level instead of loading every
-  schema ([ADR-0046](0046-gist-shared-vocabulary.md)); Webform pre-fill
+  schema ([ADR-0053](0053-gist-shared-vocabulary.md)); Webform pre-fill
   per field ([ADR-0041](0041-annotation-guided-webform-prefill.md));
   reading structure ("which fields of a case are sensitive") without
   scraping config.
