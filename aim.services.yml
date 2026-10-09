@@ -38,7 +38,6 @@ services:
       - '@logger.channel.aim'
       - '@aim.backend.decision'
       - '@literals.reader'
-      - '@literals_finder.finder'
 
   # Class alias so autowired consumers (the auto-registered AimHooks
   # service, src/Hook/AimHooks.php) can type-hint AimMemoryManager

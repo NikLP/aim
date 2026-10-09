@@ -30,8 +30,6 @@ use Drupal\aim\Backend\ActivityBackendInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
 use Drupal\literals\LiteralReader;
-use Drupal\literals_finder\Finder\LiteralFinderInterface;
-use Drupal\literals_finder\Finder\LiteralFindResult;
 use Drupal\search_api\IndexInterface;
 use Drupal\search_api\Query\QueryInterface as SearchApiQueryInterface;
 use Drupal\search_api\Query\ResultSetInterface;
@@ -184,9 +182,6 @@ class AimMemoryManager {
    * @param \Drupal\literals\LiteralReader $literalReader
    *   The literals reader. recall() uses it to replace [literal:key] tokens
    *   in fact text as the viewing account.
-   * @param \Drupal\literals_finder\Finder\LiteralFinderInterface $literalFinder
-   *   The literal finder. recallLiterals() asks it for a live literal beside
-   *   vector recall.
    */
   public function __construct(
     protected AiProviderPluginManager $aiProvider,
@@ -202,7 +197,6 @@ class AimMemoryManager {
     protected LoggerChannelInterface $logger,
     protected ActivityBackendInterface $decisionBackend,
     protected LiteralReader $literalReader,
-    protected LiteralFinderInterface $literalFinder,
   ) {}
 
   /**
@@ -330,6 +324,19 @@ class AimMemoryManager {
   public function getRecallMaxDistance(): float {
     $value = $this->configFactory->get('aim.settings')->get('recall_max_distance');
     return $value !== NULL ? (float) $value : self::DEFAULT_RECALL_MAX_DISTANCE;
+  }
+
+  /**
+   * Returns the recall gap callers apply to trim loose matches.
+   *
+   * @return float
+   *   Keep only facts whose distance is within this of the best match's. 0
+   *   (the default) turns the trim off. Like getRecallMaxDistance(), it is
+   *   applied only when a caller passes it to recall(): the model-facing
+   *   recall tools do, consolidation's neighbor search does not.
+   */
+  public function getRecallGap(): float {
+    return (float) $this->configFactory->get('aim.settings')->get('recall_gap');
   }
 
   /**
@@ -1112,68 +1119,6 @@ class AimMemoryManager {
   }
 
   /**
-   * Asks the literal finder for the literal a question is looking for.
-   *
-   * Beside vector recall, not part of it: the literal is a live, exact value
-   * kept in the literals store, so nothing is copied into aim and its gist
-   * exists once, on the literal. Returns the match as a fact-shaped row
-   * flagged `live`, with the raw value and its label as text (the caller or
-   * its model chooses how to present it). An ambiguous or empty result, or
-   * a literal the current user cannot read, gives no row. The finder is
-   * access checked for the current user and never guesses.
-   *
-   * @param string $text
-   *   The search text.
-   * @param array $rows
-   *   The vector recall rows, to skip a literal a fact already carries as a
-   *   [literal:key] token.
-   *
-   * @return array
-   *   Zero or one recall()-shaped rows.
-   */
-  public function recallLiterals(string $text, array $rows = []): array {
-    $result = $this->literalFinder->find($text, $this->currentUser);
-    $resolved = $this->literalReader->resolveFound($result->outcome, $result->literals, $this->currentUser);
-    $this->logAudit('Literal recall: outcome @outcome (finder @finder, tier @tier, reason @reason), uid @uid.', [
-      '@outcome' => $resolved['outcome'],
-      '@finder' => $result->outcome,
-      '@tier' => $result->tier,
-      '@reason' => $result->reason ?: 'none',
-      '@uid' => $this->currentUser->id(),
-    ]);
-    if ($this->configFactory->get('aim.settings')->get('log_query_text')) {
-      // Opt-in personal data, same gate as recall(): verbose and
-      // log_query_text both on.
-      $this->logVerbose('Literal recall question: @query', ['@query' => $text]);
-    }
-    if ($resolved['outcome'] !== LiteralFindResult::MATCH) {
-      return [];
-    }
-    $key = (string) array_key_first($resolved['items']);
-    foreach ($rows as $row) {
-      if (in_array($key, $row['literal_keys'] ?? [], TRUE)) {
-        return [];
-      }
-    }
-    $item = reset($resolved['items']);
-    return [[
-      'id' => 'literal:' . $key,
-      'score' => NULL,
-      'scope' => 'site',
-      'subject' => 'literal',
-      'text' => $item->label . ': ' . $item->value,
-      'source' => 'literal',
-      'state' => NULL,
-      'trusted' => TRUE,
-      'created' => $this->time->getRequestTime(),
-      'asserted' => NULL,
-      'live' => TRUE,
-      'literal_keys' => [$key],
-    ],
-    ];
-  }
-
-  /**
    * Formats a recall() row as one line of text for a model or a person.
    *
    * Adds the fact's date so a reader can tell a recent fact from an old
@@ -1184,13 +1129,9 @@ class AimMemoryManager {
    *   A row from recall().
    *
    * @return string
-   *   For example "- Nik lives in Leeds (recorded 2026-09-14)", or
-   *   "- Sign in: https://... (current value)" for a live literal.
+   *   For example "- Nik lives in Leeds (recorded 2026-09-14)".
    */
   public function formatFactLine(array $row): string {
-    if (!empty($row['live'])) {
-      return '- ' . $row['text'] . ' (current value)';
-    }
     if (!empty($row['asserted'])) {
       $date = '(true since ' . gmdate('Y-m-d', (int) $row['asserted']) . ')';
     }
@@ -1225,6 +1166,11 @@ class AimMemoryManager {
    *   ADR-0002's addendum - every other caller should leave this alone.
    *   TRUE lifts that filter, for a review queue that needs to see
    *   untrusted facts too.
+   * @param float|null $gap
+   *   Keep only facts whose distance is within this of the best match's,
+   *   so a clear winner is not returned with a tail of loosely related
+   *   facts. NULL or 0 returns every fact under $maxDistance.
+   *   getRecallGap() is the site's value.
    *
    * @return array
    *   A list of rows, each with keys id, score, scope, subject, text,
@@ -1243,7 +1189,7 @@ class AimMemoryManager {
    * @throws \InvalidArgumentException
    *   If $subjectUid does not resolve to a real account.
    */
-  public function recall(string $text, ?string $scope, ?string $subject, ?string $subjectUid, int $limit, ?float $maxDistance = NULL, bool $includeUntrusted = FALSE): array {
+  public function recall(string $text, ?string $scope, ?string $subject, ?string $subjectUid, int $limit, ?float $maxDistance = NULL, bool $includeUntrusted = FALSE, ?float $gap = NULL): array {
     $index = $this->loadVectorIndex();
 
     if (!$index) {
@@ -1337,12 +1283,16 @@ class AimMemoryManager {
         'trusted' => (bool) $fact->get('trusted')->value,
         'created' => (int) $fact->get('created')->value,
         'asserted' => $fact->get('asserted')->isEmpty() ? NULL : (int) $fact->get('asserted')->value,
-        'literal_keys' => $this->literalReader->tokenKeys((string) $fact->get('text')->value),
       ];
 
       if (count($rows) >= $limit) {
         break;
       }
+    }
+
+    if ($gap && $rows) {
+      $limitDistance = (float) $rows[0]['score'] + $gap;
+      $rows = array_values(array_filter($rows, fn (array $row): bool => (float) $row['score'] <= $limitDistance));
     }
 
     $this->logVerbose('Recall returned @count rows (scope @scope, subject @subject, subject uid @subject_uid, limit @limit, best score @best, untrusted included @untrusted, uid @uid).', [

@@ -72,14 +72,12 @@ final class AimRecall extends FunctionCallBase implements ExecutableFunctionCall
     try {
       // Abstain on a poor match: a non-empty result set only means the
       // index had *something*, not that it was relevant.
-      $rows = $this->memoryManager->recall($text, self::FACT_SCOPE, NULL, NULL, self::RESULT_LIMIT, $this->memoryManager->getRecallMaxDistance());
+      $rows = $this->memoryManager->recall($text, self::FACT_SCOPE, NULL, NULL, self::RESULT_LIMIT, $this->memoryManager->getRecallMaxDistance(), FALSE, $this->memoryManager->getRecallGap());
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {
       $this->setOutput('Could not search memory: ' . $e->getMessage());
       return;
     }
-
-    $rows = array_merge($this->memoryManager->recallLiterals($text, $rows), $rows);
 
     if (empty($rows)) {
       $this->setOutput('No relevant facts found.');

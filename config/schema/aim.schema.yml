@@ -56,6 +56,13 @@ aim.settings:
         Range:
           min: 0
           max: 1
+    recall_gap:
+      type: float
+      label: 'Keep only recalled facts within this distance of the best match (0 = off)'
+      constraints:
+        Range:
+          min: 0
+          max: 1
     default_trusted:
       type: boolean
       label: 'Trust new facts by default'

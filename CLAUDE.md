@@ -40,12 +40,12 @@ DDEV, `drupal11` type, PHP 8.4, MariaDB 11.8, docroot `web/`.
 `ai_vdb_provider_mariadb`, `search_api`, `views`, `queue_ui`,
 `serialization` (core - required by `mcp_server_tool_bridge`'s schema
 generation).
-**Hard dependencies:** `literals` and `literals_finder` (sibling modules in
-`web/modules/custom/`; `recall()` replaces `[literal:key]` tokens through
-the first, and `recallLiterals()` asks the second; see
-[DEVELOPING.md](DEVELOPING.md)'s "Exact values from `literals` in recall").
-The finder was optional at first; it is a hard dependency for now to keep
-the code simple (TODO.md, Literals).
+**Hard dependency:** `literals` (sibling module in `web/modules/custom/`,
+the exact-value store; `recall()` replaces `[literal:key]` tokens through
+it). `literals_finder` and `literals_tool` are optional: the assistant gets
+the lookup tool through `tool_ai_connector`. See
+[DEVELOPING.md](DEVELOPING.md)'s "Exact values from `literals`". Memory is
+aim's job; literals is the value store behind it, not a second recall path.
 **Composer-present but not enabled:** `eca` (no `aim` code uses it -
 `aim_eca` was removed, see [DEVELOPING.md](DEVELOPING.md)), `ai_context`
 (CCC).

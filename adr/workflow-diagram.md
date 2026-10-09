@@ -5,8 +5,8 @@ How a fact moves through the module, as the code stands on 2026-10-02
 `AimGuardrailsConstraint`, `aim_tool`, `aim_chatbot`). Not a decision
 record: for the reasoning see [0000-index.md](0000-index.md).
 
-Four diagrams: write path (1), consolidation (2), recall (3), and
-call counts for a sample round (4). The
+Five diagrams: write path (1), consolidation (2), recall (3), and
+call counts for a sample round (4), and exact values (5). The
 write path ends by enqueuing a fact for consolidation, which is the
 hand-off into diagram 2. Diagram 3 reads what diagrams 1 and 2 left in
 the vector table.
@@ -301,3 +301,52 @@ Notes on diagram 4:
 - Cost: Jev is $0.042 per million input tokens, so 300 calls are well
   under a cent; the amazeeio frontier model is free.
 
+
+## 5. Exact values: how a literal reaches an answer
+
+Memory recall and exact values are separate. Recall finds facts; the
+assistant calls a lookup tool when it needs an exact value. The value
+always comes from the `literals` store, read as the person asking.
+
+```mermaid
+flowchart TD
+  classDef llm fill:#cfe3ff,stroke:#2b6cb0,color:#102a43
+  classDef vec fill:#ffe2c2,stroke:#c05621,color:#3d1f00
+  classDef code fill:#eceff1,stroke:#607d8b,color:#1f2a30
+  classDef bad fill:#fdd,stroke:#c53030,color:#4a0000
+
+  Q["Visitor question"]:::code
+  A["Chat model (the gate)<br/>decides what it needs"]:::llm
+
+  subgraph MEM["Memory: aim_recall"]
+    R1["Embed the question,<br/>nearest facts by vector distance"]:::vec
+    R2["recall_gap trims the loose tail"]:::code
+    R3["replaceTokens() per fact,<br/>as the recalling account"]:::code
+    R4{"Every token<br/>readable?"}:::code
+    R5["Fact text, value in place"]:::code
+    R6["Fact withheld whole<br/>(debug: [redacted])"]:::bad
+  end
+
+  subgraph LIT["Exact value: literals:lookup tool"]
+    L1["By key, search words,<br/>or question (finder, optional)"]:::code
+    L2["Resolve the value<br/>access checked for the viewer"]:::code
+    L3["Label and exact value<br/>(no value if not allowed)"]:::code
+  end
+
+  Q --> A
+  A -->|"needs facts"| R1 --> R2 --> R3 --> R4
+  R4 -->|yes| R5 --> A
+  R4 -->|no| R6
+  A -->|"needs a phone number,<br/>a URL"| L1 --> L2 --> L3 --> A
+  A --> Z["Reply, value given exactly as returned"]:::llm
+```
+
+Read it this way:
+
+- **The model is the gate.** It decides whether a question is a one-shot
+  value lookup, so nothing calls a decision model on every recall.
+- **Nothing is copied.** The value lives in the literal; a fact holds at most
+  a token, so editing the literal changes every answer with no reindex.
+- **Who sees what is decided at read time**, by the person asking.
+- **The finder is optional.** It only maps a loose question to a literal for
+  the tool's `question` mode; key and search-word lookups need no model.

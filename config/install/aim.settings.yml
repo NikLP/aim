@@ -8,6 +8,7 @@ activities:
   verifier: { backend: chat, provider: '', model: '' }
 merge_max_distance: 0
 recall_max_distance: 0.45
+recall_gap: 0
 default_trusted: false
 show_redacted_facts: false
 log_audit: false

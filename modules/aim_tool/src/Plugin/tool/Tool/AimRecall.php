@@ -132,6 +132,8 @@ final class AimRecall extends ToolBase {
         $userFilter,
         (int) ($values['limit'] ?? 10),
         isset($values['max_distance']) ? (float) $values['max_distance'] : $this->memoryManager->getRecallMaxDistance(),
+        FALSE,
+        $this->memoryManager->getRecallGap(),
       );
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {
@@ -139,12 +141,6 @@ final class AimRecall extends ToolBase {
         new TranslatableMarkup('Could not search memory: @message', ['@message' => $e->getMessage()]),
         NULL,
       );
-    }
-
-    // A literal is site-wide, so it fits an unscoped or site recall that is
-    // not narrowed to one subject or user.
-    if (in_array($values['scope'] ?? NULL, [NULL, 'site'], TRUE) && empty($values['subject']) && empty($userFilter)) {
-      $rows = array_merge($this->memoryManager->recallLiterals($values['text'], $rows), $rows);
     }
 
     if (empty($rows)) {

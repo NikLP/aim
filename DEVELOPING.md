@@ -485,12 +485,11 @@ Central service backing every write/read path. Key public methods:
   `--provider`/`--model` options default to `NULL` and fall through to
   this, so they follow whatever the site default is.
 
-### Exact values from `literals` in recall
+### Exact values from `literals`
 
-`literals` (a hard dependency) is the "this means this" store: exact values
-(a phone number, a URL) that must never be paraphrased. `aim` reaches them
-two ways, and the work lives here, in `AimMemoryManager`, because aim is the
-caller; `literals` itself is unchanged by it.
+`literals` (a hard dependency) is the store for exact values (a phone
+number, a URL) that must never be paraphrased. Memory stays aim's job;
+literals is the value store behind it. They meet in two small places:
 
 - **Tokens in fact text.** A fact may contain `[literal:key]` (the value) or
   `[literal:key:link]` (a Markdown link where the value has a safe one).
@@ -500,32 +499,28 @@ caller; `literals` itself is unchanged by it.
   literal the viewer cannot read is withheld whole (a sentence with a hole
   misleads, and its presence would hint a restricted value exists);
   `aim.settings:show_redacted_facts` (Debugging section, default off)
-  returns it with `LiteralReader::REDACTED` (`[redacted]`) in place of the
-  value instead. Replacement is one pass, so a resolved value is never
-  scanned for further tokens.
-- **Live lookup.** `recallLiterals($text, $rows)` asks
-  `literals_finder.finder` (a hard dependency for now, see below) for the
-  literal the question is looking for, as
-  the current user, and returns zero or one `recall()`-shaped row flagged
-  `live` (text `Label: raw value`; `formatFactLine()` ends it "(current
-  value)"). Nothing is copied into aim. It runs beside `recall()`, not
-  inside it, so consolidation and the benchmark are unaffected: `aim_tool`'s
-  `aim_recall` (unscoped or `site`, not narrowed by subject or user) and
-  `aim_chatbot`'s `aim_recall` call it. A match is skipped when a recalled
-  fact already carries the same `[literal:key]` token. The finder is the
-  only fuzzy step (a chooser model call, cached); it returns a match, an
-  ambiguity or nothing, never a guess, and ambiguity yields no row. With no
-  decision model configured (reason `no_backend`), no live row appears and
-  literals still reach recall exactly through tokens.
-  `literals_finder` is a hard dependency of `aim` for now: it needs
-  `drupal/ai`, which aim already requires, and a missing optional service
-  would only add a null branch. It could be made optional again (the
-  manager's argument nullable, `@?literals_finder.finder`, an early return
-  in `recallLiterals()`) if a site wants literals tokens without any
-  decision model; that is not needed today. Audit: one line per lookup (outcome, tier,
-  reason, uid); the question text is logged only under `log_query_text`.
-  The finder caps the question length itself
-  (`literals_finder.settings:max_question_length`, 300).
+  returns it with `LiteralReader::REDACTED` (`[redacted]`) instead.
+  Replacement is one pass, so a resolved value is never scanned for further
+  tokens. Use a token for a sentence that says something the literal does
+  not; a fact that only points at a literal duplicates the literal's
+  description. Not enforced.
+- **A lookup tool the assistant calls.** `literals:lookup` (a Tool API tool
+  from `literals_tool`) is exposed to the on-site assistant through
+  `tool_ai_connector` as `tool:literals:lookup`, listed in the
+  `aim_chatbot` agent's tools, and over MCP as `literals_lookup`. The large
+  model decides when it needs an exact value and calls it (by key, search
+  words or question); the model is the gate for "is this a one-shot lookup",
+  so recall does not call the literals finder and the two paths never
+  compete. The finder (`literals_finder`) is optional and only matters for
+  the tool's `question` mode; `aim` does not depend on it. The demo persona
+  tells the assistant to use the tool for phone numbers and web addresses.
+
+### Recall gap
+
+`aim.settings:recall_gap` (0 = off) keeps only facts within that distance of
+the best match, applied by the model-facing recall tools through
+`getRecallGap()` and the `$gap` argument of `recall()`, never by
+consolidation.
 
 ### Guardrails (`aim_write_guardrails` set)
 
@@ -892,8 +887,7 @@ Channel `aim` (service `logger.channel.aim`). Three tiers:
 - `aim.settings:log_query_text` (debug, needs `log_verbose`): adds the
   recall query text, for diagnosing poor or empty matches. Off by default;
   the only place any user-supplied text is logged. It also adds the
-  question of each live literal lookup (see "Exact values from `literals`
-  in recall").
+  question of each literals finder lookup.
 
 Gate info/debug calls through `AimMemoryManager::logAudit()` /
 `logVerbose()`; the embedding cache subscriber reads `log_verbose` itself

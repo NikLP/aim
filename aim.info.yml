@@ -12,4 +12,3 @@ dependencies:
   - search_api:search_api
   - drupal:views
   - literals:literals
-  - literals:literals_finder

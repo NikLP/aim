@@ -229,6 +229,16 @@ final class AimSettingsForm extends ConfigFormBase {
       '#step' => 0.001,
       '#required' => TRUE,
     ];
+    $form['recall']['recall_gap'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Recall gap'),
+      '#description' => $this->t("Keep only recalled facts whose distance is within this of the best match's, so a clear winner is not returned with a tail of loosely related facts. 0 turns it off. Applies to the chatbot and MCP recall tools, not to consolidation. Too small drops a legitimate second fact; check it against your real questions."),
+      '#config_target' => 'aim.settings:recall_gap',
+      '#min' => 0,
+      '#max' => 1,
+      '#step' => 0.01,
+      '#required' => TRUE,
+    ];
 
     $form['governance'] = [
       '#type' => 'details',

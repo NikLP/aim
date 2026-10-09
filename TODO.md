@@ -24,18 +24,19 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       that resolves to nothing to `none`). The chat responder and the
       tool's `byQuestion()` repeat that loop today; move both onto it, then
       use it from `aim_recall`.
-- [x] **Finder as a live recall source.** `aim_recall` asks
-      `literals_finder.finder` (optional service, progressive enhancement)
-      beside vector recall and returns the literal as a fact-shaped live
-      result. Nothing is stored in aim; the gist exists once, on the
-      literal. De-duplicate by literal key if a pointer fact also exists.
-      Add an audit line when the finder errors.
-- [ ] **Make `literals_finder` optional again (low priority).** It is a
-      hard dependency of `aim` for now. The finder is the only fuzzy step
-      and needs a decision model; token replacement is exact and needs
-      none. Revisit if a site wants tokens without a model: make the
-      manager's finder argument nullable, wire `@?literals_finder.finder`,
-      return early in `recallLiterals()`.
+- [x] **Exact values as a tool, not a recall path.** Reworked 2026-10-09: the
+      finder is not called from `aim_recall` (it was finder-first for a day).
+      The on-site assistant gets `tool:literals:lookup` through
+      `tool_ai_connector`; the large model is the gate for one-shot
+      lookups. `aim` depends on `literals`, not `literals_finder`.
+- [ ] **Review literal access (raised 2026-10-09).** Two layers can disagree:
+      a literal's audience (anonymous, authenticated, restricted) and the
+      resolver's own access check on the target (a `url` literal checks the
+      route). `/user/login` has audience anonymous but the route denies a
+      signed-in user, so the finder reports a match and the lookup returns
+      `none`, silently. Decide one model (audience only, resolver only, or
+      the stricter of both surfaced to the author at save time) and make a
+      mismatch visible.
 - [ ] **Convert-a-fact retires the fact.** Promoting an extracted one-shot
       fact to a literal supersedes it via `superseded_by`; the literal's
       gist is then the only description. Short form, never one click: a
@@ -61,9 +62,6 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
 - [ ] **Copy controls** ("copy value", "copy link") on chat answers, shown by
       role or audience: front-end work; the chat items already carry value,
       label and kind.
-- [ ] **Pointer fact with a tracked gist** (alternative to the live source,
-      only if the live source proves insufficient): a fact with no text
-      whose index entry is computed from the literal's gist.
 - [ ] **A blind question set written by Nik** (about 15 to 40 questions,
       without looking at `eval/gold.seed.yml`), then re-check
       `chooser_context` and the thresholds. All numbers so far are
