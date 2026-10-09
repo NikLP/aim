@@ -97,7 +97,7 @@ final class AimSettingsForm extends ConfigFormBase {
     $form['thresholds']['ambiguous_threshold'] = [
       '#type' => 'number',
       '#title' => $this->t('Ambiguous threshold'),
-      '#description' => $this->t('Distance at or below which a candidate fact gets a single LLM classification call (ADD/UPDATE/DELETE/NOOP). Above this, facts are left alone at zero cost. Must be greater than the auto-merge threshold.'),
+      '#description' => $this->t('Distance at or below which a candidate fact gets a single LLM classification call (ADD/UPDATE/RETIRE/NOOP). Above this, facts are left alone at zero cost. Must be greater than the auto-merge threshold.'),
       '#config_target' => 'aim.settings:ambiguous_threshold',
       '#min' => 0,
       '#max' => 1,
@@ -145,7 +145,7 @@ final class AimSettingsForm extends ConfigFormBase {
       ],
       'consolidation' => [
         $this->t('Consolidation classifier'),
-        $this->t('Classifies ambiguous pairs as ADD/UPDATE/DELETE/NOOP.'),
+        $this->t('Classifies ambiguous pairs as ADD/UPDATE/RETIRE/NOOP.'),
       ],
       'verifier' => [
         $this->t('Merge verifier'),
@@ -286,8 +286,8 @@ final class AimSettingsForm extends ConfigFormBase {
     ];
     $form['logging']['log_query_text'] = [
       '#type' => 'checkbox',
-      '#title' => $this->t('Include recall query text in verbose logs'),
-      '#description' => $this->t('Adds the query to each recall entry, for diagnosing a poor or empty match. Queries can contain personal data and will be stored in the log: enable only while investigating, then turn off. Has no effect unless verbose logging is on. Fact text is never logged.'),
+      '#title' => $this->t('Include query and fact text in verbose logs'),
+      '#description' => $this->t('Adds the query to each recall entry, and the kept, candidate and merged fact text to each merge verifier entry, for diagnosing a poor match or a rejected merge. Both can contain personal data and will be stored in the log: enable only while investigating, then turn off. Has no effect unless verbose logging is on. Fact text is otherwise never logged.'),
       '#config_target' => 'aim.settings:log_query_text',
       '#states' => ['disabled' => [':input[name="log_verbose"]' => ['checked' => FALSE]]],
     ];
@@ -295,7 +295,7 @@ final class AimSettingsForm extends ConfigFormBase {
     $form['prompts'] = [
       '#type' => 'details',
       '#title' => $this->t('Prompts'),
-      '#description' => $this->t('The instruction text sent to the chat provider for extraction and consolidation. The requested output shape (the ADD/UPDATE/DELETE/NOOP decision enum, the scope enum) is enforced by a structured-output JSON schema in code, not by this text - editing the prose below changes how the model reasons, not what fields it must return.'),
+      '#description' => $this->t('The instruction text sent to the chat provider for extraction and consolidation. The requested output shape (the ADD/UPDATE/RETIRE/NOOP decision enum, the scope enum) is enforced by a structured-output JSON schema in code, not by this text - editing the prose below changes how the model reasons, not what fields it must return.'),
       '#open' => FALSE,
     ];
     $form['prompts']['extraction_prompt'] = [

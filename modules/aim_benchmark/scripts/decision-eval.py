@@ -2,9 +2,9 @@
 """Score a /v1/systemone decision model on the aim decision points.
 
 Tasks (sets in decision-eval-sets.json, hand-written, labels unverified):
-  pairs  classifyPair(): choice ADD/UPDATE/NOOP/DELETE; confusion matrix,
-         accuracy, and "unsafe" errors (data-losing UPDATE/DELETE when the
-         right answer was ADD/NOOP, or DELETE on anything real).
+  pairs  classifyPair(): choice ADD/UPDATE/NOOP/RETIRE; confusion matrix,
+         accuracy, and "unsafe" errors (data-losing UPDATE/RETIRE when the
+         right answer was ADD/NOOP, or RETIRE on anything real).
   merges verifyMerge(): does the merged text keep both facts and add nothing.
   gate   reframed plausibility: is the candidate consistent with the
          context facts and worth storing.
@@ -22,7 +22,7 @@ OPTIONS = {
     "ADD": "The facts are genuinely different; keep both.",
     "UPDATE": "The candidate refines, corrects or supersedes the existing fact.",
     "NOOP": "The candidate restates the existing fact with no new information.",
-    "DELETE": "The candidate should not exist as a memory at all (nonsensical or clearly erroneous). Use sparingly.",
+    "RETIRE": "The candidate should not exist as a memory at all (nonsensical or clearly erroneous). Use sparingly.",
 }
 PAIR_Q = ("Decide what to do with the candidate fact relative to the existing fact. "
           "When unsure, choose ADD: keeping both facts is always safe.")
@@ -64,7 +64,7 @@ def run_pairs(host, model, items):
         conf[it["label"]][got] += 1
         times.append(t)
         hits += got == it["label"]
-        if (got == "DELETE" and it["label"] != "DELETE") or \
+        if (got == "RETIRE" and it["label"] != "RETIRE") or \
            (got == "UPDATE" and it["label"] in ("ADD", "NOOP")):
             unsafe += 1
     print("pairs: accuracy %d/%d, unsafe errors %d" % (hits, len(items), unsafe))

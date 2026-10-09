@@ -14,10 +14,10 @@ use Drupal\Core\Entity\EntityChangedTrait;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityViewBuilder;
 use Drupal\Core\Entity\Form\DeleteMultipleForm;
-use Drupal\Core\Entity\Routing\DefaultHtmlRouteProvider;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\AimFactAccessControlHandler;
+use Drupal\aim\Routing\AimFactHtmlRouteProvider;
 use Drupal\aim\AimFactListBuilder;
 use Drupal\aim\AimFactViewsData;
 use Drupal\user\EntityOwnerInterface;
@@ -45,7 +45,7 @@ use Drupal\user\EntityOwnerTrait;
       'delete-multiple-confirm' => DeleteMultipleForm::class,
     ],
     'route_provider' => [
-      'html' => DefaultHtmlRouteProvider::class,
+      'html' => AimFactHtmlRouteProvider::class,
     ],
   ],
   entity_keys: [
@@ -135,9 +135,13 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['type' => 'options_buttons', 'weight' => 35]);
 
+    $fields['retired'] = BaseFieldDefinition::create('timestamp')
+      ->setLabel(t('Retired'))
+      ->setDescription(t('When set, this fact is out of retrieval. Set by consolidation and the Retire action instead of deleting the fact outright, to preserve an audit trail.'));
+
     $fields['expires'] = BaseFieldDefinition::create('timestamp')
       ->setLabel(t('Expires'))
-      ->setDescription(t('When set, this fact is superseded and should be excluded from retrieval past this time. Set by consolidation instead of deleting the fact outright, to preserve an audit trail.'));
+      ->setDescription(t('Optional sell-by date. Nothing acts on it yet; a sweep will retire the fact once it passes.'));
 
     $fields['superseded_by'] = BaseFieldDefinition::create('entity_reference')
       ->setLabel(t('Superseded by'))

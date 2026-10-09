@@ -53,8 +53,14 @@ consolidation_prompt: |
   that replaces the existing fact's text.
   - "NOOP": the candidate simply restates the existing fact with no new information.
   The existing fact stands unchanged and the candidate is redundant.
-  - "DELETE": the candidate fact should not exist as a memory at all
+  - "RETIRE": the candidate fact should not exist as a memory at all
   (e.g. nonsensical or clearly erroneous). Use sparingly.
+
+  If both facts state a different value for the same attribute of the same thing
+  (a day, time, number, place or name), they cannot both be true: choose "UPDATE",
+  with the candidate's value in merged_text. This holds even when the existing fact
+  says more than the candidate: keep the rest of the existing fact and change only
+  the conflicting value.
 
   When unsure whether the candidate is a refinement or a distinct fact, choose "ADD":
   merging is where nuance is lost, and keeping both facts is always safe.
@@ -78,4 +84,7 @@ merge_verify_prompt: |
   Set faithful to true only if every detail of Fact A and Fact B survives in
   Merged (names, numbers, dates, conditions, negations) and Merged adds
   nothing that neither fact states, except where Fact B plainly corrects or
-  supersedes a detail of Fact A. Otherwise set faithful to false.
+  supersedes a detail of Fact A. A value in Fact B that differs from Fact A's
+  value for the same attribute (a duration, day, price or place) supersedes it:
+  the old value must not appear in Merged, and its absence is not a lost detail.
+  Otherwise set faithful to false.

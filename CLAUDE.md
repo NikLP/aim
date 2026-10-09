@@ -173,7 +173,7 @@ duplicated here.
   [ADR-0028](adr/resolved/0028-scope-type-plugin.md) piece 1),
   `text` (Guardrails-validated), `source`, `state` (tri-state boolean),
   `category` (taxonomy, vocabulary `aim_category`), `asserted` (valid-time
-  start), `superseded_by`/`expires`/`superseded_by_reason` (consolidation's
+  start), `retired`/`superseded_by`/`superseded_by_reason`, plus `expires` (a nullable sell-by date nothing acts on yet) (consolidation's
   non-destructive supersede edge and its JSON provenance), `uid`
   (who wrote it), `trusted` (boolean, the draft-to-trusted gate - defaults
   to `aim.settings:default_trusted`, `recall()` excludes untrusted facts
@@ -222,7 +222,7 @@ duplicated here.
 - Vector search: server `aim_vector`, index `aim_vector_index`, collection
   table `aim_fact_vectors` (MariaDB HNSW `VECTOR INDEX`; renamed from
   `aim_facts` 2026-09-28 - too easy to confuse with the `aim_fact` entity
-  table in a raw SQL query). Retired facts (`expires`
+  table in a raw SQL query). Retired facts (`retired`
   set) are excluded from the index by the `aim_exclude_retired` processor
   ([ADR-0022](adr/resolved/0022-exclude-retired-facts-from-vector-index.md)),
   `user` is an indexed attribute with a BTREE index

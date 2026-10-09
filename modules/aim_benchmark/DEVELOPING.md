@@ -76,7 +76,7 @@ pairs), `merges` (`verifyMerge()`; `--sets
 scripts/decision-eval-merges-hard.json` for 20 subtle faults),
 `merges-split` (the same as three small questions) and `gate`
 (plausibility). It reports accuracy, a confusion matrix, unsafe errors
-(a data-losing UPDATE/DELETE), AUC and a best threshold (tuned on the
+(a data-losing UPDATE/RETIRE), AUC and a best threshold (tuned on the
 set, so optimistic) and per-call time. Use the threshold to set
 `activities.verifier.threshold` for a model. Local-model results and
 service setup: [ADR-0038](../../adr/0038-local-decision-models-parked.md).

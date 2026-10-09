@@ -56,7 +56,7 @@ yet, so a pass there says nothing about the module.
    supported / unsupported / misattributed. Needed before the grounded
    check build (TODO).
 5. **Harder UPDATE/NOOP pairs** and the **gold sets** TODO item (a)-(c):
-   15-25 hand-written pairs per ADD/UPDATE/DELETE/NOOP with hard
+   15-25 hand-written pairs per ADD/UPDATE/RETIRE/NOOP with hard
    negatives, human-verified labels; merge set from mutated good merges;
    site-context contradictions for the `gate` set.
 6. **Pass bar** (ADR-0021 open question 2): decide before scoring, e.g.
@@ -120,7 +120,7 @@ unless noted; synthetic data only for hosted Jev.
    run for it. Plugin code not opened (TODO). Also run the offline
    `ai_provider_typesafeai/tests/check-decision-api.php` check.
 6. **Baselines** (none exist, so no improvement can be claimed): merge
-   fidelity review of dry-run UPDATE/DELETE rows on a snapshot copy; a
+   fidelity review of dry-run UPDATE/RETIRE rows on a snapshot copy; a
    disclosed LongMemEval slice (50-100 questions) for recall precision,
    knowledge-update correctness and abstention; recall payload size vs
    full-history tokens; duplicate rate. Then tune `recall_max_distance`

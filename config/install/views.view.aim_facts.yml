@@ -219,12 +219,12 @@ display:
             format: true-false
             format_custom_false: ''
             format_custom_true: 'true'
-        expires:
-          id: expires
+        retired:
+          id: retired
           table: aim_fact
-          field: expires
+          field: retired
           entity_type: aim_fact
-          entity_field: expires
+          entity_field: retired
           plugin_id: field
           label: 'Retired at'
           exclude: false
@@ -308,7 +308,7 @@ display:
             source: source
             uid: uid
             state: state
-            expires: expires
+            retired: retired
             operations: operations
           default: id
           info:
@@ -373,7 +373,7 @@ display:
               separator: ''
               empty_column: false
               responsive: ''
-            expires:
+            retired:
               sortable: true
               default_sort_order: asc
               align: ''

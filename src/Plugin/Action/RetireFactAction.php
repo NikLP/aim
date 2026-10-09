@@ -13,7 +13,7 @@ use Drupal\aim\Service\AimMemoryManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * Soft-retires facts by stamping expires, like consolidation does.
+ * Soft-retires facts by stamping retired, like consolidation does.
  */
 #[Action(
   id: 'aim_fact_retire',
@@ -53,10 +53,10 @@ class RetireFactAction extends AimFactActionBase {
    * {@inheritdoc}
    */
   protected function apply(AimFact $fact): bool {
-    if (!$fact->get('expires')->isEmpty()) {
+    if (!$fact->get('retired')->isEmpty()) {
       return FALSE;
     }
-    $fact->set('expires', $this->time->getRequestTime());
+    $fact->set('retired', $this->time->getRequestTime());
     return TRUE;
   }
 

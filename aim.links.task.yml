@@ -1,0 +1,13 @@
+aim.settings_tab:
+  title: 'Settings'
+  route_name: aim.settings
+  base_route: aim.settings
+  weight: 0
+
+aim.permissions_tab:
+  title: 'Permissions'
+  route_name: user.admin_permissions.module
+  route_parameters:
+    modules: 'aim,aim_tool'
+  base_route: aim.settings
+  weight: 10

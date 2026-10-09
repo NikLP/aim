@@ -200,7 +200,7 @@ are recommendations.
 
 **Fact lifecycle**
 
-- [ ] Agreed: add a `retired` timestamp (set by consolidation and the
+- [x] BUILT 2026-10-09 (`aim_update_10009`; the sweep that retires past `expires` is still unbuilt, ADR-0032): add a `retired` timestamp (set by consolidation and the
       Retire action) and keep `expires` as a real sell-by date (nullable,
       unused today). `ExcludeRetired` and the PHP safety nets key off
       `retired`; a sweep sets `retired` once `expires` passes. Migrate
@@ -208,7 +208,7 @@ are recommendations.
       `subject_uid` rename needed three update hooks and silently broke a
       View, check Views). Needed by ADR-0035's `release` and ADR-0032's
       auto-expiry.
-- [ ] Agreed: rename the consolidation verb DELETE to RETIRE. It is a
+- [x] BUILT 2026-10-09 (aim_update_10010): rename the consolidation verb DELETE to RETIRE. It is a
       soft retire. Touches the structured-output enum and prompt line in
       `AimMemoryManager` (the model must answer with the new word),
       dry-run output, any edited prompt override, and old
@@ -281,6 +281,14 @@ are recommendations.
       Untrust bulk actions). Still open: the `trusted` override on
       `remember()` bypasses it - decide whether callers passing
       `trusted: TRUE` should need the permission.
+- [ ] **Loop back to the trust permission (raised 2026-10-09).** Nobody
+      holds `trust {scope} aim facts` and the ADR-0037 grounded check (Jev)
+      now sets `trusted` automatically, so it guards a workflow that is not
+      running. Decide whether it is for a human clearing what the verifier
+      rejects (then likely one `review` permission, not one per scope) or
+      goes, with the trust actions falling back to `administer aim memory`.
+      Left as is for now.
+
 ## PoC deviations to close before non-PoC data goes in
 
 - [ ] User-scope authorship gap (raised 2026-09-30): nothing checks that a

@@ -77,7 +77,7 @@ final class AimStatusChecker {
   private function checkIndexParity(): array {
     $live = (int) $this->entityTypeManager->getStorage('aim_fact')->getQuery()
       ->accessCheck(FALSE)
-      ->notExists('expires')
+      ->notExists('retired')
       ->exists('text')
       ->count()
       ->execute();

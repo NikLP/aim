@@ -32,6 +32,10 @@ use of the tool at all, not which scopes it can write.
   instead of a hardcoded `scope=entity` shape. A `facts` batch entry's
   own `scope_fields` stays unrefined - Tool API's refiner mechanism has
   no per-list-item equivalent.
+- `src/Plugin/tool/Tool/AimLiteral.php` - `aim_literal`, a thin wrapper over
+  the `literals` reader/search services (key or search words only; no
+  finder), gated on `read aim memory`. Lets a site expose literals under
+  aim's name without `literals_tool`.
 - `config/optional/mcp_server_tool_bridge.mcp_tool_config.*.yml` - MCP
   exposure config, installs automatically once `mcp_server_tool_bridge`
   is enabled.

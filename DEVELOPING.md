@@ -128,12 +128,12 @@ related-but-distinct facts under this embedding model; pulled back to
 0.09).
 
 **Nothing is destroyed** (ADR-0005 addendum, 2026-10-01). Every outcome
-that removes a fact from recall is a soft retire (`expires` set), so it
+that removes a fact from recall is a soft retire (`retired` set), so it
 is auditable and reversible with the Un-retire action (which also clears
 `superseded_by_reason`):
 
 - `NOOP` (and the auto path): candidate retired, `superseded_by` = kept.
-- `DELETE`: candidate retired, `superseded_by` left empty.
+- `RETIRE`: candidate retired, `superseded_by` left empty.
 - `UPDATE`: a **new merged fact** is created and both inputs are retired
   pointing at it. The old wording survives on the retired rows. Metadata
   carried over: scope, subject/user, target and owner from the kept fact;
@@ -224,10 +224,10 @@ not a `cron` key, see [ADR-0003](adr/resolved/0003-async-processing-dedicated-cr
 
 **Retired facts are not in the vector index:** the `aim_exclude_retired`
 Search API processor (`src/Plugin/search_api/processor/ExcludeRetired.php`)
-rejects any fact with `expires` set, and Search API deletes a rejected
+rejects any fact with `retired` set, and Search API deletes a rejected
 item from the server. Retiring a fact is a plain `save()` that re-tracks
 it, so its row goes on the next `sapi-i` (`index_directly` is off), and
-clearing `expires` brings it back. `recall()`/`findNeighbors()` keep
+clearing `retired` brings it back. `recall()`/`findNeighbors()` keep
 their PHP `expires` check as a safety net for that gap. Retired facts stay
 `aim_fact` entities (audit trail, `superseded_by` edges, admin views) but are not
 vector-searchable. Design, verification and rollout in
@@ -885,14 +885,16 @@ Channel `aim` (service `logger.channel.aim`). Three tiers:
   trust/untrust/retire/unretire actions.
 - `aim.settings:log_verbose` (debug): recall, embedding cache, extraction.
 - `aim.settings:log_query_text` (debug, needs `log_verbose`): adds the
-  recall query text, for diagnosing poor or empty matches. Off by default;
-  the only place any user-supplied text is logged. It also adds the
+  recall query text, for diagnosing poor or empty matches, and the kept,
+  candidate and merged fact text on merge verifier entries, for diagnosing
+  a rejected merge. Off by default; the only place any user-supplied text
+  or fact text is logged. It also adds the
   question of each literals finder lookup.
 
 Gate info/debug calls through `AimMemoryManager::logAudit()` /
 `logVerbose()`; the embedding cache subscriber reads `log_verbose` itself
 (the manager depends on it, so it cannot depend back). Never log fact text
-or, outside `log_query_text`, recall query text (personal data, and guardrail violation messages can
+or recall query text outside `log_query_text` (personal data, and guardrail violation messages can
 quote it): IDs, scope, uid, subject, decision, score, auto-versus-model,
 provider and model ID only. Consolidation logging lives in the single
 helper `logConsolidation()`, so reworking `decideAndApply()` doesn't

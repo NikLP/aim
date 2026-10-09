@@ -324,11 +324,9 @@ final class AimCommands extends DrushCommands {
    * Each fact is compared to its nearest vector neighbors (up to three)
    * within the same scope/subject: an obvious near-duplicate is retired
    * automatically, an ambiguous case gets a classification call (ADD/UPDATE/
-   * DELETE/NOOP, Mem0's vocabulary), and anything past the ambiguous
+   * RETIRE/NOOP, Mem0's vocabulary), and anything past the ambiguous
    * threshold is left alone at zero cost. Retiring a fact sets its
-   * `expires` field rather than deleting it, to keep an audit trail - a
-   * hard DELETE only happens when the model explicitly says the candidate
-   * should not exist as a memory at all.
+   * `retired` field rather than deleting it, to keep an audit trail.
    *
    * The two thresholds default to the live aim.settings config
    * (/admin/config/aim/settings), not a hardcoded value - --auto-threshold/

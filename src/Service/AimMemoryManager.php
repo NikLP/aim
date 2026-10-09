@@ -1176,7 +1176,7 @@ class AimMemoryManager {
    *   A list of rows, each with keys id, score, scope, subject, text,
    *   source, state, trusted, created, asserted (a timestamp, or NULL when
    *   never set; see formatFactLine()). Retired facts are never returned, so
-   *   there is no expires key. score is what search_api reports for the
+   *   there is no retired key. score is what search_api reports for the
    *   match, which for ai_vdb_provider_mariadb is MariaDB's
    *   VEC_DISTANCE_COSINE value: a cosine distance, 0.0 for an identical
    *   embedding and larger the less similar the fact is, so lower is a
@@ -1244,7 +1244,7 @@ class AimMemoryManager {
       }
       catch (SearchApiException) {
         // A stale index entry pointing at an aim_fact that no longer
-        // exists (deleted directly, or by consolidation's DELETE
+        // exists (deleted directly, or by consolidation's RETIRE
         // decision) and hasn't been reindexed away yet - skip it rather
         // than let one stale row fail the whole recall() call.
         continue;
@@ -1258,7 +1258,7 @@ class AimMemoryManager {
       // The aim_exclude_retired processor keeps retired facts out of the
       // index (ADR-0022), but one retired since the last index run is
       // still there; filter it out here for that gap.
-      if (!$fact->get('expires')->isEmpty()) {
+      if (!$fact->get('retired')->isEmpty()) {
         continue;
       }
 
@@ -1324,9 +1324,9 @@ class AimMemoryManager {
    * empirical threshold defaults. Each fact is compared to its nearest
    * vector neighbor within the same scope/subject: an obvious near-duplicate
    * is retired automatically, an ambiguous case gets a single classification
-   * call (ADD/UPDATE/DELETE/NOOP), and anything past the ambiguous
+   * call (ADD/UPDATE/RETIRE/NOOP), and anything past the ambiguous
    * threshold is left alone at zero cost. Retiring a fact sets its
-   * `expires` field rather than deleting it, to keep an audit trail; an
+   * `retired` field rather than deleting it, to keep an audit trail; an
    * UPDATE creates a new merged fact and retires both inputs, and every
    * retirement records its reason in `superseded_by_reason`. An
    * UPDATE whose merged text fails the aim_write_guardrails check (decision
@@ -1364,7 +1364,7 @@ class AimMemoryManager {
     }
 
     $fact_storage = $this->entityTypeManager->getStorage('aim_fact');
-    $query = $fact_storage->getQuery()->accessCheck(FALSE)->sort('id')->notExists('expires');
+    $query = $fact_storage->getQuery()->accessCheck(FALSE)->sort('id')->notExists('retired');
 
     if (!empty($scope)) {
       $query->condition('scope', $scope);
@@ -1401,7 +1401,7 @@ class AimMemoryManager {
    * by enqueueForConsolidation() (decision 4's Queue API automation). No
    * pair registry is needed here the way consolidate()'s sweep needs
    * one - each queue item is processed and saved independently, so a later
-   * item sees an already-`expires`-set fact and findNeighbors()
+   * item sees an already-`retired`-set fact and findNeighbors()
    * already filters those out.
    *
    * Up to NEIGHBOR_LIMIT neighbors are checked, nearest first: a
@@ -1494,7 +1494,7 @@ class AimMemoryManager {
       [$decision, $merged_text] = $this->decideAndApply($kept, $candidate, $score, $autoThreshold, $providerId, $modelId, $dryRun);
       $rows[] = [$kept->id(), $candidate->id(), round($score, 3), $decision, $merged_text];
 
-      if (in_array($decision, ['NOOP', 'DELETE'], TRUE)) {
+      if (in_array($decision, ['NOOP', 'RETIRE'], TRUE)) {
         $retired[$candidate->id()] = TRUE;
       }
       elseif ($decision === 'UPDATE') {
@@ -1538,7 +1538,7 @@ class AimMemoryManager {
    *   If TRUE, the decision is computed but nothing is saved.
    *
    * @return array
-   *   A [decision, merged text] pair: the decision is ADD, UPDATE, DELETE,
+   *   A [decision, merged text] pair: the decision is ADD, UPDATE, RETIRE,
    *   NOOP, or the synthetic BLOCKED; the text is NULL unless the decision
    *   is UPDATE, BLOCKED, or an ADD downgraded from a merge that failed
    *   verification.
@@ -1596,7 +1596,7 @@ class AimMemoryManager {
         // auditable and either input can be un-retired.
         $merged = $this->createMergedFact($kept, $candidate, (string) $merged_text);
         foreach ([$kept, $candidate] as $input) {
-          $input->set('expires', $this->time->getRequestTime());
+          $input->set('retired', $this->time->getRequestTime());
           $input->set('superseded_by', $merged->id());
         }
         $candidate->set('superseded_by_reason', $reason);
@@ -1605,16 +1605,16 @@ class AimMemoryManager {
         break;
 
       case 'NOOP':
-        $candidate->set('expires', $this->time->getRequestTime());
+        $candidate->set('retired', $this->time->getRequestTime());
         $candidate->set('superseded_by', $kept->id());
         $candidate->set('superseded_by_reason', $reason);
         $candidate->save();
         break;
 
-      case 'DELETE':
+      case 'RETIRE':
         // Soft retire with no replacement: superseded_by stays empty, the
         // reason records why. Reversible with the un-retire action.
-        $candidate->set('expires', $this->time->getRequestTime());
+        $candidate->set('retired', $this->time->getRequestTime());
         $candidate->set('superseded_by_reason', $reason);
         $candidate->save();
         break;
@@ -1728,11 +1728,29 @@ class AimMemoryManager {
           'fact_b' => (string) $candidate->get('text')->value,
           'merged' => $mergedText,
         ],
-        ['faithful' => new NoulQuestion('Every detail of fact_a and fact_b (names, numbers, dates, conditions, negations) survives in merged, and merged adds nothing the two facts do not say. Judge faithfulness to the inputs, not whether they are true.')],
+        ['faithful' => new NoulQuestion('Every detail of fact_a and fact_b (names, numbers, dates, conditions, negations) survives in merged, and merged adds nothing the two facts do not say, except that a value in fact_b which differs from the value fact_a gives for the same attribute (a duration, day, price or place) supersedes it, so the old value should be absent. Judge faithfulness to the inputs, not whether they are true.')],
       );
       $response = $this->decisionBackend->run('verifier', $input, $decision_model[0], $decision_model[1]);
       $threshold = (float) ($this->configFactory->get('aim.settings')->get('activities.verifier.threshold') ?? 0);
-      return $response->getNoul('faithful')->isLikely($threshold > 0 ? $threshold : 0.5);
+      $cutoff = $threshold > 0 ? $threshold : 0.5;
+      $faithful = $response->getNoul('faithful');
+      $this->logVerbose('Merge verifier (kept @kept, candidate @candidate): faithful probability @score, cutoff @cutoff.', [
+        '@kept' => $kept->id(),
+        '@candidate' => $candidate->id(),
+        '@score' => round($faithful->getProbability(), 3),
+        '@cutoff' => $cutoff,
+      ]);
+      if ($this->configFactory->get('aim.settings')->get('log_query_text')) {
+        // Opt-in personal data, same switch as the recall query text.
+        $this->logVerbose('Merge verifier texts (kept @kept, candidate @candidate): A "@a", B "@b", merged "@merged".', [
+          '@kept' => $kept->id(),
+          '@candidate' => $candidate->id(),
+          '@a' => (string) $kept->get('text')->value,
+          '@b' => (string) $candidate->get('text')->value,
+          '@merged' => $mergedText,
+        ]);
+      }
+      return $faithful->isLikely($cutoff);
     }
 
     $prompt = strtr($this->configFactory->get('aim.settings')->get('merge_verify_prompt'), [
@@ -1828,7 +1846,7 @@ class AimMemoryManager {
    * logConsolidation() so both move together if decideAndApply() changes.
    *
    * @param string $decision
-   *   UPDATE, DELETE or NOOP (the decisions that retire a fact).
+   *   UPDATE, RETIRE or NOOP (the decisions that retire a fact).
    * @param float $score
    *   The similarity score between the pair.
    * @param array|null $model
@@ -1924,7 +1942,7 @@ class AimMemoryManager {
    * @param float $score
    *   The similarity score between the two.
    * @param string $decision
-   *   ADD, UPDATE, DELETE, NOOP or BLOCKED.
+   *   ADD, UPDATE, RETIRE, NOOP or BLOCKED.
    * @param array|null $model
    *   A [provider ID, model ID] pair if the model decided, NULL if the
    *   auto threshold did.
@@ -2018,7 +2036,7 @@ class AimMemoryManager {
       // The aim_exclude_retired processor keeps retired facts out of the
       // index (ADR-0022), but one retired since the last index run is
       // still there and would otherwise resurface as a neighbor.
-      if (!$candidate->get('expires')->isEmpty()) {
+      if (!$candidate->get('retired')->isEmpty()) {
         continue;
       }
 
@@ -2050,7 +2068,7 @@ class AimMemoryManager {
    *
    * @return array
    *   A [decision, merged_text] pair. Decision is one of ADD, UPDATE,
-   *   DELETE, NOOP. merged_text is only meaningful for UPDATE.
+   *   RETIRE, NOOP. merged_text is only meaningful for UPDATE.
    */
   protected function classifyPair(AimFact $kept, AimFact $candidate, string $providerId, string $modelId): array {
     $decision_model = $this->decisionModelFor('consolidation');
@@ -2065,7 +2083,7 @@ class AimMemoryManager {
             'ADD' => 'The facts are genuinely different; keep both.',
             'UPDATE' => 'The candidate refines, corrects or supersedes the existing fact.',
             'NOOP' => 'The candidate restates the existing fact with no new information.',
-            'DELETE' => 'The candidate should not exist as a memory at all (nonsensical or clearly erroneous). Use sparingly.',
+            'RETIRE' => 'The candidate should not exist as a memory at all (nonsensical or clearly erroneous). Use sparingly.',
           ]),
         ],
       );
@@ -2098,7 +2116,7 @@ class AimMemoryManager {
         'properties' => [
           'decision' => [
             'type' => 'string',
-            'enum' => ['ADD', 'UPDATE', 'DELETE', 'NOOP'],
+            'enum' => ['ADD', 'UPDATE', 'RETIRE', 'NOOP'],
           ],
           'merged_text' => ['type' => 'string'],
         ],
@@ -2118,7 +2136,19 @@ class AimMemoryManager {
       throw new \RuntimeException("Model response was not the expected JSON shape: $response_text");
     }
 
-    return [$decoded['decision'], $decoded['merged_text'] ?? NULL];
+    $decision = $decoded['decision'];
+    $merged = $decoded['merged_text'] ?? NULL;
+    // The model sometimes labels a changed value ADD while returning a
+    // rewritten merged_text, contradicting the prompt (unchanged for any
+    // decision but UPDATE). The rewrite is the stronger signal: treat it as
+    // an UPDATE and let the merge verifier gate it like any other.
+    if ($decision === 'ADD' && is_string($merged) && trim($merged) !== '') {
+      $norm = static fn (string $text): string => mb_strtolower(preg_replace('/\s+/', ' ', trim($text)));
+      if ($norm($merged) !== $norm((string) $kept->get('text')->value)) {
+        $decision = 'UPDATE';
+      }
+    }
+    return [$decision, $merged];
   }
 
   /**
