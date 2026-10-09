@@ -1,6 +1,9 @@
 name: 'AIM demo: community library'
 description: 'A fictional community library as an AIM demo site: site identity, chat persona and recall cutoff. The facts load separately with drush aim:remember --file=facts.json.'
 type: 'Demo'
+recipes:
+  - core/recipes/page_content_type
+  - core/recipes/basic_html_format_editor
 install:
   - aim
   - aim_chatbot
@@ -11,6 +14,8 @@ config:
   actions:
     system.site:
       simpleConfigUpdate:
+        # The Welcome page in content/ (alias /welcome).
+        page.front: /welcome
         name: "Harbourside Community Library"
         slogan: "A fictional library, used to demonstrate AIM: agent memory built in Drupal"
     aim.settings:

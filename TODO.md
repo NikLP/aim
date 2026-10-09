@@ -76,6 +76,35 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
   is likely to be scrapped; aim's own chat is a demo that survives for now
   as a non-console way in.
 
+## Plugin, skills and the verbal webform demo (raised 2026-10-09, important)
+
+- [ ] **A Claude Code plugin for aim.** Bundle the skills (`aim-discovery`,
+      `aim-memory`, the ones below), the MCP server config with its OAuth
+      endpoint, and the tools (`aim_recall`, `aim_remember`, `aim_literal`).
+      MCP tools alone do not tell a model *when* to use them; the skills do.
+      Build once the grill-to-recipe skill exists, so version one has
+      something to show. Needs an ADR.
+- [ ] **Skill chain: grill, then recipe.** The grill writes site memory; a
+      recipe-building skill reads it and proposes a Recipe. ADR-0035's gate
+      applies (dry-run and human review before any apply). Own ADR.
+- [ ] **Verbal webform demo.** Chain: a webform builder tool (the `webform`
+      module is not installed; search drupal.org for an existing Webform
+      Tool API / MCP builder before building one) so a form is designed by
+      talking; annotations on each element (purpose, plain-language help, what
+      a good answer looks like); a walkthrough skill that asks each question,
+      writes the answer back, and uses aim for anything already known. Demo:
+      an everyman describes the form they want, then is interviewed through
+      it. Blockers: `annotations` has no write path and the `aim_annotations`
+      bridge (ADR-0024) is unbuilt; submissions need a narrow,
+      permission-gated write tool, not general entity writes.
+- [ ] **Re-check the personas and prompts wherever tools or access changed.**
+      The `aim_chatbot` agent persona (`config/sync/ai_agents.ai_agent.aim_chatbot.yml`)
+      and the library persona in `demo/seed.php` name `literals:lookup` and
+      assume what the assistant can see; check them if the assistant moves to
+      `aim_literal` (so `literals_tool` can be disabled), and now that a
+      signed-in member only gets facts through `view site aim facts`. Also
+      the `aim-discovery` and `aim-memory` skills.
+
 ## Recipes (raised 2026-09-27)
 
 - [ ] Apply `recipes/aim_demo_library` to an isolated scratch site (its
@@ -157,6 +186,23 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
     plugin code not opened).
   - `web/modules/contrib/ai_provider_typesafeai/tests/check-decision-api.php`
     (offline class check) has not been run.
+
+- [ ] **Re-measure consolidation after the 2026-10-09 changes.** `auto_threshold`
+      0.09 to 0.04, UPDATE line added to the consolidation prompt, supersession
+      rule added to the verifier's Noul question, and an ADD whose `merged_text`
+      differs from the kept text is now treated as UPDATE (verifier-gated).
+      Run the gold and merge sets to check for regressions; the seeded demo
+      cases (Code Club day change, computers 60 to 90 minutes) now pass.
+- [ ] **Atomic extraction.** Check the extraction prompt asks for one claim per
+      fact: a compound fact ("60 minutes, and printing costs 10p") makes a
+      later update a partial overwrite the verifier has to untangle.
+- [ ] **Jev rerank of recall results** (ADR-0036's re-rank, pinned): widen the
+      distance cutoff and have Jev filter the top N, aimed at paraphrase
+      misses ("wheelchair accessible" vs "step-free"). About 0.4 s per hosted
+      call; measure on the known misses first. Sends fact text to the model,
+      unlike the literals finder (key and gist only).
+- [ ] **Exercise `aim_update_10009`/`10010` on data with retired facts**; both
+      ran only against empty data. Check the facts View afterwards.
 
 ## Design review findings (raised 2026-10-02)
 

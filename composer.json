@@ -18,7 +18,8 @@
         "drupal/queue_ui": "Adds an admin UI button to manually run the aim_consolidate queue worker without a shell, see CLAUDE.md's Consolidation section.",
         "drupal/simple_oauth": "Required by aim_tool_oauth to let a remote MCP client (no Drupal session) authenticate as an OAuth2 client, see CLAUDE.md's MCP OAuth section.",
         "e0ipso/simple_oauth_21": "Required by aim_tool_oauth for RFC 9728 discovery metadata and dynamic client registration (not on drupal.org, this is its real Packagist name).",
-        "drupal/mcp_server_oauth": "Required by aim_tool_oauth to enforce OAuth2 scopes on aim_remember/aim_recall."
+        "drupal/mcp_server_oauth": "Required by aim_tool_oauth to enforce OAuth2 scopes on aim_remember/aim_recall.",
+        "drupal/ai_provider_ollama": "The shipped search_api.server.aim_vector embeds with ollama__nomic-embed-text:latest, so a local Ollama with that model pulled is needed unless the server is pointed at another embeddings provider."
     },
     "autoload": {
         "psr-4": {
