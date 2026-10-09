@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace Drupal\aim\Entity;
 
-use Drupal\Core\Entity\Attribute\ContentEntityType;
 use Drupal\Component\Utility\Unicode;
+use Drupal\Core\Entity\Attribute\ContentEntityType;
 use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\ContentEntityDeleteForm;
 use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Entity\EntityChangedInterface;
 use Drupal\Core\Entity\EntityChangedTrait;
+use Drupal\Core\Entity\EntityListBuilder;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityViewBuilder;
 use Drupal\Core\Entity\Form\DeleteMultipleForm;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\AimFactAccessControlHandler;
-use Drupal\aim\Routing\AimFactHtmlRouteProvider;
-use Drupal\aim\AimFactListBuilder;
 use Drupal\aim\AimFactViewsData;
+use Drupal\aim\Routing\AimFactHtmlRouteProvider;
 use Drupal\user\EntityOwnerInterface;
 use Drupal\user\EntityOwnerTrait;
 
@@ -37,7 +37,7 @@ use Drupal\user\EntityOwnerTrait;
   handlers: [
     'views_data' => AimFactViewsData::class,
     'view_builder' => EntityViewBuilder::class,
-    'list_builder' => AimFactListBuilder::class,
+    'list_builder' => EntityListBuilder::class,
     'access' => AimFactAccessControlHandler::class,
     'form' => [
       'default' => ContentEntityForm::class,

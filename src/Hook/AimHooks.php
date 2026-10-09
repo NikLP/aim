@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\aim\Hook;
 
-use Drupal\ai\AiVdbProviderPluginManager;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Hook\Order\Order;
+use Drupal\ai\AiVdbProviderPluginManager;
 use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;

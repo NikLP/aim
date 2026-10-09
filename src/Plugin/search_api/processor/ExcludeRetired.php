@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\aim\Plugin\search_api\processor;
 
-use Drupal\aim\Entity\AimFact;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\aim\Entity\AimFact;
 use Drupal\search_api\Attribute\SearchApiProcessor;
 use Drupal\search_api\Processor\ProcessorPluginBase;
 
