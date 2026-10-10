@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: f8170b37-a556-4b10-a43a-3a4cd4c4d06e
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'Community groups can book a meeting room for free, for up to 4 hours at a time.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

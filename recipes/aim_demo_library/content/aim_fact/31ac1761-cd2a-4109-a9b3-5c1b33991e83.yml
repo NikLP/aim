@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 31ac1761-cd2a-4109-a9b3-5c1b33991e83
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'Only assistance dogs are allowed inside the library.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

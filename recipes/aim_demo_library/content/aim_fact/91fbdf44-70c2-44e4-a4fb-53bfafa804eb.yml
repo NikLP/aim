@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 91fbdf44-70c2-44e4-a4fb-53bfafa804eb
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'You can reach the library by phone or at hello@harbourside-library.example.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

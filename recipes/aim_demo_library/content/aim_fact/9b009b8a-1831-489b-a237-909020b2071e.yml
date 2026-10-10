@@ -1,0 +1,22 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 9b009b8a-1831-489b-a237-909020b2071e
+  bundle: user
+  default_langcode: en
+default:
+  user:
+    -
+      target_id: 1
+  text:
+    -
+      value: 'Sam prefers short answers as bullet points.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

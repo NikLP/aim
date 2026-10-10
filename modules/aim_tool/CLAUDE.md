@@ -33,9 +33,13 @@ use of the tool at all, not which scopes it can write.
   own `scope_fields` stays unrefined - Tool API's refiner mechanism has
   no per-list-item equivalent.
 - `src/Plugin/tool/Tool/AimLiteral.php` - `aim_literal`, a thin wrapper over
-  the `literals` reader/search services (key or search words only; no
-  finder), gated on `read aim memory`. Lets a site expose literals under
-  aim's name without `literals_tool`.
+  the `literals.lookup` service (key, search words, or a question when
+  `literals_finder` is enabled), gated on `view literals` (or `view
+  restricted literals`), not `read aim memory`: literals check access per
+  value, so a signed-in member can use it in chat. The lookup tool
+  an aim site uses; `literals_tool`'s `literals:lookup` wraps the same
+  service for sites without aim. Only the attribute (ID, descriptions) and
+  the permission live here.
 - `config/optional/mcp_server_tool_bridge.mcp_tool_config.*.yml` - MCP
   exposure config, installs automatically once `mcp_server_tool_bridge`
   is enabled.

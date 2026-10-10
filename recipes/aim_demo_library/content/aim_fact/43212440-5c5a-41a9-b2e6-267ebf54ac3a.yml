@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 43212440-5c5a-41a9-b2e6-267ebf54ac3a
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'Code Club for ages 9 to 13 meets every Thursday at 4pm in the makerspace.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

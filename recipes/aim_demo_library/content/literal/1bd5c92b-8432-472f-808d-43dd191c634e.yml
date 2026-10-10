@@ -1,0 +1,28 @@
+_meta:
+  version: '1.0'
+  entity_type: literal
+  uuid: 1bd5c92b-8432-472f-808d-43dd191c634e
+  bundle: phone
+  default_langcode: en
+default:
+  id:
+    -
+      value: staff_line
+  status:
+    -
+      value: true
+  name:
+    -
+      value: 'Staff line'
+  restricted:
+    -
+      value: true
+  value:
+    -
+      value: '+44 1223 000111'
+  gist:
+    -
+      value: 'The phone number staff use to reach the library back office'
+  uid:
+    -
+      target_id: 1

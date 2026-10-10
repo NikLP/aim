@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 4e28a4e0-9c6e-479e-9bb8-93276b111d4f
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: "Baby Rhyme Time runs every Tuesday at 10:30am in the Children's Room."
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

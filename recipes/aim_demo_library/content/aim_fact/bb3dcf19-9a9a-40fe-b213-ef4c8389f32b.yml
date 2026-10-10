@@ -1,0 +1,22 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: bb3dcf19-9a9a-40fe-b213-ef4c8389f32b
+  bundle: role
+  default_langcode: en
+default:
+  subject:
+    -
+      value: content_editor
+  text:
+    -
+      value: 'News posts need a summary of no more than 160 characters.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

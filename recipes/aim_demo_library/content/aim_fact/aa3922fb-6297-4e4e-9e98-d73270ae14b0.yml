@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: aa3922fb-6297-4e4e-9e98-d73270ae14b0
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'The building is step-free, there is a hearing loop at the main desk, and large-print and audio books are shelved by the entrance.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

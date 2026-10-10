@@ -1,0 +1,22 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 48d41614-3622-4fef-949d-342befca9a87
+  bundle: role
+  default_langcode: en
+default:
+  subject:
+    -
+      value: content_editor
+  text:
+    -
+      value: 'Events must be published at least two weeks before they take place.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

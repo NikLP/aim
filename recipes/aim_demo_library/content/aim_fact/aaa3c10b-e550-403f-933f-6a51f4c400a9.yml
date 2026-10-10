@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: aaa3c10b-e550-403f-933f-6a51f4c400a9
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'The annual book sale is held on the first weekend of June in the main hall.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

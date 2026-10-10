@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: c41821c8-531c-44cc-b702-6c03c0590a73
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'Northlight Digital provides website support on weekdays from 9am to 5pm, and urgent problems go to the on-call number.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

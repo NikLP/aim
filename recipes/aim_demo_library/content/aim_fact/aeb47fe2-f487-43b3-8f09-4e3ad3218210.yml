@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: aeb47fe2-f487-43b3-8f09-4e3ad3218210
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'Borrowing history is deleted 30 days after an item is returned, unless the member opts in to keep it.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

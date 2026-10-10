@@ -1,0 +1,22 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 8d02509f-edc1-4735-af5b-ad348ecba6eb
+  bundle: user
+  default_langcode: en
+default:
+  user:
+    -
+      target_id: 1
+  text:
+    -
+      value: 'Sam wants the weekly website analytics summary on Monday mornings.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

@@ -1,0 +1,28 @@
+_meta:
+  version: '1.0'
+  entity_type: literal
+  uuid: 88e776e6-c091-4306-ba3d-2beb76a1b476
+  bundle: url
+  default_langcode: en
+default:
+  id:
+    -
+      value: my_account
+  status:
+    -
+      value: true
+  name:
+    -
+      value: 'My account'
+  restricted:
+    -
+      value: true
+  value:
+    -
+      value: /user
+  gist:
+    -
+      value: 'The page where a signed-in member sees their own account, ALSO check loans, fines or personal details'
+  uid:
+    -
+      target_id: 1

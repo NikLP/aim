@@ -1,0 +1,22 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 738ba251-d03d-4baa-9778-76853dff17da
+  bundle: case
+  default_langcode: en
+default:
+  subject:
+    -
+      value: case-7f1c595f
+  text:
+    -
+      value: 'The events calendar redesign was approved by the trustees on 3 September.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

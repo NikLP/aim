@@ -1,0 +1,22 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 5dd6af3e-b92e-41d6-9700-ccbf05e2983a
+  bundle: case
+  default_langcode: en
+default:
+  subject:
+    -
+      value: case-7f1c595f
+  text:
+    -
+      value: 'The old events page will redirect to the new calendar on launch day.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

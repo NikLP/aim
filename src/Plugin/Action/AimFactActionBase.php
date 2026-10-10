@@ -70,13 +70,13 @@ abstract class AimFactActionBase extends ActionBase implements ContainerFactoryP
   /**
    * {@inheritdoc}
    */
-  public function execute($entity = NULL) {
-    if ($entity instanceof AimFact && $this->apply($entity)) {
-      $entity->save();
+  public function execute($object = NULL) {
+    if ($object instanceof AimFact && $this->apply($object)) {
+      $object->save();
       $this->memoryManager->logAudit('Action @action applied to fact @id (scope @scope, uid @uid).', [
         '@action' => $this->getPluginId(),
-        '@id' => $entity->id(),
-        '@scope' => $entity->bundle(),
+        '@id' => $object->id(),
+        '@scope' => $object->bundle(),
         '@uid' => $this->currentUser->id(),
       ]);
     }

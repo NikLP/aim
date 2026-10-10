@@ -1,0 +1,22 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 554781d3-3c27-4a1c-81a9-2b13196f9dfe
+  bundle: case
+  default_langcode: en
+default:
+  subject:
+    -
+      value: case-7f1c595f
+  text:
+    -
+      value: 'Northlight Digital is building the events calendar with Views and a recurring-dates field.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

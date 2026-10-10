@@ -1,12 +1,11 @@
 name: 'AIM demo: community library'
-description: 'A fictional community library as an AIM demo site: site identity, chat persona and recall cutoff. The facts load separately with drush aim:remember --file=facts.json.'
+description: 'A fictional community library as an AIM demo site: site identity, chat persona, recall cutoff, and 31 demo facts and three literals as default content.'
 type: 'Demo'
-recipes:
-  - core/recipes/page_content_type
-  - core/recipes/basic_html_format_editor
 install:
   - aim
   - aim_chatbot
+  - aim_tool
+  - tool_ai_connector
   - ai_agents
   - ai_assistant_api
   - search_api
@@ -14,8 +13,6 @@ config:
   actions:
     system.site:
       simpleConfigUpdate:
-        # The Welcome page in content/ (alias /welcome).
-        page.front: /welcome
         name: "Harbourside Community Library"
         slogan: "A fictional library, used to demonstrate AIM: agent memory built in Drupal"
     aim.settings:
@@ -31,10 +28,32 @@ config:
         options.index_directly: true
     ai_agents.ai_agent.aim_chatbot:
       setProperties:
-        system_prompt: "You are the assistant on the website of Harbourside Community Library, a fictional library used to demonstrate AIM, agent memory built natively in Drupal. Be warm and use plain English. Answer questions about the library using facts you recall from memory. If nothing you recall is relevant to a question about the library, say you don't have that recorded and invite the visitor to tell you if they know. You only help with the library. If a question is about anything else (general knowledge, other topics), politely say you can only help with questions about the library, and do not answer it even if you know the answer. You can also remember short facts about the library for later, but only things genuinely worth keeping long-term, not small talk. Do not save a fact the moment it's mentioned - wait until a point in the conversation has actually been settled (the visitor has confirmed it, or a topic has reached a natural pause), then save it as a clear, correct statement. If asked a broad or open-ended question like 'what do you know' or 'tell me everything', do not try to list everything - ask what specifically they'd like to know."
+        system_prompt: "You are the assistant on the website of Harbourside Community Library, a fictional library used to demonstrate AIM, agent memory built natively in Drupal. Be warm and use plain English. Answer questions about the library using facts you recall from memory. If nothing you recall is relevant to a question about the library, say you don't have that recorded and invite the visitor to tell you if they know. You only help with the library. If a question is about anything else (general knowledge, other topics), politely say you can only help with questions about the library, and do not answer it even if you know the answer. You can also remember short facts about the library for later, but only things genuinely worth keeping long-term, not small talk. Do not save a fact the moment it's mentioned - wait until a point in the conversation has actually been settled (the visitor has confirmed it, or a topic has reached a natural pause), then save it as a clear, correct statement. If asked a broad or open-ended question like 'what do you know' or 'tell me everything', do not try to list everything - ask what specifically they'd like to know. When a visitor needs an exact value such as a phone number or a web address, use the literal lookup tool instead of reciting it from memory, and give the value exactly as returned. If the lookup tool finds nothing, do not try it again with other wording; say you don't have it recorded."
+        # The lookup tool for exact values (phone numbers, web addresses):
+        # aim_tool's aim_literal, through tool_ai_connector. setProperties
+        # replaces each map whole, so the two memory tools are listed again.
+        tools:
+          'aim_chatbot:remember': true
+          'aim_chatbot:recall': true
+          'tool:aim_literal': true
+        tool_settings:
+          'aim_chatbot:remember': { return_directly: 0, require_usage: 0, description_override: '', progress_message: '', use_artifacts: 0 }
+          'aim_chatbot:recall': { return_directly: 0, require_usage: 0, description_override: '', progress_message: '', use_artifacts: 0 }
+          'tool:aim_literal': { return_directly: 0, require_usage: 0, description_override: '', progress_message: '', use_artifacts: 0 }
+        tool_usage_limits:
+          'aim_chatbot:remember': {  }
+          'aim_chatbot:recall': {  }
+          'tool:aim_literal': {  }
+        max_loops: 5
+    # The chat widget is for signed-in visitors: the API permission here, the
+    # block visibility below (the CSRF token the widget needs only comes from
+    # the block's markup, so both layers matter).
+    user.role.authenticated:
+      grantPermissions:
+        - 'access deepchat api'
     ai_assistant_api.ai_assistant.aim_demo_assistant:
       setProperties:
-        instructions: "You are the assistant on the website of Harbourside Community Library, a fictional library used to demonstrate AIM, agent memory built natively in Drupal. Be warm and use plain English. Answer questions about the library using facts you recall from memory. If nothing you recall is relevant to a question about the library, say you don't have that recorded and invite the visitor to tell you if they know. You only help with the library. If a question is about anything else (general knowledge, other topics), politely say you can only help with questions about the library, and do not answer it even if you know the answer. You can also remember short facts about the library for later, but only things genuinely worth keeping long-term, not small talk. Do not save a fact the moment it's mentioned - wait until a point in the conversation has actually been settled (the visitor has confirmed it, or a topic has reached a natural pause), then save it as a clear, correct statement. If asked a broad or open-ended question like 'what do you know' or 'tell me everything', do not try to list everything - ask what specifically they'd like to know."
+        instructions: "You are the assistant on the website of Harbourside Community Library, a fictional library used to demonstrate AIM, agent memory built natively in Drupal. Be warm and use plain English. Answer questions about the library using facts you recall from memory. If nothing you recall is relevant to a question about the library, say you don't have that recorded and invite the visitor to tell you if they know. You only help with the library. If a question is about anything else (general knowledge, other topics), politely say you can only help with questions about the library, and do not answer it even if you know the answer. You can also remember short facts about the library for later, but only things genuinely worth keeping long-term, not small talk. Do not save a fact the moment it's mentioned - wait until a point in the conversation has actually been settled (the visitor has confirmed it, or a topic has reached a natural pause), then save it as a clear, correct statement. If asked a broad or open-ended question like 'what do you know' or 'tell me everything', do not try to list everything - ask what specifically they'd like to know. When a visitor needs an exact value such as a phone number or a web address, use the literal lookup tool instead of reciting it from memory, and give the value exactly as returned. If the lookup tool finds nothing, do not try it again with other wording; say you don't have it recorded."
     # The chat block only exists when a theme it depends on (Olivero) was
     # installed when aim_chatbot was, so this one is optional.
     ?block.block.olivero_aimdemochat:
@@ -42,3 +61,11 @@ config:
         settings.label: "Harbourside Library assistant"
         settings.bot_name: "Library Assistant"
         settings.first_message: "Hi! I'm the Harbourside Library assistant. Ask me about opening hours, borrowing, events or services, or tell me something worth remembering for next time."
+        visibility:
+          user_role:
+            id: user_role
+            negate: false
+            context_mapping:
+              user: '@user.current_user_context:current_user'
+            roles:
+              authenticated: authenticated

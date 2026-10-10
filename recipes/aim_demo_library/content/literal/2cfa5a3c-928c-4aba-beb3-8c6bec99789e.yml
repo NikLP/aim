@@ -1,0 +1,28 @@
+_meta:
+  version: '1.0'
+  entity_type: literal
+  uuid: 2cfa5a3c-928c-4aba-beb3-8c6bec99789e
+  bundle: phone
+  default_langcode: en
+default:
+  id:
+    -
+      value: main_phone
+  status:
+    -
+      value: true
+  name:
+    -
+      value: 'Main phone'
+  restricted:
+    -
+      value: false
+  value:
+    -
+      value: '+44 1223 000000'
+  gist:
+    -
+      value: 'The library main phone number, ALSO customer service and speaking to a librarian'
+  uid:
+    -
+      target_id: 1

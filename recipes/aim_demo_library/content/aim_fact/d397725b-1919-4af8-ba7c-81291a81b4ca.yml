@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: d397725b-1919-4af8-ba7c-81291a81b4ca
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'Public computers can be booked for 60 minutes at a time, and printing costs 10p per black-and-white page.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

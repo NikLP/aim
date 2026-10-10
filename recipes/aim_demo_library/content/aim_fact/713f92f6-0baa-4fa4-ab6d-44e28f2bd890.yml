@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 713f92f6-0baa-4fa4-ab6d-44e28f2bd890
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: "The library's writing style is warm and plain English with no jargon, and it addresses readers as 'you'."
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

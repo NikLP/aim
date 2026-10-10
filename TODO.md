@@ -26,15 +26,16 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       use it from `aim_recall`.
 - [x] **Exact values as a tool, not a recall path.** Reworked 2026-10-09: the
       finder is not called from `aim_recall` (it was finder-first for a day).
-      The on-site assistant gets `tool:literals:lookup` through
-      `tool_ai_connector`; the large model is the gate for one-shot
-      lookups. `aim` depends on `literals`, not `literals_finder`.
+      The on-site assistant gets the lookup tool through
+      `tool_ai_connector` (`aim_literal` from 2026-10-10, see below); the
+      large model is the gate for one-shot lookups. `aim` depends on `literals`, not `literals_finder`.
 - [ ] **Review literal access (raised 2026-10-09).** Two layers can disagree:
-      a literal's audience (anonymous, authenticated, restricted) and the
+      a literal's view rule (`view literals`, plus `view restricted literals`
+      for a restricted one; audiences were removed 2026-10-10) and the
       resolver's own access check on the target (a `url` literal checks the
-      route). `/user/login` has audience anonymous but the route denies a
+      route). `/user/login` is unrestricted but the route denies a
       signed-in user, so the finder reports a match and the lookup returns
-      `none`, silently. Decide one model (audience only, resolver only, or
+      `none`, silently. Decide one model (literal rule only, resolver only, or
       the stricter of both surfaced to the author at save time) and make a
       mismatch visible.
 - [ ] **Convert-a-fact retires the fact.** Promoting an extracted one-shot
@@ -48,7 +49,7 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       smoothing: the large model writes the reply around the resolved
       value; default to public (anonymous) values only. Escalation: a
       "think harder" control on a mode 1 answer re-runs the question
-      through mode 2 or full recall. The audience rule is a trade-off to
+      through mode 2 or full recall. The public-values-only rule is a trade-off to
       keep and revisit, not a settled principle.
 - [ ] **Optional pre-gate.** A tiny "is this a lookup?" question with no menu
       in its prompt, ahead of the finder, so non-lookup traffic does not pay
@@ -60,12 +61,19 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       against the large model doing the same lookup, on the same questions.
       This decides whether literals saves anything (ADR-0052 decision 3).
 - [ ] **Copy controls** ("copy value", "copy link") on chat answers, shown by
-      role or audience: front-end work; the chat items already carry value,
+      role or permission: front-end work; the chat items already carry value,
       label and kind.
 - [ ] **A blind question set written by Nik** (about 15 to 40 questions,
       without looking at `eval/gold.seed.yml`), then re-check
       `chooser_context` and the thresholds. All numbers so far are
       in-sample.
+- [ ] **Revisit example phrasings per literal (raised 2026-10-10).** ADR-0040
+      "Deferred and pinned" has the history and the `ALSO` convention.
+      Intent-matching systems (Dialogflow, Rasa, Azure custom question
+      answering) all treat several example phrasings per answer as the main
+      lever, which our "wider alias list pulled near-topic questions in"
+      trial contradicts on one in-sample run. Re-test after the blind set
+      above, against the in-gist `ALSO` convention.
 - [ ] **Demo** ([ADR-0054](../literals/adr/0054-demo-the-scottish-play.md)):
       theater seed set, on-screen decision-request viewer, a miss fallback,
       a local fallback. Target: DrupalCon or a Drupal camp in Scotland,
@@ -97,13 +105,34 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       it. Blockers: `annotations` has no write path and the `aim_annotations`
       bridge (ADR-0024) is unbuilt; submissions need a narrow,
       permission-gated write tool, not general entity writes.
-- [ ] **Re-check the personas and prompts wherever tools or access changed.**
-      The `aim_chatbot` agent persona (`config/sync/ai_agents.ai_agent.aim_chatbot.yml`)
-      and the library persona in `demo/seed.php` name `literals:lookup` and
-      assume what the assistant can see; check them if the assistant moves to
-      `aim_literal` (so `literals_tool` can be disabled), and now that a
-      signed-in member only gets facts through `view site aim facts`. Also
+- [x] **Switch the assistant to `aim_literal` (done 2026-10-10).**
+      The `aim_demo_library` recipe adds `tool:aim_literal` to the `aim_chatbot` agent
+      (plus the widget's block visibility and `access deepchat api`), and
+      the demo README and preflight use it. `literals_tool` is still
+      enabled on this site but no longer needed by the demo.
+- [x] **Replace `demo/seed.php` with recipe content (done 2026-10-10).**
+      The 31 facts and three literals are default content in
+      `recipes/aim_demo_library/content/`, the full persona is in the
+      recipe's config actions, and `demo/seed.php`, `demo/seed-facts.json`
+      and the recipe's `facts.json` are deleted. Guardrails run on import
+      (core's importer validates). The Welcome page node went with
+      `page_content_type`, `basic_html_format_editor` and `page.front`.
+- [ ] **Apply `aim_demo_library` to a fresh install (raised 2026-10-10).**
+      The reset on this site (delete facts, re-apply; commands in
+      `demo/README.md`) ran 2026-10-10: 31 facts indexed on import, all 13
+      pre-flight checks passed. A fresh install is still untested. Also
+      decide whether the demo needs a front page again.
+- [ ] **Re-check what the personas assume the assistant can see** (a
+      signed-in member only gets facts through `view site aim facts`;
+      `aim_literal` needs only `view literals` since 2026-10-10), and
       the `aim-discovery` and `aim-memory` skills.
+- [x] **A `field` literal resolver (built 2026-10-10, `FieldResolver`, shipped `field` type).** Returns one field's
+      value from one entity, `entity_type:id:field_name` (for example
+      `site_settings:3:field_phone`), so Site Settings, Config Pages or any
+      node field can back a literal without a bridge module per source. The
+      existing `entity` resolver returns a link to the entity instead.
+      Access is the intersection: the literal's own view rule and the
+      field's `$item->access('view', $account)`; document that choice.
 
 ## Recipes (raised 2026-09-27)
 
@@ -147,8 +176,8 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       "decision path within X points of chat accuracy at under Y s per pair".
 - [ ] Model eval sets (verified 2026-10-02; none built): (a) classifyPair
       gold set, 15-25 (kept, candidate) pairs per ADD/UPDATE/DELETE/NOOP
-      with hard negatives, human-verified labels (`demo/seed-facts.json` has
-      only ~23 facts, so most pairs are hand-written); (b) verifyMerge set
+      with hard negatives, human-verified labels (the demo recipe has only 31
+      facts, so most pairs are hand-written); (b) verifyMerge set
       from mutated good merges, also try split noul questions (keeps A,
       keeps B, adds nothing); (c) add to the `gate` set in `decision-eval-sets.json`
       site-context contradictions. Synthetic data only for hosted Jev.
@@ -328,8 +357,8 @@ are recommendations.
       `remember()` bypasses it - decide whether callers passing
       `trusted: TRUE` should need the permission.
 - [ ] **Loop back to the trust permission (raised 2026-10-09).** Nobody
-      holds `trust {scope} aim facts` and the ADR-0037 grounded check (Jev)
-      now sets `trusted` automatically, so it guards a workflow that is not
+      holds `trust {scope} aim facts` and the ADR-0037 grounded check (Jev,
+      not built yet) is to set `trusted` automatically, so it guards a workflow that is not
       running. Decide whether it is for a human clearing what the verifier
       rejects (then likely one `review` permission, not one per scope) or
       goes, with the trust actions falling back to `administer aim memory`.

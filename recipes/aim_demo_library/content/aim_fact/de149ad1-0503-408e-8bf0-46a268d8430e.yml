@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: de149ad1-0503-408e-8bf0-46a268d8430e
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'Members can borrow up to 20 items at a time for 3 weeks, and can renew twice online unless another member has reserved the item.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

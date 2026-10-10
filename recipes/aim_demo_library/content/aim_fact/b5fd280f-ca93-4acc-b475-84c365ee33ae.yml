@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: b5fd280f-ca93-4acc-b475-84c365ee33ae
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'The library stopped charging overdue fines in 2022, and items not returned after 8 weeks are billed at replacement cost.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

@@ -1,0 +1,22 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 59acdb88-2681-46b1-b520-61c88c0b7cdf
+  bundle: role
+  default_langcode: en
+default:
+  subject:
+    -
+      value: content_editor
+  text:
+    -
+      value: 'Editors must add alt text to every image before publishing.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 4e4c85e1-f379-4af2-a117-b176a9bb88d5
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'The library is closed on public holidays and on the last Friday of every month for staff training.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

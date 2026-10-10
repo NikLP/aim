@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 6394b8f8-8e75-4983-a949-42e37b968d02
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'The library website is built on Drupal 11 and maintained by the agency Northlight Digital.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

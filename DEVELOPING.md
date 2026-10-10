@@ -504,15 +504,18 @@ literals is the value store behind it. They meet in two small places:
   tokens. Use a token for a sentence that says something the literal does
   not; a fact that only points at a literal duplicates the literal's
   description. Not enforced.
-- **A lookup tool the assistant calls.** `literals:lookup` (a Tool API tool
-  from `literals_tool`) is exposed to the on-site assistant through
-  `tool_ai_connector` as `tool:literals:lookup`, listed in the
-  `aim_chatbot` agent's tools, and over MCP as `literals_lookup`. The large
+- **A lookup tool the assistant calls.** An aim site uses `aim_tool`'s
+  `aim_literal` (decided 2026-10-10), exposed to the on-site assistant
+  through `tool_ai_connector` and over MCP; `literals_tool`'s
+  `literals:lookup` is for sites running `literals` without aim. Both are
+  thin wrappers over the one `literals.lookup` service, so they behave
+  identically. The demo recipe (`aim_demo_library`) gives its agent
+  `tool:aim_literal`. The large
   model decides when it needs an exact value and calls it (by key, search
   words or question); the model is the gate for "is this a one-shot lookup",
   so recall does not call the literals finder and the two paths never
   compete. The finder (`literals_finder`) is optional and only matters for
-  the tool's `question` mode; `aim` does not depend on it. The demo persona
+  the `question` mode; `aim` does not depend on it. The demo persona
   tells the assistant to use the tool for phone numbers and web addresses.
 
 ### Recall gap
@@ -951,14 +954,18 @@ ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>
 ```
 
 - **`aim_demo_library`**: a fictional community library (site identity,
-  chat persona, recall cutoff, `index_directly`) plus `facts.json`, loaded
-  afterwards with `drush aim:remember --file`. The first archetype starter
-  kit ([ADR-0014](adr/0014-usecase-archetype-starter-kits.md)). Details and
-  caveats in its [README](recipes/aim_demo_library/README.md).
-- **Facts are not recipe content.** A recipe's default content saves
-  entities directly, and it is unverified whether that runs Guardrails,
-  embedding and indexing. `aim:remember --file` goes through `remember()`,
-  so they always do.
+  chat persona, recall cutoff, `index_directly`) plus its 31 facts and
+  three literals as default content in `content/`. This site's demo kit
+  (`demo/` in the site shell) is reset with it. The first archetype
+  starter kit ([ADR-0014](adr/0014-usecase-archetype-starter-kits.md)).
+  Details and caveats in its [README](recipes/aim_demo_library/README.md).
+- **Facts as recipe content skip `remember()`.** Core's importer saves
+  entities directly, but calls `validate()` first, so the Guardrails
+  constraint on `text` still runs (a violation aborts the apply). With
+  `index_directly` on they are embedded and indexed as they are imported
+  (verified 2026-10-10, 31 facts); without it, run
+  `drush search-api:index aim_vector_index` after applying.
+  `aim:remember --file` goes through `remember()` and always indexes.
 - **No `aim_mcp` recipe, deliberately.** The remote-MCP stack is already
   shipped: `aim_tool` carries the tool configs, `aim_tool_oauth` the
   scopes and the tool-gating settings, and the `simple_oauth`/`mcp_server`
@@ -973,8 +980,8 @@ ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>
   ddev drush php:eval '\Drupal\Core\Recipe\Recipe::createFromDirectory("/var/www/html/web/modules/custom/aim/recipes/<name>");'
   ```
 
-  No output means valid. That is all that has been checked so far: no
-  recipe here has been applied to a site.
+  No output means valid. `aim_demo_library` has been applied to this
+  site (2026-10-10); none has been applied to a fresh install yet.
 - Config actions on config entities use `setProperties` (dotted keys reach
   nested values without replacing the rest); `simpleConfigUpdate` is for
   simple config like `system.site` and `aim.settings`.
@@ -984,11 +991,13 @@ ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>
 ## Default content export
 
 ```bash
-vendor/bin/dr content:export aim_fact <id>
+ddev drush content:export aim_fact --dir=/var/www/html/web/modules/custom/aim/recipes/<name>/content
 ```
 
-Not `web/core/scripts/drupal` - its autoload path assumes `vendor/`
-inside the docroot, wrong for this project's layout. Pure read of entity
+Drush's command wraps core's exporter; core's own `dr` script and
+`web/core/scripts/drupal` fail under this project's layout. Without an ID
+it exports every fact (`--bundle=site` narrows it). `created`/`changed`
+are left out by core, so imported facts are dated by the import. Pure read of entity
 field data - never touches search_api/the vector collection table;
 reindex after import is required regardless. Don't use
 `--with-dependencies` to carry `uid` through - the exporter includes the

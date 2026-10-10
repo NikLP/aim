@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 489cf361-500b-4096-a773-d07fbe482802
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'Harbourside Community Library is open Monday to Friday from 9am to 8pm, Saturday from 10am to 5pm, and Sunday from 12pm to 4pm.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

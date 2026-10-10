@@ -1,0 +1,22 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 117f7d3c-27f0-4081-ac84-5f6412d47c78
+  bundle: role
+  default_langcode: en
+default:
+  subject:
+    -
+      value: communications_manager
+  text:
+    -
+      value: 'Only the Communications Manager can publish press releases.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

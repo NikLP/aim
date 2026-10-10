@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: ef65e177-1a4d-4c16-94ef-2f3072351aa8
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'Membership is free for residents of the borough, and children under 16 need a parent or guardian to sign up.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

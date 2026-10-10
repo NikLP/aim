@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 8e3b1841-8e17-4d2e-88fb-47776f3b6da6
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'Free Wi-Fi is available in the building on the network Harbourside_Public, and it needs no password.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

@@ -1,0 +1,22 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 0ed2c0b2-83c0-4af6-8c76-1dafa2723b70
+  bundle: user
+  default_langcode: en
+default:
+  user:
+    -
+      target_id: 1
+  text:
+    -
+      value: "Sam Okafor is the library's Head of Digital and the site administrator."
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

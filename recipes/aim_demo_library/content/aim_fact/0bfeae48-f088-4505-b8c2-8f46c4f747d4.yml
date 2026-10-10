@@ -1,0 +1,19 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 0bfeae48-f088-4505-b8c2-8f46c4f747d4
+  bundle: site
+  default_langcode: en
+default:
+  text:
+    -
+      value: 'The makerspace has two 3D printers, and users must complete a 20-minute induction before using them.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0

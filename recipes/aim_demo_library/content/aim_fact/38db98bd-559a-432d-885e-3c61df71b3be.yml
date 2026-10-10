@@ -1,0 +1,22 @@
+_meta:
+  version: '1.0'
+  entity_type: aim_fact
+  uuid: 38db98bd-559a-432d-885e-3c61df71b3be
+  bundle: user
+  default_langcode: en
+default:
+  user:
+    -
+      target_id: 1
+  text:
+    -
+      value: 'Sam is presenting the new events calendar to the trustees on 14 October.'
+  source:
+    -
+      value: demo-seed
+  trusted:
+    -
+      value: true
+  uid:
+    -
+      target_id: 0
