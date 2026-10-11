@@ -12,19 +12,16 @@ The Active table is one list; these are the threads running through it.
   literals, answer modes), [0053](0053-gist-shared-vocabulary.md),
   [0046](0046-core-cutoff-time-axis-and-shared-gist-finder.md); parked
   extensions in [0049](0049-finder-family-parked.md).
-- **Annotations bridge** (blocked on the Annotations write path and trust
-  gate; the WebMCP direction may supersede much of it) -
-  [0024](0024-annotations-integration-target-scoped-promotion.md),
-  [0041](0041-annotation-guided-webform-prefill.md),
-  [0042](0042-fact-compiled-briefs.md),
-  [0043](0043-content-truth-drift-audit.md).
+- **Annotations bridge** (prerequisites cleared 2026-10-11, bridge module
+  unbuilt; the WebMCP direction may supersede part of it) -
+  [0024](0024-annotations-integration-target-scoped-promotion.md) (with the
+  former 0041 and 0042), [0043](0043-content-truth-drift-audit.md),
+  [0053](0053-gist-shared-vocabulary.md).
 - **Write-path gate and decision models** -
   [0002](0002-governance-deferred-guardrails-mandatory.md),
-  [0033](0033-plausibility-gate-processing-modes.md) with
-  [0037](0037-transient-source-passages-for-grounding.md) (the grounded check, built 2026-10-11),
+  [0037](resolved/0037-transient-source-passages-for-grounding.md) (the grounded check, built 2026-10-11, with the gate semantics of the former 0033),
   [0056](0056-personal-data-write-gate.md) (personal-data gate, parked),
-  [0021](0021-jev-typed-decision-provider.md),
-  [0038](0038-local-decision-models-parked.md) (parked),
+  [0021](0021-jev-typed-decision-provider.md) (decision models: hosted Jev live, local parked, with the former 0038),
   [0035](0035-standing-constraints-action-gate.md),
   [0036](0036-memory-algorithm-appraisal.md) (research).
 - **Chat, tools and front ends** - [0008](0008-chatbot-integration-mechanism.md)
@@ -39,25 +36,17 @@ Still carrying work, proposed, or deferred.
 | --- | --- | --- |
 | [0002](0002-governance-deferred-guardrails-mandatory.md) | Governance deferred for PoC; Guardrails mandatory from day one | Accepted; draft-to-trusted resolved as a lightweight flag (not Content Moderation) 2026-09-28, built 2026-09-28; the `trusted` override on `remember()` is still ungated (TODO.md) |
 | [0008](0008-chatbot-integration-mechanism.md) | Chatbot integration: `ai_agents` tools, not a CCC content source; addendum 2026-10-08 holds the former 0034 (split public read-only and staff write assistants, gated by tool permission) | Accepted; addendum proposed, not built |
-| [0012](0012-fact-relation-graph.md) | Fact-to-fact relation graph and multi-hop retrieval | Parked 2026-10-08 - no consumer; kept as reference |
-| [0014](0014-usecase-archetype-starter-kits.md) | Use-case archetype starter kits via Recipes | Parked 2026-10-08 - two Recipes exist; catalog not pursued |
 | [0016](0016-document-ingestion-ui.md) | Document ingestion via a Drupal form: three modes, one shared core | Mode 1 accepted (build now); Mode 2 blocked on ADR-0002; Mode 3 out of scope |
-| [0019](0019-recall-abstention-distance-cutoff.md) | Recall abstention via a distance cutoff, and what bounds recall quality | Accepted - chatbot cutoff built 2026-09-19; follow-ups not built |
 | [0020](0020-verbatim-facts-consolidation-opt-out.md) | Verbatim facts: an explicit opt-out from consolidation | Proposed - analyzed, not built; build/no-build undecided |
-| [0021](0021-jev-typed-decision-provider.md) | Jev (TypeSafe AI) as a typed-decision provider: spike, not adoption; addendum on Laya, an open-source alternative | Deferred, updated 2026-10-02 - Decision API now in core `drupal/ai` 1.6, Ollama serves decision models (tev1); no spike scheduled |
-| [0024](0024-annotations-integration-target-scoped-promotion.md) | Annotations integration: facts scoped to annotation targets, review as promotion | Proposed - blocker 2 (Annotations write path) done 2026-09-28; blocker 1 (trust gate) designed, not built; `scope: entity` + its ADR-0025 plugin now built ([ADR-0027](resolved/0027-entity-scope.md), 2026-09-29); the bridge module's own write path is still unbuilt |
+| [0021](0021-jev-typed-decision-provider.md) | Decision models: hosted Jev is the live path, local models measured and parked; absorbs the former 0033 (processing modes) and 0038 (local models, small-machine runbook) | Accepted as current state, rewritten 2026-10-11; pass bar, retention and per-model config open (TODO.md) |
+| [0024](0024-annotations-integration-target-scoped-promotion.md) | Annotations bridge: facts scoped to annotation targets, review as promotion; absorbs the former 0041 (Webform pre-fill) and 0042 (fact-compiled briefs) | Proposed - design only; prerequisites cleared (the `trusted` flag built, Annotations write path exists in the dev copy, `scope: entity` built); bridge module unbuilt |
 | [0029](0029-context-carrying-turns.md) | Context-carrying turns: mention tokens, an API-first console with context chips, `batch_id` provenance, one review pipeline | Accepted 2026-09-30 - design only, not built |
 | [0030](0030-fact-groups.md) | Fact groups: a scope-agnostic `group` field shipped as an `aim_group` submodule, plus a generic `recall()` filter seam | Accepted 2026-09-30 - design only, not built |
-| [0031](0031-cron-fallback-for-queue-processing.md) | Opt-in `hook_cron` fallback for queue processing, alongside the dedicated crontab | Proposed 2026-09-30 - design only, not built; amends 0003 |
+| [0031](0031-cron-fallback-for-queue-processing.md) | Opt-in `hook_cron` fallback for queue processing, alongside the dedicated crontab | Proposed 2026-09-30 - design only, not built (ADR-0057's `hook_cron` expiry sweep is a separate, built thing); amends 0003 |
 | [0032](0032-dated-category-listing-for-quick-notes.md) | No `event` scope for diary-style notes: category + `asserted` date, a non-vector list method, and tid-based capture in the Tool API | Proposed 2026-10-01 - design only, not built |
-| [0033](0033-plausibility-gate-processing-modes.md) | Plausibility gate on new facts: untrusted until scored, fail closed, and queued vs inline vs post-response processing | Proposed 2026-10-01, addendum 2026-10-02 - design only, not built; measured on the dev laptop (laya:en, then tev1:4b) |
 | [0035](0035-standing-constraints-action-gate.md) | Standing constraints: structured "don't build X until Y" facts enforced by a deterministic action-layer gate, semantic recall advisory only | Proposed 2026-10-01 - design only, not built |
 | [0036](0036-memory-algorithm-appraisal.md) | Memory algorithm appraisal: what to borrow from the literature (recency/importance re-rank, RRF, decay), and what aim does badly | Proposed 2026-10-02 - research only, nothing built |
-| [0037](0037-transient-source-passages-for-grounding.md) | Transient source passages (side table + pointer, deleted after the check) so a decision model can check a candidate against what was actually said | Built 2026-10-11 as a write-time check (no stored passages, decisions 1-4 replaced); shadow mode on this site |
-| [0038](0038-local-decision-models-parked.md) | Local decision models: measured, parked, and how to bring one back (Laya, `tev1`, memory-capped services) | Parked |
 | [0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md) | Literals: a standalone `literal` entity (name, key, value, gist, type, restricted flag) found by a decision-model chooser over the whole menu; values never reach the model; `aim` consumes the finder, no scope or mirror | Accepted, built through finder/tool/search; rewritten 2026-10-07 as current state (history in git); supersedes 0039 |
-| [0041](0041-annotation-guided-webform-prefill.md) | Annotation-guided Webform pre-fill: annotations describe each field, an agent fills it from recalled facts and literals as the viewing account | Proposed 2026-10-04 - design only, not built; replaces the 2026-10-03 interview-to-Webform draft |
-| [0042](0042-fact-compiled-briefs.md) | Fact-compiled briefs: a readable per-subject document compiled from trusted facts, following the `annotations_docs` pattern (draft, edit, lock, publish) | Proposed 2026-10-04 - design only, not built; prompted by the "agents need documentation" critique |
 | [0043](0043-content-truth-drift-audit.md) | Content-versus-truth drift audit: live facts as an independent reference, a typed decision flags published content that contradicts them, human resolves | Proposed 2026-10-04 - design only, not built; needs a content index and a measured false-positive rate |
 | [0044](0044-tool-api-method-attributes.md) | Tool API method attributes (drupal/tool MR 162): watch upstream, design new tools as typed service methods with explicit value objects | Proposed 2026-10-04 - watching brief, nothing built |
 | [0046](0046-core-cutoff-time-axis-and-shared-gist-finder.md) | Where core stops: time as a retrieval axis instead of a `kind`, sibling modules for other semantics, literals standalone; absorbs the former 0045 (memory kinds: `aim_fact` is semantic by design, defer a `kind` field) | Proposed 2026-10-04, updated 2026-10-08 - pieces 1-3 design only; 4 done, 5 became `literals_finder` + 0049 |
@@ -86,13 +75,17 @@ remains binding, it just has nothing left to build.
 | [0009](resolved/0009-recipe-apply-safety-gate.md) | No unattended `drush recipe apply` on an AI-generated recipe | Retired 2026-10-02 - subsumed by 0035's action gate; never built |
 | [0010](resolved/0010-drupal-native-agent-memory-rationale.md) | Original rationale, market appraisal, and risk analysis (folded in from repo root 2026-09-10) | Founding rationale; binding decisions superseded by 0001-0009; open questions live in TODO.md |
 | [0011](resolved/0011-extraction-explicit-subject-uid.md) | Extraction never guesses scope=user account matches; requires explicit `--subject-uid` | Accepted - built |
+| [0012](resolved/0012-fact-relation-graph.md) | Fact-to-fact relation graph and multi-hop retrieval | Retired 2026-10-11 (parked 2026-10-08) - no consumer; revisit trigger in TODO.md |
 | [0013](resolved/0013-mcp-tool-exposure.md) | MCP tool exposure via Tool API (`tool`/`mcp_server`/`mcp_server_tool_bridge`) | Accepted - built and OAuth-authenticated, 2026-09-12/13 |
+| [0014](resolved/0014-usecase-archetype-starter-kits.md) | Use-case archetype starter kits via Recipes | Retired 2026-10-11 (parked 2026-10-08) - two Recipes exist; revisit trigger in TODO.md |
 | [0015](resolved/0015-immediate-consolidation-considered-deferred.md) | Immediate post-write consolidation via kernel.terminate | Deferred - closed on this site by `index_directly`; design kept for hosted embeddings |
 | [0017](resolved/0017-query-embedding-cache.md) | Query-embedding cache via a drupal/ai event subscriber | Accepted - built and verified 2026-09-27 |
 | [0018](resolved/0018-index-subject-uid-with-btree.md) | Index `subject_uid` as a Search API attribute, with a BTREE index on its column | Accepted - built and verified 2026-09-26 |
+| [0019](resolved/0019-recall-abstention-distance-cutoff.md) | Recall abstention via a distance cutoff, and what bounds recall quality | Accepted - built 2026-09-19/27; `aim:calibrate` follow-up in TODO.md |
 | [0022](resolved/0022-exclude-retired-facts-from-vector-index.md) | Retired facts stay out of the vector index (Search API processor) | Accepted - built and rolled out 2026-09-26 |
 | [0023](resolved/0023-hnsw-tuning-and-thin-provider-shim.md) | HNSW tuning (M=16, ef_search=100), and keeping the provider shim thin | Accepted - built and verified 2026-09-26 |
 | [0025](resolved/0025-scope-access-plugin-type.md) | Scope-specific view access as a plugin type, not hardcoded bundle branches | Accepted - built and verified 2026-09-28; widened by 0028 |
 | [0026](resolved/0026-pluggable-scope-submodules.md) | Pluggable scope submodules: ThirdPartySettings for config, ADR-0025's plugin type for behavior | Built (pieces 1-5); piece 6, the bundling recipe, tracked in TODO.md |
 | [0027](resolved/0027-entity-scope.md) | `scope: entity`: facts about an arbitrary Drupal entity, view access mirroring that entity's own | Built and verified 2026-09-29; remaining polish tracked in TODO.md |
 | [0028](resolved/0028-scope-type-plugin.md) | Widen the scope-access plugin into a scope-type plugin: fields, settings, and behavior in one seam | Built and verified 2026-09-29 (pieces 0-4) |
+| [0037](resolved/0037-transient-source-passages-for-grounding.md) | Grounded check: a decision model checks a candidate fact against the text it was written from, at write time, nothing stored; absorbs the gate semantics of the former 0033 | Built 2026-10-11 (shadow mode on this site); enforce decision, length cap and follow-ups in TODO.md |

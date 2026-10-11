@@ -1,6 +1,6 @@
 # ADR-0014: Use-case archetype starter kits via Recipes
 
-**Status:** Parked 2026-10-08. Two Recipes exist (`recipes/aim_demo_library`, `recipes/aim_ollama_local`); the archetype catalog is not being pursued beyond them. Was: Proposed - exploratory best-guess estimate, not an accepted
+**Status:** Retired 2026-10-11 (parked 2026-10-08; revisit trigger in TODO.md). Two Recipes exist (`recipes/aim_demo_library`, `recipes/aim_ollama_local`); the archetype catalog is not being pursued beyond them. Was: Proposed - exploratory best-guess estimate, not an accepted
 design and not built. Written to scope the idea and flag open questions
 before any Skill/config work starts, not to lock in a mechanism.
 **Date:** 2026-09-14
@@ -28,7 +28,7 @@ set). Both are the same unanswered question seen from different angles -
 this ADR is the first attempt at an actual shape, folding both in rather
 than tracking them as two separate loose ends.
 
-retired [ADR-0009](resolved/0009-recipe-apply-safety-gate.md) (now [ADR-0035](0035-standing-constraints-action-gate.md)) already settled the *safety*
+retired [ADR-0009](0009-recipe-apply-safety-gate.md) (now [ADR-0035](../0035-standing-constraints-action-gate.md)) already settled the *safety*
 question for applying an AI-generated Recipe (dry-run/review gate, no
 unattended `drush recipe apply`). It says nothing about what recipes get
 offered or how discovery differs per use case - that's this ADR's
@@ -75,7 +75,7 @@ assuming one needs to be written from scratch.
   swap.
 - **Guardrail-set fragmentation.** Multiple named Guardrail sets is more
   governance surface than one - and sits ahead of
-  [ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s still-
+  [ADR-0002](../0002-governance-deferred-guardrails-mandatory.md)'s still-
   deferred Content Moderation gate, which will eventually want to reason
   about all of them uniformly. Don't let per-archetype sets drift
   independently once that gate lands; reconcile then, not before.

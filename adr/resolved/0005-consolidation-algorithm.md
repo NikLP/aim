@@ -91,7 +91,7 @@ audit trail) still occupy result slots: on the live site every live site
 fact has a retired twin, and `recall()` at limit 5 returns 2-3 rows.
 Measured, with the recommended over-fetch fix and why an index-level
 flag is not the first choice, in
-[ADR-0019](../0019-recall-abstention-distance-cutoff.md). Resolved
+[ADR-0019](0019-recall-abstention-distance-cutoff.md). Resolved
 2026-09-26 differently: retired facts are now excluded from the index by
 a Search API processor, [ADR-0022](0022-exclude-retired-facts-from-vector-index.md).
 The PHP `expires` filters above stay as a safety net for the gap before
@@ -116,7 +116,7 @@ Raised while testing this mechanism against real data for the first time
 manufactured a duplicate to exercise it). The name `related` was
 deliberately generic, per this ADR's original text, to double as "the
 explicit graph half of aim's fact-to-fact relations idea" - but
-[ADR-0012](../0012-fact-relation-graph.md), written the same month, already
+[ADR-0012](0012-fact-relation-graph.md), written the same month, already
 concluded that idea should get its own typed relation entity instead of
 reusing this field, since an authored semantic edge needs a type/
 confidence/provenance that a bare `entity_reference` can't carry. That

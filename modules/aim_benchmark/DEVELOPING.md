@@ -81,4 +81,4 @@ added 2026-10-11 reviewed with Nik the same day). The drift sets belong to ADR-0
 prototype. Output: accuracy, a confusion matrix and unsafe errors (a
 data-losing UPDATE/RETIRE) for pairs; AUC, errors at the live cutoff and
 score ranges for merges and grounding; per-call time. Local-model results:
-[ADR-0038](../../adr/0038-local-decision-models-parked.md).
+[ADR-0021](../../adr/0021-jev-typed-decision-provider.md).

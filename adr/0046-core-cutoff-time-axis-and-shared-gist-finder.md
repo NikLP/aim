@@ -148,7 +148,7 @@ scoped, retrievable statements of site and organizational truth: one kind.
 skipping episodic and revising procedural in place; recall ranked by
 recency for episodic and by trigger for procedural; episodic needing an
 event time and procedural a trigger and an outcome
-([ADR-0012](0012-fact-relation-graph.md)). Costs: an update hook, a vector
+([ADR-0012](resolved/0012-fact-relation-graph.md)). Costs: an update hook, a vector
 index schema change if filterable, classifying extraction prompts (a new
 hallucination surface on every write), consolidation branching, admin UI.
 Benefit today: near zero, because no live data would populate it.

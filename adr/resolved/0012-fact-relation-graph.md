@@ -1,6 +1,6 @@
 # ADR-0012: Fact-to-fact relation graph and multi-hop retrieval
 
-**Status:** Parked 2026-10-08 (no consumer; kept as reference). Was: Proposed - exploratory best-guess estimate, not an accepted
+**Status:** Retired 2026-10-11 (parked 2026-10-08; no consumer; kept as reference, revisit trigger in TODO.md). Was: Proposed - exploratory best-guess estimate, not an accepted
 design and not built. Written to capture what's known and flag risks
 before any schema/code work starts, not to lock in a mechanism.
 **Date:** 2026-09-11

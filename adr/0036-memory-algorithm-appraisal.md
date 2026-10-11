@@ -7,7 +7,7 @@ under "Candidates" is a separate decision if taken up.
 ## Context
 
 Prior comparisons ([ADR-0010](resolved/0010-drupal-native-agent-memory-rationale.md),
-the mem0 code read, [ADR-0012](0012-fact-relation-graph.md)) compared
+the mem0 code read, [ADR-0012](resolved/0012-fact-relation-graph.md)) compared
 *products*. This ADR looks at the underlying *algorithms* and cognitive
 models, and checks each against what `AimMemoryManager` does today
 (`recall()`, `consolidate()`, `findNearestNeighbor()`).

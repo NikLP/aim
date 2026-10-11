@@ -14,7 +14,9 @@ module reference in [../../DEVELOPING.md](../../DEVELOPING.md).
 `mcp_server_tool_bridge` exposes both over MCP via config-only
 `mcp_tool_config` entities (`config/optional`, installs automatically
 once the bridge module is enabled). `aim_remember` also takes an
-optional `facts` list for saving several facts in one call/bootstrap.
+optional `facts` list for saving several facts in one call/bootstrap, and an
+optional `expires` (`YYYY-MM-DD`, also per `facts` entry): the fact is
+retired after that day by `drush aim:expire` or `hook_cron` (ADR-0057).
 
 Requires `drupal/mcp_server_tool_bridge:^1.0.0-beta2` +
 `drupal/mcp_server:^2.0.0-beta3` together - `mcp_server_tool_bridge`'s

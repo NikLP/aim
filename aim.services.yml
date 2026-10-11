@@ -55,6 +55,7 @@ services:
       - '@config.factory'
       - '@ai.vdb_provider'
       - '@entity_type.manager'
+      - '@datetime.time'
 
   Drupal\aim\AimStatusChecker:
     alias: aim.status_checker

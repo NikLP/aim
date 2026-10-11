@@ -1,6 +1,6 @@
 # ADR-0031: Opt-in `hook_cron` fallback for queue processing, alongside the dedicated crontab
 
-**Status:** Proposed 2026-09-30 - design only, nothing built. Amends
+**Status:** Proposed 2026-09-30 - design only, nothing built (ADR-0057's `hook_cron` is a separate, cheap expiry sweep with no model call, not this). Amends
 [ADR-0003](resolved/0003-async-processing-dedicated-crontab.md)'s "never
 `hook_cron`" rule; does not replace its dedicated-crontab recommendation.
 **Date:** 2026-09-30

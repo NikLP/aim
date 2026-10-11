@@ -79,8 +79,8 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
    **Temporary deviation (2026-10-02):** this site's consolidation and
    verifier run on hosted Jev (synthetic/demo data only); the chat path and
    `DecisionBackend` stay so a local decision model can be switched back
-   in per activity. ([ADR-0021](adr/0021-jev-typed-decision-provider.md)
-   addendum)
+   in per activity. ([ADR-0021](adr/0021-jev-typed-decision-provider.md),
+   decision 2)
 6. **Build order** - prove schema/logic with interactive Claude Code +
    local embeddings before any unattended provider.
    ([ADR-0004](adr/resolved/0004-sovereignty-and-poc-build-order.md))
@@ -123,7 +123,7 @@ than relying on the site shell's manifest.
 
 | Module | Purpose | Docs |
 | --- | --- | --- |
-| `aim` | Core - `aim_fact`/`aim_scope` entities, `AimMemoryManager`, Guardrails wiring, vector search, admin UI, `aim:remember`/`aim:recall`/`aim:extract`/`aim:consolidate` Drush commands. Ships zero scope instances itself (ADR-0026). | this file |
+| `aim` | Core - `aim_fact`/`aim_scope` entities, `AimMemoryManager`, Guardrails wiring, vector search, admin UI, `aim:remember`/`aim:recall`/`aim:extract`/`aim:consolidate`/`aim:expire` Drush commands. Ships zero scope instances itself (ADR-0026). | this file |
 | `aim_scope_user` | Ships the `user` `aim_scope`, its `AimScopeUser` access plugin (role-visibility, ADR-0025), and the `requires_account` ThirdPartySetting (ADR-0007) | [CLAUDE.md](modules/aim_scope_user/CLAUDE.md) |
 | `aim_scope_role` | Ships the `role` `aim_scope`. Zero PHP. | [README.md](modules/aim_scope_role/README.md) |
 | `aim_scope_site` | Ships the `site` `aim_scope` - `aim_chatbot`'s hardcoded scope. Zero PHP. | [README.md](modules/aim_scope_site/README.md) |
@@ -177,7 +177,7 @@ duplicated here.
   (who wrote it), `grounding_score` (float, empty when unchecked: how
   strongly a decision model found the fact stated in the text it was
   written from, checked at write time, text never stored -
-  [ADR-0037](adr/0037-transient-source-passages-for-grounding.md); see
+  [ADR-0037](adr/resolved/0037-transient-source-passages-for-grounding.md); see
   [DEVELOPING.md](DEVELOPING.md)'s "Grounded check"), `trusted` (boolean, the draft-to-trusted gate - defaults
   to `aim.settings:default_trusted`, `recall()` excludes untrusted facts
   unless asked otherwise, see

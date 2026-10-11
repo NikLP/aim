@@ -1,157 +1,146 @@
-# ADR-0024: Annotations integration - facts scoped to annotation targets, review as promotion
+# ADR-0024: Annotations bridge: facts scoped to annotation targets, review as promotion, and the two other consumers (form pre-fill, briefs)
 
-**Status:** Proposed - exploratory, not built. Blocked on ADR-0002's
-deferred draft-to-trusted gate and a write path that doesn't exist yet on
-the Annotations side. Written to capture the idea and the real blockers
-before any schema/code work starts, not to lock in a mechanism.
+**Status:** Proposed - design only, the bridge module is unbuilt. Both
+blockers listed on 2026-09-27 are now cleared (re-checked 2026-10-11):
+the `trusted` flag and its Trust/Untrust actions are built
+([ADR-0002](0002-governance-deferred-guardrails-mandatory.md) addendum), and
+Annotations has a write path (see Context). Absorbs the former ADR-0041
+(Webform pre-fill) and ADR-0042 (fact-compiled briefs). The WebMCP
+direction may supersede part of this.
 **Date:** 2026-09-27
 
 ## Context
 
-Raised in a separate conversation comparing `aim` to Annotations (Nik's
-other Drupal module, `drupal/annotations` ^2.0@alpha, present in this site
-at `web/modules/contrib/annotations`, own git repo, not a dependency of
-`aim`'s own `composer.json`). Framing: Annotations is the human-curated
-layer of site knowledge, `aim` is the machine-observed layer.
+Annotations (Nik's other Drupal module, `drupal/annotations` 2.0.0-alpha,
+own git repo, not a dependency of `aim`) is the human-curated layer of
+site knowledge; `aim` is the machine-observed layer. Checked against its
+code and docs, not assumed:
 
-**A factual correction to that conversation, checked directly against
-the module's code and docs rather than assumed.** The claim was that an
-"`ai_context` provider patch" already gets annotations into agent
-prompts. No such patch exists, and none is needed. Annotations ships two
-submodules that are entirely independent of `drupal/ai_context` (CCC):
+- **No `ai_context` (CCC) patch is involved.** `annotations_context`
+  assembles a payload and exposes it as markdown/HTML, a JSON API
+  (`/api/annotations/{target_id}`) and its own MCP endpoint;
+  `annotations_tool` provides Tool API plugins for function-calling
+  agents. Annotations independently reached the conclusion of
+  [ADR-0008](0008-chatbot-integration-mechanism.md): Tool API, not a CCC
+  content-source plugin.
+- **`annotation_target` granularity is bundle/field/role** (`id =
+  {entity_type}__{bundle}`, e.g. `node__article`), never one node
+  instance. The bridge is structural (site- and role-scoped knowledge);
+  facts about one instance use `scope: entity`
+  ([ADR-0027](resolved/0027-entity-scope.md), built).
+- **The write path exists in the development copy, not in this site's.**
+  `annotations_tool` there ships `annotations_write` (`ToolOperation::Write`;
+  `target_id`, `field_name`, `type_id`, `value`, optional `langcode`;
+  upserts one annotation's `value` via `AnnotationStorageService::writeValue()`)
+  and `annotations_read` (renamed from the old `GetAnnotations`, 2026-09-28).
+  Authorization is at the storage layer: the account needs `edit {type}
+  annotations`, and a denial returns a typed access failure. This site's
+  `contrib/annotations` copy (2.0.0-alpha4) is older: read and list tools
+  only, no write. Re-verify the shape against the version installed when
+  the bridge is built.
+- **Annotations has a draft-and-publish pattern aim can copy.**
+  `annotations_docs` generates one AI draft per (target, type) as an
+  unpublished node, per role and language, with a lock against
+  regenerate and a manual publish step.
+- **Known limit:** `annotations_webform` shows an element's annotation only
+  for top-level elements, not inside fieldsets, containers or wizard
+  pages.
 
-- `annotations_context` - assembles a structured payload and exposes it
-  as a markdown/HTML preview, a JSON API (`/api/annotations/{target_id}`),
-  and its own MCP endpoint (`/api/annotations/mcp`, Streamable HTTP,
-  2025-03-26 spec).
-- `annotations_tool` - Tool API plugins (`annotations_read`,
-  `annotations_list_targets`) for function-calling agents, gated on
-  `view annotations context` and the annotation type's `in_ai_context`
-  third-party setting.
+## Decision (best-guess proposal, not committed)
 
-Neither depends on or patches `ai_context`. This is a stronger argument
-for fit than the original claim, not a weaker one: Annotations
-independently reached the same conclusion [ADR-0008](0008-chatbot-integration-mechanism.md)
-already documents for `aim` - Tool API primary, not a CCC content-source
-plugin - and that ADR's own consequences section already flags this kind
-of independent convergence as corroborating, not coincidental.
+**1. Packaging.** A thin bridge submodule, `aim_annotations`, under `aim`:
+`aim` depends toward Annotations, never the reverse, and stays usable
+without it. Same thin-shim convention as
+[ADR-0023](resolved/0023-hnsw-tuning-and-thin-provider-shim.md).
 
-**Confirmed correct in the original conversation:** `annotation_target`
-granularity is bundle/field/role-level (`id = {entity_type}__{bundle}`,
-e.g. `node__article`), never a specific node instance. This integration
-is naturally structural (site/role-scoped knowledge), not a route to
-per-content-instance "content notes" - that would need `aim` facts
-referencing specific nodes directly, unrelated to this ADR.
+**2. What a fact points at.** A fact is linked by `annotation_target` id,
+not by a specific `annotation` entity, so it can exist before anyone writes
+the annotation. `scope: entity` does not fit (it names an instance, a
+target names a bundle or field), so this is either a field on the `site`/
+`role` scopes or a new scope; resist a new `view/create {scope} aim facts`
+permission pair unless a real access need shows up.
 
-**Confirmed gap, from `annotations_tool`'s own CLAUDE.md (as of
-2026-09-27):** there was no write path. `AnnotationStorageService`
-exposed only `getForTarget`/`getLatestForTarget`/`getEntitiesForTarget`/
-`getEntityMapForTarget`/`hasAnnotationData`/`deleteForTarget`/
-`countForType`/`deleteForType` - no `save()`. That module's own docs
-flagged a write tool as "worth doing if an actual agent-authoring use
-case shows up, not a gap to fill preemptively" - this ADR is that use
-case. **Update 2026-09-28: done, per Nik** - the write path was built.
-Re-verify its exact shape against `annotations_tool`'s current CLAUDE.md
-before wiring the bridge to it, rather than assuming the interface
-guessed at above.
+**3. Review becomes promotion.** A reviewer looking at an untrusted fact
+linked to a target gets a "promote to annotation" action. It writes the
+annotation through `annotations_write` (a staging store rather than a
+direct save is worth checking; Tool API notes from Matt Glaman's
+"Define the capability once, call it anywhere", all unverified against
+released tags: set `operation: Write` and judge `destructive` honestly,
+keep inputs and outputs typed, expect enums and permissions to flatten in
+`tool:info` and MCP schemas while Tool API issue #3582943 is open), then
+retires the source fact with `superseded_by_reason` naming the annotation.
+Annotations becomes the trusted tier; the review queue is the drafts tier.
+Guardrails run again at promotion, since the text becomes site-official
+documentation served by `annotations_context`.
 
-**Confirmed gap, from `aim`'s own decision 3:** [ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s
-draft-to-trusted gate is deferred for the PoC. Every `aim_fact` is live
-the instant it's saved. There is no draft tier on `aim`'s side to promote
-*from* yet either. **Update 2026-09-28:** the design for this is now
-resolved (ADR-0002's addendum) as a single `trusted` boolean field, not
-Content Moderation - much cheaper than this ADR originally assumed, but
-still not built. Promotion itself stays fully programmatic either way -
-it never depended on which mechanism `aim_fact` used for its own gate.
+**4. Consumers (formerly ADR-0041 and ADR-0042).** Two features sit on the
+same pair of modules and need no change to `aim` core.
 
-## Decision (best-guess proposal - not committed)
+*Webform pre-fill.* An agent holding `aim_recall` plus `annotations_read`
+fills a form per element: read the element's annotation (what the field
+wants); recall as the **viewing account** from the field label plus that
+text; take the best match under `recall_max_distance` (split it to the
+field's shape if needed; exact values such as phone numbers come from
+literals, [ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md));
+leave the field blank if nothing matches or the match is ambiguous; the
+visitor reviews every value before submit, and nothing is saved back
+without confirmation. Site and role facts act as policy ("never collect
+date of birth"); a `scope: case` fact supplies the case ID. Costs:
+annotation quality sets fill quality, the mapping is LLM-judged so human
+review is mandatory, facts are free text so splitting is real work, and
+recalled facts go to the configured provider. `ai_webform` is dropped
+(obsolete); `annotations_webform` has no token support and needs none.
 
-Three separable pieces:
-
-**1. Dependency direction and packaging.** A thin bridge submodule,
-`aim_annotations`, living under `aim` (`aim` depends toward Annotations,
-never the reverse). This matches the thin-shim convention
-[ADR-0023](resolved/0023-hnsw-tuning-and-thin-provider-shim.md) already sets for
-`AimMariaDBProvider`, and keeps Annotations - the funded, closer-to-stable
-project - free of any dependency on `aim`'s experimental stack. `aim`
-stays independently usable without Annotations installed.
-
-**2. What a fact points at.** `aim_fact` gets linked by `annotation_target`
-id (e.g. `node__article`), not by referencing a specific `annotation`
-content entity. A fact can then exist before anyone has written an
-annotation for that target, and the two modules meet at the target rather
-than `aim` reaching into Annotations' content entities directly.
-
-**3. Review becomes promotion.** A reviewer looking at a draft `aim_fact`
-linked to a target gets a "promote to annotation" action: it
-creates/updates the `annotation` entity for that target through a new
-write path on the Annotations side (shaped like `tool_belt`'s
-`EntitySave`, the precedent `annotations_tool`'s own CLAUDE.md already
-names for a future write tool), then marks the source `aim_fact` as
-consumed/superseded. Annotations becomes the trusted tier; `aim`'s review
-queue becomes the drafts tier. This is meant to replace or absorb
-ADR-0002's in-place draft-to-trusted gate for facts that have a target to
-promote into, not run alongside it as a second, separate gate.
+*Fact-compiled briefs.* A readable brief per scope subject (a user, a case,
+an entity target) compiled from that subject's live, trusted, unsuperseded
+facts and injected whole into an agent's context, for the cases top-k recall
+misses (unknown unknowns) and for human review of a pile of atomic facts
+(Liao, "Agents don't need memory, they need documentation", 2026-10-04: one
+author's anecdote, no benchmarks). Built by `aim` itself following
+`annotations_docs` as a pattern, not using it: an AI draft stored
+unpublished, optional per-role filtering, a manual publish step, a config
+entity for the system prompt. Not copied: direct editing of the brief,
+since an edit that bypasses the facts forks them. Facts stay the source of
+truth; the body is read-only and regenerated when facts change; each brief
+records the fact IDs it came from. Correction is by feedback: a reviewer
+marks up a sandbox copy and an agent turns it into fact changes through the
+normal Guardrails and trust path. Injection is size-bounded and falls back
+to recall. One brief per user is an LLM call each, so likely only for case,
+entity and site subjects.
 
 ## Consequences / risks
 
-- **Nothing to build this on top of yet.** Two prerequisites gate this
-  entirely: ADR-0002's gate (something for a human to review before
-  promotion) and a `save()` write path on `AnnotationStorageService`
-  (something to promote into). Building the bridge before either exists
-  produces a bridge with nothing connected at either end.
-- **Bridge maintenance cost.** `aim_annotations` tracks both modules'
-  schemas at once. A change to `aim_scope`'s config-entity shape or to
-  `annotation_target`'s id format breaks the bridge, not either core
-  module - the same fragility ADR-0023 already accepts for
-  `AimMariaDBProvider`, now duplicated across two independent projects
-  instead of one upstream dependency.
-- **Staleness detection is a separate, unbuilt mechanism.** If a fact is
-  linked to a target and that target changes (a new annotation revision,
-  a bundle's fields changing), the fact should be flagged for review.
-  Likely modeled on `annotations_audit`'s existing waypoint/
-  accumulated-changes drift detection rather than invented fresh, but not
-  designed here.
-- **Guardrails apply twice.** Promoting a fact into an annotation is a
-  second write with its own trust implications - decision 7's
-  Guardrails-mandatory stance (live today, not part of the governance
-  deferral) should run again at promotion time, not only at fact-write
-  time, since the text is about to become site-official documentation
-  consumed by `annotations_context`'s MCP/Tool API/JSON surfaces.
-- **Scope discipline.** The originating conversation also raised
-  RAG-plus-memory correction capture, source-revision staleness for
-  general RAG content, and job-market framing. Those are real but
-  separate ideas, deliberately not captured here - this ADR is only the
-  Annotations-specific integration.
+- **Nothing built on either side yet** beyond the prerequisites; the bridge
+  tracks two modules' schemas at once (a change to `aim_scope` config or
+  to the `annotation_target` id format breaks the bridge, not either
+  module).
+- **Staleness is a separate unbuilt mechanism:** if a target changes, its
+  linked facts should be flagged, likely modeled on `annotations_audit`'s
+  drift detection. See also
+  [ADR-0043](0043-content-truth-drift-audit.md), which checks published
+  content against facts and needs no Annotations dependency.
+- **Gist.** [ADR-0053](0053-gist-shared-vocabulary.md) (body in annopm
+  ADR-028) defines a shared "gist" field; an annotation's gist can prefill a
+  literal's gist ([ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)).
+  Annotations attaches at bundle and field granularity, so this is limited
+  to singleton hosts.
+- **Privacy:** recall must never run as a broader account than the viewer.
+- **Scope discipline:** RAG-plus-correction capture and source-revision
+  staleness for general RAG content are separate ideas, not captured here.
 
 ## Open questions
 
-- Whether target-linked facts need a new `aim_scope` bundle (e.g.
-  `scope: annotation`) or just a field on the existing `site`/`role`
-  scopes holding a target id string. A new bundle adds another
-  `view {scope} aim facts`/`create {scope} aim facts` permission pair for
-  what may be pure linkage, not a new audience - worth resisting unless a
-  real access-control need shows up.
-- Who can trigger promotion: reuse Annotations' existing
-  `edit {type} annotations` permission, or a new permission scoped to the
-  bridge module.
-- Manual admin action (a button on the draft-fact review UI) vs. a Drush
-  command or queue worker that can batch-promote. Manual first is
-  consistent with [ADR-0004](resolved/0004-sovereignty-and-poc-build-order.md)'s
-  build order (prove the mechanism interactively before automating it).
-- Whether [ADR-0012](0012-fact-relation-graph.md)'s entity-linking/
-  co-mention idea (cited there from `mem0ai/mem0`) has any bearing on
-  target-linked facts too - out of scope here, flagged only as a
-  "see also."
-
-None of the above is validated against real code paths on either module -
-this captures what's known and where the real blockers are, not a spec to
-build against as-is.
-
-## Addendum 2026-10-04: a second consumer, literal gists
-
-[ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md) (Literals) reads the same mapping the other way: Annotations describes a field and asks what goes there, Literals describes a value and asks where it lives. An annotation's `value` can serve as a literal's gist (singleton hosts such as `config_pages` pages), and Annotations' target discovery can supply the entity/bundle/field picker. That is a separate optional bridge from the one proposed above, with the same review-as-promotion shape; the two may share work. Annotations attaches at bundle and field granularity, never an entity instance, which limits the gist use to singletons. Nothing here changes this ADR's status or blockers.
-
-## Addendum 2026-10-05: Tool API notes from Matt Glaman's capability-once post
-
-[Define the capability once, call it anywhere](https://mglaman.dev/blog/define-capability-once-call-it-anywhere) bears on this ADR's Tool API surface (`annotations_tool`, the proposed promotion write tool). Points to apply when that write tool is designed, all **unverified** against released tags and the issue queue: set `operation: ToolOperation::Write` and judge `destructive` honestly; keep inputs and outputs typed so an agent can chain them; mutate through a staging store rather than saving directly (the `canvas_tools` approach, which fits review-as-promotion); and expect `tool:info` and MCP schemas to flatten inputs (no enums, no required permissions) while Tool API issue #3582943 is open. The same findings for `aim_tool` are in [TODO.md](../TODO.md) under "aim_tool: schema discoverability and typed output". Nothing here changes this ADR's status or blockers.
+- Who can trigger promotion: reuse `edit {type} annotations` or add a bridge
+  permission. Manual button first, per
+  [ADR-0004](resolved/0004-sovereignty-and-poc-build-order.md), batch later.
+- How the pre-fill agent writes values into a rendered form (front-end
+  widget, Webform pre-population endpoint, or telling the visitor), and
+  whether forms that map cleanly to a fixed fact category are better served
+  by a deterministic token default (`[aim:...]`) than an LLM.
+- Brief feedback loop shape (draft node, diff view, comments), whether the
+  resulting fact changes pass the grounded check
+  ([ADR-0037](resolved/0037-transient-source-passages-for-grounding.md)) or
+  wait for review, the regeneration trigger, and storage (a node type or an
+  `aim`-owned entity; no node dependency in core `aim`).
+- Whether [ADR-0012](resolved/0012-fact-relation-graph.md)'s entity linking
+  bears on target-linked facts: out of scope, a "see also".

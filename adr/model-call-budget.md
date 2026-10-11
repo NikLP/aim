@@ -4,7 +4,7 @@ Where aim calls a model, how many calls a sample round costs under three
 setups, and what moving work off the frontier model saves. Not a decision
 record: for the reasoning see [0000-index.md](0000-index.md),
 [ADR-0021](0021-jev-typed-decision-provider.md) and
-[ADR-0038](0038-local-decision-models-parked.md). Companion to diagram 4
+[ADR-0021](0021-jev-typed-decision-provider.md). Companion to diagram 4
 in [workflow-diagram.md](workflow-diagram.md).
 
 "Frontier" is the frontier chat model (the site default chat model, here
@@ -43,7 +43,7 @@ goal. Scores are judgments from what each call sends, not measurements.
 | --- | --- | --- | --- |
 | Embeddings (index and query) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | Nothing: local Ollama | Already local |
 | Guardrails (length, markup) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | Nothing: code, no model | n/a |
-| Pair classification | 🟩🟩🟩🟨⬜⬜⬜⬜⬜ | Two short facts to Jev | Local decision model (parked, ADR-0038) |
+| Pair classification | 🟩🟩🟩🟨⬜⬜⬜⬜⬜ | Two short facts to Jev | Local decision model (parked, ADR-0021) |
 | Merge verifier | 🟩🟩🟩🟨⬜⬜⬜⬜⬜ | Two short facts and a merge to Jev | Local decision model |
 | Literal finder | 🟩🟩🟩🟨🟨⬜⬜⬜⬜ | The visitor's question and the gist menu to Jev; no values | Local decision model |
 | Merge writer | 🟩🟩🟩🟨🟨🟨⬜⬜⬜ | Two facts to the frontier model | Small local chat model (untested) |
@@ -123,7 +123,7 @@ What the numbers say:
 Plausibly: extraction is text to short sentences, not reasoning. But
 nothing in aim measures it. Two risks: a weaker model hallucinates facts
 the text does not contain, and misses real ones. Hallucination is what
-the grounded check in [ADR-0037](0037-transient-source-passages-for-grounding.md)
+the grounded check in [ADR-0037](resolved/0037-transient-source-passages-for-grounding.md)
 is for, and it is a decision call (cheap, typed), so a small extractor
 plus a grounded check is the natural pairing. To decide, build an
 extraction eval (text in, labeled fact list out; score recall and
@@ -145,7 +145,7 @@ real, but they are bought with data leaving the building. Treat a
 sovereign path (a local decision model and a local chat model for
 extraction and merging) as a requirement for any real deployment, not an
 optional extra. A local decision model costs 10-14 s per call on the dev
-laptop plus heavy memory use ([ADR-0038](0038-local-decision-models-parked.md));
+laptop plus heavy memory use ([ADR-0021](0021-jev-typed-decision-provider.md));
 the chat backend stays selectable per activity as the fallback.
 
 **Accuracy.** Setup B may be more accurate than setup A, not just
@@ -184,9 +184,9 @@ that leaves is short atomic fact text going to the decision model, the
 smallest and most curated traffic in the system.
 
 What closes the gap is hardware and model maturity, not design. The dev
-laptop is not a yardstick for local model hosting (see ADR-0038). On it (no GPU, 14 GB) the local decision model was slower and weaker
+laptop is not a yardstick for local model hosting (see ADR-0021). On it (no GPU, 14 GB) the local decision model was slower and weaker
 (`tev1:4b` 17/24 pairs at 10-14 s per call against Jev's 23/24 at 0.4 s,
-[ADR-0038](0038-local-decision-models-parked.md)); on production hardware
+[ADR-0021](0021-jev-typed-decision-provider.md)); on production hardware
 with a GPU, or with a better local decision model, the same architecture
 runs the whole stack in-house. Build and measure toward that end state,
 with Jev as the working reference the local model has to match.

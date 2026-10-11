@@ -3,7 +3,7 @@
 **Status:** Deferred (re-evaluated 2026-10-02) - the problem is closed on
 this site by `index_directly` (see the 2026-09-26 addendum); the design is
 retained as the reference for hosted-embedding sites and for
-[ADR-0033](../0033-plausibility-gate-processing-modes.md)'s post-response
+[ADR-0037](0037-transient-source-passages-for-grounding.md)'s post-response
 mode. Designed and prototyped 2026-09-14, then deliberately reverted the
 same session. Not built. The design below is complete enough
 to build from directly if this gets picked back up; the point of this ADR

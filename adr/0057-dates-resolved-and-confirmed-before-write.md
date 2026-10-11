@@ -1,6 +1,6 @@
 # ADR-0057: Dates resolved and confirmed before a fact is written
 
-**Status:** Proposed 2026-10-11 - points 3 (the `expires` input on `remember()`, `drush aim:remember`, batch/ingest entries and both remember tools) and the expiry sweep (`drush aim:expire`, hourly crontab) built and live-tested 2026-10-11; points 1, 2, 4-7 not built.
+**Status:** Proposed 2026-10-11 - points 3 (the `expires` input on `remember()`, `drush aim:remember`, batch/ingest entries and both remember tools) and the expiry sweep (`drush aim:expire`, hourly crontab, `hook_cron` as backup) built and live-tested 2026-10-11; points 1, 2, 4-7 not built.
 **Date:** 2026-10-11
 
 ## Context
@@ -13,7 +13,7 @@ from now") go wrong over time, and nothing in aim catches it:
   was noted" into the standing hours kept the phrase and lost its anchor,
   so the merged fact is wrong once the two months pass. Three options were
   listed and none chosen.
-- The grounded check ([ADR-0037](0037-transient-source-passages-for-grounding.md))
+- The grounded check ([ADR-0037](resolved/0037-transient-source-passages-for-grounding.md))
   correctly passes "the reading room is closed for painting until Friday":
   it is what was said. It cannot tell that the fact becomes ambiguous next
   week. Faithful and durable are different checks.

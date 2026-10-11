@@ -4,7 +4,7 @@
 2026-10-10, design only. Decision 7 (no stored passages) was built on its
 own merits as part of ADR-0037 on 2026-10-11. Needs a
 personal-data eval set first (decision 4). If accepted, replaces
-[ADR-0037](0037-transient-source-passages-for-grounding.md) decisions 1-4
+[ADR-0037](resolved/0037-transient-source-passages-for-grounding.md) decisions 1-4
 (decision 7 below).
 **Date:** 2026-10-10
 
@@ -92,7 +92,7 @@ the subject's display name as context and asks about anyone else.
   question): "Does the fact name or identify a private individual?"; for
   `user` scope, "anyone other than the subject?". Hosted Jev on this site,
   synthetic data only; a site with real data needs a local model
-  ([ADR-0038](0038-local-decision-models-parked.md)). Build an eval set
+  ([ADR-0021](0021-jev-typed-decision-provider.md)). Build an eval set
   first: `pii` task in `decision-eval.php`, named and unnamed people, roles,
   organizations, and the subject-versus-third-party case.
 

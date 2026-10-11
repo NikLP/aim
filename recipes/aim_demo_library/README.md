@@ -2,7 +2,7 @@
 
 A fictional community library (Harbourside Community Library) as a demo
 site for [AIM](../../README.md). It is the first archetype starter kit
-from [ADR-0014](../../adr/0014-usecase-archetype-starter-kits.md): a
+from [ADR-0014](../../adr/resolved/0014-usecase-archetype-starter-kits.md): a
 small, self-contained story that shows recall, abstention, scope and
 consolidation without any real data.
 
@@ -65,7 +65,7 @@ the settings above, and the facts are added on top of whatever is there
   save ties up a worker for seconds ([ADR-0015](../../adr/resolved/0015-immediate-consolidation-considered-deferred.md)
   addendum); remove that action.
 - **0.48 is calibrated to this dataset** with `nomic-embed-text`
-  ([ADR-0019](../../adr/0019-recall-abstention-distance-cutoff.md)).
+  ([ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md)).
   Recalibrate if the model changes.
 - **No review gate.** Every fact is live the moment it is saved, and any
   signed-in visitor can add facts through the chat widget (the recipe

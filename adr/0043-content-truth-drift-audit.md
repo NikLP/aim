@@ -69,15 +69,15 @@ disagreements to a human. It never edits content.
   `unrelated` option and a human-only resolution path are the mitigation;
   the false-positive rate must be measured on a labelled set before this
   ships, in the same way as the grounded evaluation in
-  [ADR-0037](0037-transient-source-passages-for-grounding.md).
+  [ADR-0037](resolved/0037-transient-source-passages-for-grounding.md).
 - **Garbage in, flagged out.** A wrong but trusted fact produces false
   findings against correct pages. The trust gate and the plausibility gate
-  ([ADR-0033](0033-plausibility-gate-processing-modes.md)) bear more weight
+  ([ADR-0037](resolved/0037-transient-source-passages-for-grounding.md)) bear more weight
   here than in chat, where a wrong fact only affects one answer.
 - **Cost.** One classifier call per (fact, passage) pair, bounded by the
   shortlist size and by queueing. Decision models are small and typed, so
   this suits a local model once one is measured acceptable
-  ([ADR-0038](0038-local-decision-models-parked.md)).
+  ([ADR-0021](0021-jev-typed-decision-provider.md)).
 - **Content index.** A new dependency: a Search API index over published
   content, kept in sync. `ai_search` may already provide one on a given
   site; core `aim` should not require it.

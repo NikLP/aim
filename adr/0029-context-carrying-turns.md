@@ -181,7 +181,7 @@ Two gaps this ADR exposes but does not solve:
 [ADR-0006](resolved/0006-agent-native-write-path.md),
 [ADR-0008](0008-chatbot-integration-mechanism.md),
 [ADR-0011](resolved/0011-extraction-explicit-subject-uid.md),
-[ADR-0012](0012-fact-relation-graph.md) (fact-to-fact links, distinct from
+[ADR-0012](resolved/0012-fact-relation-graph.md) (fact-to-fact links, distinct from
 `batch_id`),
 [ADR-0016](0016-document-ingestion-ui.md),
 [ADR-0021](0021-jev-typed-decision-provider.md),

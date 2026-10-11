@@ -53,7 +53,7 @@ mechanism and alternatives considered.
   facts mean more coincidental near matches, so the off-topic floor
   drifts down (same queries against all scopes' 120 facts instead of
   site's 18 matched closer by up to 0.035). Decision, full measurements
-  and the retuning checklist: [ADR-0019](../../adr/0019-recall-abstention-distance-cutoff.md).
+  and the retuning checklist: [ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md).
   Separately, `recall()` returns fewer than 5 live rows here because
   retired facts take result slots - same ADR.
 

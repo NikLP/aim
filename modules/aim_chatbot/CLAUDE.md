@@ -24,7 +24,7 @@ the `site` bundle this hardcode relies on is guaranteed installed.
 - `src/EventSubscriber/AimChatbotSourceTextSubscriber.php` - before the
   remember tool runs, passes it the visitor's last message plus the
   assistant turn before it, for the grounded check
-  ([ADR-0037](../../adr/0037-transient-source-passages-for-grounding.md)).
+  ([ADR-0037](../../adr/resolved/0037-transient-source-passages-for-grounding.md)).
   The previous turn is only there when the assistant keeps history
   (`allow_history`); this module ships `none`, the demo recipe sets
   `private_tempstore_pool`.
@@ -40,7 +40,7 @@ the `site` bundle this hardcode relies on is guaranteed installed.
 `aim_chatbot:recall` drops matches past `aim.settings:recall_max_distance`
 and answers "No relevant facts found." when none survive - see
 [DEVELOPING.md](DEVELOPING.md)'s "Gotchas" and
-[ADR-0019](../../adr/0019-recall-abstention-distance-cutoff.md). The
+[ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md). The
 cutoff is embeddings-model specific: retune it if the model changes, and
 recheck as the site-scope corpus grows or diversifies. The same cutoff is
 passed to `AimMemoryManager::recall()` as `$maxDistance`, and `aim_tool`'s

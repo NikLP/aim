@@ -113,7 +113,7 @@ explicit "ask in words" entry in the widget, never the default for typing
   its location when the asking account may resolve it differently.
 - **Use cases** (all "a description in words, no knowledge of where it
   lives"): finding exact values and config locations; agents (tool picking,
-  Webform pre-fill per field in [ADR-0041](0041-annotation-guided-webform-prefill.md),
+  Webform pre-fill per field in [ADR-0024](0024-annotations-integration-target-scoped-promotion.md),
   reading structure); authoring (token insertion, chatbot answers that
   relay stored values); speculative governance (finding where a fact is
   repeated, for [ADR-0043](0043-content-truth-drift-audit.md)). Strongest

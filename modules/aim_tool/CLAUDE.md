@@ -33,7 +33,7 @@ use of the tool at all, not which scopes it can write.
   own `scope_fields` stays unrefined - Tool API's refiner mechanism has
   no per-list-item equivalent. An optional `source_text` (the words the
   fact or batch came from) feeds the grounded check, one call for the
-  whole batch ([ADR-0037](../../adr/0037-transient-source-passages-for-grounding.md)).
+  whole batch ([ADR-0037](../../adr/resolved/0037-transient-source-passages-for-grounding.md)).
 - `src/Plugin/tool/Tool/AimLiteral.php` - `aim_literal`, a thin wrapper over
   the `literals.lookup` service (key, search words, or a question when
   `literals_finder` is enabled), gated on `view literals` (or `view
@@ -49,7 +49,7 @@ use of the tool at all, not which scopes it can write.
 `AimRecall` drops matches past `aim.settings:recall_max_distance` by
 default (an off-topic query returns "No relevant facts found." instead of
 the nearest unrelated facts), and takes an optional `max_distance` input
-to override it ([ADR-0019](../../adr/0019-recall-abstention-distance-cutoff.md)).
+to override it ([ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md)).
 
 See [ADR-0013](../../adr/resolved/0013-mcp-tool-exposure.md) for why this is a
 separate plugin pair from `aim_chatbot`'s rather than a shared one.

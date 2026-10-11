@@ -27,7 +27,7 @@ yet, so a pass there says nothing about the module.
   human review, so they stay CONTRADICTS.
 - A. `classifyPair`/`verifyMerge`/gate sets (`decision-eval-sets.json`,
   `decision-eval-merges-hard.json`, `decision-eval-real-pairs.json`): hosted
-  Jev 23/24 pairs, 25/25 real pairs, merges and gate AUC 1.00 (ADR-0038,
+  Jev 23/24 pairs, 25/25 real pairs, merges and gate AUC 1.00 (ADR-0021,
   ADR-0021 addendum). Local models parked.
 - B. Live verification of the embedding cache (ADR-0017), top-N
   consolidation dry run (40 vs 86 decisions), Ollama vs hosted recall

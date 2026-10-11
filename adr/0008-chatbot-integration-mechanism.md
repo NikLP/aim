@@ -116,7 +116,7 @@ poisoning vector. Proposal: two assistants over the same memory.
   from the public assistant (only confirm-before-save needs it);
   `demo/seed.php` and `seed-facts.json` need two agents, a staff role and
   demo user, and a trimmed public persona. Staff writes still pass
-  Guardrails and, once built, the plausibility gate (ADR-0033).
+  Guardrails and, once built, the plausibility gate (ADR-0037).
 - Open: can the endpoint select any assistant by ID, and is a
   per-assistant access check worth adding upstream; should staff `remember`
   stay `scope: site` or take a scope as `aim_tool` does.

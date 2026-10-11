@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\aim;
 
+use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -41,12 +42,15 @@ final class AimStatusChecker {
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    *   The entity type manager, used to query aim_fact - a real content
    *   entity - via the entity query API rather than raw SQL.
+   * @param \Drupal\Component\Datetime\TimeInterface $time
+   *   The time service, used to tell an overdue expiry from a fresh one.
    */
   public function __construct(
     protected Connection $database,
     protected ConfigFactoryInterface $configFactory,
     protected AiVdbProviderPluginManager $vdbProviders,
     protected EntityTypeManagerInterface $entityTypeManager,
+    protected TimeInterface $time,
   ) {}
 
   /**
@@ -65,6 +69,33 @@ final class AimStatusChecker {
       'provider_shim' => $this->checkProviderShim(),
       'hnsw_tuning' => $this->checkHnswTuning(),
       'recall_cutoff' => $this->checkRecallCutoff(),
+      'expiry_sweep' => $this->checkExpirySweep(),
+    ];
+  }
+
+  /**
+   * Checks that no live fact is long past its expires date (ADR-0057).
+   *
+   * The sweep runs from the crontab and from hook_cron, so a fact two hours
+   * past its date means neither is running.
+   *
+   * @return array
+   *   ['label' => string, 'ok' => bool, 'detail' => string].
+   */
+  private function checkExpirySweep(): array {
+    $overdue = (int) $this->entityTypeManager->getStorage('aim_fact')->getQuery()
+      ->accessCheck(FALSE)
+      ->notExists('retired')
+      ->condition('expires', $this->time->getRequestTime() - 7200, '<')
+      ->count()
+      ->execute();
+
+    return [
+      'label' => 'Expiry sweep running',
+      'ok' => $overdue === 0,
+      'detail' => $overdue === 0
+        ? 'no live fact is overdue'
+        : "$overdue live fact(s) expired over 2 hours ago - run drush aim:expire, and add it to the crontab (or check Drupal cron runs)",
     ];
   }
 

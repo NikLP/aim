@@ -107,6 +107,20 @@ class AimHooks {
   }
 
   /**
+   * Implements hook_cron().
+   *
+   * Backup for the `drush aim:expire` crontab entry (ADR-0057): retires
+   * facts whose expires date has passed. A cheap database query with no
+   * model call, so it does not break ADR-0003's rule against putting
+   * LLM-bound queue work in general cron; retireExpired() is idempotent,
+   * so running from both is harmless.
+   */
+  #[Hook('cron')]
+  public function cron(): void {
+    $this->memoryManager->retireExpired();
+  }
+
+  /**
    * Implements hook_ai_vdb_provider_info_alter().
    *
    * Swaps in AimMariaDBProvider, which works around two

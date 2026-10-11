@@ -87,7 +87,7 @@ Four memory categories, composable at retrieval the way Mem0 composes
   rule; a personal-data check is designed but parked in
   [ADR-0056](adr/0056-personal-data-write-gate.md)). A fact written with
   the text it came from is checked against that text by a decision model
-  (the grounded check, [ADR-0037](adr/0037-transient-source-passages-for-grounding.md));
+  (the grounded check, [ADR-0037](adr/resolved/0037-transient-source-passages-for-grounding.md));
   the text is never stored, and the check can set `trusted` or only
   record its score. A
   lightweight `trusted` flag is the draft-to-trusted human-review gate
@@ -202,7 +202,9 @@ ones it wants. Each submodule has its own requirements and setup:
    `drush aim:recall "some fact"`. For an unattended pipeline,
    `drush aim:extract <file>` classifies and stores facts from raw text; the
    Content > AIM facts > Ingest form (`ingest aim memory`) does the same, plus
-   one-fact-per-line and JSON imports without a model.
+   one-fact-per-line and JSON imports without a model. A fact with an end
+   date (`--expires=2026-10-16`) retires itself once it passes; add
+   `drush aim:expire` to the crontab (Drupal cron also runs it).
 4. For a remote MCP client (Claude.ai/Claude Desktop, no Drupal session),
    enable `aim_tool_oauth` - see its own
    [README.md](modules/aim_tool_oauth/README.md)/

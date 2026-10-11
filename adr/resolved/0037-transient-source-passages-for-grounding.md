@@ -3,14 +3,15 @@
 **Status:** Built 2026-10-11 as a write-time check: decisions 1-4 (side
 table, queue step, retention sweep) replaced by checking while the source
 text is in memory and storing none of it (see "Built" below; first proposed
-as [ADR-0056](0056-personal-data-write-gate.md) decision 7). Shadow mode on
-this site. Proposed 2026-10-02.
+as [ADR-0056](../0056-personal-data-write-gate.md) decision 7). Shadow mode on
+this site; the enforce decision, length cap and other follow-ups are in
+TODO.md. Proposed 2026-10-02. Absorbs the gate semantics of the former
+ADR-0033 (see "Gate semantics" below).
 **Date:** 2026-10-02
 
 ## Context
 
-[ADR-0033](0033-plausibility-gate-processing-modes.md) proposed scoring a
-bare fact for plausibility. Measured 2026-10-02, that does not work with
+The former ADR-0033 proposed scoring a bare fact for plausibility. Measured 2026-10-02, that does not work with
 the small decision models available locally: `laya:en` scored true and
 false library facts almost identically (AUC 0.61 for the generic
 question, 0.77 at best for a reworded one), and `tev1:4b` only did well
@@ -28,7 +29,7 @@ evidence is in the state.
 Today the source text is not kept. `extractFacts()` receives it, returns
 facts, and drops it; `aim_fact.source` is a short label string. A
 grounded check needs the text to still exist when the check runs, which
-is later, in the queue ([ADR-0003](resolved/0003-async-processing-dedicated-crontab.md)).
+is later, in the queue ([ADR-0003](0003-async-processing-dedicated-crontab.md)).
 
 The earlier "no conversation recording" constraint was a misconstrual
 (it meant audio only) and no longer applies, so keeping text for
@@ -56,7 +57,7 @@ stays null.
 A new worker (or a step in `AimConsolidateQueueWorker`) asks a decision
 model one Noul question per fact with state = passage plus candidate
 ("The text states the candidate fact."). The verdict sets `trusted`
-(ADR-0033 decisions 1 and 2: fail closed, stay untrusted on error or
+(gate semantics below: fail closed, stay untrusted on error or
 truncation). When every fact pointing at a passage has a verdict, the
 passage `text` is set to NULL. The row stays, so the fact's `source_ref`
 and the passage `hash` remain as an audit trail ("checked against
@@ -65,14 +66,14 @@ passage X") without keeping the personal data. A passage with a known
 same file can skip re-extraction.
 
 **4. A short retention backstop.** A sweep (the dedicated crontab,
-[ADR-0003](resolved/0003-async-processing-dedicated-crontab.md)) clears the
+[ADR-0003](0003-async-processing-dedicated-crontab.md)) clears the
 text of passages older than a setting (default 7 days) whatever their state, so
 a stuck queue cannot hold personal data indefinitely. Facts whose
 passage expired unchecked stay untrusted.
 
 **5. No consolidation table, no failed table.** The queue is the work
 list, and a fact row with `trusted=false` is both "pending" and "failed
-the check" (ADR-0033 decision 1). Neither needs a table. The agreed
+the check" (gate semantics below). Neither needs a table. The agreed
 `aim_rejection` quarantine (TODO.md "Lossy rejection") is a different
 thing: candidates that never became a fact row. A fact that fails the
 grounded check is a fact row and appears in the review queue as such.
@@ -93,6 +94,33 @@ Only the flag flips later, so the vector index never waits on the gate.
   opts in. The decision backend on a local Ollama keeps the text on the
   machine.
 
+## Gate semantics (from the former ADR-0033)
+
+What makes a fact recallable is separate from when the check runs
+(processing modes: [ADR-0021](../0021-jev-typed-decision-provider.md)). Pollution
+protection comes entirely from the gate. A fact becoming recallable a little
+later is acceptable; a bad fact becoming recallable at all is not.
+
+1. **Untrusted until checked.** With `grounding_mode: enforce` and
+   `default_trusted: false`, a new fact is saved untrusted and the check
+   flips `trusted`; `recall()` needs no change. Facts below the cutoff stay
+   untrusted for human review (the review queue in
+   [ADR-0002](../0002-governance-deferred-guardrails-mandatory.md)).
+2. **Fail closed.** If the model is unreachable, errors, or returns
+   `STATE_TRUNCATED`, the fact stays untrusted. The failure mode is silence
+   (a saved fact never recalled), not pollution, so make silence visible:
+   untrusted-fact count belongs on `aim:status`.
+3. **Bound the input.** A maximum length on `text` (proposed 500
+   characters; the longest real fact was 214), enforced by a field
+   constraint, plus a length hint in the extractor prompt. Not built:
+   `text` is still an unbounded `longtext` (TODO.md).
+
+Rejected: save as trusted, score afterward and demote on failure (a bad fact
+is recallable until the score lands; valid only for a low-stakes site); a
+"include this session's untrusted facts" recall flag (deferred, needs the
+`batch_id` of [ADR-0029](../0029-context-carrying-turns.md)); no length cap and
+rely on truncation (truncation is an error, not a degraded score).
+
 ## Alternatives considered
 
 - **Source text as a field on `aim_fact`.** Simplest, but it puts raw
@@ -106,7 +134,7 @@ Only the flag flips later, so the vector index never waits on the gate.
   would be copied once per item.
 - **A consolidation table / a failed-facts table.** Rejected: see
   decision 5.
-- **Plausibility on the bare fact** (ADR-0033 as first written). Measured
+- **Plausibility on the bare fact** (the former ADR-0033 as first written). Measured
   weak above; kept only as the optional reject-the-obvious tier.
 
 ## Open questions
@@ -115,7 +143,7 @@ Only the flag flips later, so the vector index never waits on the gate.
   setting `ingest_max_chars` (default about 100 KB, about 25k tokens)
   caps what `aim:extract` and the ingest form accept, with a "split this
   file" error. A passage longer than the check model's window fails
-  closed (facts stay untrusted, ADR-0033). Revisit with chunking.
+  closed (facts stay untrusted, gate semantics below). Revisit with chunking.
 - **Direct writes.** Decided (2026-10-03): `remember()` without
   `source_text` cannot be grounded and stays on the per-caller `trusted`
   override. Worth trying: the chat tools pass the visitor's message as
@@ -173,7 +201,7 @@ fact later against its passage.
   cache so a batch is checked once. Activity `grounding` (decision only,
   tag `aim_ground`), `activities.grounding.threshold` (default 0.7).
 - `grounding_score` on `aim_fact`; `grounding_mode` off, shadow or enforce
-  (decision 6 of ADR-0033 kept: enforce fails closed). This site: shadow,
+  (enforce fails closed, as below). This site: shadow,
   `jev-latest`, 0.7.
 - Source text from extraction (whole document), `remember()`'s
   `sourceText`, the MCP tool's `source_text`, and the chat assistant's

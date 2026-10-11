@@ -174,7 +174,7 @@ Settings (`aim.settings`, `/admin/config/aim/settings`):
   Set the verifier to a different model so one checks the other. The
   decision backend's confirmation cutoff is `activities.verifier.threshold`
   (empty or 0 means 0.5; this site uses 0.8 for Jev). A local decision
-  model is parked, see [ADR-0038](adr/0038-local-decision-models-parked.md).
+  model is parked, see [ADR-0021](adr/0021-jev-typed-decision-provider.md).
 - `merge_max_distance` (default 0 = off): merged embedding must sit within
   this cosine distance of each input. Measured 2026-10-01 on one pair, it
   barely separates a faithful merge (0.02 / 0.11) from a lossy one
@@ -218,6 +218,9 @@ retirement). Set `expires` with `drush aim:remember --expires=2026-10-16`,
 the `expires` field in a JSON/batch entry, or the `expires` input of the
 chat and MCP remember tools (a `YYYY-MM-DD` calendar date; the fact is
 retired after that day, and a date already past is refused).
+`hook_cron` runs the same sweep as a backup (it is a cheap query with no
+model call, so it stays clear of ADR-0003's no-`hook_cron` rule for
+LLM-bound queue work); the crontab line just makes it prompt.
 
 `processItem()` reindexes before consolidating (`index_directly` is off
 in the shipped config, so a just-written fact isn't searchable yet without
@@ -788,7 +791,7 @@ integrations) - needs a real Console API key, or stays on Ollama.
 **Running a local model service on a small machine** (Ollama for
 embeddings; local decision models are parked): the memory-cap and
 systemd settings that worked on the 14 GB dev laptop are in
-[ADR-0038](adr/0038-local-decision-models-parked.md).
+[ADR-0021](adr/0021-jev-typed-decision-provider.md).
 
 **Gotchas:**
 
@@ -1020,7 +1023,7 @@ ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>
   chat persona, recall cutoff, `index_directly`) plus its 31 facts and
   three literals as default content in `content/`. This site's demo kit
   (`demo/` in the site shell) is reset with it. The first archetype
-  starter kit ([ADR-0014](adr/0014-usecase-archetype-starter-kits.md)).
+  starter kit ([ADR-0014](adr/resolved/0014-usecase-archetype-starter-kits.md)).
   Details and caveats in its [README](recipes/aim_demo_library/README.md).
 - **Facts as recipe content skip `remember()`.** Core's importer saves
   entities directly, but calls `validate()` first, so the Guardrails

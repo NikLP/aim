@@ -3,7 +3,7 @@
 **Status:** Proposed (2026-10-01) - design only, not built. Builds on
 [ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s `trusted`
 flag and retired [ADR-0009](resolved/0009-recipe-apply-safety-gate.md)'s apply gate; the
-authority rules below depend on [ADR-0033](0033-plausibility-gate-processing-modes.md)
+authority rules below depend on [ADR-0037](resolved/0037-transient-source-passages-for-grounding.md)
 only for untrusted-by-default writes.
 **Date:** 2026-10-01
 
@@ -104,7 +104,7 @@ layer, and keep semantic recall as an advisory second pass only.
 - Should the checker also gate non-AI actions (a human using the admin UI
   to add the blog type), or only agent-initiated ones? Gating humans is
   scope creep; start with agent-initiated calls only.
-- Whether ADR-0033's plausibility scorer should have any say here. Leaning
+- Whether ADR-0037's plausibility scorer should have any say here. Leaning
   no: a score is a retrieval-quality signal, and a constraint's authority
   should come from a human, not a probability.
 

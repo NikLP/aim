@@ -149,7 +149,7 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       (see `adr/model-call-budget.md`).
 - [x] Ingest form (ADR-0016 Mode 1) BUILT 2026-10-02: Batch API for large files is the follow-up.
 
-## Decision models (raised 2026-10-02, ADR-0021/0033 addenda)
+## Decision models (raised 2026-10-02, ADR-0021/0037)
 
 - [x] Move aim's model choices (BUILT 2026-10-02: extraction, consolidation, verifier; add a `decision` entry when classifyPair moves to the Decision API) to the AI suite's `ai_provider_configuration`
       element (one per activity: extraction, consolidation classifier,
@@ -169,6 +169,12 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
 - [x] BUILT 2026-10-02 (`activities.*.backend`; thresholds/question text still hardcoded, not per-model config): build `classifyPair()` and `verifyMerge()` on the core Decision API
       through the provider manager, chat path staying the default, behind a
       setting. Thresholds and question text as per-model config.
+- [ ] Length cap on `text` (proposed 500 characters, longest real fact 214),
+      a field constraint plus a hint in the extractor prompt, and untrusted
+      count on `aim:status` (ADR-0037 gate semantics 2-3, from the former 0033).
+- [ ] `drush aim:calibrate` (ADR-0019): takes labeled queries, prints the
+      answerable / near-topic / off-topic distance distributions and the gap,
+      suggests a `recall_max_distance`. Role and case scope were never measured.
 - [ ] Decide the pass bar (ADR-0021 open question 2) before scoring, e.g.
       "decision path within X points of chat accuracy at under Y s per pair".
 - [ ] Model eval sets (verified 2026-10-02; none built): (a) classifyPair
@@ -178,11 +184,11 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       from mutated good merges, also try split noul questions (keeps A,
       keeps B, adds nothing); (c) add to the `gate` set in `decision-eval-sets.json`
       site-context contradictions. Synthetic data only for hosted Jev.
-- [ ] 2026-10-02 eval rework ([ADR-0037](adr/0037-transient-source-passages-for-grounding.md)):
+- [ ] 2026-10-02 eval rework ([ADR-0037](adr/resolved/0037-transient-source-passages-for-grounding.md)):
       `aim_benchmark/scripts/decision-eval.py` + `decision-eval-sets.json`
       built (pairs/merges/gate; hand-written, labels human-verified
       2026-10-02). Results (hosted Jev 23/24 pairs, 25/25 real pairs,
-      merges and gate AUC 1.00; local models parked): ADR-0038 and the
+      merges and gate AUC 1.00; local models parked): ADR-0021 and the
       ADR-0021 addendum. Groundedness set BUILT 2026-10-10
       (`decision-eval-grounding.json`, 44 items, `grounding` task; results
       in ADR-0037's addendum; labels verified by Nik 2026-10-10). Still to build:
@@ -210,7 +216,7 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       and `DecisionBackend`, grouped by `setRunId()`.
 - [ ] Hard merge set `decision-eval-merges-hard.json` (20 subtle faults, 2026-10-02): `jev-latest` AUC 1.00 but at the live 0.5 cutoff one bad merge (max 0.68) passes; perfect split at 0.81-0.86. `verifyMerge` uses `isLikely()` default 0.5: BUILT 2026-10-02: `activities.verifier.threshold` (settings form + schema; empty/0 = 0.5, live site 0.8). Still open: per-activity `concurrency` (default 1; the AI module calls are synchronous, so pooling needs HTTP-level work or parallel queue workers) Extra cross-check questions TESTED and DROPPED 2026-10-02 (3 noul: same/new/conflict next to the choice, 55 pairs): neither of the 2 misses is fixed (the noul answers agree with the wrong choice) and "same" does not separate NOOP (median 0.49). Concurrency judged nice-to-have: consolidation runs per fact via the queue (about 3 decisions, ~1 s), so only a bulk backfill is slow. `merges-split` mode added (3 small noul questions, min score).
 - [ ] Per-model thresholds and editable question text for the decision
-      backend (ADR-0021 decision 3); question text is hardcoded in
+      backend (ADR-0021 decision 5); question text is hardcoded in
       `AimMemoryManager` today. Limits: `tev1` input ~2,050 tokens, Ollama
       max 26 options.
 - [ ] Verify Jev (`typesafeai`) reports token usage live; confirm the
@@ -371,7 +377,7 @@ are recommendations.
       [ADR-0057](adr/0057-dates-resolved-and-confirmed-before-write.md)
       (resolve and confirm dates before write, `expires` plus its sweep).
       `expires` input and `aim:expire` sweep BUILT 2026-10-11 (add the
-      hourly crontab line); still to do: today's date to the assistant,
+      hourly crontab line; `hook_cron` backs it up); still to do: today's date to the assistant,
       persona wording, extraction date resolution, never merging a dated
       fact into an undated one, dated eval items.
 - [ ] Pinned: `verified`/`verified_by` fields (not `trusted`), ADR-0036.
@@ -404,17 +410,22 @@ are recommendations.
       service account, and the reviewer is meant to be someone else
       (ADR-0002 addendum skipped this on purpose). Answers "who approved
       this?", the first audit question an enterprise buyer asks.
-- [ ] **Edit as supersede, not overwrite (raised 2026-10-11).** A text edit
-      on `/admin/content/aim-facts/{aim_fact}/edit` replaces the text in
+- [ ] **Edit history for facts (raised 2026-10-11).** A text edit on
+      `/admin/content/aim-facts/{aim_fact}/edit` replaces the text in
       place, so manual changes leave no trail, unlike consolidation's
-      non-destructive supersede. Proposed: a changed `text` saves a new
-      fact and retires the old one (`superseded_by`, reason "edited by
-      uid N"), the same edge consolidation writes. Gives an edit history
-      without making `aim_fact` revisionable or adopting Content
-      Moderation (both rejected in the ADR-0002 addendum). Check: the
-      fact ID changes on edit, so anything holding the old ID (links,
-      entity-scope references, literal tokens) needs to follow
-      `superseded_by`.
+      non-destructive supersede. Proposed: make `aim_fact` revisionable
+      on its own, without Content Moderation (the ADR-0002 addendum
+      rejected CM and counted revisionability as one of its costs; on
+      its own it is much cheaper). The fact ID stays stable; each edit
+      gets a revision with author, time and log message, and core's
+      revision UI comes with it. Search API indexes the default revision
+      only, so recall and the vector table are unchanged. Costs:
+      `aim_fact_revision` tables and an update hook converting the
+      existing entity type (`updateFieldableEntityType()`; check Views,
+      the `subject_uid` rename broke one silently). Consolidation keeps
+      its supersede edge: a merge is two facts becoming one, not an
+      edit. Rejected: saving an edit as a new fact that supersedes the
+      old one, because the ID would change on every edit.
 
 ## PoC deviations to close before non-PoC data goes in
 
@@ -682,6 +693,13 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
       landing (ADR-0002 addendum, 2026-09-28), so `aim_fact` has no
       planned path to revisionable. Revisit only if that changes for an
       unrelated reason.
+
+## Parked ADRs, revisit triggers (retired 2026-10-11)
+
+- ADR-0012 (fact-to-fact relation graph, multi-hop retrieval): revisit when a
+  consumer needs more than the supersede edge in `related`.
+- ADR-0014 (use-case archetype starter kits): revisit when a third Recipe
+  beyond `aim_demo_library` and `aim_ollama_local` is wanted.
 
 ## Queue processing (ADR-0031)
 
