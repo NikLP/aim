@@ -8,6 +8,10 @@ Tasks (sets in decision-eval-sets.json, hand-written, labels unverified):
   merges verifyMerge(): does the merged text keep both facts and add nothing.
   gate   reframed plausibility: is the candidate consistent with the
          context facts and worth storing.
+  grounding  ADR-0037's grounded check: does the passage state the
+         candidate? Two wordings per call (plain, strict); AUC of supported
+         against unsupported plus misattributed, and every miss at 0.50.
+         Set in decision-eval-grounding.json.
 
 Sequential, one request at a time, per-call timeout; stdlib only.
 
@@ -153,14 +157,81 @@ def run_drift(host, model, items):
     return times
 
 
+GROUNDING_QS = {
+    "plain": "Does the text state the candidate fact?",
+    "strict": ("Does the text state the candidate fact? Answer no if the candidate adds, "
+               "changes or drops any detail, gives an old value the text has replaced, pins a "
+               "detail on the wrong person or thing, or states as settled something the text "
+               "only proposes, hedges or reports second-hand."),
+}
+
+
+def grounding_scores_batched(host, model, passages, items):
+    """One call per passage: every candidate for it in the state, two questions each."""
+    scores = {k: [None] * len(items) for k in GROUNDING_QS}
+    times = []
+    groups = collections.defaultdict(list)
+    for i, it in enumerate(items):
+        groups[it["passage"]].append(i)
+    for passage, idx in groups.items():
+        state = {"text": passages[passage]}
+        questions = {}
+        for n, i in enumerate(idx, 1):
+            state["candidate_%d" % n] = items[i]["candidate"]
+            for k, q in GROUNDING_QS.items():
+                questions["%s_%d" % (k, n)] = {"type": "noul", "instructions": q.replace(
+                    "the candidate fact", "the fact in candidate_%d" % n).replace("the candidate ", "candidate_%d " % n)}
+        t, a = call(host, model, state, questions)
+        times.append(t)
+        print("  batch %-20s %2d candidates, %.2fs" % (passage, len(idx), t))
+        for n, i in enumerate(idx, 1):
+            for k in GROUNDING_QS:
+                scores[k][i] = a["%s_%d" % (k, n)]["noul"]
+    return scores, times
+
+
+def run_grounding(host, model, data, batch=False):
+    passages, items = data["passages"], data["grounding"]
+    if batch:
+        scores, times = grounding_scores_batched(host, model, passages, items)
+    else:
+        scores = {k: [] for k in GROUNDING_QS}
+        times = []
+        for it in items:
+            t, a = call(host, model, {"text": passages[it["passage"]], "candidate": it["candidate"]},
+                        {k: {"type": "noul", "instructions": q} for k, q in GROUNDING_QS.items()})
+            times.append(t)
+            for k in GROUNDING_QS:
+                scores[k].append(a[k]["noul"])
+    for k in GROUNDING_QS:
+        pos = [s for s, it in zip(scores[k], items) if it["label"] == "supported"]
+        neg = [s for s, it in zip(scores[k], items) if it["label"] != "supported"]
+        acc, thr = best_threshold(pos, neg)
+        false_trust = sum(n >= 0.5 for n in neg)
+        false_hold = sum(p < 0.5 for p in pos)
+        print("grounding/%s: AUC %.2f, @0.50 false trust %d/%d, false hold %d/%d, best balanced %.2f @ %.2f (tuned on this set, optimistic)"
+              % (k, auc(pos, neg), false_trust, len(neg), false_hold, len(pos), acc, thr))
+        for label in ("supported", "unsupported", "misattributed"):
+            vals = [s for s, it in zip(scores[k], items) if it["label"] == label]
+            if vals:
+                print("  %-14s n=%d min %.2f med %.2f max %.2f" % (label, len(vals), min(vals), st.median(vals), max(vals)))
+        for s, it in zip(scores[k], items):
+            if (it["label"] == "supported") != (s >= 0.5):
+                print("  MISS %.2f %-13s %s | %s" % (s, it["label"], it["candidate"][:70], it["note"]))
+    return times
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("task", choices=["pairs", "merges", "merges-split", "gate", "drift", "all"])
+    ap.add_argument("task", choices=["pairs", "merges", "merges-split", "gate", "drift", "grounding", "all"])
     ap.add_argument("model")
     ap.add_argument("--host", default="http://localhost:11434")
     ap.add_argument("--sets", default=str(HERE / "decision-eval-sets.json"))
     ap.add_argument("--drift-set", default=str(HERE / "decision-eval-drift.json"),
                     help="drift task: JSON file with a 'drift' list; uses 'final' label if present, else 'label'")
+    ap.add_argument("--grounding-set", default=str(HERE / "decision-eval-grounding.json"))
+    ap.add_argument("--batch", action="store_true",
+                    help="grounding: one call per passage with every candidate in the state")
     ap.add_argument("--key-env", help="env var holding a bearer token (hosted Jev)")
     ap.add_argument("--limit", type=int, default=0, help="cap items per task (smoke test)")
     args = ap.parse_args()
@@ -187,6 +258,10 @@ def main():
             it["label"] = it.get("final", it["label"])
             it.setdefault("note", it.get("source", ""))
         times += run_drift(args.host, args.model, cut(drift))
+    if args.task == "grounding":
+        data = json.load(open(args.grounding_set))
+        data["grounding"] = cut(data["grounding"])
+        times += run_grounding(args.host, args.model, data, args.batch)
     print("%s: %d calls, median %.2fs, max %.2fs, wall %.0fs"
           % (args.model, len(times), st.median(times), max(times), time.time() - start))
 

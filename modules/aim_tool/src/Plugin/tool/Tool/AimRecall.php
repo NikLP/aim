@@ -34,8 +34,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * "read aim memory" only gates use of this tool at all - the real
  * per-scope "view {scope} aim facts" permission still applies per result:
  * AimMemoryManager::executeSearchQuery() runs this query as the calling
- * account (never bypasses access) whenever it is a real authenticated
- * user, so ai_search's own per-result entity access check
+ * account and never bypasses access (only Drush and consolidation do), so
+ * ai_search's own per-result entity access check
  * (SearchApiAiSearchBackend::checkEntityAccess()) filters out any fact the
  * caller can't actually view, including their own scope=user facts if
  * they hold no "view user aim facts" permission - no separate filtering

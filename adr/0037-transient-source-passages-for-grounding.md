@@ -1,10 +1,10 @@
 # ADR-0037: Transient source passages, so a decision model can check a candidate fact against what was actually said
 
-**Status:** Proposed (2026-10-02) - design only, not built; blocked on the
-evaluation in [TODO.md](../TODO.md) "Decision models". Builds on
-[ADR-0033](0033-plausibility-gate-processing-modes.md)'s gate and
-[ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s `trusted`
-flag.
+**Status:** Built 2026-10-11 as a write-time check: decisions 1-4 (side
+table, queue step, retention sweep) replaced by checking while the source
+text is in memory and storing none of it (see "Built" below; first proposed
+as [ADR-0056](0056-personal-data-write-gate.md) decision 7). Shadow mode on
+this site. Proposed 2026-10-02.
 **Date:** 2026-10-02
 
 ## Context
@@ -127,3 +127,72 @@ Only the flag flips later, so the vector index never waits on the gate.
   known hash with cleared text re-runs the check (leaning no).
 - **Model.** Decided (2026-10-03): `nli` is no longer available, so hosted
   Jev is the only candidate; the groundedness eval set decides it.
+
+## Addendum (2026-10-10): groundedness eval, hosted Jev
+
+`aim_benchmark/scripts/decision-eval-grounding.json`: 44 hand-written
+items (21 supported, 16 unsupported, 7 misattributed) over the three
+`demo/ingest-test` prose files plus six one-line chat messages. Labels
+human-verified by Nik 2026-10-10, no changes. `jev-latest`, three runs, scores stable to about 0.05:
+
+| Wording | AUC | Wrongly trusted at 0.50 | Wrongly held at 0.50 | Supported min |
+| --- | --- | --- | --- | --- |
+| plain ("Does the text state the candidate fact?") | 0.99 | 3-4 of 23 | 0 of 21 | 0.92 |
+| strict (names the failure kinds) | 0.99 | 2 of 23 | 0 of 21 | 0.73 |
+
+0.35 s median per call, both wordings in one call.
+
+- The strict wording catches proposals and wishes stated as fact ("Alex
+  wants to add" read as "runs") that the plain one lets through at 0.6-0.7.
+- One miss in every run and both wordings: a preference moved between the
+  two parties in a meeting ("Northlight wants" for "the library wants"),
+  0.85-0.98. Misattribution between people in the same passage is the
+  known weak spot.
+- The chat item whose passage is only "Yes, that's right." was held, so
+  chat writes must pass the prior turn in `source_text` or confirmed facts
+  stay untrusted.
+- Batched (`--batch`, 2026-10-11): one call per passage with every
+  candidate in the state (up to 14 candidates, 28 questions) takes the same
+  0.35-0.41 s as a single-fact call, and scores hold: strict AUC 1.00, 1 of
+  23 wrongly trusted at 0.50, supported min 0.76, two runs. So the check
+  costs one call per write operation, not per fact.
+- Next: decide wording and cutoff (strict at
+  a cutoff of about 0.7 holds every bad item but the misattribution on this
+  set, tuned on the set so optimistic).
+
+## Built (2026-10-11): checked at write time, nothing stored
+
+Hosted Jev answers a batched call in 0.35 s, so the check runs when the
+fact is written, not later in the queue. That drops decisions 1-4: no
+`aim_fact_source` table, `source_ref`, retention sweep or `view aim fact
+source` permission, and no raw text in the database. Lost: re-checking a
+fact later against its passage.
+
+- `AimMemoryManager::checkGrounding()`: every candidate in one Decision
+  call, the strict wording from the eval (`GROUNDING_QUESTION`), a request
+  cache so a batch is checked once. Activity `grounding` (decision only,
+  tag `aim_ground`), `activities.grounding.threshold` (default 0.7).
+- `grounding_score` on `aim_fact`; `grounding_mode` off, shadow or enforce
+  (decision 6 of ADR-0033 kept: enforce fails closed). This site: shadow,
+  `jev-latest`, 0.7.
+- Source text from extraction (whole document), `remember()`'s
+  `sourceText`, the MCP tool's `source_text`, and the chat assistant's
+  remember tool via `aim_chatbot`'s subscriber (visitor's last message plus
+  the assistant turn before it).
+- Checks: the facts list's Grounding column and "below" filter, an audit
+  line per verdict, `aim_activity_metrics`, the eval set; texts only under
+  the opt-in `log_query_text`. Kernel test `AimGroundingTest`.
+
+Found while building:
+
+- The demo assistant had lost its session history (aim_chatbot ships
+  `allow_history: none` and the demo recipe did not override it), so the
+  persona's confirm-before-save could not work and the chat source text had
+  no previous turn. The recipe now sets `private_tempstore_pool`.
+- The strict question marks a faithful clean-up down: the preflight canary
+  ("Please remember that the library's ZZPREFLIGHT story-time mascot is a
+  fox named Rusty", saved without the token) scored 0.52-0.62. Before
+  enforcing, test a narrower clause ("drops a detail that changes its
+  meaning") with clean-up items added to the eval set; the preflight's
+  recall-after-save check would fail under enforce as things stand.
+

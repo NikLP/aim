@@ -180,6 +180,13 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['type' => 'boolean_checkbox', 'weight' => 60]);
 
+    // ADR-0037's grounded check, run at write time against the text the fact
+    // came from; that text is never stored. Empty means not checked.
+    $fields['grounding_score'] = BaseFieldDefinition::create('float')
+      ->setLabel(t('Grounding score'))
+      ->setDescription(t('How likely a decision model judged it that the source text states this fact, 0 to 1, checked when the fact was written. Empty when there was no source text or the check was off or failed.'))
+      ->setDisplayConfigurable('view', TRUE);
+
     $fields += static::ownerBaseFieldDefinitions($entity_type);
     $fields['uid']
       ->setLabel(t('Extracted by'))

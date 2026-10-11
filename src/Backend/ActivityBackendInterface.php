@@ -26,6 +26,7 @@ interface ActivityBackendInterface {
     'extraction' => 'aim_extract',
     'consolidation' => 'aim_consolidate',
     'verifier' => 'aim_consolidate_verify',
+    'grounding' => 'aim_ground',
   ];
 
   /**

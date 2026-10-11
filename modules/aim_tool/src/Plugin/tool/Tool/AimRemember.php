@@ -110,6 +110,12 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
       description: new TranslatableMarkup('Extra fields the chosen scope needs, if any - e.g. target_type/target_id for scope=entity. Ask if unsure what a given scope expects here; omit entirely for a scope with none.'),
       required: FALSE,
     ),
+    'source_text' => new InputDefinition(
+      data_type: 'string',
+      label: new TranslatableMarkup('Source text'),
+      description: new TranslatableMarkup('The exact words the fact (or every fact in facts) came from: what the person said or the passage you read, quoted verbatim, not a summary. Used to check each fact is actually stated there; never stored. Omit when there is no such text.'),
+      required: FALSE,
+    ),
     'facts' => new ListInputDefinition(
       label: new TranslatableMarkup('Facts'),
       description: new TranslatableMarkup('Several facts to save in one call instead of text/scope/subject/source above - use this whenever more than one fact needs saving, instead of calling this tool repeatedly. Each entry is an object: {text (required, the fact statement), scope (required, one of the scopes actually installed on this site), subject (optional), source (optional), scope_fields (optional, extra fields the entry scope needs, e.g. target_type/target_id for scope=entity)}.'),
@@ -257,8 +263,9 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
    * {@inheritdoc}
    */
   protected function doExecute(array $values): ExecutableResult {
+    $sourceText = ($values['source_text'] ?? '') !== '' ? (string) $values['source_text'] : NULL;
     if (!empty($values['facts'])) {
-      return $this->doExecuteBatch($values['facts']);
+      return $this->doExecuteBatch($values['facts'], $sourceText);
     }
 
     if (empty($values['text'])) {
@@ -268,7 +275,7 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
       );
     }
 
-    $fact = $this->rememberOne($values);
+    $fact = $this->rememberOne($values, $sourceText);
     if (isset($fact['error'])) {
       return ExecutableResult::failure(
         new TranslatableMarkup('Could not save fact: @message', ['@message' => $fact['error']]),
@@ -301,20 +308,27 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
    * @param array $facts
    *   Fact entries, each shaped like doExecute()'s own text/scope/subject/
    *   source inputs.
+   * @param string|null $sourceText
+   *   The text every entry came from, or NULL.
    *
    * @return \Drupal\tool\ExecutableResult
    *   The batch result, with a per-entry summary in the results output.
    */
-  private function doExecuteBatch(array $facts): ExecutableResult {
+  private function doExecuteBatch(array $facts, ?string $sourceText = NULL): ExecutableResult {
     $lines = [];
     $created = 0;
+    if ($sourceText !== NULL) {
+      // One grounding call for the whole batch; each remember() below then
+      // finds its score already fetched.
+      $this->memoryManager->checkGrounding($sourceText, array_filter(array_map(fn ($entry) => (string) ($entry['text'] ?? ''), $facts)));
+    }
     foreach ($facts as $i => $entry) {
       if (empty($entry['text'])) {
         $lines[] = "Entry $i: missing text, skipped.";
         continue;
       }
 
-      $fact = $this->rememberOne($entry);
+      $fact = $this->rememberOne($entry, $sourceText);
       if (isset($fact['error'])) {
         $lines[] = "Entry $i: " . $fact['error'];
         continue;
@@ -343,12 +357,14 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
    * @param array $fields
    *   Text/scope/subject/source/scope_fields, as given on a single call or
    *   one facts entry.
+   * @param string|null $sourceText
+   *   The text the fact came from, for the grounded check, or NULL.
    *
    * @return array
    *   ['id' => int, 'bundle' => string, 'subject' => string] on success, or
    *   ['error' => string] on failure.
    */
-  private function rememberOne(array $fields): array {
+  private function rememberOne(array $fields, ?string $sourceText = NULL): array {
     $scope = $fields['scope'] ?? NULL;
     $scopeFields = $fields['scope_fields'] ?? [];
     if (empty($scope)) {
@@ -385,6 +401,7 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
         NULL,
         $scopeFields['target_type'] ?? NULL,
         $scopeFields['target_id'] ?? NULL,
+        $sourceText,
       );
     }
     catch (\InvalidArgumentException $e) {

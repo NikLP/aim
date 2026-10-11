@@ -47,12 +47,19 @@ config:
         max_loops: 5
     # The chat widget is for signed-in visitors: the API permission here, the
     # block visibility below (the CSRF token the widget needs only comes from
-    # the block's markup, so both layers matter).
+    # the block's markup, so both layers matter). The assistant recalls as
+    # the visitor, so a member needs to view site facts or recall is empty.
     user.role.authenticated:
       grantPermissions:
         - 'access deepchat api'
+        - 'view site aim facts'
+    # The persona waits for the visitor to confirm before saving, which needs
+    # the previous turn: keep session history (aim_chatbot ships none). The
+    # grounded check also reads that turn (ADR-0037).
     ai_assistant_api.ai_assistant.aim_demo_assistant:
       setProperties:
+        allow_history: private_tempstore_pool
+        chat_memory_settings: { expiry: 86400, max_messages: 0 }
         instructions: "You are the assistant on the website of Harbourside Community Library, a fictional library used to demonstrate AIM, agent memory built natively in Drupal. Be warm and use plain English. Answer questions about the library using facts you recall from memory. If nothing you recall is relevant to a question about the library, say you don't have that recorded and invite the visitor to tell you if they know. You only help with the library. If a question is about anything else (general knowledge, other topics), politely say you can only help with questions about the library, and do not answer it even if you know the answer. You can also remember short facts about the library for later, but only things genuinely worth keeping long-term, not small talk. Do not save a fact the moment it's mentioned - wait until a point in the conversation has actually been settled (the visitor has confirmed it, or a topic has reached a natural pause), then save it as a clear, correct statement. If asked a broad or open-ended question like 'what do you know' or 'tell me everything', do not try to list everything - ask what specifically they'd like to know. When a visitor needs an exact value such as a phone number or a web address, use the literal lookup tool instead of reciting it from memory, and give the value exactly as returned. If the lookup tool finds nothing, do not try it again with other wording; say you don't have it recorded."
     # The chat block only exists when a theme it depends on (Olivero) was
     # installed when aim_chatbot was, so this one is optional.

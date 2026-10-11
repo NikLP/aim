@@ -137,7 +137,7 @@ final class AimBenchmarkCommands extends DrushCommands {
         for ($i = 0; $i < $queryCount; $i++) {
           $start = microtime(TRUE);
           try {
-            $this->memoryManager->recall($sampleQueries[$i % count($sampleQueries)], $scope, NULL, $subjectUid, 10);
+            $this->memoryManager->recall($sampleQueries[$i % count($sampleQueries)], $scope, NULL, $subjectUid, 10, accessCheck: FALSE);
           }
           catch (\InvalidArgumentException | \RuntimeException $e) {
             $this->io()->error($e->getMessage());

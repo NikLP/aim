@@ -25,7 +25,7 @@ mode extracts.
 | Merge verifier (`verifyMerge()`) | Does the merged text keep both facts | A yes/no probability | Only if backend is `chat` | Decision model (live: Jev, threshold 0.8) |
 | Merge writer (`writeMerge()`) | Writes the merged text for an UPDATE | Generative | Yes | Small chat model (untested) |
 | Chat assistant (`aim_chatbot`, `aim_console`) | Answers a visitor, calls the recall tool | Reasoning, tool use | Yes | Stays frontier (or a strong local model) |
-| Plausibility gate, grounded check | Not wired (ADR-0033, ADR-0037) | A typed probability | n/a | Decision model |
+| Grounded check (ADR-0037) | Does the source text state each new fact; one batched call per write operation | A typed probability | No (hosted Jev here, shadow mode) | Already a decision model; a local one for real data |
 | Recall, embeddings | Vectors only, no chat | Embeddings | No (local Ollama) | Already local |
 | Literal finder (`literals_finder`, optional: behind the literals tool's question mode and the literals chat) | Picks the one literal a question asks for, from a menu of gists | A typed choice | No (hosted Jev here) | Decision model (live: Jev) |
 | Convert a fact to a literal | Splits an extracted fact into gist and value | Generative or typed | Not built | Small chat model or decision model |
@@ -49,7 +49,7 @@ goal. Scores are judgments from what each call sends, not measurements.
 | Merge writer | 🟩🟩🟩🟨🟨🟨⬜⬜⬜ | Two facts to the frontier model | Small local chat model (untested) |
 | Convert a fact (planned) | 🟩🟩🟩🟨🟨🟨⬜⬜⬜ | One fact, which may hold the value | Small local chat model |
 | Chat assistant | 🟩🟩🟩🟨🟨🟨🟥⬜⬜ | Visitor questions plus recalled facts to the frontier model | Strong local chat model |
-| Grounded check (planned, ADR-0037) | 🟩🟩🟩🟨🟨🟨🟥⬜⬜ | A fact and its source passage | Local decision model |
+| Grounded check (ADR-0037) | 🟩🟩🟩🟨🟨🟨🟥⬜⬜ | New facts and their source text (a message, or the whole document) to Jev; nothing stored | Local decision model |
 | Extraction | 🟩🟩🟩🟨🟨🟨🟥🟥🟥 | Whole source documents to the frontier model | Small local chat model (untested) |
 
 Reading it: extraction is the single largest exposure, and the one place

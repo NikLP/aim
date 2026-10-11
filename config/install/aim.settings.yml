@@ -6,6 +6,8 @@ activities:
   extraction: { backend: chat, provider: '', model: '' }
   consolidation: { backend: chat, provider: '', model: '' }
   verifier: { backend: chat, provider: '', model: '' }
+  grounding: { backend: decision, provider: '', model: '' }
+grounding_mode: 'off'
 merge_max_distance: 0
 recall_max_distance: 0.45
 recall_gap: 0

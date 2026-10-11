@@ -22,7 +22,8 @@ The Active table is one list; these are the threads running through it.
 - **Write-path gate and decision models** -
   [0002](0002-governance-deferred-guardrails-mandatory.md),
   [0033](0033-plausibility-gate-processing-modes.md) with
-  [0037](0037-transient-source-passages-for-grounding.md) (the live design),
+  [0037](0037-transient-source-passages-for-grounding.md) (the grounded check, built 2026-10-11),
+  [0056](0056-personal-data-write-gate.md) (personal-data gate, parked),
   [0021](0021-jev-typed-decision-provider.md),
   [0038](0038-local-decision-models-parked.md) (parked),
   [0035](0035-standing-constraints-action-gate.md),
@@ -53,7 +54,7 @@ Still carrying work, proposed, or deferred.
 | [0033](0033-plausibility-gate-processing-modes.md) | Plausibility gate on new facts: untrusted until scored, fail closed, and queued vs inline vs post-response processing | Proposed 2026-10-01, addendum 2026-10-02 - design only, not built; measured on the dev laptop (laya:en, then tev1:4b) |
 | [0035](0035-standing-constraints-action-gate.md) | Standing constraints: structured "don't build X until Y" facts enforced by a deterministic action-layer gate, semantic recall advisory only | Proposed 2026-10-01 - design only, not built |
 | [0036](0036-memory-algorithm-appraisal.md) | Memory algorithm appraisal: what to borrow from the literature (recency/importance re-rank, RRF, decay), and what aim does badly | Proposed 2026-10-02 - research only, nothing built |
-| [0037](0037-transient-source-passages-for-grounding.md) | Transient source passages (side table + pointer, deleted after the check) so a decision model can check a candidate against what was actually said | Proposed 2026-10-02 - design only, not built; blocked on the grounded evaluation set |
+| [0037](0037-transient-source-passages-for-grounding.md) | Transient source passages (side table + pointer, deleted after the check) so a decision model can check a candidate against what was actually said | Built 2026-10-11 as a write-time check (no stored passages, decisions 1-4 replaced); shadow mode on this site |
 | [0038](0038-local-decision-models-parked.md) | Local decision models: measured, parked, and how to bring one back (Laya, `tev1`, memory-capped services) | Parked |
 | [0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md) | Literals: a standalone `literal` entity (name, key, value, gist, type, audience) found by a decision-model chooser over the whole menu; values never reach the model; `aim` consumes the finder, no scope or mirror | Accepted, built through finder/tool/search; rewritten 2026-10-07 as current state (history in git); supersedes 0039 |
 | [0041](0041-annotation-guided-webform-prefill.md) | Annotation-guided Webform pre-fill: annotations describe each field, an agent fills it from recalled facts and literals as the viewing account | Proposed 2026-10-04 - design only, not built; replaces the 2026-10-03 interview-to-Webform draft |
@@ -67,6 +68,7 @@ Still carrying work, proposed, or deferred.
 | [0052](../../literals/adr/0052-what-literals-is-for.md) | What literals is for and not: find-and-gate layer for things, not a chat-cost trick; build and measure the one-shot gate first; menu/page candidates instead of a second sitemap; `{label, url}` results | Proposed 2026-10-06 - decision record; `{label, url}` results built 2026-10-07; addendum 2026-10-08: how aim uses literals (convert-a-fact retires the fact, finder as live recall source and gate, answer modes), unbuilt |
 | [0053](0053-gist-shared-vocabulary.md) | "Gist" as a separate searchable field, shared by annotations and literals: definition, provenance (fuzzy-trace, ReadAgent), find-by-gist, factoring the finder | Proposed 2026-10-04 - design only, not built; duplicated from annopm ADR-028 |
 | [0054](../../literals/adr/0054-demo-the-scottish-play.md) | Demoing literals: "break a leg" (metadata does the work) and the Scottish play (a literal whose value, "Macbeth", the model never sees); script, claims, prerequisites | Proposed 2026-10-08 - demo plan, nothing built |
+| [0056](0056-personal-data-write-gate.md) | No personal data stored unless authorised: refuse names and contact details at write time (patterns plus a decision-model check), authorised by `user` scope or a permission, never by a model; grounded check inline, no stored passages | Parked 2026-10-11 (proposed 2026-10-10) - design only; revisit later |
 | [0055](0055-decision-rationale-as-entity-scope-facts.md) | Decision rationale as entity-scope facts: validate against grep with existing `aim_fact` features before building a `decision` entity (from annopm ADR-022) | Proposed 2026-10-08 - validation test only, nothing built |
 
 ## Resolved

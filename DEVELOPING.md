@@ -547,6 +547,46 @@ input, independent of what `validateForm()` validated) - moot today since
 both shipped guardrails are Stop-only, worth knowing before adding one
 that rewrites.
 
+### Grounded check (ADR-0037)
+
+When a fact is written with the text it came from, a decision model is
+asked whether that text states the fact, and the answer (a probability, 0
+to 1) is stored on the fact as `grounding_score`. The source text is sent
+to the model and never stored.
+
+- **Where the source text comes from:** extraction (`aim:extract`, the
+  ingest form's prose mode) passes the whole document;
+  `remember(..., sourceText: ...)`; the MCP `aim_remember` tool's
+  `source_text` input (supplied by the calling agent, so only as verbatim
+  as that agent is); the chat assistant's remember tool, through
+  `aim_chatbot`'s `AimChatbotSourceTextSubscriber` (the visitor's last
+  message plus the assistant turn before it, which needs the assistant's
+  session history on). JSON and one-fact-per-line ingest have no source
+  text and stay unchecked (`grounding_score` empty).
+- **One call per write, not per fact.** `checkGrounding()` puts every
+  candidate in one Decision call (`candidate_1` ... in the state, one
+  strict Noul question each, `GROUNDING_QUESTION`). Extraction and an MCP
+  batch check all their facts at once; each `remember()` then finds its
+  score in the request cache. About 0.35 s on hosted Jev.
+- **Modes** (`aim.settings:grounding_mode`, AIM settings > Models >
+  Grounded check): `off`; `shadow` records the score and leaves `trusted`
+  alone; `enforce` also sets `trusted` (at or above
+  `activities.grounding.threshold`, default 0.7), untrusted when the check
+  fails or has no model (fail closed). An explicit `trusted` from the
+  caller always wins. Decision backend only (`activities.grounding`).
+- **Checking reliability:** the Grounding column (sortable) and the
+  "Grounding score below" filter on the facts list; an audit line per
+  verdict (fact ID, score, cutoff, mode, no text); call time and tokens in
+  `aim_activity_metrics` (activity `aim_ground`); the eval set
+  (`aim_benchmark`'s `decision-eval.py grounding --batch`) after any model
+  or wording change. With `log_verbose` and `log_query_text` on, each score
+  is logged with the candidate and passage text: opt-in personal data,
+  for diagnosis only.
+- **Known calibration issue:** the strict question penalizes any dropped
+  detail, so a faithful clean-up scores low (the preflight canary, with its
+  `ZZPREFLIGHT` token dropped by the assistant, scored 0.52-0.62). Check
+  this in shadow mode before enforcing.
+
 ### Scope/bundle model
 
 `aim_fact`'s bundle key field is named `scope`, deliberately not `type` -
@@ -660,22 +700,27 @@ then export the index config.
   above, not running `search-api:clear` again. After a `DROP TABLE`-and-
   reindex cycle, reindex directly and skip `search-api:clear` entirely.
 
-### `checkViewAccess()`/anonymous drush callers
+### `checkViewAccess()` and skipping access on recall
 
-`recall()` (via `AimMemoryManager::executeSearchQuery()`) sets
-`search_api_bypass_access` for an anonymous caller (drush/cron) instead
-of elevating to any particular account - a drush/cron caller has no real
-"viewer" to check access on behalf of, and already holds raw DB
-credentials, so the access check was never a real security boundary at
-that call site. See [ADR-0006](adr/resolved/0006-agent-native-write-path.md)'s
-addendum for the full reasoning (an earlier uid-1-elevation approach was
-reworked away from - uid 1 has no core guarantee of existing or holding
-any particular role). A real authenticated caller (Tool API/MCP, an
-interactive admin) runs the query as themselves, so
-`AimFactAccessControlHandler`'s real per-scope permission applies
-per-result - a caller with only the flat `read aim memory` permission
-cannot recall their own `scope=user` facts via `aim_recall` unless also
-granted `view user aim facts`.
+`AimMemoryManager::executeSearchQuery()` and `recall()` take
+`bool $accessCheck = TRUE`, the same idiom as core's entity query
+`accessCheck()`. FALSE sets `search_api_bypass_access`. Three callers
+pass it: `drush aim:recall`, `aim:benchmark`,
+and consolidation's neighbor search. A Drush caller has no viewer to check
+access for and already holds raw DB credentials, so the check is no real
+boundary there; consolidation must compare against every fact in the
+scope, whoever triggered it, and returns nothing to a viewer. No account
+switching (see [ADR-0006](adr/resolved/0006-agent-native-write-path.md)'s
+addenda: uid 1 has no core guarantee of existing or holding any role).
+
+Everyone else (Tool API/MCP, the chatbot, any web request) runs the query
+as the current account, so `AimFactAccessControlHandler`'s per-scope
+permission applies per result. Being anonymous is not a reason to bypass:
+an anonymous web or MCP caller gets only what anonymous may view. So the
+chatbot recalls nothing for a visitor whose role lacks
+`view site aim facts`, and a caller with only `read aim memory` cannot
+recall their own `scope=user` facts via `aim_recall` without
+`view user aim facts`.
 
 ### User-scope role visibility
 
@@ -798,9 +843,18 @@ by hand. Fresh installs get all of it from config and the shim.
    add `mhnsw_ef_search: 100` to the server's `database_settings`, and
    rebuild the vector index once at `M=16` (the `ALTER TABLE` under "Tuning
    vector search accuracy").
-5. **Per-site choices, not defaults:** `index_directly` on if embeddings are
+5. **`grounding_score` field** (ADR-0037, 2026-10-11): install its storage,
+   then save the AIM settings form once (adds `activities.grounding` and
+   `grounding_mode`) and re-import `views.view.aim_facts` for the column and
+   filter:
+
+   ```bash
+   ddev drush php:eval '$d = \Drupal::service("entity_field.manager")->getFieldStorageDefinitions("aim_fact")["grounding_score"]; \Drupal::entityDefinitionUpdateManager()->installFieldStorageDefinition("grounding_score", "aim_fact", "aim", $d);'
+   ```
+
+6. **Per-site choices, not defaults:** `index_directly` on if embeddings are
    local; `recall_max_distance` recalibrated to your dataset (ADR-0019).
-6. Run `drush aim:status` to confirm steps 1-4 above actually took (it
+7. Run `drush aim:status` to confirm steps 1-4 above actually took (it
    checks index parity, orphan rows, the provider shim, and HNSW tuning
    directly against the DB), then export the config and confirm `ddev
    drush config:status` reports no differences.

@@ -83,7 +83,13 @@ Four memory categories, composable at retrieval the way Mem0 composes
   `hook_cron` - extraction, consolidation, and decay run unattended, not
   on the live request path.
 - **Governance:** every candidate fact passes through `drupal/ai`'s
-  Guardrails (prompt-injection/PII filtering) before it's written. A
+  Guardrails before it's written (today a length limit and a no-markup
+  rule; a personal-data check is designed but parked in
+  [ADR-0056](adr/0056-personal-data-write-gate.md)). A fact written with
+  the text it came from is checked against that text by a decision model
+  (the grounded check, [ADR-0037](adr/0037-transient-source-passages-for-grounding.md));
+  the text is never stored, and the check can set `trusted` or only
+  record its score. A
   lightweight `trusted` flag is the draft-to-trusted human-review gate
   ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
   addendum) - `recall()` excludes untrusted facts by default; full

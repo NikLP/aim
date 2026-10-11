@@ -31,7 +31,9 @@ use of the tool at all, not which scopes it can write.
   MCP schema reflects whatever scope submodules are actually installed
   instead of a hardcoded `scope=entity` shape. A `facts` batch entry's
   own `scope_fields` stays unrefined - Tool API's refiner mechanism has
-  no per-list-item equivalent.
+  no per-list-item equivalent. An optional `source_text` (the words the
+  fact or batch came from) feeds the grounded check, one call for the
+  whole batch ([ADR-0037](../../adr/0037-transient-source-passages-for-grounding.md)).
 - `src/Plugin/tool/Tool/AimLiteral.php` - `aim_literal`, a thin wrapper over
   the `literals.lookup` service (key, search words, or a question when
   `literals_finder` is enabled), gated on `view literals` (or `view

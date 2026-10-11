@@ -48,6 +48,23 @@ final class AimRemember extends FunctionCallBase implements ExecutableFunctionCa
   protected AimMemoryManager $memoryManager;
 
   /**
+   * The conversation the fact comes from, for the grounded check.
+   */
+  protected ?string $sourceText = NULL;
+
+  /**
+   * Sets the conversation the fact comes from.
+   *
+   * Set by AimChatbotSourceTextSubscriber just before the tool runs.
+   *
+   * @param string|null $sourceText
+   *   The visitor's last message with the assistant turn before it, or NULL.
+   */
+  public function setSourceText(?string $sourceText): void {
+    $this->sourceText = $sourceText;
+  }
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): FunctionCallInterface|static {
@@ -68,7 +85,7 @@ final class AimRemember extends FunctionCallBase implements ExecutableFunctionCa
     }
 
     try {
-      $fact = $this->memoryManager->remember($text, self::FACT_SCOPE, NULL, 'chatbot:aim_chatbot', NULL);
+      $fact = $this->memoryManager->remember($text, self::FACT_SCOPE, NULL, 'chatbot:aim_chatbot', NULL, sourceText: $this->sourceText);
       $this->setOutput('Saved fact ' . $fact->id() . ': ' . $text);
     }
     catch (\InvalidArgumentException $e) {

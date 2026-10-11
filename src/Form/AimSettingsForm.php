@@ -151,6 +151,10 @@ final class AimSettingsForm extends ConfigFormBase {
         $this->t('Merge verifier'),
         $this->t('Checks a merged text keeps every detail of both inputs. Default uses the consolidation model; a different model can check the first.'),
       ],
+      'grounding' => [
+        $this->t('Grounded check'),
+        $this->t('Checks, when a fact is written, that the text it came from states it (ADR-0037). Decision models only. The source text is sent to this model and never stored.'),
+      ],
     ];
     $config = $this->config('aim.settings');
     foreach ($activities as $activity => [$title, $description]) {
@@ -167,6 +171,36 @@ final class AimSettingsForm extends ConfigFormBase {
         '#description' => $description,
       ];
       $selector = ':input[name="models[' . $activity . '][backend]"]';
+      if ($activity === 'grounding') {
+        $form['models'][$activity]['decision'] = [
+          '#type' => 'ai_provider_configuration',
+          '#title' => $this->t('Decision model'),
+          '#operation_type' => 'decision',
+          '#advanced_config' => FALSE,
+          '#default_provider_allowed' => FALSE,
+          '#default_value' => $default_value,
+        ];
+        $form['models'][$activity]['threshold'] = [
+          '#type' => 'number',
+          '#title' => $this->t('Grounded threshold'),
+          '#description' => $this->t('A fact counts as grounded when the score is at or above this value. Empty or 0 uses 0.7. Model-specific: calibrate with the grounding task in the aim_benchmark eval script (hosted Jev split cleanly at about 0.76 on a 44-item set, tuned on that set).'),
+          '#default_value' => $choice['threshold'] ?? NULL,
+          '#min' => 0,
+          '#max' => 1,
+          '#step' => 0.01,
+        ];
+        $form['models'][$activity]['grounding_mode'] = [
+          '#type' => 'radios',
+          '#title' => $this->t('Mode'),
+          '#options' => [
+            'off' => $this->t('Off: no check'),
+            'shadow' => $this->t("Shadow: record each fact's score, leave trusted alone"),
+            'enforce' => $this->t('Enforce: also set trusted from the score (untrusted when the check fails)'),
+          ],
+          '#default_value' => $config->get('grounding_mode') ?: 'off',
+        ];
+        continue;
+      }
       if ($activity !== 'extraction') {
         $form['models'][$activity]['backend'] = [
           '#type' => 'radios',
@@ -331,9 +365,9 @@ final class AimSettingsForm extends ConfigFormBase {
    */
   public function submitForm(array &$form, FormStateInterface $form_state): void {
     $activities = [];
-    foreach (['extraction', 'consolidation', 'verifier'] as $activity) {
+    foreach (['extraction', 'consolidation', 'verifier', 'grounding'] as $activity) {
       $value = $form_state->getValue(['models', $activity]) ?? [];
-      $backend = $activity !== 'extraction' && ($value['backend'] ?? 'chat') === 'decision' ? 'decision' : 'chat';
+      $backend = $activity === 'grounding' || ($activity !== 'extraction' && ($value['backend'] ?? 'chat') === 'decision') ? 'decision' : 'chat';
       $picked = $value[$backend] ?? [];
       $use_default = $backend === 'chat' && !empty($picked['use_default']);
       $activities[$activity] = [
@@ -341,11 +375,14 @@ final class AimSettingsForm extends ConfigFormBase {
         'provider' => $use_default ? '' : (string) ($picked['provider'] ?? ''),
         'model' => $use_default ? '' : (string) ($picked['model'] ?? ''),
       ];
-      if ($activity === 'verifier' && !empty($value['threshold'])) {
+      if (in_array($activity, ['verifier', 'grounding'], TRUE) && !empty($value['threshold'])) {
         $activities[$activity]['threshold'] = (float) $value['threshold'];
       }
     }
-    $this->configFactory()->getEditable('aim.settings')->set('activities', $activities)->save();
+    $this->configFactory()->getEditable('aim.settings')
+      ->set('activities', $activities)
+      ->set('grounding_mode', $form_state->getValue(['models', 'grounding', 'grounding_mode']) ?: 'off')
+      ->save();
     parent::submitForm($form, $form_state);
   }
 

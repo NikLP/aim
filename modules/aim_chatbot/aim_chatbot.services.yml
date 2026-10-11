@@ -1,0 +1,5 @@
+services:
+  aim_chatbot.source_text_subscriber:
+    class: Drupal\aim_chatbot\EventSubscriber\AimChatbotSourceTextSubscriber
+    tags:
+      - { name: event_subscriber }

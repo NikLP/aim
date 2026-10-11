@@ -141,3 +141,13 @@ behavior:
 The third is a real gap, not just a caveat. Proposed fix (a `verbatim`
 opt-out flag, not built) in
 [ADR-0020](../0020-verbatim-facts-consolidation-opt-out.md).
+
+## Addendum (2026-10-10): the trigger is an explicit `accessCheck` argument, not "anonymous"
+
+Keying the bypass on `isAnonymous()` failed open: any anonymous entry
+point (the chat widget reopened for anonymous, an MCP transport running
+without a session) recalled every fact in every scope. `executeSearchQuery()`
+and `recall()` now take `bool $accessCheck = TRUE` (core's entity query
+`accessCheck()` idiom); only Drush commands (`aim:recall`,
+`aim:benchmark`) and consolidation's neighbor search pass FALSE. Every other caller, anonymous included, runs the query as the
+current account. Still no account switching.

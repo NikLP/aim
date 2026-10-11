@@ -29,40 +29,40 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       The on-site assistant gets the lookup tool through
       `tool_ai_connector` (`aim_literal` from 2026-10-10, see below); the
       large model is the gate for one-shot lookups. `aim` depends on `literals`, not `literals_finder`.
-- [ ] **Review literal access (raised 2026-10-09).** Two layers can disagree:
-      a literal's view rule (`view literals`, plus `view restricted literals`
-      for a restricted one; audiences were removed 2026-10-10) and the
-      resolver's own access check on the target (a `url` literal checks the
-      route). `/user/login` is unrestricted but the route denies a
-      signed-in user, so the finder reports a match and the lookup returns
-      `none`, silently. Decide one model (literal rule only, resolver only, or
-      the stricter of both surfaced to the author at save time) and make a
-      mismatch visible.
+- [x] **Review literal access (decided 2026-10-10: document and accept).**
+      The literal's view rule and the resolver's route check can disagree
+      (`/user/login` is anonymous-only, so a signed-in user gets `none`).
+      Only core's account routes do this here; documented in
+      [literals/CLAUDE.md](../literals/CLAUDE.md), no save-time warning.
 - [ ] **Convert-a-fact retires the fact.** Promoting an extracted one-shot
       fact to a literal supersedes it via `superseded_by`; the literal's
       gist is then the only description. Short form, never one click: a
       model splits the fact into gist and value, a human picks the type,
-      the literal carries a `source_fact` back-reference. Depends on the
-      `retired`/`expires` split under "Design review findings".
-- [ ] **Answer modes (a setting).** Mode 1, literal only: fixed reply, no
+      the literal carries a `source_fact` back-reference. Unblocked: the
+      `retired`/`expires` split was built 2026-10-09 (`aim_update_10009`).
+- [ ] **Answer modes (decided 2026-10-10: a skill, wired up later, not a
+      module setting).** Mode 1, literal only: fixed reply, no
       large model, the value never reaches a model. Mode 2, literal plus
       smoothing: the large model writes the reply around the resolved
       value; default to public (anonymous) values only. Escalation: a
       "think harder" control on a mode 1 answer re-runs the question
       through mode 2 or full recall. The public-values-only rule is a trade-off to
       keep and revisit, not a settled principle.
-- [ ] **Optional pre-gate.** A tiny "is this a lookup?" question with no menu
+- [ ] **Optional pre-gate (setup-dependent, later).** Only matters in a
+      setup where the finder runs on every question; the assistant's
+      tool-call design (2026-10-09) does not. A tiny "is this a lookup?" question with no menu
       in its prompt, ahead of the finder, so non-lookup traffic does not pay
       for a menu-sized prompt (about 4,000 tokens at 200 literals). Its
       failures are safe. Keep only if measured to pay (share of traffic
       removed against its own latency). The finder itself is already the
       gate for whether a literal fits.
-- [ ] **Measure the gate end to end:** cost and latency of gate-then-literal
+- [ ] **Measure the gate end to end (setup-dependent, later, with the
+      pre-gate):** cost and latency of gate-then-literal
       against the large model doing the same lookup, on the same questions.
       This decides whether literals saves anything (ADR-0052 decision 3).
 - [ ] **Copy controls** ("copy value", "copy link") on chat answers, shown by
       role or permission: front-end work; the chat items already carry value,
-      label and kind.
+      label and kind. Waits: cosmetic.
 - [ ] **A blind question set written by Nik** (about 15 to 40 questions,
       without looking at `eval/gold.seed.yml`), then re-check
       `chooser_context` and the thresholds. All numbers so far are
@@ -74,7 +74,7 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       lever, which our "wider alias list pulled near-topic questions in"
       trial contradicts on one in-sample run. Re-test after the blind set
       above, against the in-gist `ALSO` convention.
-- [ ] **Demo** ([ADR-0054](../literals/adr/0054-demo-the-scottish-play.md)):
+- [ ] **Demo, deferred** ([ADR-0054](../literals/adr/0054-demo-the-scottish-play.md)):
       theater seed set, on-screen decision-request viewer, a miss fallback,
       a local fallback. Target: DrupalCon or a Drupal camp in Scotland,
       early 2027.
@@ -186,10 +186,22 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       built (pairs/merges/gate; hand-written, labels human-verified
       2026-10-02). Results (hosted Jev 23/24 pairs, 25/25 real pairs,
       merges and gate AUC 1.00; local models parked): ADR-0038 and the
-      ADR-0021 addendum. Still to build: a groundedness set (passage +
-      candidate, labeled supported/unsupported/misattributed), harder
-      UPDATE/NOOP pairs, and an `nli` model run (an Ollaya model).
-- [ ] Grounded check build (ADR-0037, decisions 2026-10-03): `aim_fact_source` (hash-keyed, text nulled after the check), `source_ref` on `aim_fact`, `source_text` on `remember()`, `ingest_max_chars` (about 100 KB, chunking parked), `grounding` activity (Jev only; `nli` gone), shadow mode first, then `default_trusted: false`. Eval set first.
+      ADR-0021 addendum. Groundedness set BUILT 2026-10-10
+      (`decision-eval-grounding.json`, 44 items, `grounding` task; results
+      in ADR-0037's addendum; labels verified by Nik 2026-10-10). Still to build:
+      harder UPDATE/NOOP pairs.
+- [x] Grounded check BUILT 2026-10-11 as a write-time check, nothing
+      stored (ADR-0037 "Built"); shadow mode on this site.
+- [ ] Grounded check follow-ups: (1) review shadow scores on real use,
+      then decide enforce and `default_trusted: false`; (2) the strict
+      question marks faithful clean-ups down (preflight canary 0.52-0.62):
+      add clean-up items to the eval set and test "drops a detail that
+      changes its meaning"; the preflight's recall-after-save check fails
+      under enforce until then; (3) per-model question text (same item as
+      the decision backend's, below); (4) `ingest_max_chars` and a
+      passage-size limit for the Jev call (untested above about 1,000
+      words); (5) MCP `source_text` is whatever the calling agent quotes,
+      so it is only as verbatim as that agent.
 - [ ] Extend `decision-eval.py`: confusion matrix by confidence bucket and
       a cost-weighted threshold sweep (a wrong UPDATE loses data, a missed
       merge is cheap).
@@ -230,8 +242,9 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       misses ("wheelchair accessible" vs "step-free"). About 0.4 s per hosted
       call; measure on the known misses first. Sends fact text to the model,
       unlike the literals finder (key and gist only).
-- [ ] **Exercise `aim_update_10009`/`10010` on data with retired facts**; both
-      ran only against empty data. Check the facts View afterwards.
+- [ ] **Check the facts View on data with retired facts** (the
+      `aim_update_10009`/`10010` hooks were removed in 05979b3 under the
+      no-update-hooks rule; they had only run against empty data).
 
 ## Design review findings (raised 2026-10-02)
 
@@ -245,12 +258,12 @@ are recommendations.
       `--uid`). Consolidation retirements and merged facts are exempt
       (a merged fact copies `uid` and `user` from the kept fact). The
       current database is disposable, so no `uid` backfill is needed.
-- [ ] Replace `isAnonymous()` as the trigger for
-      `search_api_bypass_access` in `AimMemoryManager::executeSearchQuery()`
-      with an explicit `$systemCaller` argument (default FALSE) that only
-      Drush commands and the queue worker pass as TRUE. Web and MCP always
-      get access checks, so an anonymous web caller gets nothing instead
-      of everything.
+- [x] BUILT 2026-10-10: `search_api_bypass_access` is keyed on an explicit
+      `$accessCheck` argument on `executeSearchQuery()`/`recall()`
+      (default TRUE, core's `accessCheck()` idiom), FALSE passed only by `aim:recall`, `aim:benchmark` and
+      consolidation's neighbor search. Web and MCP always get access
+      checks; anonymous now gets nothing instead of everything (verified
+      live). ADR-0006 addendum.
 - [ ] Docs: say "the fact is about this user" for `user` scope (`user` is
       the subject, `uid` is the author; keep `uid`, it is Drupal's idiom).
 - [ ] Grill access: what exists is fine for now (Drush with `--uid`, or
@@ -259,6 +272,15 @@ are recommendations.
       A web console ([ADR-0029](adr/0029-context-carrying-turns.md),
       `aim_console`) needs its own chat model; point it at local Ollama to
       stay sovereign.
+
+**Personal data (raised 2026-10-10, [ADR-0056](adr/0056-personal-data-write-gate.md), parked 2026-10-11)**
+
+- [ ] Parked by Nik 2026-10-11, revisit later. Accept or amend ADR-0056 (no personal data stored unless
+      authorised). Then: a `pii` eval set and task in `decision-eval.py`,
+      the `aim_personal_data` guardrail set, the extraction prompt change,
+      and the demo's raw email fact moved into a literal.
+- [ ] If accepted, `aim_rejection` keeps no text for `personal_data`
+      rejections, and ADR-0037 is built inline (no `aim_fact_source`).
 
 **Lossy rejection**
 

@@ -133,8 +133,7 @@ display:
           empty_zero: false
           hide_alter_empty: true
           type: basic_string
-          settings:
-            trim_length: 150
+          settings: {  }
         source:
           id: source
           table: aim_fact
@@ -219,6 +218,20 @@ display:
             format: true-false
             format_custom_false: ''
             format_custom_true: 'true'
+        grounding_score:
+          id: grounding_score
+          table: aim_fact
+          field: grounding_score
+          entity_type: aim_fact
+          entity_field: grounding_score
+          plugin_id: field
+          label: Grounding
+          type: number_decimal
+          settings:
+            thousand_separator: ''
+            decimal_separator: .
+            scale: 2
+            prefix_suffix: false
         retired:
           id: retired
           table: aim_fact
@@ -291,7 +304,28 @@ display:
           plugin_id: standard
           order: DESC
       arguments: {  }
-      filters: {  }
+      filters:
+        grounding_score:
+          id: grounding_score
+          table: aim_fact
+          field: grounding_score
+          entity_type: aim_fact
+          entity_field: grounding_score
+          plugin_id: numeric
+          operator: '<'
+          value:
+            min: ''
+            max: ''
+            value: ''
+          exposed: true
+          expose:
+            operator_id: grounding_score_op
+            label: 'Grounding score below'
+            description: 'Facts whose source text scored under this, to spot-check the grounded check.'
+            use_operator: false
+            identifier: grounding_below
+            remember: false
+            multiple: false
       style:
         type: table
         options:
@@ -310,6 +344,7 @@ display:
             state: state
             retired: retired
             operations: operations
+            grounding_score: grounding_score
           default: id
           info:
             aim_fact_bulk_form:
@@ -385,6 +420,13 @@ display:
               separator: ''
               empty_column: false
               responsive: ''
+            grounding_score:
+              sortable: true
+              default_sort_order: asc
+              align: ''
+              separator: ''
+              empty_column: false
+              responsive: ''
           override: true
           sticky: true
           summary: ''
@@ -404,6 +446,7 @@ display:
       contexts:
         - 'languages:language_content'
         - 'languages:language_interface'
+        - url
         - url.query_args
         - user.permissions
       tags: {  }
@@ -428,6 +471,7 @@ display:
       contexts:
         - 'languages:language_content'
         - 'languages:language_interface'
+        - url
         - url.query_args
         - user.permissions
       tags: {  }

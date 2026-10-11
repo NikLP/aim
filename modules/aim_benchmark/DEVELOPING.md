@@ -74,8 +74,11 @@ Tasks: `pairs` (`classifyPair()`, 24 hand-written pairs; also run
 `--sets scripts/decision-eval-real-pairs.json` for 25 real near-neighbour
 pairs), `merges` (`verifyMerge()`; `--sets
 scripts/decision-eval-merges-hard.json` for 20 subtle faults),
-`merges-split` (the same as three small questions) and `gate`
-(plausibility). It reports accuracy, a confusion matrix, unsafe errors
+`merges-split` (the same as three small questions), `gate`
+(plausibility) and `grounding` (ADR-0037's grounded check, 44 passage and
+candidate items in `scripts/decision-eval-grounding.json`, asked in a
+plain and a strict wording per call; labels human-verified 2026-10-10;
+`--batch` sends one call per passage with every candidate in the state). It reports accuracy, a confusion matrix, unsafe errors
 (a data-losing UPDATE/RETIRE), AUC and a best threshold (tuned on the
 set, so optimistic) and per-call time. Use the threshold to set
 `activities.verifier.threshold` for a model. Local-model results and

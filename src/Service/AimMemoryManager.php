@@ -65,6 +65,23 @@ class AimMemoryManager {
   protected const CONSOLIDATE_QUEUE_ID = 'aim_consolidate';
 
   /**
+   * The grounded check's question, %1$s being the candidate's state key.
+   *
+   * The "strict" wording measured in aim_benchmark's decision-eval.py
+   * grounding task (ADR-0037 addendum): naming the failure kinds stops
+   * proposals and wishes passing as settled facts.
+   */
+  protected const GROUNDING_QUESTION = 'Does the text state the fact in %1$s? Answer no if %1$s adds, changes or drops any detail, gives an old value the text has replaced, pins a detail on the wrong person or thing, or states as settled something the text only proposes, hedges or reports second-hand.';
+
+  /**
+   * The grounding cutoff when activities.grounding.threshold is unset.
+   *
+   * Hosted Jev split supported from unsupported candidates at about 0.76 on
+   * the 44-item eval set (tuned on that set, so optimistic).
+   */
+  protected const GROUNDING_DEFAULT_THRESHOLD = 0.7;
+
+  /**
    * Shipped default for aim.settings' auto_threshold, and a fallback.
    *
    * The live, admin-editable value is aim.settings:auto_threshold
@@ -165,10 +182,8 @@ class AimMemoryManager {
    *   consolidation thresholds and extraction/consolidation prompts (see
    *   /admin/config/aim/settings, Drupal\aim\Form\AimSettingsForm).
    * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
-   *   The current user, used by executeSearchQuery() to tell a real
-   *   authenticated caller (Tool API/MCP, an interactive admin) apart from
-   *   an anonymous one (drush, cron) - only the latter needs the
-   *   search_api_bypass_access treatment that method exists for.
+   *   The current user: the author uid in audit lines, and the viewer
+   *   recall() replaces literal tokens as.
    * @param \Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber $embeddingCache
    *   The query-embedding cache subscriber (ADR-0017), activated by
    *   executeSearchQuery() for the duration of a query's execute() call.
@@ -198,6 +213,16 @@ class AimMemoryManager {
     protected ActivityBackendInterface $decisionBackend,
     protected LiteralReader $literalReader,
   ) {}
+
+  /**
+   * Grounding scores fetched this request, keyed by passage and candidate.
+   *
+   * Lets a caller check a whole batch in one call, after which remember()
+   * finds each fact's score here instead of calling again.
+   *
+   * @var array<string, float|null>
+   */
+  protected array $groundingCache = [];
 
   /**
    * Logs an audit event at info level, if aim.settings:log_audit is on.
@@ -614,7 +639,8 @@ class AimMemoryManager {
    * default, so it needs an explicit choice.
    *
    * @param string $activity
-   *   One of extraction, consolidation or verifier.
+   *   One of extraction, consolidation, verifier or grounding. Extraction is
+   *   always chat, grounding always decision.
    *
    * @return array|null
    *   An array with keys 'provider_id', 'model_id' and 'backend', or NULL if
@@ -622,7 +648,7 @@ class AimMemoryManager {
    */
   public function getModelFor(string $activity): ?array {
     $choice = $this->configFactory->get('aim.settings')->get('activities.' . $activity) ?? [];
-    $backend = ($choice['backend'] ?? 'chat') === 'decision' && $activity !== 'extraction' ? 'decision' : 'chat';
+    $backend = $activity === 'grounding' || (($choice['backend'] ?? 'chat') === 'decision' && $activity !== 'extraction') ? 'decision' : 'chat';
     if (!empty($choice['provider']) && !empty($choice['model'])) {
       return ['provider_id' => $choice['provider'], 'model_id' => $choice['model'], 'backend' => $backend];
     }
@@ -637,7 +663,7 @@ class AimMemoryManager {
    * Returns the decision-backend model for an activity, if it uses one.
    *
    * @param string $activity
-   *   One of consolidation or verifier.
+   *   One of consolidation, verifier or grounding.
    *
    * @return array|null
    *   A [provider_id, model_id] pair, or NULL when the activity uses the
@@ -649,48 +675,170 @@ class AimMemoryManager {
   }
 
   /**
-   * Runs a search_api query, bypassing access only for an anonymous caller.
+   * Returns the grounded check's mode: off, shadow or enforce.
    *
-   * Drush (and cron) runs as the anonymous user by default, which has no
-   * view access to aim_fact, so the AI Search backend's per-result entity
-   * access check would silently drop every match. Previously "fixed" by
-   * account-switching to uid 1 for the query duration - dropped 2026-09-18
-   * as unsound, not just imperfect: Drupal core has no special-cased uid-1
-   * bypass (confirmed by reading \Drupal\Core\Session\PermissionChecker
-   * directly - it evaluates roles/permissions like any other account) and
-   * no storage-layer protection against uid 1 being deleted (confirmed by
-   * reading \Drupal\user\Entity\User - the only guard is a UI form check, a
-   * direct delete or drush user:cancel bypasses it), so "elevate to uid 1"
-   * both could throw outright (the RuntimeException this method used to
-   * carry for exactly that case) and, even when it didn't, provided no real
-   * guarantee of admin access - purely a site-configuration accident.
+   * Shadow records each fact's score and leaves trusted alone; enforce also
+   * sets trusted from the score (ADR-0037).
    *
-   * Explicit search_api_bypass_access (SearchApiAiSearchBackend::search(),
-   * confirmed by reading it directly) is the correct replacement, not a
-   * downgrade: a drush/cron caller already has raw database credentials, so
-   * gating search_api's result set behind entity access checks a real
-   * per-scope permission it could trivially route around with
-   * `drush sql:query` is not a real security boundary in this context to
-   * begin with. See ADR-0006's 2026-09-18 addendum for the full reversal
-   * and why the ADR originally rejected this.
+   * @return string
+   *   The mode, off when unset or unknown.
+   */
+  public function getGroundingMode(): string {
+    $mode = $this->configFactory->get('aim.settings')->get('grounding_mode');
+    return in_array($mode, ['shadow', 'enforce'], TRUE) ? $mode : 'off';
+  }
+
+  /**
+   * Returns the score at or above which a fact counts as grounded.
    *
-   * A real authenticated caller (aim_tool's Tool API/MCP plugins, an
-   * interactive admin) already has an account of its own to query as - it
-   * must run the query as itself, not bypass access, so ai_search's own
-   * per-result $entity->access('view', $account) check
-   * (SearchApiAiSearchBackend::checkEntityAccess()) applies the real
-   * per-scope permission AimFactAccessControlHandler enforces, the same
-   * one the admin UI already relies on - no new filtering logic needed
-   * here.
+   * @return float
+   *   aim.settings:activities.grounding.threshold, or the shipped default
+   *   when unset or 0.
+   */
+  public function getGroundingThreshold(): float {
+    $threshold = (float) ($this->configFactory->get('aim.settings')->get('activities.grounding.threshold') ?? 0);
+    return $threshold > 0 ? $threshold : self::GROUNDING_DEFAULT_THRESHOLD;
+  }
+
+  /**
+   * Asks the decision model whether a passage states each candidate fact.
+   *
+   * One call for the whole list: every candidate goes into the state next
+   * to the passage with its own question, which measured as fast and as
+   * accurate as one call per fact (ADR-0037 addendum). Scores already
+   * fetched this request are reused. The passage is never stored; with
+   * log_query_text on, it is logged with each score for diagnosis.
+   *
+   * @param string $passage
+   *   The text the facts were written from.
+   * @param string[] $candidates
+   *   Candidate fact texts, keyed however the caller likes.
+   *
+   * @return array
+   *   A grounding probability (0 to 1) per candidate, same keys, or NULL for
+   *   each candidate when the check is off, has no decision model, or failed.
+   */
+  public function checkGrounding(string $passage, array $candidates): array {
+    $scores = array_fill_keys(array_keys($candidates), NULL);
+    $passage = trim($passage);
+    if ($this->getGroundingMode() === 'off' || $passage === '' || !$candidates) {
+      return $scores;
+    }
+    $model = $this->decisionModelFor('grounding');
+    if ($model === NULL) {
+      $this->logger->warning('Grounding is @mode but no decision model is chosen for it in the AIM settings; facts are not checked.', ['@mode' => $this->getGroundingMode()]);
+      return $scores;
+    }
+
+    $state = ['text' => $passage];
+    $questions = [];
+    $asked = [];
+    foreach ($candidates as $key => $candidate) {
+      $hash = hash('sha256', $passage . "\0" . $candidate);
+      if (array_key_exists($hash, $this->groundingCache)) {
+        $scores[$key] = $this->groundingCache[$hash];
+        continue;
+      }
+      $id = 'candidate_' . (count($asked) + 1);
+      $state[$id] = (string) $candidate;
+      $questions[$id] = new NoulQuestion(sprintf(self::GROUNDING_QUESTION, $id));
+      $asked[$id] = [$key, $hash];
+    }
+    if (!$asked) {
+      return $scores;
+    }
+
+    try {
+      $response = $this->decisionBackend->run('grounding', new DecisionInput($state, $questions), $model[0], $model[1]);
+      foreach ($asked as $id => [$key, $hash]) {
+        $scores[$key] = $this->groundingCache[$hash] = $response->getNoul($id)->getProbability();
+      }
+    }
+    catch (\Exception $e) {
+      $this->logger->warning('Grounding check failed to run for @count candidate(s): @message', [
+        '@count' => count($asked),
+        '@message' => $e->getMessage(),
+      ]);
+      return $scores;
+    }
+
+    if ($this->configFactory->get('aim.settings')->get('log_query_text')) {
+      // Opt-in personal data, same switch as the recall query text.
+      foreach ($asked as $id => [$key]) {
+        $this->logVerbose('Grounding texts: score @score for "@candidate" against "@passage".', [
+          '@score' => round((float) $scores[$key], 3),
+          '@candidate' => $state[$id],
+          '@passage' => $passage,
+        ]);
+      }
+    }
+
+    return $scores;
+  }
+
+  /**
+   * Field values a grounding score sets on a new fact.
+   *
+   * @param float|null $score
+   *   The checkGrounding() score, NULL when it could not be had.
+   * @param bool|null $trusted
+   *   The caller's explicit trusted value, which enforce mode never
+   *   overrides.
+   *
+   * @return array
+   *   grounding_score, plus trusted in enforce mode: TRUE at or above the
+   *   threshold, FALSE below it or when the check failed (fail closed).
+   */
+  protected function groundingValues(?float $score, ?bool $trusted): array {
+    $values = ['grounding_score' => $score];
+    if ($trusted === NULL && $this->getGroundingMode() === 'enforce') {
+      $values['trusted'] = $score !== NULL && $score >= $this->getGroundingThreshold();
+    }
+    return $values;
+  }
+
+  /**
+   * Logs a fact's grounding verdict. IDs and the score only, no text.
+   *
+   * @param \Drupal\aim\Entity\AimFact $fact
+   *   The saved fact.
+   */
+  protected function logGrounding(AimFact $fact): void {
+    $score = $fact->get('grounding_score')->value;
+    $this->logAudit('Grounding check for fact @id: score @score, cutoff @cutoff, mode @mode, trusted @trusted.', [
+      '@id' => $fact->id(),
+      '@score' => $score === NULL ? 'none (check failed or no model)' : round((float) $score, 3),
+      '@cutoff' => $this->getGroundingThreshold(),
+      '@mode' => $this->getGroundingMode(),
+      '@trusted' => $fact->get('trusted')->value ? 'yes' : 'no',
+    ]);
+  }
+
+  /**
+   * Runs a search_api query, checking entity access unless told not to.
+   *
+   * Same idiom as core's entity query accessCheck(): access is checked by
+   * default, and a caller opts out explicitly. By default the query runs as
+   * the current account, so ai_search's per-result
+   * $entity->access('view', $account) check
+   * (SearchApiAiSearchBackend::checkEntityAccess()) applies the per-scope
+   * permission AimFactAccessControlHandler enforces, anonymous included.
+   *
+   * Only Drush commands and consolidation pass FALSE: Drush has no viewer to
+   * check for and holds raw database credentials already, and consolidation
+   * compares against every fact in a scope and returns nothing to a viewer.
+   * Never switch accounts instead, see ADR-0006's 2026-09-18 addendum.
    *
    * @param \Drupal\search_api\Query\QueryInterface $query
    *   The query to execute.
+   * @param bool $accessCheck
+   *   FALSE sets search_api_bypass_access, so entity access is not checked.
    *
    * @return \Drupal\search_api\Query\ResultSetInterface
    *   The query results.
    */
-  public function executeSearchQuery(SearchApiQueryInterface $query): ResultSetInterface {
-    if ($this->currentUser->isAnonymous()) {
+  public function executeSearchQuery(SearchApiQueryInterface $query, bool $accessCheck = TRUE): ResultSetInterface {
+    if (!$accessCheck) {
       $query->setOption('search_api_bypass_access', TRUE);
     }
     // ADR-0017: cache query-time embeddings for the duration of this call
@@ -745,6 +893,10 @@ class AimMemoryManager {
    * @param string|null $targetId
    *   The referenced entity's ID, for scope=entity. Ignored for every
    *   other scope.
+   * @param string|null $sourceText
+   *   The text this fact was written from (a visitor's message, a
+   *   document), for the grounded check (ADR-0037). Checked, never stored.
+   *   NULL leaves the fact unchecked.
    *
    * @return \Drupal\aim\Entity\AimFact
    *   The created fact.
@@ -753,7 +905,7 @@ class AimMemoryManager {
    *   If scope is invalid, scope=user and subject does not resolve to a real
    *   account, or the text fails a guardrail check.
    */
-  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, ?bool $state = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL, ?string $targetType = NULL, ?string $targetId = NULL): AimFact {
+  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, ?bool $state = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL): AimFact {
     $allowed = $this->allowedScopes();
     if (!in_array($scope, $allowed, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
@@ -809,6 +961,11 @@ class AimMemoryManager {
       $values['trusted'] = $trusted;
     }
 
+    $grounded = $sourceText !== NULL && $this->getGroundingMode() !== 'off';
+    if ($grounded) {
+      $values += $this->groundingValues($this->checkGrounding($sourceText, [$text])[0], $trusted);
+    }
+
     if ($targetType !== NULL) {
       $values['target_type'] = $targetType;
     }
@@ -839,6 +996,9 @@ class AimMemoryManager {
       '@uid' => $this->currentUser->id(),
       '@trusted' => $entity->get('trusted')->value ? 'yes' : 'no',
     ]);
+    if ($grounded) {
+      $this->logGrounding($entity);
+    }
 
     return $entity;
   }
@@ -893,6 +1053,10 @@ class AimMemoryManager {
    *   $trusted docblock - NULL is the right default here too, since this
    *   method's callers are extraction paths the draft-to-trusted gate
    *   exists for.
+   * @param string|null $sourceText
+   *   The text the candidates were extracted from, for the grounded check
+   *   (ADR-0037): one call for every candidate. Never stored. NULL leaves
+   *   the facts unchecked.
    *
    * @return array
    *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[]), 'skipped'
@@ -903,7 +1067,7 @@ class AimMemoryManager {
    * @throws \InvalidArgumentException
    *   If $subjectUid is given but does not resolve to a real account.
    */
-  public function createFactsFromCandidates(array $facts, string $source, ?string $subjectUid = NULL, ?bool $trusted = NULL): array {
+  public function createFactsFromCandidates(array $facts, string $source, ?string $subjectUid = NULL, ?bool $trusted = NULL, ?string $sourceText = NULL): array {
     $storage = $this->entityTypeManager->getStorage('aim_fact');
     $created = [];
     $skipped = 0;
@@ -917,7 +1081,10 @@ class AimMemoryManager {
       }
     }
 
-    foreach ($facts as $fact) {
+    $grounded = $sourceText !== NULL && $this->getGroundingMode() !== 'off';
+    $scores = $grounded ? $this->checkGrounding($sourceText, array_column($facts, 'text')) : [];
+
+    foreach (array_values($facts) as $i => $fact) {
       $values = [
         'text' => $fact['text'],
         'source' => $source,
@@ -944,6 +1111,9 @@ class AimMemoryManager {
 
       if ($trusted !== NULL) {
         $values['trusted'] = $trusted;
+      }
+      if ($grounded) {
+        $values += $this->groundingValues($scores[$i] ?? NULL, $trusted);
       }
 
       $entity = $storage->create($values);
@@ -974,6 +1144,9 @@ class AimMemoryManager {
         '@uid' => $this->currentUser->id(),
         '@trusted' => $entity->get('trusted')->value ? 'yes' : 'no',
       ]);
+      if ($grounded) {
+        $this->logGrounding($entity);
+      }
     }
 
     if ($skipped > 0) {
@@ -1023,7 +1196,7 @@ class AimMemoryManager {
     if (empty($facts)) {
       return ['created' => [], 'skipped' => 0, 'blocked' => 0, 'extracted' => 0];
     }
-    $result = $this->createFactsFromCandidates($facts, $source, $subjectUid ?: NULL);
+    $result = $this->createFactsFromCandidates($facts, $source, $subjectUid ?: NULL, NULL, trim($text));
     $result['extracted'] = count($facts);
     return $result;
   }
@@ -1171,6 +1344,10 @@ class AimMemoryManager {
    *   so a clear winner is not returned with a tail of loosely related
    *   facts. NULL or 0 returns every fact under $maxDistance.
    *   getRecallGap() is the site's value.
+   * @param bool $accessCheck
+   *   TRUE (the default) returns only facts the current account may view.
+   *   FALSE skips entity access, for Drush commands only. See
+   *   executeSearchQuery().
    *
    * @return array
    *   A list of rows, each with keys id, score, scope, subject, text,
@@ -1189,7 +1366,7 @@ class AimMemoryManager {
    * @throws \InvalidArgumentException
    *   If $subjectUid does not resolve to a real account.
    */
-  public function recall(string $text, ?string $scope, ?string $subject, ?string $subjectUid, int $limit, ?float $maxDistance = NULL, bool $includeUntrusted = FALSE, ?float $gap = NULL): array {
+  public function recall(string $text, ?string $scope, ?string $subject, ?string $subjectUid, int $limit, ?float $maxDistance = NULL, bool $includeUntrusted = FALSE, ?float $gap = NULL, bool $accessCheck = TRUE): array {
     $index = $this->loadVectorIndex();
 
     if (!$index) {
@@ -1228,7 +1405,7 @@ class AimMemoryManager {
     // candidates. The loop below stops at $limit. See ADR-0018.
     $query->range(0, $filter_account ? $limit * 5 : $limit);
 
-    $results = $this->executeSearchQuery($query);
+    $results = $this->executeSearchQuery($query, $accessCheck);
 
     $rows = [];
     foreach ($results as $result) {
@@ -2007,7 +2184,9 @@ class AimMemoryManager {
     $query->range(0, $is_user_scope ? max(20, $limit + 4) : $limit + 4);
 
     $neighbors = [];
-    $results = $this->executeSearchQuery($query);
+    // Consolidation compares against every fact in the scope, whoever
+    // triggered it, and returns nothing to a viewer.
+    $results = $this->executeSearchQuery($query, accessCheck: FALSE);
     foreach ($results as $result) {
       // Rows arrive nearest-first, so the first one past the cutoff ends
       // the useful part of the list.

@@ -285,6 +285,7 @@ final class AimCommands extends DrushCommands {
         (int) $options['limit'],
         ($options['max-distance'] ?? NULL) !== NULL && $options['max-distance'] !== '' ? (float) $options['max-distance'] : NULL,
         (bool) $options['include-untrusted'],
+        accessCheck: FALSE,
       );
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {

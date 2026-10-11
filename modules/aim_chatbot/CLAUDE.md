@@ -21,6 +21,13 @@ the `site` bundle this hardcode relies on is guaranteed installed.
 - `src/Plugin/AiFunctionCall/AimRemember.php` / `AimRecall.php` - the two
   tools, both backed by `aim.memory_manager` directly (no extraction LLM
   call - same write path as `drush aim:remember`/`aim:recall`).
+- `src/EventSubscriber/AimChatbotSourceTextSubscriber.php` - before the
+  remember tool runs, passes it the visitor's last message plus the
+  assistant turn before it, for the grounded check
+  ([ADR-0037](../../adr/0037-transient-source-passages-for-grounding.md)).
+  The previous turn is only there when the assistant keeps history
+  (`allow_history`); this module ships `none`, the demo recipe sets
+  `private_tempstore_pool`.
 - `config/install/ai_agents.ai_agent.aim_chatbot.yml` - the agent config,
   `guardrail_set: aim_write_guardrails`.
 - `config/install/ai_assistant_api.ai_assistant.aim_demo_assistant.yml` +

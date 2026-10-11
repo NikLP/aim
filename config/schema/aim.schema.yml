@@ -36,6 +36,13 @@ aim.settings:
           type: aim.activity_choice
         verifier:
           type: aim.activity_choice
+        grounding:
+          type: aim.activity_choice
+    grounding_mode:
+      type: string
+      label: 'Grounded check: off, shadow (record the score only) or enforce (also set trusted)'
+      constraints:
+        Choice: ['off', shadow, enforce]
     merge_max_distance:
       type: float
       label: 'Maximum merged-to-input embedding distance, 0 disables'
@@ -140,7 +147,7 @@ aim.activity_choice:
       label: 'Model ID'
     threshold:
       type: float
-      label: 'Verifier only: probability above which a decision model confirms a merge, 0 or absent for 0.5'
+      label: 'Verifier and grounding only: probability a decision model must reach, 0 or absent for the default (0.5 verifier, 0.7 grounding)'
       constraints:
         Range:
           min: 0

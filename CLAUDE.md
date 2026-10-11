@@ -176,7 +176,11 @@ duplicated here.
   `category` (taxonomy, vocabulary `aim_category`), `asserted` (valid-time
   start), `retired`/`superseded_by`/`superseded_by_reason`, plus `expires` (a nullable sell-by date nothing acts on yet) (consolidation's
   non-destructive supersede edge and its JSON provenance), `uid`
-  (who wrote it), `trusted` (boolean, the draft-to-trusted gate - defaults
+  (who wrote it), `grounding_score` (float, empty when unchecked: how
+  strongly a decision model found the fact stated in the text it was
+  written from, checked at write time, text never stored -
+  [ADR-0037](adr/0037-transient-source-passages-for-grounding.md); see
+  [DEVELOPING.md](DEVELOPING.md)'s "Grounded check"), `trusted` (boolean, the draft-to-trusted gate - defaults
   to `aim.settings:default_trusted`, `recall()` excludes untrusted facts
   unless asked otherwise, see
   [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s

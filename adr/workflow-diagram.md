@@ -192,7 +192,7 @@ flowchart TD
   U -->|"given, no such user"| E2["InvalidArgumentException"]:::bad
   U -->|"ok or not given"| F["build query with keys = query text<br/>conditions: scope, subject, user,<br/>trusted = TRUE unless include-untrusted<br/>range: limit, or limit x 5 when user-filtered"]:::code
 
-  F --> EX["executeSearchQuery()<br/>anonymous caller (drush/cron):<br/>search_api_bypass_access on"]:::code
+  F --> EX["executeSearchQuery()<br/>accessCheck: FALSE (drush, consolidation):<br/>search_api_bypass_access on"]:::code
   EX --> EC{"query embedding cached?<br/>key: provider, model, config, text<br/>TTL 7 days, query time only"}:::vec
   EC -->|miss| EM["embed query text<br/>embeddings model call"]:::vec
   EC -->|hit| KNN

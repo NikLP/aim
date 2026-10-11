@@ -1,0 +1,280 @@
+{
+  "_note": "Hand-written 2026-10-10 for ADR-0037's grounded check: does the passage state the candidate? Labels human-verified by Nik 2026-10-10, no changes. Synthetic Harbourside text only (safe for hosted Jev); the three long passages are copies of demo/ingest-test/*.txt so the set stays fixed if those change. supported = the text states it; unsupported = invented, changed, stale, hedged, proposed or reported detail; misattributed = a real detail from the text pinned on the wrong subject.",
+  "passages": {
+    "transcript": "Notes from a call with Northlight Digital about the website. Present: Sam Okafor and two people from Northlight.\n\nThey said site search is the next big job. It will use Search API and the library wants events and opening hours to come first in the results. It has to work with screen readers. Northlight first thought three weeks, but after looking at the events calendar they now say five weeks. Launch is planned for the week of 3 November. Sam mentioned in passing that the weather was awful on the way in. Northlight support is still weekdays 9am to 5pm, and urgent problems go to the on-call number. They also reminded us that editors must add alt text to every image, which has caused problems before.",
+    "meeting": "Staff meeting, Harbourside Community Library, Tuesday morning. Present: Alex, the two branch assistants and the Children's Librarian.\n\nAlex opened by saying the home delivery service has been a success so far and will carry on every Wednesday. Someone asked about the cafe: Dockside Coffee will keep running it and it stays open 9am to 4pm on weekdays. Nobody was sure about parking, so Alex checked and confirmed there are 20 spaces, free for two hours, with two blue badge bays by the entrance.\n\nOn events: the Language Cafe is still on Thursdays at 6pm in the meeting room, and Alex wants to add drop-in tech help on Mondays at 10am. The Children's Librarian said Toddler Storytime stays on Fridays at 11am. We agreed that lost property will be kept for four weeks and then given to charity. Oh, and somebody left a umbrella in the reading room again, which is not really a fact worth keeping.\n\nFinally, the book sale: the trustees want it moved to the second weekend of June from next year.",
+    "email": "Hi all,\n\nA quick update on the Summer Reading Challenge for 2027. The theme this year is Ocean Explorers and it runs from 12 July to 31 August. It is free for children aged 4 to 11. Each child collects a sticker for every book they finish, up to six, and anyone who gets all six receives a medal at the finale. The finale was going to be on Saturday 4 September but we have had to move it to Saturday 11 September because the main hall is booked. Anyone helping at sessions needs a DBS check first, so please sort that out early. I will order the stickers by 1 June, as usual.\n\nThanks,\nThe Children's Librarian",
+    "chat_photocopier": "Visitor: Just so you know, the photocopier on the first floor is broken until next Tuesday.",
+    "chat_daughter": "Visitor: My daughter is vegetarian, so she won't be coming to the sausage sizzle.",
+    "chat_confirm_2turn": "Assistant: Shall I note that Code Club has moved to Wednesdays at 4pm?\nVisitor: Yes, that's right.",
+    "chat_confirm_1turn": "Visitor: Yes, that's right.",
+    "chat_hedge": "Visitor: I think the library might be closing early on Christmas Eve, not sure though.",
+    "chat_hearsay": "Visitor: Someone on Facebook said the library is closing for good in March."
+  },
+  "grounding": [
+    {
+      "label": "supported",
+      "passage": "transcript",
+      "candidate": "Site search will be built with Search API.",
+      "note": "direct"
+    },
+    {
+      "label": "supported",
+      "passage": "transcript",
+      "candidate": "The website search must work with screen readers.",
+      "note": "direct"
+    },
+    {
+      "label": "supported",
+      "passage": "transcript",
+      "candidate": "Northlight Digital estimates five weeks for the site search work.",
+      "note": "current value of a revised estimate"
+    },
+    {
+      "label": "supported",
+      "passage": "transcript",
+      "candidate": "Site search launch is planned for the week of 3 November.",
+      "note": "direct"
+    },
+    {
+      "label": "supported",
+      "passage": "transcript",
+      "candidate": "Northlight Digital support is available on weekdays from 9am to 5pm.",
+      "note": "direct"
+    },
+    {
+      "label": "supported",
+      "passage": "transcript",
+      "candidate": "Editors must add alt text to every image on the website.",
+      "note": "direct"
+    },
+    {
+      "label": "supported",
+      "passage": "transcript",
+      "candidate": "Events and opening hours should rank first in site search results.",
+      "note": "paraphrase"
+    },
+    {
+      "label": "supported",
+      "passage": "transcript",
+      "candidate": "The weather was awful on the way to the website call.",
+      "note": "grounded but not worth keeping: grounding is not the worth check"
+    },
+    {
+      "label": "unsupported",
+      "passage": "transcript",
+      "candidate": "Northlight Digital estimates three weeks for the site search work.",
+      "note": "stale: the text revises 3 to 5 weeks"
+    },
+    {
+      "label": "unsupported",
+      "passage": "transcript",
+      "candidate": "Northlight Digital support is available on weekdays and Saturdays from 9am to 5pm.",
+      "note": "added detail (Saturdays)"
+    },
+    {
+      "label": "unsupported",
+      "passage": "transcript",
+      "candidate": "Site search will launch on 3 November.",
+      "note": "narrowed: week of 3 November became a date (borderline, check)"
+    },
+    {
+      "label": "unsupported",
+      "passage": "transcript",
+      "candidate": "Northlight Digital's on-call number is 01632 960 444.",
+      "note": "invented value"
+    },
+    {
+      "label": "misattributed",
+      "passage": "transcript",
+      "candidate": "Sam Okafor works for Northlight Digital.",
+      "note": "Sam attended; the text lists Sam apart from Northlight's people"
+    },
+    {
+      "label": "misattributed",
+      "passage": "transcript",
+      "candidate": "Northlight Digital wants events and opening hours to come first in search results.",
+      "note": "the library wants this, not Northlight"
+    },
+    {
+      "label": "supported",
+      "passage": "meeting",
+      "candidate": "The home delivery service runs every Wednesday.",
+      "note": "direct"
+    },
+    {
+      "label": "supported",
+      "passage": "meeting",
+      "candidate": "Dockside Coffee runs the library cafe, which is open 9am to 4pm on weekdays.",
+      "note": "two sentences combined"
+    },
+    {
+      "label": "supported",
+      "passage": "meeting",
+      "candidate": "The car park has 20 spaces, free for two hours, with two blue badge bays by the entrance.",
+      "note": "direct"
+    },
+    {
+      "label": "supported",
+      "passage": "meeting",
+      "candidate": "The Language Cafe meets on Thursdays at 6pm in the meeting room.",
+      "note": "direct"
+    },
+    {
+      "label": "supported",
+      "passage": "meeting",
+      "candidate": "Toddler Storytime is on Fridays at 11am.",
+      "note": "direct"
+    },
+    {
+      "label": "supported",
+      "passage": "meeting",
+      "candidate": "Lost property is kept for four weeks and then given to charity.",
+      "note": "direct"
+    },
+    {
+      "label": "unsupported",
+      "passage": "meeting",
+      "candidate": "Drop-in tech help runs on Mondays at 10am.",
+      "note": "proposal stated as fact (Alex wants to add it)"
+    },
+    {
+      "label": "unsupported",
+      "passage": "meeting",
+      "candidate": "The book sale is held on the second weekend of June.",
+      "note": "future wish stated as current (from next year, trustees want)"
+    },
+    {
+      "label": "unsupported",
+      "passage": "meeting",
+      "candidate": "The car park has 20 spaces, free for three hours.",
+      "note": "number changed"
+    },
+    {
+      "label": "unsupported",
+      "passage": "meeting",
+      "candidate": "The cafe is open 9am to 4pm every day.",
+      "note": "overgeneralized: weekdays became every day"
+    },
+    {
+      "label": "unsupported",
+      "passage": "meeting",
+      "candidate": "Home delivery is free for housebound members.",
+      "note": "plausible but invented: no cost or eligibility in the text"
+    },
+    {
+      "label": "misattributed",
+      "passage": "meeting",
+      "candidate": "Alex said Toddler Storytime stays on Fridays at 11am.",
+      "note": "the Children's Librarian said it"
+    },
+    {
+      "label": "misattributed",
+      "passage": "meeting",
+      "candidate": "Toddler Storytime is on Thursdays at 6pm.",
+      "note": "the Language Cafe's slot"
+    },
+    {
+      "label": "misattributed",
+      "passage": "meeting",
+      "candidate": "Dockside Coffee runs the home delivery service.",
+      "note": "detail moved to another subject"
+    },
+    {
+      "label": "supported",
+      "passage": "email",
+      "candidate": "The 2027 Summer Reading Challenge theme is Ocean Explorers.",
+      "note": "direct"
+    },
+    {
+      "label": "supported",
+      "passage": "email",
+      "candidate": "The Summer Reading Challenge runs from 12 July to 31 August and is free for children aged 4 to 11.",
+      "note": "two sentences combined"
+    },
+    {
+      "label": "supported",
+      "passage": "email",
+      "candidate": "The Summer Reading Challenge finale is on Saturday 11 September.",
+      "note": "current value of a moved date"
+    },
+    {
+      "label": "supported",
+      "passage": "email",
+      "candidate": "Volunteers at Summer Reading Challenge sessions need a DBS check first.",
+      "note": "paraphrase: anyone helping"
+    },
+    {
+      "label": "supported",
+      "passage": "email",
+      "candidate": "Children who finish six books in the Summer Reading Challenge receive a medal at the finale.",
+      "note": "paraphrase"
+    },
+    {
+      "label": "unsupported",
+      "passage": "email",
+      "candidate": "The Summer Reading Challenge finale is on Saturday 4 September.",
+      "note": "stale: the text moves it to 11 September"
+    },
+    {
+      "label": "unsupported",
+      "passage": "email",
+      "candidate": "The Summer Reading Challenge finale takes place in the main hall.",
+      "note": "the text implies the opposite (main hall is booked)"
+    },
+    {
+      "label": "unsupported",
+      "passage": "email",
+      "candidate": "Children collect a sticker for every book they finish, up to ten.",
+      "note": "number changed"
+    },
+    {
+      "label": "misattributed",
+      "passage": "email",
+      "candidate": "Children aged 4 to 11 need a DBS check to take part in the Summer Reading Challenge.",
+      "note": "the DBS check is for helpers"
+    },
+    {
+      "label": "supported",
+      "passage": "chat_photocopier",
+      "candidate": "The first-floor photocopier is out of order until next Tuesday.",
+      "note": "paraphrase"
+    },
+    {
+      "label": "unsupported",
+      "passage": "chat_photocopier",
+      "candidate": "The first-floor photocopier has been repaired.",
+      "note": "contradicted"
+    },
+    {
+      "label": "misattributed",
+      "passage": "chat_daughter",
+      "candidate": "The visitor is vegetarian.",
+      "note": "ADR-0037's example: it is the daughter"
+    },
+    {
+      "label": "supported",
+      "passage": "chat_confirm_2turn",
+      "candidate": "Code Club now meets on Wednesdays at 4pm.",
+      "note": "visitor confirms the assistant's restatement"
+    },
+    {
+      "label": "unsupported",
+      "passage": "chat_confirm_1turn",
+      "candidate": "Code Club now meets on Wednesdays at 4pm.",
+      "note": "true, but the last message alone does not state it: chat source_text needs the prior turn"
+    },
+    {
+      "label": "unsupported",
+      "passage": "chat_hedge",
+      "candidate": "The library closes early on Christmas Eve.",
+      "note": "hedge dropped"
+    },
+    {
+      "label": "unsupported",
+      "passage": "chat_hearsay",
+      "candidate": "The library is closing permanently in March.",
+      "note": "hearsay stated as fact"
+    }
+  ]
+}
