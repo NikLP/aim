@@ -151,6 +151,7 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'state', description: 'Optional boolean flag value: true or false. Omit for facts with no boolean shape.')]
   #[CLI\Option(name: 'category', description: 'Comma-separated term name(s) from the aim_category vocabulary.')]
   #[CLI\Option(name: 'asserted', description: 'When this fact became true in reality, if different from now.')]
+  #[CLI\Option(name: 'expires', description: 'Calendar date (YYYY-MM-DD) the fact stops being true; it is retired after that day.')]
   #[CLI\Option(name: 'target-type', description: 'The referenced entity type ID, for scope=entity (e.g. node). Ignored for every other scope.')]
   #[CLI\Option(name: 'target-id', description: 'The referenced entity ID, for scope=entity. Ignored for every other scope.')]
   #[CLI\Option(name: 'file', description: 'Path to a JSON file of fact objects, saved in one bootstrap instead of $text/the other options.')]
@@ -166,6 +167,7 @@ final class AimCommands extends DrushCommands {
       'state' => NULL,
       'category' => NULL,
       'asserted' => NULL,
+      'expires' => NULL,
       'target-type' => NULL,
       'target-id' => NULL,
       'file' => NULL,
@@ -191,7 +193,7 @@ final class AimCommands extends DrushCommands {
 
     try {
       [$state, $category, $asserted] = $this->memoryManager->parseFactFields($options);
-      $fact = $this->memoryManager->remember($text, $options['scope'], $options['subject'], $options['source'], $state, $category, $asserted, NULL, $options['target-type'], $options['target-id']);
+      $fact = $this->memoryManager->remember($text, $options['scope'], $options['subject'], $options['source'], $state, $category, $asserted, NULL, $options['target-type'], $options['target-id'], expires: $this->memoryManager->parseExpires($options));
     }
     catch (\InvalidArgumentException $e) {
       $this->io()->error($e->getMessage());
@@ -405,6 +407,18 @@ final class AimCommands extends DrushCommands {
     else {
       $this->io()->success(count($result['rows']) . ' decision(s) applied.');
     }
+  }
+
+  /**
+   * Retires every live fact whose expires date has passed (ADR-0057).
+   *
+   * Meant for a crontab entry, next to the consolidation queue runner.
+   */
+  #[CLI\Command(name: 'aim:expire', aliases: ['aim-expire'])]
+  #[CLI\Usage(name: 'drush aim:expire', description: 'Retire every live fact whose expires date has passed.')]
+  public function expire(): void {
+    $count = $this->memoryManager->retireExpired();
+    $this->io()->success($count . ' expired fact(s) retired.');
   }
 
   /**

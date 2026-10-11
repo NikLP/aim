@@ -27,7 +27,7 @@ mode extracts.
 | Chat assistant (`aim_chatbot`, `aim_console`) | Answers a visitor, calls the recall tool | Reasoning, tool use | Yes | Stays frontier (or a strong local model) |
 | Grounded check (ADR-0037) | Does the source text state each new fact; one batched call per write operation | A typed probability | No (hosted Jev here, shadow mode) | Already a decision model; a local one for real data |
 | Recall, embeddings | Vectors only, no chat | Embeddings | No (local Ollama) | Already local |
-| Literal finder (`literals_finder`, optional: behind the literals tool's question mode and the literals chat) | Picks the one literal a question asks for, from a menu of gists | A typed choice | No (hosted Jev here) | Decision model (live: Jev) |
+| Literal finder (`literals_finder`, optional: behind the lookup tool's question mode, `aim_literal` or `literals:lookup`, and the literals chat) | Picks the one literal a question asks for, from a menu of gists | A typed choice | No (hosted Jev here) | Decision model (live: Jev) |
 | Convert a fact to a literal | Splits an extracted fact into gist and value | Generative or typed | Not built | Small chat model or decision model |
 
 ## Sovereignty by call

@@ -4,8 +4,9 @@
  * @file
  * Scores the aim decision points through Drupal's own Decision provider.
  *
- * Every call goes through aim.backend.decision and the configured provider (keys stay in Drupal,
- * metrics land in aim_activity_metrics under the activity's tag).
+ * Every call goes through aim.backend.decision and the configured provider
+ * (keys stay in Drupal, metrics land in aim_activity_metrics under the
+ * activity's tag).
  *
  * Usage (from the site root, script path shortened; set files are named
  * relative to this directory):

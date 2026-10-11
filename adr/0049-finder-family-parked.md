@@ -92,7 +92,7 @@ says how many levels were chosen on labels only). Surfaced as a finder
 explicit "ask in words" entry in the widget, never the default for typing
 (model calls, slower than autocomplete).
 
-- **Blocked** on annotations carrying gists (ADR-0024, ADR-0047: the bridge
+- **Blocked** on annotations carrying gists (ADR-0024, ADR-0040 tracked gists: the bridge
   write path and trust gate are not fully built); until then only literals
   have gists and the tree is label-only. Also on `children()`.
 - **Cost.** The deterministic walk is cheap (cached definitions, one
@@ -107,7 +107,7 @@ explicit "ask in words" entry in the widget, never the default for typing
 - **Risks.** Compounding error (a wrong pick near the root misleads every
   level below; evaluate top-k leaves, one-level backtracking and showing the
   path taken), latency (depth times a call; fine for "ask" and agents, not
-  typing), gist drift (ADR-0047's tracked gists).
+  typing), gist drift (ADR-0040's tracked gists).
 - **Open.** Top-k with a person confirming versus one automatic pick; fixed
   root versus vector shortlist; whether a leaf returns its value or only
   its location when the asking account may resolve it differently.

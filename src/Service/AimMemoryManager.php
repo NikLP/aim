@@ -898,6 +898,10 @@ class AimMemoryManager {
    *   The text this fact was written from (a visitor's message, a
    *   document), for the grounded check (ADR-0037). Checked, never stored.
    *   NULL leaves the fact unchecked.
+   * @param int|null $expires
+   *   When this fact stops being true, as a Unix timestamp (ADR-0057).
+   *   retireExpired() retires it once this passes. NULL means no end date.
+   *   Must be in the future.
    *
    * @return \Drupal\aim\Entity\AimFact
    *   The created fact.
@@ -906,7 +910,7 @@ class AimMemoryManager {
    *   If scope is invalid, scope=user and subject does not resolve to a real
    *   account, or the text fails a guardrail check.
    */
-  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, ?bool $state = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL): AimFact {
+  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, ?bool $state = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL, ?int $expires = NULL): AimFact {
     $allowed = $this->allowedScopes();
     if (!in_array($scope, $allowed, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
@@ -956,6 +960,13 @@ class AimMemoryManager {
 
     if ($asserted !== NULL) {
       $values['asserted'] = $asserted;
+    }
+
+    if ($expires !== NULL) {
+      if ($expires <= $this->time->getRequestTime()) {
+        throw new \InvalidArgumentException('Invalid expires ' . gmdate('Y-m-d', $expires) . ', it is already past.');
+      }
+      $values['expires'] = $expires;
     }
 
     if ($trusted !== NULL) {
@@ -1245,6 +1256,7 @@ class AimMemoryManager {
           NULL,
           $entry['target_type'] ?? NULL,
           $entry['target_id'] ?? NULL,
+          expires: $this->parseExpires($entry),
         );
       }
       catch (\InvalidArgumentException $e) {
@@ -1290,6 +1302,58 @@ class AimMemoryManager {
     }
 
     return [$state, $category, $asserted];
+  }
+
+  /**
+   * Parses the expires field of a fact entry.
+   *
+   * @param array $fields
+   *   A fact entry or command options, possibly with an expires date.
+   *
+   * @return int|null
+   *   A Unix timestamp (end of that day, UTC), or NULL when not given.
+   *
+   * @throws \InvalidArgumentException
+   *   If expires cannot be parsed.
+   */
+  public function parseExpires(array $fields): ?int {
+    $value = $fields['expires'] ?? NULL;
+    if ($value === NULL || $value === '') {
+      return NULL;
+    }
+    $parsed = strtotime((string) $value . ' 23:59:59 UTC');
+    if ($parsed === FALSE) {
+      throw new \InvalidArgumentException('Invalid expires "' . $value . '", expected a calendar date such as 2026-10-16.');
+    }
+    return $parsed;
+  }
+
+  /**
+   * Retires every live fact whose expires date has passed (ADR-0057).
+   *
+   * Soft retirement, like consolidation's: the fact stays for audit and
+   * leaves recall and the vector index.
+   *
+   * @return int
+   *   The number of facts retired.
+   */
+  public function retireExpired(): int {
+    $storage = $this->entityTypeManager->getStorage('aim_fact');
+    $now = $this->time->getRequestTime();
+    $ids = $storage->getQuery()
+      ->accessCheck(FALSE)
+      ->condition('expires', $now, '<=')
+      ->notExists('retired')
+      ->execute();
+    foreach ($storage->loadMultiple($ids) as $fact) {
+      $fact->set('retired', $now);
+      $fact->save();
+      $this->logAudit('Fact @id retired: expires date passed (scope @scope).', [
+        '@id' => $fact->id(),
+        '@scope' => $fact->bundle(),
+      ]);
+    }
+    return count($ids);
   }
 
   /**

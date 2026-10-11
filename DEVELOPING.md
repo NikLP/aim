@@ -209,7 +209,15 @@ each new fact right after save. Carries no `cron` key, so
 
 ```crontab
 * * * * * ddev exec drush queue:run aim_consolidate
+0 * * * * ddev exec drush aim:expire
 ```
+
+The second entry is the expiry sweep (ADR-0057): `aim:expire` retires every
+live fact whose `expires` date has passed (soft, like consolidation's
+retirement). Set `expires` with `drush aim:remember --expires=2026-10-16`,
+the `expires` field in a JSON/batch entry, or the `expires` input of the
+chat and MCP remember tools (a `YYYY-MM-DD` calendar date; the fact is
+retired after that day, and a date already past is refused).
 
 `processItem()` reindexes before consolidating (`index_directly` is off
 in the shipped config, so a just-written fact isn't searchable yet without

@@ -1,6 +1,6 @@
 # ADR-0057: Dates resolved and confirmed before a fact is written
 
-**Status:** Proposed 2026-10-11 - design only, nothing built.
+**Status:** Proposed 2026-10-11 - points 3 (the `expires` input on `remember()`, `drush aim:remember`, batch/ingest entries and both remember tools) and the expiry sweep (`drush aim:expire`, hourly crontab) built and live-tested 2026-10-11; points 1, 2, 4-7 not built.
 **Date:** 2026-10-11
 
 ## Context

@@ -74,10 +74,6 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       lever, which our "wider alias list pulled near-topic questions in"
       trial contradicts on one in-sample run. Re-test after the blind set
       above, against the in-gist `ALSO` convention.
-- [ ] **Demo, deferred** ([ADR-0054](../literals/adr/0054-demo-the-scottish-play.md)):
-      theater seed set, on-screen decision-request viewer, a miss fallback,
-      a local fallback. Target: DrupalCon or a Drupal camp in Scotland,
-      early 2027.
 - Parked, with reasons in ADR-0040 "Deferred and pinned": staged choice,
   groups, keyword fallback, per-medium context registry, local-model
   re-measure, `search_api`, tokens in body copy. The `literals_chat` module
@@ -141,6 +137,7 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       schema validation. Then confirm `aim:remember --file` loads all 31
       facts and the demo questions in the site repo's `demo/README.md`
       answer as before.
+
 ## Ingestion
 
 - [ ] Chunking for `aim:extract` and the ingest form: today the whole file
@@ -373,6 +370,10 @@ are recommendations.
       merged into permanent facts: proposed fix in
       [ADR-0057](adr/0057-dates-resolved-and-confirmed-before-write.md)
       (resolve and confirm dates before write, `expires` plus its sweep).
+      `expires` input and `aim:expire` sweep BUILT 2026-10-11 (add the
+      hourly crontab line); still to do: today's date to the assistant,
+      persona wording, extraction date resolution, never merging a dated
+      fact into an undated one, dated eval items.
 - [ ] Pinned: `verified`/`verified_by` fields (not `trusted`), ADR-0036.
 - [ ] Parked (ADR-0057 time stance): recency/importance re-rank,
       weights default 0, needs a gold set.
@@ -396,6 +397,24 @@ are recommendations.
       rejects (then likely one `review` permission, not one per scope) or
       goes, with the trust actions falling back to `administer aim memory`.
       Left as is for now.
+- [ ] **Record who trusted a fact (raised 2026-10-11).** Add `trusted_by`
+      (user reference) and `trusted_at` (timestamp) base fields, set by the
+      Trust/Untrust actions, the edit form and the grounded check (its
+      service account). `uid` cannot stand in: it is the author, often a
+      service account, and the reviewer is meant to be someone else
+      (ADR-0002 addendum skipped this on purpose). Answers "who approved
+      this?", the first audit question an enterprise buyer asks.
+- [ ] **Edit as supersede, not overwrite (raised 2026-10-11).** A text edit
+      on `/admin/content/aim-facts/{aim_fact}/edit` replaces the text in
+      place, so manual changes leave no trail, unlike consolidation's
+      non-destructive supersede. Proposed: a changed `text` saves a new
+      fact and retires the old one (`superseded_by`, reason "edited by
+      uid N"), the same edge consolidation writes. Gives an edit history
+      without making `aim_fact` revisionable or adopting Content
+      Moderation (both rejected in the ADR-0002 addendum). Check: the
+      fact ID changes on edit, so anything holding the old ID (links,
+      entity-scope references, literal tokens) needs to follow
+      `superseded_by`.
 
 ## PoC deviations to close before non-PoC data goes in
 

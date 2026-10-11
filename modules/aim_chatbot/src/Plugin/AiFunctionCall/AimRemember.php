@@ -36,6 +36,12 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
       description: new TranslatableMarkup('The fact to remember, as a short atomic statement.'),
       required: TRUE,
     ),
+    'expires' => new ContextDefinition(
+      data_type: 'string',
+      label: new TranslatableMarkup('Expires'),
+      description: new TranslatableMarkup('Only when the fact has a stated end: the calendar date it stops being true, as YYYY-MM-DD (for example 2026-10-16 for "until Friday 16 October"). Work it out from today\'s date. Omit for a fact with no end.'),
+      required: FALSE,
+    ),
   ],
 )]
 final class AimRemember extends FunctionCallBase implements ExecutableFunctionCallInterface, ContainerFactoryPluginInterface {
@@ -85,7 +91,7 @@ final class AimRemember extends FunctionCallBase implements ExecutableFunctionCa
     }
 
     try {
-      $fact = $this->memoryManager->remember($text, self::FACT_SCOPE, NULL, 'chatbot:aim_chatbot', NULL, sourceText: $this->sourceText);
+      $fact = $this->memoryManager->remember($text, self::FACT_SCOPE, NULL, 'chatbot:aim_chatbot', NULL, sourceText: $this->sourceText, expires: $this->memoryManager->parseExpires(['expires' => $this->getContextValue('expires')]));
       $this->setOutput('Saved fact ' . $fact->id() . ': ' . $text);
     }
     catch (\InvalidArgumentException $e) {

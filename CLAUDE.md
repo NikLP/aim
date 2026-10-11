@@ -172,7 +172,7 @@ duplicated here.
   [ADR-0028](adr/resolved/0028-scope-type-plugin.md) piece 1),
   `text` (Guardrails-validated), `source`, `state` (tri-state boolean),
   `category` (taxonomy, vocabulary `aim_category`), `asserted` (valid-time
-  start), `retired`/`superseded_by`/`superseded_by_reason`, plus `expires` (a nullable sell-by date nothing acts on yet) (consolidation's
+  start), `retired`/`superseded_by`/`superseded_by_reason`, plus `expires` (a nullable end date; `aim:expire` retires the fact once it passes, ADR-0057) (consolidation's
   non-destructive supersede edge and its JSON provenance), `uid`
   (who wrote it), `grounding_score` (float, empty when unchecked: how
   strongly a decision model found the fact stated in the text it was

@@ -105,6 +105,12 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
       description: new TranslatableMarkup('Provenance tag for this fact.'),
       required: FALSE,
     ),
+    'expires' => new InputDefinition(
+      data_type: 'string',
+      label: new TranslatableMarkup('Expires'),
+      description: new TranslatableMarkup('Only when the fact has a stated end: the calendar date it stops being true, as YYYY-MM-DD. Write facts with calendar dates ("closed until Friday 16 October 2026"), never relative ones ("until Friday"), which go stale. The fact is retired after that date. Omit for a fact with no end.'),
+      required: FALSE,
+    ),
     'scope_fields' => new MapInputDefinition(
       label: new TranslatableMarkup('Scope fields'),
       description: new TranslatableMarkup('Extra fields the chosen scope needs, if any - e.g. target_type/target_id for scope=entity. Ask if unsure what a given scope expects here; omit entirely for a scope with none.'),
@@ -146,6 +152,12 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
             data_type: 'string',
             label: new TranslatableMarkup('Source'),
             description: new TranslatableMarkup('Provenance tag for this fact.'),
+            required: FALSE,
+          ),
+          'expires' => new InputDefinition(
+            data_type: 'string',
+            label: new TranslatableMarkup('Expires'),
+            description: new TranslatableMarkup('The calendar date this fact stops being true, as YYYY-MM-DD. Omit for a fact with no end.'),
             required: FALSE,
           ),
           'scope_fields' => new MapInputDefinition(
@@ -402,6 +414,7 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
         $scopeFields['target_type'] ?? NULL,
         $scopeFields['target_id'] ?? NULL,
         $sourceText,
+        $this->memoryManager->parseExpires($fields),
       );
     }
     catch (\InvalidArgumentException $e) {

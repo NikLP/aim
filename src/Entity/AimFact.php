@@ -140,7 +140,7 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
 
     $fields['expires'] = BaseFieldDefinition::create('timestamp')
       ->setLabel(t('Expires'))
-      ->setDescription(t('Optional sell-by date. Nothing acts on it yet; a sweep will retire the fact once it passes.'));
+      ->setDescription(t('Optional end date. `drush aim:expire` (a crontab entry) retires the fact once it passes (ADR-0057).'));
 
     $fields['superseded_by'] = BaseFieldDefinition::create('entity_reference')
       ->setLabel(t('Superseded by'))

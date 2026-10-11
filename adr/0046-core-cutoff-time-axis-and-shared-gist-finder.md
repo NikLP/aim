@@ -78,7 +78,8 @@ ADR-0035 (authored rules), so it is not a core concern.
 ### 4. Literals become a standalone module
 
 **Done:** literals shipped as a standalone module with no `scope=literal`
-and no mirror of gists into `aim_fact`; `aim` is to consume the finder
+and no mirror of gists into `aim_fact`; `aim` consumes literals through
+`[literal:key]` tokens at recall and the `aim_literal` tool, not the finder
 (ADR-0040 section 9, ADR-0052 addendum). The text below is the original
 proposal. Today a literal's gist is mirrored into an `aim_fact` with
 `scope=literal`, so literals depend on aim. Invert it:
@@ -86,7 +87,8 @@ proposal. Today a literal's gist is mirrored into an `aim_fact` with
 - **Standalone:** literals depend on Search API / `ai_search` (for the gist
   index) and Tool API, not on aim. The chooser model is optional.
 - **Optional bridge:** aim can include literals in recall when both are
-  installed.
+  installed (built as tokens plus the `aim_literal` tool; the finder as a
+  recall source is not built).
 - **Agent-facing contract:** a Tool API tool whose description is the
   trigger ("the user wants an exact value that cannot be inferred"). The
   agent gets a deterministic path to the value instead of relying on fuzzy
