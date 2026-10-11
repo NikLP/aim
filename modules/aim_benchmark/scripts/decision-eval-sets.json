@@ -1,5 +1,5 @@
 {
- "_note": "Hand-written; labels human-verified by Nik 2026-10-02 (pairs, merges, gate, no changes). Synthetic Harbourside facts only (safe for hosted Jev). pairs: classifyPair; merges: verifyMerge; gate: reframed plausibility (consistent with context and worth storing). Five supersession merges added 2026-10-11 for the verifier's supersession rule (2026-10-09), labels not yet verified by Nik.",
+ "_note": "Hand-written; labels human-verified by Nik 2026-10-02 (pairs, merges, gate, no changes). Synthetic Harbourside facts only (safe for hosted Jev). pairs: classifyPair; merges: verifyMerge; gate: reframed plausibility (consistent with context and worth storing). Five supersession merges added 2026-10-11 for the verifier's supersession rule (2026-10-09), reviewed with Nik 2026-10-11, no label changes.",
  "pairs": [
   {
    "label": "ADD",

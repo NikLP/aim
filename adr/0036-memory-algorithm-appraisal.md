@@ -164,6 +164,10 @@ the minimal alternative if only "when" is wanted. Not built.
 
 ## Pinned 2026-10-02: recency/importance re-rank (finding 2)
 
+**Parked 2026-10-11** by the time stance in
+[ADR-0057](0057-dates-resolved-and-confirmed-before-write.md): store the
+date, show the date, no time reasoning. Same for the access counter.
+
 Not to be built until the top-3 consolidation change and the dated
 `recall()` output have been tested on real use. Weights default to 0, and
 need a gold set first.
@@ -178,7 +182,9 @@ Facts with an end or a relative date are a poor fit for UPDATE. Options,
 none built: have the classifier answer ADD for time-limited facts, give
 such facts a real `expires` sell-by date (TODO's `retired`/`expires`
 split), or have the merge writer resolve relative dates against
-`created`/`asserted`.
+`created`/`asserted`. Proposed answer (2026-10-11):
+[ADR-0057](0057-dates-resolved-and-confirmed-before-write.md), resolve and
+confirm at write time instead.
 
 ## Checked 2026-10-02: RRF keyword path is feasible without MariaDB FULLTEXT
 

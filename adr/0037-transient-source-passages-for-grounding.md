@@ -200,7 +200,7 @@ Found while building:
 ## Addendum (2026-10-11): narrower wording tested, not adopted
 
 Eight items added to the eval set (six faithful clean-ups, two drops that
-change the meaning; labels not yet verified by Nik), 52 items. Run through
+change the meaning; reviewed with Nik 2026-10-11, no label changes), 52 items. Run through
 Drupal's own provider (`aim_benchmark/scripts/decision-eval.php`,
 `typesafeai`, `jev-latest`, batched as live), two runs, cutoff 0.7:
 

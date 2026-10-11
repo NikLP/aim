@@ -196,7 +196,7 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       then decide enforce and `default_trusted: false`; (2) the strict
       question marks faithful clean-ups down (preflight canary 0.52-0.62):
       narrower wordings tested 2026-10-11 and not adopted (ADR-0037
-      addendum; eight new eval items, labels to verify). Fixed at the
+      addendum; eight new eval items, reviewed). Fixed at the
       preflight instead: its chat canary has no junk token now and scores
       0.84, so enforce no longer breaks the preflight; (3) per-model question text (same item as
       the decision backend's, below); (4) `ingest_max_chars` and a
@@ -370,11 +370,13 @@ are recommendations.
 - [ ] Real (non-dry) run and queue-worker check of top-N consolidation;
       no automated tests cover it yet.
 - [ ] Time-limited facts ("for two months from now") must not be UPDATE
-      merged into permanent facts; see ADR-0036 for options.
+      merged into permanent facts: proposed fix in
+      [ADR-0057](adr/0057-dates-resolved-and-confirmed-before-write.md)
+      (resolve and confirm dates before write, `expires` plus its sweep).
 - [ ] Pinned: `verified`/`verified_by` fields (not `trusted`), ADR-0036.
-- [ ] Pinned until the above is tested: recency/importance re-rank,
+- [ ] Parked (ADR-0057 time stance): recency/importance re-rank,
       weights default 0, needs a gold set.
-- [ ] Later: access counter / last-recalled (after the `retired` split).
+- [ ] Parked (ADR-0057 time stance): access counter / last-recalled.
 - [ ] Later, on a real recall miss: RRF keyword path via `search_api_db`.
 
 ## Governance

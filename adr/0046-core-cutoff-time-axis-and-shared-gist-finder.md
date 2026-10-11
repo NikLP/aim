@@ -38,6 +38,10 @@ to scope and to any notion of memory kind. Nothing infers behavior from it.
 
 ### 2. Mitigate the missing episodic kind with time, not a kind
 
+**Parked 2026-10-11:** since/until recall filters wait for a real caller;
+see the time stance in
+[ADR-0057](0057-dates-resolved-and-confirmed-before-write.md).
+
 Make time a retrieval axis for every fact instead of adding a `kind` field:
 
 - **Time-window recall:** `since`/`until` filters and an order-by-time

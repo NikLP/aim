@@ -72,12 +72,12 @@ ddev drush php:script .../decision-eval.php -- pairs decision-eval-real-pairs.js
 ```
 
 Sets: `decision-eval-sets.json` (24 hand-written pairs, merges with five
-supersession items added 2026-10-11, plus a `gate` set no task reads
+supersession items added 2026-10-11, reviewed with Nik, plus a `gate` set no task reads
 yet), `decision-eval-real-pairs.json` (25 real near-neighbour pairs),
 `decision-eval-merges-hard.json` (20 subtle faults) and
 `decision-eval-grounding.json` (52 items; the first 44 labels
 human-verified 2026-10-10, the 8 clean-up and meaning-changing-drop items
-added 2026-10-11 not yet). The drift sets belong to ADR-0043's parked
+added 2026-10-11 reviewed with Nik the same day). The drift sets belong to ADR-0043's parked
 prototype. Output: accuracy, a confusion matrix and unsafe errors (a
 data-losing UPDATE/RETIRE) for pairs; AUC, errors at the live cutoff and
 score ranges for merges and grounding; per-call time. Local-model results:
