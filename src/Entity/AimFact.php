@@ -26,9 +26,8 @@ use Drupal\user\EntityOwnerTrait;
 /**
  * Defines the AIM fact content entity.
  *
- * PoC entity: no moderation gate, no revisions yet. Every fact is live and
- * retrievable the moment it is saved. See CLAUDE.md for the governance
- * layer this is deliberately skipping for now.
+ * Not revisionable and no Content Moderation: the draft-to-trusted gate is
+ * the `trusted` field, which recall() filters on (ADR-0002 addendum).
  */
 #[ContentEntityType(
   id: 'aim_fact',

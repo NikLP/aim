@@ -44,8 +44,8 @@ for things Drupal already ships:
 | Vector embedding per object | `VECTOR` field via `ai_vdb_provider_mariadb`, on the same entity |
 | `user_id`/`agent_id`/`run_id`/`org_id` scoping | User entity, Role, a case/session entity, a site-global bundle |
 | Provenance (fact -> source episode) | Entity reference to the source content/interaction |
-| Audit trail | Revisioning / Content Moderation |
-| Governed at the data layer | Permissions/roles, plus a draft-to-trusted human-review workflow state |
+| Audit trail | Non-destructive supersede edges (`retired`/`superseded_by`) + an IDs-only audit log |
+| Governed at the data layer | Permissions/roles, plus a `trusted` flag reviewers set (draft-to-trusted) |
 | Policy versioning | Config export/sync |
 
 MariaDB 11.7+'s native `VECTOR` type and HNSW `VECTOR INDEX`, wrapped by
@@ -92,9 +92,8 @@ Four memory categories, composable at retrieval the way Mem0 composes
   record its score. A
   lightweight `trusted` flag is the draft-to-trusted human-review gate
   ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
-  addendum) - `recall()` excludes untrusted facts by default; full
-  Content Moderation/revisioning is deferred for the PoC - see
-  [CLAUDE.md](CLAUDE.md). One deliberate
+  addendum) - `recall()` excludes untrusted facts by default. Content
+  Moderation was considered and not adopted (same addendum). One deliberate
   exception either way: an entity flagged as synchronizing
   (`setSyncing(TRUE)`, which core's Migrate destinations set on
   everything they save) skips both Guardrails and the consolidation

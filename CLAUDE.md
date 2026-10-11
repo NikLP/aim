@@ -65,9 +65,12 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
    in-database mode only. ([ADR-0001](adr/resolved/0001-storage-and-scope-model.md))
 2. **Scope model** - four bundles (user/role/site/case), composable at
    retrieval. ([ADR-0001](adr/resolved/0001-storage-and-scope-model.md))
-3. **Governance** - permissions/roles + Content Moderation draft-to-trusted
-   gate; nothing LLM-extracted is auto-trusted. **Deferred for PoC** - see
-   below. ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md))
+3. **Governance** - permissions/roles + a draft-to-trusted gate, built as
+   the `trusted` flag rather than Content Moderation; `recall()` skips
+   untrusted facts. New facts start untrusted (`default_trusted: false`)
+   unless a site opts in or the grounded check, in enforce mode, trusts
+   them. ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
+   addendum)
 4. **Processing** - Queue API + a dedicated crontab entry, never
    `hook_cron`. ([ADR-0003](adr/resolved/0003-async-processing-dedicated-crontab.md))
 5. **Sovereignty** - extraction/consolidation must support Ollama; hosted
@@ -82,18 +85,13 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
    local embeddings before any unattended provider.
    ([ADR-0004](adr/resolved/0004-sovereignty-and-poc-build-order.md))
 7. **Guardrails mandatory** - every candidate fact runs through
-   `drupal/ai`'s Guardrails before it's written anywhere. Live today, not
-   part of the governance deferral above.
+   `drupal/ai`'s Guardrails before it's written anywhere.
    ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md))
 8. **Generative/planning surface** (spec -> Recipe -> built site) is in
    scope; no recipe-apply tool is exposed to an LLM-driven caller without
    a dry-run and human review.
    ([ADR-0035](adr/0035-standing-constraints-action-gate.md); retired
    [ADR-0009](adr/resolved/0009-recipe-apply-safety-gate.md))
-
-**PoC deviation from decision 3 (temporary, not abandoned):** no Content
-Moderation / draft-to-trusted gate - every fact is live the moment it's
-saved. Re-introduce before any non-PoC data goes in.
 
 No Drupal module competes with `aim`'s actual scope (governed,
 Guardrail-checked, extracted-and-consolidated, vector-searchable memory) -
