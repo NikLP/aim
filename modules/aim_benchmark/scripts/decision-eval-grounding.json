@@ -1,5 +1,5 @@
 {
-  "_note": "Hand-written 2026-10-10 for ADR-0037's grounded check: does the passage state the candidate? Labels human-verified by Nik 2026-10-10, no changes. Synthetic Harbourside text only (safe for hosted Jev); the three long passages are copies of demo/ingest-test/*.txt so the set stays fixed if those change. supported = the text states it; unsupported = invented, changed, stale, hedged, proposed or reported detail; misattributed = a real detail from the text pinned on the wrong subject.",
+  "_note": "Hand-written 2026-10-10 for ADR-0037's grounded check: does the passage state the candidate? Labels human-verified by Nik 2026-10-10, no changes. Synthetic Harbourside text only (safe for hosted Jev); the three long passages are copies of demo/ingest-test/*.txt so the set stays fixed if those change. supported = the text states it; unsupported = invented, changed, stale, hedged, proposed or reported detail; misattributed = a real detail from the text pinned on the wrong subject. Eight items added 2026-10-11 (six faithful clean-ups, two meaning-changing drops, over the chat_cleanup_* and chat_drop_* passages), labels not yet verified by Nik.",
   "passages": {
     "transcript": "Notes from a call with Northlight Digital about the website. Present: Sam Okafor and two people from Northlight.\n\nThey said site search is the next big job. It will use Search API and the library wants events and opening hours to come first in the results. It has to work with screen readers. Northlight first thought three weeks, but after looking at the events calendar they now say five weeks. Launch is planned for the week of 3 November. Sam mentioned in passing that the weather was awful on the way in. Northlight support is still weekdays 9am to 5pm, and urgent problems go to the on-call number. They also reminded us that editors must add alt text to every image, which has caused problems before.",
     "meeting": "Staff meeting, Harbourside Community Library, Tuesday morning. Present: Alex, the two branch assistants and the Children's Librarian.\n\nAlex opened by saying the home delivery service has been a success so far and will carry on every Wednesday. Someone asked about the cafe: Dockside Coffee will keep running it and it stays open 9am to 4pm on weekdays. Nobody was sure about parking, so Alex checked and confirmed there are 20 spaces, free for two hours, with two blue badge bays by the entrance.\n\nOn events: the Language Cafe is still on Thursdays at 6pm in the meeting room, and Alex wants to add drop-in tech help on Mondays at 10am. The Children's Librarian said Toddler Storytime stays on Fridays at 11am. We agreed that lost property will be kept for four weeks and then given to charity. Oh, and somebody left a umbrella in the reading room again, which is not really a fact worth keeping.\n\nFinally, the book sale: the trustees want it moved to the second weekend of June from next year.",
@@ -9,7 +9,15 @@
     "chat_confirm_2turn": "Assistant: Shall I note that Code Club has moved to Wednesdays at 4pm?\nVisitor: Yes, that's right.",
     "chat_confirm_1turn": "Visitor: Yes, that's right.",
     "chat_hedge": "Visitor: I think the library might be closing early on Christmas Eve, not sure though.",
-    "chat_hearsay": "Visitor: Someone on Facebook said the library is closing for good in March."
+    "chat_hearsay": "Visitor: Someone on Facebook said the library is closing for good in March.",
+    "chat_cleanup_canary": "Visitor: Please remember that the library's ZZPREFLIGHT story-time mascot is a fox named Rusty.",
+    "chat_cleanup_filler": "Visitor: Hiya, sorry to bother you! Um, so basically the knitting group meets on Tuesdays at 2pm now. Cheers, have a lovely day!",
+    "chat_cleanup_typos": "Visitor: fyi the libary wifi pasword got changed, its on the card at the front desk now lol",
+    "chat_cleanup_note": "Visitor: Can you make a note: Saturday opening hours are 10am to 1pm from now on. That's all, thanks.",
+    "chat_cleanup_confirm": "Assistant: Shall I note that the reading room is closed for painting until Friday?\nVisitor: Yes please, that's right, thanks so much!",
+    "chat_cleanup_aside": "Visitor: Please remember that the toy library is on the ground floor now, next to the lifts - my son loves it!",
+    "chat_drop_condition": "Visitor: Please note the public computers can be booked for 90 minutes, but only by library members.",
+    "chat_drop_period": "Visitor: Please remember that the reading room is closed on Mondays during the summer holidays."
   },
   "grounding": [
     {
@@ -275,6 +283,54 @@
       "passage": "chat_hearsay",
       "candidate": "The library is closing permanently in March.",
       "note": "hearsay stated as fact"
+    },
+    {
+      "label": "supported",
+      "passage": "chat_cleanup_canary",
+      "candidate": "The library's story-time mascot is a fox named Rusty.",
+      "note": "clean-up: request to remember and a junk test token dropped (the preflight canary)"
+    },
+    {
+      "label": "supported",
+      "passage": "chat_cleanup_filler",
+      "candidate": "The knitting group meets on Tuesdays at 2pm.",
+      "note": "clean-up: greeting, filler and sign-off dropped"
+    },
+    {
+      "label": "supported",
+      "passage": "chat_cleanup_typos",
+      "candidate": "The library wifi password has changed and is on the card at the front desk.",
+      "note": "clean-up: typos fixed, 'fyi' and 'lol' dropped"
+    },
+    {
+      "label": "supported",
+      "passage": "chat_cleanup_note",
+      "candidate": "The library is open 10am to 1pm on Saturdays.",
+      "note": "clean-up: 'make a note' request and thanks dropped"
+    },
+    {
+      "label": "supported",
+      "passage": "chat_cleanup_confirm",
+      "candidate": "The reading room is closed for painting until Friday.",
+      "note": "clean-up: two-turn confirmation, pleasantries dropped"
+    },
+    {
+      "label": "supported",
+      "passage": "chat_cleanup_aside",
+      "candidate": "The toy library is on the ground floor, next to the lifts.",
+      "note": "clean-up: request to remember and a personal aside dropped"
+    },
+    {
+      "label": "unsupported",
+      "passage": "chat_drop_condition",
+      "candidate": "The public computers can be booked for 90 minutes.",
+      "note": "meaning-changing drop: members-only condition"
+    },
+    {
+      "label": "unsupported",
+      "passage": "chat_drop_period",
+      "candidate": "The reading room is closed on Mondays.",
+      "note": "meaning-changing drop: summer-holidays period"
     }
   ]
 }

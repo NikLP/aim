@@ -10,7 +10,7 @@ updated when one is done. Hosted Jev takes synthetic or public data only
 
 | Kind | Goes through | Lives in | Answers |
 | --- | --- | --- | --- |
-| **A. Model evals** | The model's HTTP API directly (`decision-eval.py`). No Drupal, no module code. | `modules/aim_benchmark/scripts/` | Can the model make this judgment at all? |
+| **A. Model evals** | The configured provider through Drupal (`decision-eval.php`, `aim.backend.decision`), fixed hand-written sets, no aim write path. Never the model's API directly. | `modules/aim_benchmark/scripts/` | Can the model make this judgment at all? |
 | **B. Module runs** | The module: `drush aim:remember` / `aim:extract` / `aim:consolidate` / `aim:recall` on a snapshot, real backends, real queue. | `demo/ingest-test/`, `aim_benchmark` commands | Does aim, wired to a model, do the right thing end to end? |
 | **C. Automated tests** | PHPUnit (kernel/unit). One kernel test so far (below). | `tests/src/Kernel/` | Does a class behave, without a live site? |
 
@@ -61,7 +61,7 @@ yet, so a pass there says nothing about the module.
    site-context contradictions for the `gate` set.
 6. **Pass bar** (ADR-0021 open question 2): decide before scoring, e.g.
    "decision path within X points of chat accuracy at under Y s per pair".
-7. **Extend `decision-eval.py`:** confusion matrix by confidence bucket and
+7. **Extend `decision-eval.php`:** confusion matrix by confidence bucket and
    a cost-weighted threshold sweep (a wrong UPDATE loses data, a missed
    merge is cheap).
 8. **Can a small local model extract?** (`adr/model-call-budget.md`):

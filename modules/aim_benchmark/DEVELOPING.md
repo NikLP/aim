@@ -55,31 +55,30 @@ e.g. from `drush php:eval`:
 
 `aim:benchmark-cleanup zzpar` removes it again afterward.
 
-## `scripts/decision-eval.py` - decision-model scorer
+## `scripts/decision-eval.php` - decision-model scorer through Drupal
 
-Scores any `/v1/systemone` decision model (hosted Jev, or a local Ollama
-or Ollaya host) on the aim decision points. Host side, standard library
-only, no Drupal needed. The sets are hand-written synthetic Harbourside
-facts with human-verified labels, so they are safe to send to a hosted
-model:
+The way to score a decision model: every call goes through
+`aim.backend.decision` and the provider and model set for that activity in
+`aim.settings` (keys stay in Drupal; calls land in `aim_activity_metrics`).
+Tasks `grounding` (every wording in the script's `$grounding_qs`, batched
+per passage as live), `merges` (the live verifier question and cutoff) and
+`pairs` (the live pair question). An optional second argument names a set
+file in `scripts/`; `merges` takes an optional cutoff third.
 
 ```bash
-# local model
-python3 scripts/decision-eval.py all tev1:4b --host http://localhost:11434
-# hosted Jev (token read from an env var, never the command line)
-python3 scripts/decision-eval.py all jev-latest --host https://api.typesafe.ai --key-env JEV_KEY
+ddev drush php:script web/modules/custom/aim/modules/aim_benchmark/scripts/decision-eval.php -- grounding
+ddev drush php:script .../decision-eval.php -- merges decision-eval-merges-hard.json
+ddev drush php:script .../decision-eval.php -- pairs decision-eval-real-pairs.json
 ```
 
-Tasks: `pairs` (`classifyPair()`, 24 hand-written pairs; also run
-`--sets scripts/decision-eval-real-pairs.json` for 25 real near-neighbour
-pairs), `merges` (`verifyMerge()`; `--sets
-scripts/decision-eval-merges-hard.json` for 20 subtle faults),
-`merges-split` (the same as three small questions), `gate`
-(plausibility) and `grounding` (ADR-0037's grounded check, 44 passage and
-candidate items in `scripts/decision-eval-grounding.json`, asked in a
-plain and a strict wording per call; labels human-verified 2026-10-10;
-`--batch` sends one call per passage with every candidate in the state). It reports accuracy, a confusion matrix, unsafe errors
-(a data-losing UPDATE/RETIRE), AUC and a best threshold (tuned on the
-set, so optimistic) and per-call time. Use the threshold to set
-`activities.verifier.threshold` for a model. Local-model results and
-service setup: [ADR-0038](../../adr/0038-local-decision-models-parked.md).
+Sets: `decision-eval-sets.json` (24 hand-written pairs, merges with five
+supersession items added 2026-10-11, plus a `gate` set no task reads
+yet), `decision-eval-real-pairs.json` (25 real near-neighbour pairs),
+`decision-eval-merges-hard.json` (20 subtle faults) and
+`decision-eval-grounding.json` (52 items; the first 44 labels
+human-verified 2026-10-10, the 8 clean-up and meaning-changing-drop items
+added 2026-10-11 not yet). The drift sets belong to ADR-0043's parked
+prototype. Output: accuracy, a confusion matrix and unsafe errors (a
+data-losing UPDATE/RETIRE) for pairs; AUC, errors at the live cutoff and
+score ranges for merges and grounding; per-call time. Local-model results:
+[ADR-0038](../../adr/0038-local-decision-models-parked.md).

@@ -93,7 +93,7 @@ the subject's display name as context and asks about anyone else.
   `user` scope, "anyone other than the subject?". Hosted Jev on this site,
   synthetic data only; a site with real data needs a local model
   ([ADR-0038](0038-local-decision-models-parked.md)). Build an eval set
-  first: `pii` task in `decision-eval.py`, named and unnamed people, roles,
+  first: `pii` task in `decision-eval.php`, named and unnamed people, roles,
   organizations, and the subject-versus-third-party case.
 
 **5. On failure, refuse, never redact.** `StopResult` with a message telling

@@ -1,5 +1,5 @@
 {
- "_note": "Hand-written; labels human-verified by Nik 2026-10-02 (pairs, merges, gate, no changes). Synthetic Harbourside facts only (safe for hosted Jev). pairs: classifyPair; merges: verifyMerge; gate: reframed plausibility (consistent with context and worth storing).",
+ "_note": "Hand-written; labels human-verified by Nik 2026-10-02 (pairs, merges, gate, no changes). Synthetic Harbourside facts only (safe for hosted Jev). pairs: classifyPair; merges: verifyMerge; gate: reframed plausibility (consistent with context and worth storing). Five supersession merges added 2026-10-11 for the verifier's supersession rule (2026-10-09), labels not yet verified by Nik.",
  "pairs": [
   {
    "label": "ADD",
@@ -220,6 +220,41 @@
    "candidate": "Code Club is run by volunteers from the local tech college.",
    "merged": "Code Club for ages 9 to 13 meets every Thursday at 4pm in the Children's Room and is run by volunteers from the local tech college.",
    "note": "wrong place"
+  },
+  {
+   "label": "good",
+   "kept": "Code Club meets every Thursday at 4pm.",
+   "candidate": "Code Club has moved to Wednesdays at 4pm.",
+   "merged": "Code Club meets every Wednesday at 4pm.",
+   "note": "supersede: day changed"
+  },
+  {
+   "label": "good",
+   "kept": "Public computers can be booked for 60 minutes at a time.",
+   "candidate": "Public computers can now be booked for 90 minutes at a time.",
+   "merged": "Public computers can be booked for 90 minutes at a time.",
+   "note": "supersede: duration changed"
+  },
+  {
+   "label": "bad",
+   "kept": "Public computers can be booked for 60 minutes at a time.",
+   "candidate": "Public computers can now be booked for 90 minutes at a time.",
+   "merged": "Public computers can be booked for 60 minutes at a time.",
+   "note": "keeps the superseded value"
+  },
+  {
+   "label": "bad",
+   "kept": "Code Club meets every Thursday at 4pm in the makerspace.",
+   "candidate": "Code Club has moved to Wednesdays.",
+   "merged": "Code Club meets every Wednesday at 4pm.",
+   "note": "supersedes the day but drops the place"
+  },
+  {
+   "label": "bad",
+   "kept": "Baby Rhyme Time runs every Tuesday at 10:30am.",
+   "candidate": "Baby Rhyme Time now starts at 11am.",
+   "merged": "Baby Rhyme Time runs every Wednesday at 11am.",
+   "note": "supersedes the time but changes the day"
   }
  ],
  "gate": [

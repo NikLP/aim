@@ -196,3 +196,30 @@ Found while building:
   meaning") with clean-up items added to the eval set; the preflight's
   recall-after-save check would fail under enforce as things stand.
 
+
+## Addendum (2026-10-11): narrower wording tested, not adopted
+
+Eight items added to the eval set (six faithful clean-ups, two drops that
+change the meaning; labels not yet verified by Nik), 52 items. Run through
+Drupal's own provider (`aim_benchmark/scripts/decision-eval.php`,
+`typesafeai`, `jev-latest`, batched as live), two runs, cutoff 0.7:
+
+| Wording | AUC | Wrongly trusted | Wrongly held | Canary | Members-only drop |
+| --- | --- | --- | --- | --- | --- |
+| strict (live) | 0.99 | 1 of 25 | 2 of 27 | 0.52-0.56 | 0.63-0.66 |
+| narrow ("drops a detail that changes its meaning") | 0.99 | 1 of 25 | 2 of 27 | 0.58-0.62 | 0.64-0.66 |
+| narrow, plus "leaving out greetings, filler, typos or a request to remember is fine" | 0.99 | 2 of 25 | 1 of 27 | 0.71 | 0.79-0.82 |
+
+- The narrow clause moves scores by about 0.05: no item changes side.
+- The explicit allowance passes the canary, but only just, and it also
+  passes the computers item with its members-only condition dropped. That
+  is the error the check exists to catch, so it is not adopted.
+- Four of the six clean-ups score 0.81-0.97 on every wording. The two
+  held ones lose more than filler: the canary loses its `ZZPREFLIGHT`
+  token, and the Saturday item loses "from now on".
+- So `GROUNDING_QUESTION` stays strict. Wording alone does not fix the
+  preflight under enforce; the canary's junk token is the problem (a
+  test-only token that a faithful clean-up drops). Fixed in the preflight:
+  the canary is now "the library's story-time mascot is a fox named
+  Fizzwick", no token, and scored 0.84 live (shadow, cutoff 0.7; the old
+  canary 0.62). All 13 preflight checks pass.

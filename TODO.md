@@ -195,14 +195,17 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
 - [ ] Grounded check follow-ups: (1) review shadow scores on real use,
       then decide enforce and `default_trusted: false`; (2) the strict
       question marks faithful clean-ups down (preflight canary 0.52-0.62):
-      add clean-up items to the eval set and test "drops a detail that
-      changes its meaning"; the preflight's recall-after-save check fails
-      under enforce until then; (3) per-model question text (same item as
+      narrower wordings tested 2026-10-11 and not adopted (ADR-0037
+      addendum; eight new eval items, labels to verify). Fixed at the
+      preflight instead: its chat canary has no junk token now and scores
+      0.84, so enforce no longer breaks the preflight; (3) per-model question text (same item as
       the decision backend's, below); (4) `ingest_max_chars` and a
       passage-size limit for the Jev call (untested above about 1,000
       words); (5) MCP `source_text` is whatever the calling agent quotes,
       so it is only as verbatim as that agent.
-- [ ] Extend `decision-eval.py`: confusion matrix by confidence bucket and
+- [ ] Extend `decision-eval.php`: the `gate`, `drift` and `merges-split`
+      tasks the removed `decision-eval.py` had (sets still in `scripts/`),
+      a confusion matrix by confidence bucket and
       a cost-weighted threshold sweep (a wrong UPDATE loses data, a missed
       merge is cheap).
 - [ ] PHP replay command in `aim_benchmark` running the same pairs through
@@ -228,12 +231,18 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
   - `web/modules/contrib/ai_provider_typesafeai/tests/check-decision-api.php`
     (offline class check) has not been run.
 
-- [ ] **Re-measure consolidation after the 2026-10-09 changes.** `auto_threshold`
-      0.09 to 0.04, UPDATE line added to the consolidation prompt, supersession
-      rule added to the verifier's Noul question, and an ADD whose `merged_text`
-      differs from the kept text is now treated as UPDATE (verifier-gated).
-      Run the gold and merge sets to check for regressions; the seeded demo
-      cases (Code Club day change, computers 60 to 90 minutes) now pass.
+- [x] **Re-measured consolidation after the 2026-10-09 changes** (2026-10-11,
+      `jev-latest` through `decision-eval.php`). Verifier (live wording,
+      supersession rule, cutoff 0.8): merges AUC 1.00, 0 of 11 bad passed,
+      2 of 8 good held (the borough+Eastvale supersede 0.71, computers 60
+      to 90 minutes 0.74: the demo case sits just under 0.8); hard merges
+      AUC 1.00, 0 of 12 bad passed, 0 of 8 good held, bad max 0.70. Pairs
+      (question unchanged): 23/24, 0 unsafe; real pairs 24/25 and 25/25
+      over two runs, the one unsafe UPDATE on the Hyperslop demo-request
+      pair. No regression. The `auto_threshold` 0.09 to 0.04 change noted
+      here earlier never landed (code, install, sync and live all 0.09).
+      The prompt line and ADD-as-UPDATE only run on the chat backend, which
+      this site does not use for consolidation: unmeasured.
 - [ ] **Atomic extraction.** Check the extraction prompt asks for one claim per
       fact: a compound fact ("60 minutes, and printing costs 10p") makes a
       later update a partial overwrite the verifier has to untangle.
@@ -276,7 +285,7 @@ are recommendations.
 **Personal data (raised 2026-10-10, [ADR-0056](adr/0056-personal-data-write-gate.md), parked 2026-10-11)**
 
 - [ ] Parked by Nik 2026-10-11, revisit later. Accept or amend ADR-0056 (no personal data stored unless
-      authorised). Then: a `pii` eval set and task in `decision-eval.py`,
+      authorised). Then: a `pii` eval set and task in `decision-eval.php`,
       the `aim_personal_data` guardrail set, the extraction prompt change,
       and the demo's raw email fact moved into a literal.
 - [ ] If accepted, `aim_rejection` keeps no text for `personal_data`

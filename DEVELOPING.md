@@ -578,14 +578,15 @@ to the model and never stored.
   "Grounding score below" filter on the facts list; an audit line per
   verdict (fact ID, score, cutoff, mode, no text); call time and tokens in
   `aim_activity_metrics` (activity `aim_ground`); the eval set
-  (`aim_benchmark`'s `decision-eval.py grounding --batch`) after any model
+  (`aim_benchmark`'s `decision-eval.php -- grounding`) after any model
   or wording change. With `log_verbose` and `log_query_text` on, each score
   is logged with the candidate and passage text: opt-in personal data,
   for diagnosis only.
 - **Known calibration issue:** the strict question penalizes any dropped
-  detail, so a faithful clean-up scores low (the preflight canary, with its
-  `ZZPREFLIGHT` token dropped by the assistant, scored 0.52-0.62). Check
-  this in shadow mode before enforcing.
+  detail, so a clean-up that drops a junk word scores low (the old
+  preflight canary's `ZZPREFLIGHT` token, 0.52-0.62). Narrower wordings did
+  not fix it without passing real meaning-changing drops (ADR-0037
+  addendum), so the preflight canary no longer carries a junk token.
 
 ### Scope/bundle model
 

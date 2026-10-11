@@ -67,9 +67,10 @@ class AimMemoryManager {
   /**
    * The grounded check's question, %1$s being the candidate's state key.
    *
-   * The "strict" wording measured in aim_benchmark's decision-eval.py
-   * grounding task (ADR-0037 addendum): naming the failure kinds stops
-   * proposals and wishes passing as settled facts.
+   * The "strict" wording measured in aim_benchmark's decision-eval.php
+   * grounding task (ADR-0037 addenda): naming the failure kinds stops
+   * proposals and wishes passing as settled facts. Narrower wordings were
+   * tested 2026-10-11 and not adopted.
    */
   protected const GROUNDING_QUESTION = 'Does the text state the fact in %1$s? Answer no if %1$s adds, changes or drops any detail, gives an old value the text has replaced, pins a detail on the wrong person or thing, or states as settled something the text only proposes, hedges or reports second-hand.';
 
