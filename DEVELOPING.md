@@ -120,7 +120,7 @@ On-demand sweep. Algorithm, schema, and thresholds in
 [ADR-0005](adr/resolved/0005-consolidation-algorithm.md). Current defaults:
 `auto_threshold: 0.09`, `ambiguous_threshold: 0.45`, calibrated against
 `ollama__nomic-embed-text:latest` - both live in `aim.settings`, editable
-at `/admin/config/aim/settings` ("Consolidation thresholds"), not just a
+at `/admin/config/aim/settings` ("Consolidation"), not just a
 code constant. **Retune if the embeddings model changes** - a threshold
 tuned for one model's distance distribution can silently auto-merge
 genuinely distinct facts under another (hit live: 0.12 auto-merged two
@@ -1006,7 +1006,7 @@ via the container, so only a hand-constructed instance is affected).
   a text field.
 - `/admin/config/aim/user-scope-access` - the role-visibility matrix, see
   "User-scope role visibility" above.
-- `/admin/config/aim/scopes` - add/edit/delete `aim_scope` entities.
+- `/admin/structure/aim-scopes` - add/edit/delete `aim_scope` entities.
 
 ---
 

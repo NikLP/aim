@@ -13,7 +13,7 @@ use Drupal\Core\Entity\EntityInterface;
  * Core's own EntityListBuilder::buildHeader()/buildRow() only add an
  * Operations column - every core bundle list builder (NodeTypeListBuilder,
  * MediaTypeListBuilder, RoleListBuilder) adds its own Label column on top.
- * aim_scope had none, so /admin/config/aim/scopes rendered as a table of
+ * aim_scope had none, so /admin/structure/aim-scopes rendered as a table of
  * bare Edit/Delete dropbuttons with no way to tell which row was which
  * scope. Mirrors RoleListBuilder (label only, no description field to
  * show) rather than NodeTypeListBuilder/MediaTypeListBuilder, since

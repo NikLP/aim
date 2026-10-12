@@ -13,11 +13,10 @@ aim.settings:
   weight: 100
 
 entity.aim_scope.collection:
-  title: 'Scopes'
+  title: 'AIM scopes'
   description: 'Manage the scopes that facts can be saved under.'
-  parent: aim.admin_config
+  parent: system.admin_structure
   route_name: entity.aim_scope.collection
-  weight: 10
 
 aim.user_scope_access:
   title: 'User-scope visibility'

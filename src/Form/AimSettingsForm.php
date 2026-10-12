@@ -78,11 +78,22 @@ final class AimSettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state): array {
+    $form['settings_tabs'] = [
+      '#type' => 'vertical_tabs',
+      '#default_tab' => 'edit-thresholds',
+    ];
     $form['thresholds'] = [
       '#type' => 'details',
-      '#title' => $this->t('Consolidation thresholds'),
+      '#group' => 'settings_tabs',
+      '#title' => $this->t('Consolidation'),
       '#description' => $this->t("Cosine-distance values from the vector index (0 is identical, larger is less similar). These are specific to the current embeddings model and should be re-checked after any change to the vector server's embeddings engine."),
       '#open' => TRUE,
+    ];
+    $form['thresholds']['merge_verify'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Verify merged text with a model'),
+      '#description' => $this->t('Before an UPDATE merge is accepted, a model confirms every detail of both facts survives. A failing merge is downgraded to ADD (keep both). Checks faithfulness to the inputs, not real-world truth.'),
+      '#config_target' => 'aim.settings:merge_verify',
     ];
     $form['thresholds']['auto_threshold'] = [
       '#type' => 'number',
@@ -115,12 +126,6 @@ final class AimSettingsForm extends ConfigFormBase {
       '#required' => TRUE,
     ];
 
-    $form['thresholds']['merge_verify'] = [
-      '#type' => 'checkbox',
-      '#title' => $this->t('Verify merged text with a model'),
-      '#description' => $this->t('Before an UPDATE merge is accepted, a model confirms every detail of both facts survives. A failing merge is downgraded to ADD (keep both). Checks faithfulness to the inputs, not real-world truth.'),
-      '#config_target' => 'aim.settings:merge_verify',
-    ];
     $form['thresholds']['merge_max_distance'] = [
       '#type' => 'number',
       '#title' => $this->t('Maximum merged-to-input distance'),
@@ -133,6 +138,7 @@ final class AimSettingsForm extends ConfigFormBase {
 
     $form['models'] = [
       '#type' => 'details',
+      '#group' => 'settings_tabs',
       '#title' => $this->t('Models'),
       '#description' => $this->t('The backend and model each activity uses. Chat default follows the site-wide default chat provider; a decision backend needs an explicit model. A Drush --provider/--model option still overrides these.'),
       '#open' => TRUE,
@@ -250,6 +256,7 @@ final class AimSettingsForm extends ConfigFormBase {
 
     $form['recall'] = [
       '#type' => 'details',
+      '#group' => 'settings_tabs',
       '#title' => $this->t('Recall'),
       '#open' => TRUE,
     ];
@@ -276,6 +283,7 @@ final class AimSettingsForm extends ConfigFormBase {
 
     $form['governance'] = [
       '#type' => 'details',
+      '#group' => 'settings_tabs',
       '#title' => $this->t('Governance'),
       '#description' => $this->t('The initial value a newly created fact gets for its own Trusted field (ADR-0002) - not a moderation gate, and editable per-fact afterward on the add/edit form.'),
       '#open' => TRUE,
@@ -287,23 +295,11 @@ final class AimSettingsForm extends ConfigFormBase {
       '#config_target' => 'aim.settings:default_trusted',
     ];
 
-    $form['debug'] = [
-      '#type' => 'details',
-      '#title' => $this->t('Debugging'),
-      '#description' => $this->t('Switches that trade safety for visibility while building or demonstrating. Leave all off in production. Query-text logging is the related switch under Logging.'),
-      '#open' => FALSE,
-    ];
-    $form['debug']['show_redacted_facts'] = [
-      '#type' => 'checkbox',
-      '#title' => $this->t('Show redacted facts (debug)'),
-      '#description' => $this->t('A fact that names a literal the viewer cannot read is normally withheld from recall() whole. When on, it is returned with <code>[redacted]</code> in place of the value, so you can see what is being hidden and why. Leave off in production: the gap reveals that a restricted value exists.'),
-      '#config_target' => 'aim.settings:show_redacted_facts',
-    ];
-
     $form['logging'] = [
       '#type' => 'details',
-      '#title' => $this->t('Logging'),
-      '#description' => $this->t('Warnings and errors (rejected writes, blocked merges, a suspended queue) are always logged to the <em>aim</em> channel. The two options below add info and debug entries. Fact text and recall query text are never logged.'),
+      '#group' => 'settings_tabs',
+      '#title' => $this->t('Logging & Debug'),
+      '#description' => $this->t('Warnings and errors (rejected writes, blocked merges, a suspended queue) are always logged to the <em>aim</em> channel. Fact text and recall query text are never logged.'),
       '#open' => FALSE,
     ];
     $form['logging']['log_audit'] = [
@@ -326,8 +322,21 @@ final class AimSettingsForm extends ConfigFormBase {
       '#states' => ['disabled' => [':input[name="log_verbose"]' => ['checked' => FALSE]]],
     ];
 
+    $form['logging']['debug'] = [
+      '#type' => 'fieldset',
+      '#title' => $this->t('Debugging'),
+      '#description' => $this->t('Switches that trade safety for visibility while building or demonstrating. Leave all off in production.'),
+    ];
+    $form['logging']['debug']['show_redacted_facts'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Show redacted facts (debug)'),
+      '#description' => $this->t('A fact that names a literal the viewer cannot read is normally withheld from recall() whole. When on, it is returned with <code>[redacted]</code> in place of the value, so you can see what is being hidden and why. Leave off in production: the gap reveals that a restricted value exists.'),
+      '#config_target' => 'aim.settings:show_redacted_facts',
+    ];
+
     $form['prompts'] = [
       '#type' => 'details',
+      '#group' => 'settings_tabs',
       '#title' => $this->t('Prompts'),
       '#description' => $this->t('The instruction text sent to the chat provider for extraction and consolidation. The requested output shape (the ADD/UPDATE/RETIRE/NOOP decision enum, the scope enum) is enforced by a structured-output JSON schema in code, not by this text - editing the prose below changes how the model reasons, not what fields it must return.'),
       '#open' => FALSE,
