@@ -80,22 +80,22 @@ final class AimSettingsForm extends ConfigFormBase {
   public function buildForm(array $form, FormStateInterface $form_state): array {
     $form['settings_tabs'] = [
       '#type' => 'vertical_tabs',
-      '#default_tab' => 'edit-thresholds',
+      '#default_tab' => 'edit-consolidation',
     ];
-    $form['thresholds'] = [
+    $form['consolidation'] = [
       '#type' => 'details',
       '#group' => 'settings_tabs',
       '#title' => $this->t('Consolidation'),
       '#description' => $this->t("Cosine-distance values from the vector index (0 is identical, larger is less similar). These are specific to the current embeddings model and should be re-checked after any change to the vector server's embeddings engine."),
       '#open' => TRUE,
     ];
-    $form['thresholds']['merge_verify'] = [
+    $form['consolidation']['merge_verify'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Verify merged text with a model'),
       '#description' => $this->t('Before an UPDATE merge is accepted, a model confirms every detail of both facts survives. A failing merge is downgraded to ADD (keep both). Checks faithfulness to the inputs, not real-world truth.'),
       '#config_target' => 'aim.settings:merge_verify',
     ];
-    $form['thresholds']['auto_threshold'] = [
+    $form['consolidation']['auto_threshold'] = [
       '#type' => 'number',
       '#title' => $this->t('Auto-merge threshold'),
       '#description' => $this->t('Distance at or below which a candidate fact is retired as a duplicate automatically, no LLM call.'),
@@ -105,7 +105,7 @@ final class AimSettingsForm extends ConfigFormBase {
       '#step' => 0.001,
       '#required' => TRUE,
     ];
-    $form['thresholds']['ambiguous_threshold'] = [
+    $form['consolidation']['ambiguous_threshold'] = [
       '#type' => 'number',
       '#title' => $this->t('Ambiguous threshold'),
       '#description' => $this->t('Distance at or below which a candidate fact gets a single LLM classification call (ADD/UPDATE/RETIRE/NOOP). Above this, facts are left alone at zero cost. Must be greater than the auto-merge threshold.'),
@@ -115,7 +115,7 @@ final class AimSettingsForm extends ConfigFormBase {
       '#step' => 0.001,
       '#required' => TRUE,
     ];
-    $form['thresholds']['neighbor_limit'] = [
+    $form['consolidation']['neighbor_limit'] = [
       '#type' => 'number',
       '#title' => $this->t('Neighbors compared per fact'),
       '#description' => $this->t("How many of a fact's nearest neighbors consolidation compares it against, nearest first. 1 only ever checks the single closest fact, so a contradiction that is not the closest is missed. Each neighbor inside the ambiguous band can cost one LLM call."),
@@ -126,7 +126,7 @@ final class AimSettingsForm extends ConfigFormBase {
       '#required' => TRUE,
     ];
 
-    $form['thresholds']['merge_max_distance'] = [
+    $form['consolidation']['merge_max_distance'] = [
       '#type' => 'number',
       '#title' => $this->t('Maximum merged-to-input distance'),
       '#description' => $this->t('Cosine distance within which the merged text must sit from each input embedding, else the merge is downgraded to ADD. 0 disables. Unmeasured: leave at 0 until calibrated.'),
@@ -218,7 +218,17 @@ final class AimSettingsForm extends ConfigFormBase {
           '#default_value' => $backend,
         ];
       }
-      $form['models'][$activity]['chat'] = [
+      // #states on the provider element itself is dropped by its theme
+      // wrapper, so each picker sits in a container that carries it.
+      $chat_parent = &$form['models'][$activity];
+      if ($activity !== 'extraction') {
+        $form['models'][$activity]['chat_box'] = [
+          '#type' => 'container',
+          '#states' => ['visible' => [$selector => ['value' => 'chat']]],
+        ];
+        $chat_parent = &$form['models'][$activity]['chat_box'];
+      }
+      $chat_parent['chat'] = [
         '#type' => 'ai_provider_configuration',
         '#title' => $this->t('Chat model'),
         '#operation_type' => 'chat',
@@ -228,16 +238,19 @@ final class AimSettingsForm extends ConfigFormBase {
           ? $default_value
           : ['provider' => '', 'model' => '', 'use_default' => TRUE],
       ];
+      unset($chat_parent);
       if ($activity !== 'extraction') {
-        $form['models'][$activity]['chat']['#states'] = ['visible' => [$selector => ['value' => 'chat']]];
-        $form['models'][$activity]['decision'] = [
+        $form['models'][$activity]['decision_box'] = [
+          '#type' => 'container',
+          '#states' => ['visible' => [$selector => ['value' => 'decision']]],
+        ];
+        $form['models'][$activity]['decision_box']['decision'] = [
           '#type' => 'ai_provider_configuration',
           '#title' => $this->t('Decision model'),
           '#operation_type' => 'decision',
           '#advanced_config' => FALSE,
           '#default_provider_allowed' => FALSE,
           '#default_value' => $backend === 'decision' ? $default_value : [],
-          '#states' => ['visible' => [$selector => ['value' => 'decision']]],
         ];
       }
       if ($activity === 'verifier') {
@@ -377,7 +390,7 @@ final class AimSettingsForm extends ConfigFormBase {
     foreach (['extraction', 'consolidation', 'verifier', 'grounding'] as $activity) {
       $value = $form_state->getValue(['models', $activity]) ?? [];
       $backend = $activity === 'grounding' || ($activity !== 'extraction' && ($value['backend'] ?? 'chat') === 'decision') ? 'decision' : 'chat';
-      $picked = $value[$backend] ?? [];
+      $picked = $value[$backend . '_box'][$backend] ?? $value[$backend] ?? [];
       $use_default = $backend === 'chat' && !empty($picked['use_default']);
       $activities[$activity] = [
         'backend' => $backend,
