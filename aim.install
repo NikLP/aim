@@ -206,3 +206,14 @@ function aim_update_10008(): void {
     $config->set('merge_prompt', $defaults['merge_prompt'])->save();
   }
 }
+
+/**
+ * Removes the unused state field from aim_fact.
+ */
+function aim_update_10009(): void {
+  $manager = \Drupal::entityDefinitionUpdateManager();
+  $definition = $manager->getFieldStorageDefinition('state', 'aim_fact');
+  if ($definition) {
+    $manager->uninstallFieldStorageDefinition($definition);
+  }
+}

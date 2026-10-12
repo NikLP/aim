@@ -407,7 +407,6 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
         $scope,
         $subject,
         $fields['source'] ?? 'tool:aim_remember',
-        NULL,
         [],
         NULL,
         NULL,

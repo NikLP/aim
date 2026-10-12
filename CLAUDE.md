@@ -170,7 +170,7 @@ duplicated here.
   not `AimFact::baseFieldDefinitions()`, and merged onto `aim_fact`
   generically by `AimHooks::entityBaseFieldInfo()` -
   [ADR-0028](adr/resolved/0028-scope-type-plugin.md) piece 1),
-  `text` (Guardrails-validated), `source`, `state` (tri-state boolean),
+  `text` (Guardrails-validated), `source`,
   `category` (taxonomy, vocabulary `aim_category`), `asserted` (valid-time
   start), `retired`/`superseded_by`/`superseded_by_reason`, plus `expires` (a nullable end date; `aim:expire` retires the fact once it passes, ADR-0057) (consolidation's
   non-destructive supersede edge and its JSON provenance), `uid`

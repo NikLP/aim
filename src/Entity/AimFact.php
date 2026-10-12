@@ -121,19 +121,6 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['weight' => 30]);
 
-    // A nullable tri-state (true/false/empty, see the description). Core's
-    // options_buttons widget lists boolean among its field types and, for a
-    // non-required single-value field, adds an "N/A" radio that writes an
-    // empty item - so the tri-state needs no custom widget, just not the
-    // default boolean_checkbox (which can only ever write true or false).
-    $fields['state'] = BaseFieldDefinition::create('boolean')
-      ->setLabel(t('State'))
-      ->setDescription(t('Optional on/off value when this fact is itself a flag (e.g. "opted out of marketing email" = TRUE). Leave empty for facts that are just prose with no boolean shape.'))
-      ->setSetting('on_label', t('True'))
-      ->setSetting('off_label', t('False'))
-      ->setDisplayConfigurable('form', TRUE)
-      ->setDisplayOptions('form', ['type' => 'options_buttons', 'weight' => 35]);
-
     $fields['retired'] = BaseFieldDefinition::create('timestamp')
       ->setLabel(t('Retired'))
       ->setDescription(t('When set, this fact is out of retrieval. Set by consolidation and the Retire action instead of deleting the fact outright, to preserve an audit trail.'));

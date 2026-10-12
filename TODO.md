@@ -513,33 +513,20 @@ questions" section)
       one class. Verified live instead - see ADR-0017's "Built
       2026-09-27". Whatever sets up `tests/src/Kernel` first should cover
       this too.
-- [ ] Bulk actions for `state` and `category` on the admin facts view -
-      deliberately not built (2026-09-30) because neither field is in use
-      yet. `trusted`/retire/un-retire have them
-      (`src/Plugin/Action/`, `system.action.aim_fact_*`). `state` is three
-      plain field-set actions (true/false/unset); `category` needs a
-      configurable action with a term form (add/replace/clear), so it is
-      the larger job. Revisit when either field starts being populated.
-- [ ] Fast-path lookup for typed facts (`state`, `category`), bypassing
-      `recall()`'s vector search entirely. Both fields are exact-match
-      (scope+subject), not fuzzy semantic - but everything, including a
-      plain boolean check, currently pays `recall()`'s full
-      embed-query-then-vector-search cost (33-540ms, see "Benchmarking").
-      Needs a second retrieval method (e.g.
-      `AimMemoryManager::getState($scope, $subject)`) doing a direct
-      indexed `WHERE` query against `aim_fact`, optionally behind a Cache
-      API layer (keyed scope+subject, invalidated on save) for a true
-      page-load hot path (e.g. "should this user see the marketing
-      banner"). Originally motivated by a 2026-09-09 question about a "warm
-      state cache for booleans" - not designed. Partly superseded
-      2026-10-01 by [ADR-0032](adr/0032-dated-category-listing-for-quick-notes.md)'s
-      `listFacts()` (same non-vector query, category/date filters):
-      build that first, add a `state` filter to it, and only then decide
-      whether the Cache API layer is still wanted. Also open: `state`
-      duplicates what the fact text already says and nothing reads it
-      (recall() just echoes it), so if no consumer for the hot-path
-      lookup appears, drop the field rather than keep a column that can
-      silently disagree with its text.
+- [ ] Bulk actions for `category` on the admin facts view - deliberately
+      not built (2026-09-30) because the field is not in use yet.
+      `trusted`/retire/un-retire have them (`src/Plugin/Action/`,
+      `system.action.aim_fact_*`). `category` needs a configurable action
+      with a term form (add/replace/clear). Revisit when it starts being
+      populated. (`state` was removed 2026-10-12.)
+- [ ] Fast-path lookup for `category`, bypassing `recall()`'s vector
+      search. `category` is exact-match, but everything currently pays
+      `recall()`'s embed-then-search cost (33-540ms, see "Benchmarking").
+      [ADR-0032](adr/0032-dated-category-listing-for-quick-notes.md)'s
+      `listFacts()` is the non-vector query; build that first, then decide
+      whether a Cache API layer (keyed scope+subject, invalidated on save)
+      is still wanted. The boolean `state` field this was originally
+      motivated by was removed 2026-10-12 (nothing read it).
 - [ ] Upstream work for `AimMariaDBProvider`'s overrides (status checked
       against drupal.org and the git history 2026-09-27; the provider project
       has only 6 issues):

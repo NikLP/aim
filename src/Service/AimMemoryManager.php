@@ -872,8 +872,6 @@ class AimMemoryManager {
    *   one and stamps it onto the created fact.
    * @param string|null $source
    *   Provenance tag for this fact.
-   * @param bool|null $state
-   *   Optional boolean flag value. NULL for facts with no boolean shape.
    * @param string[] $category
    *   Category term names to resolve against the aim_category vocabulary.
    *   A name with no matching term is skipped, not created.
@@ -910,7 +908,7 @@ class AimMemoryManager {
    *   If scope is invalid, scope=user and subject does not resolve to a real
    *   account, or the text fails a guardrail check.
    */
-  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, ?bool $state = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL, ?int $expires = NULL): AimFact {
+  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL, ?int $expires = NULL): AimFact {
     $allowed = $this->allowedScopes();
     if (!in_array($scope, $allowed, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
@@ -948,10 +946,6 @@ class AimMemoryManager {
     }
     else {
       $values['subject'] = $subject;
-    }
-
-    if ($state !== NULL) {
-      $values['state'] = $state;
     }
 
     if (!empty($category)) {
@@ -1221,7 +1215,7 @@ class AimMemoryManager {
    * a rejected guardrail) is recorded and skipped, never aborting the rest.
    *
    * @param array $entries
-   *   Fact objects with the keys text, scope, subject, source, state,
+   *   Fact objects with the keys text, scope, subject, source,
    *   category (string or array), asserted, target_type, target_id. Unknown
    *   keys are ignored.
    * @param string|null $defaultSource
@@ -1244,13 +1238,12 @@ class AimMemoryManager {
         continue;
       }
       try {
-        [$state, $category, $asserted] = $this->parseFactFields($entry);
+        [$category, $asserted] = $this->parseFactFields($entry);
         $created[$i] = $this->remember(
           $entry['text'],
           $entry['scope'],
           $entry['subject'] ?? NULL,
           $entry['source'] ?? $defaultSource,
-          $state,
           $category,
           $asserted,
           NULL,
@@ -1267,26 +1260,18 @@ class AimMemoryManager {
   }
 
   /**
-   * Parses the state/category/asserted fields of a fact entry.
+   * Parses the category/asserted fields of a fact entry.
    *
    * @param array $fields
    *   Raw values, from a command line or a decoded JSON entry.
    *
    * @return array
-   *   [$state, $category, $asserted], typed as remember() expects them.
+   *   [$category, $asserted], typed as remember() expects them.
    *
    * @throws \InvalidArgumentException
-   *   If state or asserted cannot be parsed.
+   *   If asserted cannot be parsed.
    */
   public function parseFactFields(array $fields): array {
-    $state = NULL;
-    if (($fields['state'] ?? NULL) !== NULL) {
-      $state = filter_var($fields['state'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-      if ($state === NULL) {
-        throw new \InvalidArgumentException('Invalid state "' . $fields['state'] . '", expected true or false.');
-      }
-    }
-
     $category = [];
     if (!empty($fields['category'])) {
       $category = is_array($fields['category']) ? $fields['category'] : explode(',', $fields['category']);
@@ -1301,7 +1286,7 @@ class AimMemoryManager {
       }
     }
 
-    return [$state, $category, $asserted];
+    return [$category, $asserted];
   }
 
   /**
@@ -1416,7 +1401,7 @@ class AimMemoryManager {
    *
    * @return array
    *   A list of rows, each with keys id, score, scope, subject, text,
-   *   source, state, trusted, created, asserted (a timestamp, or NULL when
+   *   source, trusted, created, asserted (a timestamp, or NULL when
    *   never set; see formatFactLine()). Retired facts are never returned, so
    *   there is no retired key. score is what search_api reports for the
    *   match, which for ai_vdb_provider_mariadb is MariaDB's
@@ -1521,7 +1506,6 @@ class AimMemoryManager {
         'subject' => $this->scopeRequiresAccount($fact->bundle()) ? $fact->get('user')->target_id : $fact->get('subject')->value,
         'text' => $text,
         'source' => $fact->get('source')->value,
-        'state' => $fact->get('state')->value,
         'trusted' => (bool) $fact->get('trusted')->value,
         'created' => (int) $fact->get('created')->value,
         'asserted' => $fact->get('asserted')->isEmpty() ? NULL : (int) $fact->get('asserted')->value,
@@ -2113,8 +2097,8 @@ class AimMemoryManager {
    *
    * Identity (scope, subject/user, target) comes from the kept fact, since
    * both inputs share it. Metadata is reconciled deliberately: text is the
-   * guardrail-checked merge; asserted is the candidate's only; state and
-   * source prefer the candidate (the newer statement) and fall back to the
+   * guardrail-checked merge; asserted is the candidate's only; source
+   * prefers the candidate (the newer statement) and falls back to the
    * kept fact;
    * category is the union; trusted only if both inputs were; the owner is
    * the kept fact's.
@@ -2148,7 +2132,7 @@ class AimMemoryManager {
     if (!$candidate->get('asserted')->isEmpty()) {
       $values['asserted'] = $candidate->get('asserted')->value;
     }
-    foreach (['state', 'source'] as $field) {
+    foreach (['source'] as $field) {
       $source = !$candidate->get($field)->isEmpty() ? $candidate : $kept;
       if (!$source->get($field)->isEmpty()) {
         $values[$field] = $source->get($field)->value;

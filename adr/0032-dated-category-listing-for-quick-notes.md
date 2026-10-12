@@ -101,7 +101,8 @@ What is actually missing:
 - **Staleness.** A past appointment is still a true fact. Decide
   whether the list method hides facts whose `asserted` is in the past by
   default (an "upcoming" mode) or leaves that to the caller's range.
-- **Does `state` earn its place?** The tri-state boolean is stored on
+- **Does `state` earn its place?** Resolved 2026-10-12: removed
+  (`aim_update_10009()`), no consumer having appeared. Original reasoning: The tri-state boolean is stored on
   the fact but nothing reads it (`recall()` only echoes it, no bulk
   actions, no UI in use), and it duplicates what the fact text already
   says, so the two can disagree. Its one stated purpose, an exact-match

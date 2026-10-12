@@ -23,7 +23,7 @@ worth remembering - no extraction LLM round-trip. See
 alongside `extract()`.
 
 ```bash
-drush aim:remember <text> [--scope] [--subject] [--source] [--state] [--category] [--asserted] [--target-type] [--target-id]
+drush aim:remember <text> [--scope] [--subject] [--source] [--category] [--asserted] [--target-type] [--target-id]
 ```
 
 - Validates scope, creates the fact directly, prints its ID.
@@ -137,7 +137,7 @@ is auditable and reversible with the Un-retire action (which also clears
 - `UPDATE`: a **new merged fact** is created and both inputs are retired
   pointing at it. The old wording survives on the retired rows. Metadata
   carried over: scope, subject/user, target and owner from the kept fact;
-  `asserted` from the candidate only; `state`/`source` from the candidate
+  `asserted` from the candidate only; `source` from the candidate
   else the kept fact; `category` the union; `trusted` only if both inputs
   were. The merged fact is queued for consolidation like any new fact.
 - `superseded_by_reason` (on the retired candidate's row only; JSON,
@@ -464,7 +464,7 @@ autowiring)
 Central service backing every write/read path. Key public methods:
 
 - `remember(string $text, ?string $scope, ?string $subject, ?string
-  $source, ?bool $state, ...): AimFact` - validated direct write. The
+  $source, ...): AimFact` - validated direct write. The
   created fact's `trusted` field is not set here - it takes
   `aim.settings:default_trusted` via `AimFact::getDefaultTrusted()`, a
   base field default value callback, so every creation path (this,

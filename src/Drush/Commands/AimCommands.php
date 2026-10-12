@@ -148,7 +148,6 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'scope', description: 'One of user, role, site, case.')]
   #[CLI\Option(name: 'subject', description: 'Who or what the fact is about. For scope=user, a uid of a real account.')]
   #[CLI\Option(name: 'source', description: 'Provenance tag for this fact.')]
-  #[CLI\Option(name: 'state', description: 'Optional boolean flag value: true or false. Omit for facts with no boolean shape.')]
   #[CLI\Option(name: 'category', description: 'Comma-separated term name(s) from the aim_category vocabulary.')]
   #[CLI\Option(name: 'asserted', description: 'When this fact became true in reality, if different from now.')]
   #[CLI\Option(name: 'expires', description: 'Calendar date (YYYY-MM-DD) the fact stops being true; it is retired after that day.')]
@@ -164,7 +163,6 @@ final class AimCommands extends DrushCommands {
       'scope' => NULL,
       'subject' => NULL,
       'source' => NULL,
-      'state' => NULL,
       'category' => NULL,
       'asserted' => NULL,
       'expires' => NULL,
@@ -192,8 +190,8 @@ final class AimCommands extends DrushCommands {
     }
 
     try {
-      [$state, $category, $asserted] = $this->memoryManager->parseFactFields($options);
-      $fact = $this->memoryManager->remember($text, $options['scope'], $options['subject'], $options['source'], $state, $category, $asserted, NULL, $options['target-type'], $options['target-id'], expires: $this->memoryManager->parseExpires($options));
+      [$category, $asserted] = $this->memoryManager->parseFactFields($options);
+      $fact = $this->memoryManager->remember($text, $options['scope'], $options['subject'], $options['source'], $category, $asserted, NULL, $options['target-type'], $options['target-id'], expires: $this->memoryManager->parseExpires($options));
     }
     catch (\InvalidArgumentException $e) {
       $this->io()->error($e->getMessage());
@@ -216,7 +214,7 @@ final class AimCommands extends DrushCommands {
    * @param string $file
    *   Path to a JSON file containing an array of fact objects. Each object
    *   uses the same field names as aim:remember's own options (text,
-   *   scope, subject, source, state, category, asserted, target_type,
+   *   scope, subject, source, category, asserted, target_type,
    *   target_id); category may be a JSON array instead of a
    *   comma-separated string.
    */
@@ -312,11 +310,10 @@ final class AimCommands extends DrushCommands {
       $row['subject'],
       $row['text'],
       $row['source'],
-      $row['state'] === NULL ? '' : ($row['state'] ? 'true' : 'false'),
       $row['trusted'] ? 'true' : 'false',
       gmdate('Y-m-d', (int) ($row['asserted'] ?: $row['created'])),
     ], $rows);
-    $this->io()->table(['ID', 'Distance', 'Scope', 'Subject', 'Text', 'Source', 'State', 'Trusted', 'Date'], $table_rows);
+    $this->io()->table(['ID', 'Distance', 'Scope', 'Subject', 'Text', 'Source', 'Trusted', 'Date'], $table_rows);
   }
 
   /**
