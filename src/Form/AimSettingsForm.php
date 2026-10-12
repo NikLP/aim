@@ -80,67 +80,14 @@ final class AimSettingsForm extends ConfigFormBase {
   public function buildForm(array $form, FormStateInterface $form_state): array {
     $form['settings_tabs'] = [
       '#type' => 'vertical_tabs',
-      '#default_tab' => 'edit-consolidation',
-    ];
-    $form['consolidation'] = [
-      '#type' => 'details',
-      '#group' => 'settings_tabs',
-      '#title' => $this->t('Consolidation'),
-      '#description' => $this->t("Cosine-distance values from the vector index (0 is identical, larger is less similar). These are specific to the current embeddings model and should be re-checked after any change to the vector server's embeddings engine."),
-      '#open' => TRUE,
-    ];
-    $form['consolidation']['merge_verify'] = [
-      '#type' => 'checkbox',
-      '#title' => $this->t('Verify merged text with a model'),
-      '#description' => $this->t('Before an UPDATE merge is accepted, a model confirms every detail of both facts survives. A failing merge is downgraded to ADD (keep both). Checks faithfulness to the inputs, not real-world truth.'),
-      '#config_target' => 'aim.settings:merge_verify',
-    ];
-    $form['consolidation']['auto_threshold'] = [
-      '#type' => 'number',
-      '#title' => $this->t('Auto-merge threshold'),
-      '#description' => $this->t('Distance at or below which a candidate fact is retired as a duplicate automatically, no LLM call.'),
-      '#config_target' => 'aim.settings:auto_threshold',
-      '#min' => 0,
-      '#max' => 1,
-      '#step' => 0.001,
-      '#required' => TRUE,
-    ];
-    $form['consolidation']['ambiguous_threshold'] = [
-      '#type' => 'number',
-      '#title' => $this->t('Ambiguous threshold'),
-      '#description' => $this->t('Distance at or below which a candidate fact gets a single LLM classification call (ADD/UPDATE/RETIRE/NOOP). Above this, facts are left alone at zero cost. Must be greater than the auto-merge threshold.'),
-      '#config_target' => 'aim.settings:ambiguous_threshold',
-      '#min' => 0,
-      '#max' => 1,
-      '#step' => 0.001,
-      '#required' => TRUE,
-    ];
-    $form['consolidation']['neighbor_limit'] = [
-      '#type' => 'number',
-      '#title' => $this->t('Neighbors compared per fact'),
-      '#description' => $this->t("How many of a fact's nearest neighbors consolidation compares it against, nearest first. 1 only ever checks the single closest fact, so a contradiction that is not the closest is missed. Each neighbor inside the ambiguous band can cost one LLM call."),
-      '#config_target' => 'aim.settings:neighbor_limit',
-      '#min' => 1,
-      '#max' => 10,
-      '#step' => 1,
-      '#required' => TRUE,
-    ];
-
-    $form['consolidation']['merge_max_distance'] = [
-      '#type' => 'number',
-      '#title' => $this->t('Maximum merged-to-input distance'),
-      '#description' => $this->t('Cosine distance within which the merged text must sit from each input embedding, else the merge is downgraded to ADD. 0 disables. Unmeasured: leave at 0 until calibrated.'),
-      '#config_target' => 'aim.settings:merge_max_distance',
-      '#min' => 0,
-      '#max' => 1,
-      '#step' => 0.001,
+      '#default_tab' => 'edit-models',
     ];
 
     $form['models'] = [
       '#type' => 'details',
       '#group' => 'settings_tabs',
       '#title' => $this->t('Models'),
-      '#description' => $this->t('The backend and model each activity uses. Chat default follows the site-wide default chat provider; a decision backend needs an explicit model. A Drush --provider/--model option still overrides these.'),
+      '#description' => $this->t('The backend and model each activity uses. Chat default follows the site-wide default chat provider; a decision backend needs an explicit model.'),
       '#open' => TRUE,
       '#tree' => TRUE,
     ];
@@ -267,6 +214,59 @@ final class AimSettingsForm extends ConfigFormBase {
       }
     }
 
+    $form['consolidation'] = [
+      '#type' => 'details',
+      '#group' => 'settings_tabs',
+      '#title' => $this->t('Consolidation'),
+      '#description' => $this->t("Cosine-distance values from the vector index (0 is identical, larger is less similar). These are specific to the current embeddings model and should be re-checked after any change to the vector server's embeddings engine."),
+      '#open' => TRUE,
+    ];
+    $form['consolidation']['merge_verify'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Verify merged text with a model'),
+      '#description' => $this->t('Before an UPDATE merge is accepted, a model confirms every detail of both facts survives. A failing merge is downgraded to ADD (keep both). Checks faithfulness to the inputs, not real-world truth.'),
+      '#config_target' => 'aim.settings:merge_verify',
+    ];
+    $form['consolidation']['auto_threshold'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Auto-merge threshold'),
+      '#description' => $this->t('Distance at or below which a candidate fact is retired as a duplicate automatically, no LLM call.'),
+      '#config_target' => 'aim.settings:auto_threshold',
+      '#min' => 0,
+      '#max' => 1,
+      '#step' => 0.001,
+      '#required' => TRUE,
+    ];
+    $form['consolidation']['ambiguous_threshold'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Ambiguous threshold'),
+      '#description' => $this->t('Distance at or below which a candidate fact gets a single LLM classification call (ADD/UPDATE/RETIRE/NOOP). Above this, facts are left alone at zero cost. Must be greater than the auto-merge threshold.'),
+      '#config_target' => 'aim.settings:ambiguous_threshold',
+      '#min' => 0,
+      '#max' => 1,
+      '#step' => 0.001,
+      '#required' => TRUE,
+    ];
+    $form['consolidation']['neighbor_limit'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Neighbors compared per fact'),
+      '#description' => $this->t("How many of a fact's nearest neighbors consolidation compares it against, nearest first. 1 only ever checks the single closest fact, so a contradiction that is not the closest is missed. Each neighbor inside the ambiguous band can cost one LLM call."),
+      '#config_target' => 'aim.settings:neighbor_limit',
+      '#min' => 1,
+      '#max' => 10,
+      '#step' => 1,
+      '#required' => TRUE,
+    ];
+    $form['consolidation']['merge_max_distance'] = [
+      '#type' => 'number',
+      '#title' => $this->t('Maximum merged-to-input distance'),
+      '#description' => $this->t('Cosine distance within which the merged text must sit from each input embedding, else the merge is downgraded to ADD. 0 disables. Unmeasured: leave at 0 until calibrated.'),
+      '#config_target' => 'aim.settings:merge_max_distance',
+      '#min' => 0,
+      '#max' => 1,
+      '#step' => 0.001,
+    ];
+
     $form['recall'] = [
       '#type' => 'details',
       '#group' => 'settings_tabs',
@@ -308,6 +308,38 @@ final class AimSettingsForm extends ConfigFormBase {
       '#config_target' => 'aim.settings:default_trusted',
     ];
 
+    $form['prompts'] = [
+      '#type' => 'details',
+      '#group' => 'settings_tabs',
+      '#title' => $this->t('Prompts'),
+      '#description' => $this->t('The instruction text sent to the chat provider for extraction and consolidation. The requested output shape (the ADD/UPDATE/RETIRE/NOOP decision enum, the scope enum) is enforced by a structured-output JSON schema in code, not by this text - editing the prose below changes how the model reasons, not what fields it must return.'),
+      '#open' => FALSE,
+    ];
+    $form['prompts']['extraction_prompt'] = [
+      '#type' => 'textarea',
+      '#title' => $this->t('Extraction prompt'),
+      '#description' => $this->t('Used by <code>aim:extract</code>. Must contain the placeholder <code>{text}</code>, replaced with the source text being extracted from.'),
+      '#config_target' => 'aim.settings:extraction_prompt',
+      '#rows' => 14,
+      '#required' => TRUE,
+    ];
+    $form['prompts']['consolidation_prompt'] = [
+      '#type' => 'textarea',
+      '#title' => $this->t('Consolidation prompt'),
+      '#description' => $this->t('Used by <code>aim:consolidate</code> and the automated consolidation queue worker, for pairs that fall in the ambiguous band. Must contain the placeholders <code>{kept_text}</code> (the established fact) and <code>{candidate_text}</code> (the newer fact being evaluated against it).'),
+      '#config_target' => 'aim.settings:consolidation_prompt',
+      '#rows' => 14,
+      '#required' => TRUE,
+    ];
+    $form['prompts']['merge_prompt'] = [
+      '#type' => 'textarea',
+      '#title' => $this->t('Merge writer prompt'),
+      '#description' => $this->t('Used only when the consolidation classifier is a decision model, which cannot write text: the site default chat model writes the merged fact from this prompt. Must contain <code>{kept_text}</code> and <code>{candidate_text}</code>.'),
+      '#config_target' => 'aim.settings:merge_prompt',
+      '#rows' => 8,
+      '#required' => TRUE,
+    ];
+
     $form['logging'] = [
       '#type' => 'details',
       '#group' => 'settings_tabs',
@@ -345,38 +377,6 @@ final class AimSettingsForm extends ConfigFormBase {
       '#title' => $this->t('Show redacted facts (debug)'),
       '#description' => $this->t('A fact that names a literal the viewer cannot read is normally withheld from recall() whole. When on, it is returned with <code>[redacted]</code> in place of the value, so you can see what is being hidden and why. Leave off in production: the gap reveals that a restricted value exists.'),
       '#config_target' => 'aim.settings:show_redacted_facts',
-    ];
-
-    $form['prompts'] = [
-      '#type' => 'details',
-      '#group' => 'settings_tabs',
-      '#title' => $this->t('Prompts'),
-      '#description' => $this->t('The instruction text sent to the chat provider for extraction and consolidation. The requested output shape (the ADD/UPDATE/RETIRE/NOOP decision enum, the scope enum) is enforced by a structured-output JSON schema in code, not by this text - editing the prose below changes how the model reasons, not what fields it must return.'),
-      '#open' => FALSE,
-    ];
-    $form['prompts']['extraction_prompt'] = [
-      '#type' => 'textarea',
-      '#title' => $this->t('Extraction prompt'),
-      '#description' => $this->t('Used by <code>aim:extract</code>. Must contain the placeholder <code>{text}</code>, replaced with the source text being extracted from.'),
-      '#config_target' => 'aim.settings:extraction_prompt',
-      '#rows' => 14,
-      '#required' => TRUE,
-    ];
-    $form['prompts']['consolidation_prompt'] = [
-      '#type' => 'textarea',
-      '#title' => $this->t('Consolidation prompt'),
-      '#description' => $this->t('Used by <code>aim:consolidate</code> and the automated consolidation queue worker, for pairs that fall in the ambiguous band. Must contain the placeholders <code>{kept_text}</code> (the established fact) and <code>{candidate_text}</code> (the newer fact being evaluated against it).'),
-      '#config_target' => 'aim.settings:consolidation_prompt',
-      '#rows' => 14,
-      '#required' => TRUE,
-    ];
-    $form['prompts']['merge_prompt'] = [
-      '#type' => 'textarea',
-      '#title' => $this->t('Merge writer prompt'),
-      '#description' => $this->t('Used only when the consolidation classifier is a decision model, which cannot write text: the site default chat model writes the merged fact from this prompt. Must contain <code>{kept_text}</code> and <code>{candidate_text}</code>.'),
-      '#config_target' => 'aim.settings:merge_prompt',
-      '#rows' => 8,
-      '#required' => TRUE,
     ];
 
     return parent::buildForm($form, $form_state);
