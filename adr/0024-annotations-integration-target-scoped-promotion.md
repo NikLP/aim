@@ -119,7 +119,7 @@ entity and site subjects.
   drift detection. See also
   [ADR-0043](0043-content-truth-drift-audit.md), which checks published
   content against facts and needs no Annotations dependency.
-- **Gist.** [ADR-0053](0053-gist-shared-vocabulary.md) (body in annopm
+- **Gist.** [ADR-0049](0049-finder-family-parked.md) section D (body in annopm
   ADR-028) defines a shared "gist" field; an annotation's gist can prefill a
   literal's gist ([ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)).
   Annotations attaches at bundle and field granularity, so this is limited

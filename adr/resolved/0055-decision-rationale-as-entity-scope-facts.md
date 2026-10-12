@@ -1,6 +1,8 @@
 # ADR-0055: Decision rationale as entity-scope facts - validate before building a `decision` entity
 
-**Status:** Proposed - concept and validation test only, nothing built.
+**Status:** Retired 2026-10-12 (parked) - the validation test was never run and
+nothing is built; revisit trigger in TODO.md. Was: Proposed, concept and
+validation test only.
 **Date:** 2026-10-08
 
 ## Context

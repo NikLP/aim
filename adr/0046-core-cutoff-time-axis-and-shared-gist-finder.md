@@ -75,51 +75,23 @@ plugins.
 Procedural memory is, until a learned-practice use case exists, covered by
 ADR-0035 (authored rules), so it is not a core concern.
 
-### 4. Literals become a standalone module
+### 4. Literals become a standalone module (done)
 
-**Done:** literals shipped as a standalone module with no `scope=literal`
-and no mirror of gists into `aim_fact`; `aim` consumes literals through
-`[literal:key]` tokens at recall and the `aim_literal` tool, not the finder
-(ADR-0040 section 9, ADR-0052 addendum). The text below is the original
-proposal. Today a literal's gist is mirrored into an `aim_fact` with
-`scope=literal`, so literals depend on aim. Invert it:
+Literals shipped standalone: no `scope=literal`, no mirror of gists into
+`aim_fact`. `aim` consumes them through `[literal:key]` tokens at recall and
+the `aim_literal` tool, not the finder
+([ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
+section 9, [ADR-0052](../../literals/adr/0052-what-literals-is-for.md)). The
+finder as a recall source is not built.
 
-- **Standalone:** literals depend on Search API / `ai_search` (for the gist
-  index) and Tool API, not on aim. The chooser model is optional.
-- **Optional bridge:** aim can include literals in recall when both are
-  installed (built as tokens plus the `aim_literal` tool; the finder as a
-  recall source is not built).
-- **Agent-facing contract:** a Tool API tool whose description is the
-  trigger ("the user wants an exact value that cannot be inferred"). The
-  agent gets a deterministic path to the value instead of relying on fuzzy
-  recall. This is exact lookup with a fuzzy address, not a reduced aim.
+### 5. One shared gist finder (became `literals_finder` and ADR-0049)
 
-### 5. One shared gist finder
-
-**Outcome:** the finder exists as `literals_finder` (a Decision API chooser
-over the whole menu; the vector shortlist was built and removed, ADR-0040).
-The tool picker and meaning navigator are parked in
-[ADR-0049](0049-finder-family-parked.md). The original proposal follows.
-
-A gist is a short natural-language statement of what a thing is for,
-embedded so it can be shortlisted. The same finder serves any registered
-item:
-
-1. **Register** an item with an id, a gist, and an access check.
-2. **Shortlist** by vector similarity, dropping anything the caller cannot
-   access (before any model sees it).
-3. **Choose** (optional) with a probabilistic check: given the query and the
-   shortlist, which item best fits, or ambiguous / none.
-
-Registrants:
-
-- **Literals:** gist describes which value a question means.
-- **Tool picker:** given a list of tools, use a probabilistic check to
-  determine which one likely best fits. A tool's description is already a
-  gist; the picker is this finder pointed at tool definitions.
-
-The service holds no domain data. Whether it lives in literals, in its own
-small module, or in aim is open (see below).
+The finder exists as `literals_finder` (a Decision API chooser over the whole
+menu; the vector shortlist was built and removed, ADR-0040). The tool picker
+and meaning navigator are parked in
+[ADR-0049](0049-finder-family-parked.md), which also holds the gist
+vocabulary. The original proposal (register an item with id, gist and access
+check; shortlist by vector; choose probabilistically) is in git history.
 
 ## Background: memory kinds (formerly ADR-0045, merged 2026-10-08)
 
@@ -169,18 +141,11 @@ exercised by a real caller before anything else is added.
   field stays deferred (see Background).
 - `recall()` gains time parameters; the write tools expose the verbatim
   flag; both are additive.
-- ADR-0040 needs an addendum for piece 4, and its finder design is the
-  basis for piece 5.
 - The cutoff rule gives a single question to ask of any new idea: does it
   change write or retrieval for every scope?
 
 ## Open questions
 
-- Where does the shared gist finder live: literals, its own module, or aim?
-  (Leaning its own small module, so literals and the tool picker both
-  depend on it without depending on each other or on aim.)
-- Is the tool picker needed beyond Tool API's own tool selection, or only
-  useful when the tool list is large?
 - Should recency weighting be per-call, per-scope, or a site setting?
 - Does anything need a hard event timestamp distinct from `asserted`
   (e.g. duration), or is one time field enough?

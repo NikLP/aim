@@ -174,7 +174,7 @@ Still to write, in this order:
 ## Literals: automated tests (C), when the module exists
 
 - No candidate the caller cannot view reaches the chooser or the result
-  (access filter runs first, ADR-0040 "The finder and the chooser").
+  (access filter runs first, ADR-0040 "The parts, settled").
 - Tokens check view access and carry cache contexts and tags; a cached page
   never serves a staff value to another user; only the published revision
   resolves.

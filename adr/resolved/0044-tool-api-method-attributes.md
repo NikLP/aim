@@ -1,9 +1,10 @@
 # ADR-0044: Tool API method attributes - watch the upstream MR, shape new tools to adopt it
 
-**Status:** Proposed 2026-10-04 - a watching brief, nothing built and no
-change to `aim_tool` yet. Touches [ADR-0013](resolved/0013-mcp-tool-exposure.md)
-(Tool API/MCP exposure) and [ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
-"Tool, search and lookup modes" (the literal agent tools).
+**Status:** Retired 2026-10-12 - a watching brief, not a decision; the
+revisit trigger is in TODO.md. Was: Proposed 2026-10-04, nothing built and no
+change to `aim_tool`. Touches [ADR-0013](0013-mcp-tool-exposure.md)
+(Tool API/MCP exposure) and [ADR-0040](../../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
+"The parts, settled" (the literal agent tools).
 **Date:** 2026-10-04
 
 ## Context
@@ -52,11 +53,11 @@ Do not change `aim_tool` now. The API is unmerged and unstable, and
    with only the intended members, which is also what the MR's
    members-only rule wants.
 3. **Registration inputs cannot carry a value.** `literal_register`
-   accepts gist and pointer only (ADR-0040, "Tool, search and lookup modes"), so the signature
+   accepts gist and pointer only (ADR-0040, "The parts, settled"), so the signature
    itself enforces "agents never enter values".
 4. **Access stays explicit and layered.** Even with `op: 'view'` on an
    entity input, the finder still drops unviewable candidates before the
-   chooser sees them (ADR-0040, "The finder and the chooser"); the tool boundary check is a
+   chooser sees them (ADR-0040, "The parts, settled"); the tool boundary check is a
    second layer, not a replacement.
 5. **Revisit when a piece lands**, in this order of likely value: typed
    `__invoke()` on existing plugins (would trim `AimRecall`/`AimRemember`

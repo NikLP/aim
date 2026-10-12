@@ -9,14 +9,13 @@ The Active table is one list; these are the threads running through it.
 - **Literals and the finder** - [0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md),
   [0048](../../literals/adr/0048-token-literal-access-and-entity-targets.md),
   [0052](../../literals/adr/0052-what-literals-is-for.md) (how aim uses
-  literals, answer modes), [0053](0053-gist-shared-vocabulary.md),
+  literals, answer modes),
   [0046](0046-core-cutoff-time-axis-and-shared-gist-finder.md); parked
-  extensions in [0049](0049-finder-family-parked.md).
+  extensions and the gist vocabulary in [0049](0049-finder-family-parked.md).
 - **Annotations bridge** (prerequisites cleared 2026-10-11, bridge module
   unbuilt; the WebMCP direction may supersede part of it) -
   [0024](0024-annotations-integration-target-scoped-promotion.md) (with the
-  former 0041 and 0042), [0043](0043-content-truth-drift-audit.md),
-  [0053](0053-gist-shared-vocabulary.md).
+  former 0041 and 0042), [0043](0043-content-truth-drift-audit.md).
 - **Write-path gate and decision models** -
   [0002](0002-governance-deferred-guardrails-mandatory.md),
   [0037](resolved/0037-transient-source-passages-for-grounding.md) (the grounded check, built 2026-10-11, with the gate semantics of the former 0033),
@@ -25,7 +24,7 @@ The Active table is one list; these are the threads running through it.
   [0035](0035-standing-constraints-action-gate.md),
   [0036](0036-memory-algorithm-appraisal.md) (research).
 - **Chat, tools and front ends** - [0008](0008-chatbot-integration-mechanism.md)
-  (with the split-assistants addendum), [0044](0044-tool-api-method-attributes.md),
+  (with the split-assistants addendum), [0044](resolved/0044-tool-api-method-attributes.md),
   [0016](0016-document-ingestion-ui.md), [0029](0029-context-carrying-turns.md).
 
 ## Active
@@ -48,15 +47,11 @@ Still carrying work, proposed, or deferred.
 | [0036](0036-memory-algorithm-appraisal.md) | Memory algorithm appraisal: what to borrow from the literature (recency/importance re-rank, RRF, decay), and what aim does badly | Proposed 2026-10-02 - research only, nothing built |
 | [0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md) | Literals: a standalone `literal` entity (name, key, value, gist, type, restricted flag) found by a decision-model chooser over the whole menu; values never reach the model; `aim` consumes the finder, no scope or mirror | Accepted, built through finder/tool/search; rewritten 2026-10-07 as current state (history in git); supersedes 0039 |
 | [0043](0043-content-truth-drift-audit.md) | Content-versus-truth drift audit: live facts as an independent reference, a typed decision flags published content that contradicts them, human resolves | Proposed 2026-10-04 - design only, not built; needs a content index and a measured false-positive rate |
-| [0044](0044-tool-api-method-attributes.md) | Tool API method attributes (drupal/tool MR 162): watch upstream, design new tools as typed service methods with explicit value objects | Proposed 2026-10-04 - watching brief, nothing built |
 | [0046](0046-core-cutoff-time-axis-and-shared-gist-finder.md) | Where core stops: time as a retrieval axis instead of a `kind`, sibling modules for other semantics, literals standalone; absorbs the former 0045 (memory kinds: `aim_fact` is semantic by design, defer a `kind` field) | Proposed 2026-10-04, updated 2026-10-08 - pieces 1-3 design only; 4 done, 5 became `literals_finder` + 0049 |
-| [0048](../../literals/adr/0048-token-literal-access-and-entity-targets.md) | Token literals resolve for the asking account (no session leak, built); entity tokens via an explicit, access-checked entity target (proposed) | Part A built 2026-10-05; Part B proposed |
-| [0049](0049-finder-family-parked.md) | The finder family (merged 2026-10-08 from 0049/0050/0051): an inline `@` picker over pluggable providers, a Jev-driven meaning navigator choosing by gist, and a tool picker; model only picks from an enumerated, access-filtered list | Parked 2026-10-08 - design only, nothing built; WebMCP may supersede the widget half |
-| [0052](../../literals/adr/0052-what-literals-is-for.md) | What literals is for and not: find-and-gate layer for things, not a chat-cost trick; the large model is the gate, finder optional; menu/page candidates instead of a second sitemap; `{label, url}` results | Proposed 2026-10-06 - decision record; `{label, url}` results built 2026-10-07; rewritten 2026-10-11 with how aim uses literals folded in (tokens at recall and `aim_literal` built; convert-a-fact, finder as recall source, answer modes unbuilt) |
-| [0053](0053-gist-shared-vocabulary.md) | "Gist" as a separate searchable field, shared by annotations and literals: definition, provenance (fuzzy-trace, ReadAgent), find-by-gist, factoring the finder | Proposed 2026-10-04 - design only, not built; body in annopm ADR-028, summarized here |
+| [0049](0049-finder-family-parked.md) | The finder family (merged 2026-10-08 from 0049/0050/0051): an inline `@` picker over pluggable providers, a Jev-driven meaning navigator choosing by gist, and a tool picker; model only picks from an enumerated, access-filtered list ; absorbs the former 0053 (the gist vocabulary) | Parked 2026-10-08 - design only, nothing built; WebMCP may supersede the widget half |
+| [0052](../../literals/adr/0052-what-literals-is-for.md) | What literals is for and not: find-and-gate layer for things, not a chat-cost trick; the finder is the gate ahead of the chat model (measured 2026-10-12, unbuilt); menu/page candidates instead of a second sitemap; `{label, url}` results | Proposed 2026-10-06 - decision record; `{label, url}` results built 2026-10-07; rewritten 2026-10-11 with how aim uses literals folded in (tokens at recall and `aim_literal` built; convert-a-fact, finder as recall source, answer modes unbuilt) |
 | [0057](0057-dates-resolved-and-confirmed-before-write.md) | Dates resolved and confirmed before write: the chat assistant states the calendar date in its confirmation, fact text carries the date, an end date sets `expires` (plus the expiry sweep), extraction resolves against the document date, time-limited facts never UPDATE-merged into permanent ones | Proposed 2026-10-11 - design only |
 | [0056](0056-personal-data-write-gate.md) | No personal data stored unless authorised: refuse names and contact details at write time (patterns plus a decision-model check), authorised by `user` scope or a permission, never by a model; grounded check inline, no stored passages | Parked 2026-10-11 (proposed 2026-10-10) - design only; revisit later |
-| [0055](0055-decision-rationale-as-entity-scope-facts.md) | Decision rationale as entity-scope facts: validate against grep with existing `aim_fact` features before building a `decision` entity (from annopm ADR-022) | Proposed 2026-10-08 - validation test only, nothing built |
 
 ## Resolved
 
@@ -89,3 +84,6 @@ remains binding, it just has nothing left to build.
 | [0027](resolved/0027-entity-scope.md) | `scope: entity`: facts about an arbitrary Drupal entity, view access mirroring that entity's own | Built and verified 2026-09-29; remaining polish tracked in TODO.md |
 | [0028](resolved/0028-scope-type-plugin.md) | Widen the scope-access plugin into a scope-type plugin: fields, settings, and behavior in one seam | Built and verified 2026-09-29 (pieces 0-4) |
 | [0037](resolved/0037-transient-source-passages-for-grounding.md) | Grounded check: a decision model checks a candidate fact against the text it was written from, at write time, nothing stored; absorbs the gate semantics of the former 0033 | Built 2026-10-11 (shadow mode on this site); enforce decision, length cap and follow-ups in TODO.md |
+| [0044](resolved/0044-tool-api-method-attributes.md) | Tool API method attributes (drupal/tool MR 162): watch upstream | Retired 2026-10-12 - a watching brief, not a decision; revisit trigger in TODO.md |
+| [0048](../../literals/adr/0048-token-literal-access-and-entity-targets.md) | Token literals resolve for the asking account (no session leak); entity data via the entity, field and content resolvers, not a token target | Resolved 2026-10-12 - Part A built, Part B dropped |
+| [0055](resolved/0055-decision-rationale-as-entity-scope-facts.md) | Decision rationale as entity-scope facts: validate against grep before building a `decision` entity | Retired 2026-10-12 (parked) - test never run, nothing built; revisit trigger in TODO.md |

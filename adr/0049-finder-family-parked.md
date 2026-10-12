@@ -2,14 +2,14 @@
 
 **Status:** Parked 2026-10-08 - design only, nothing built, none of it
 needed now. Merges the former ADR-0049 (everything finder widget),
-ADR-0050 (meaning navigator) and ADR-0051 (tool picker) into one record;
-the old numbers 0050 and 0051 are retired. The browser-side idea
+ADR-0050 (meaning navigator), ADR-0051 (tool picker) and, from 2026-10-12,
+ADR-0053 (the gist vocabulary, section D) into one record; the old numbers
+0050, 0051 and 0053 are retired. The browser-side idea
 (WebMCP) may supersede much of the widget half; revisit before building
 any of it. Builds on
 [ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
 (the finder, literals as first provider), [ADR-0048](../../literals/adr/0048-token-literal-access-and-entity-targets.md)
-(per-account access on resolve) and [ADR-0053](0053-gist-shared-vocabulary.md)
-(the gist).
+(per-account access on resolve) and the gist vocabulary in section D.
 **Date:** 2026-10-05 (widget, navigator), 2026-10-06 (tool picker)
 
 ## The shared idea
@@ -165,3 +165,50 @@ already a gist, so this does not wait on Annotations.
 - **Open.** Fixed or caller-supplied k; separate menus for read-only and
   write tools; whether grouping by Tool API operation (explain, read,
   transform, trigger, write) fits better than by module.
+
+## D. The gist, a shared word (formerly ADR-0053)
+
+**Status:** Proposed 2026-10-04, design only, nothing built. The full body
+(provenance in fuzzy-trace theory and ReadAgent, the annotations-side changes,
+editor explanation, alternatives) is annopm ADR-028, not duplicated here; the
+annotations changes are dotdev-repo work, not aim work. For literal mechanics
+[ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
+and its addenda govern.
+
+Annotations and literals both need a word for a short natural-language
+description of a record's referent, used as its address: the **gist**.
+
+- **Annotations** add `gist` as an optional second field beside their main
+  guidance text (empty falls back to the main text). **Literals** have it from
+  day one, beside `value`, which stays the exact returned thing. Gist
+  describes a field in annotations and a value in literals.
+- **Operations are named by direction:** annotations read by target and find
+  by question; literals find by question and get by key.
+- **On a literal the gist is the only matched part.** Empty means "not
+  findable by question" (still reachable by key). It is authored, short,
+  stored on the literal row; not derived by default, not a separate entity,
+  not config.
+- **The gist is a delta on the stack's context.** The pool, key, name and
+  target already say what they say; the gist adds only what they do not
+  ("Telephone number", not "Telephone number in the contact pool"). Context
+  is assembled next to the gist at read time (the chooser sees key, pool
+  context, gist; values are never sent) and at write time (the form shows
+  the same context so authors write only the delta; assembling it must not
+  add the value to anything a hosted model sees).
+- **Annotations bridge:** a literal that points at an entity field may copy
+  that field's annotation gist once as a prefill, then keep its own (the
+  field's gist may need a one-line tweak for the value). A prefill, not a
+  live link; neither module requires the other.
+- **Derived gists:** suggesting one from pool, key, name and target is a
+  plausible opt-in with a human approving it, possibly through ADR-0040's
+  proposer review queue (undecided). Not part of the base design.
+- **Storage:** literal values are content, so the gist follows the row and
+  adds no config-versus-database cost; that trade-off is annotations' (help
+  text in field config).
+- **Factoring the finder:** `LiteralChooser` and the tiered finder were built
+  behind an interface; extract a shared module only when annotations gains
+  find-by-gist (two real consumers). Possible eventual home: a contribution
+  to `drupal/ai`.
+- **Open:** for pointer-kind literals, prefill the gist at creation only, or
+  offer a refresh when the annotation gist changes? Does the chooser's
+  context include the pool name, or is the pool boundary enough?

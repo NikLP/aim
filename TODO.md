@@ -28,7 +28,7 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       finder is not called from `aim_recall` (it was finder-first for a day).
       The on-site assistant gets the lookup tool through
       `tool_ai_connector` (`aim_literal` from 2026-10-10, see below); the
-      large model is the gate for one-shot lookups. `aim` depends on `literals`, not `literals_finder`.
+      large model is the gate for one-shot lookups today (a finder-first gate is planned, below). `aim` depends on `literals`, not `literals_finder`.
 - [x] **Review literal access (decided 2026-10-10: document and accept).**
       The literal's view rule and the resolver's route check can disagree
       (`/user/login` is anonymous-only, so a signed-in user gets `none`).
@@ -56,17 +56,60 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       failures are safe. Keep only if measured to pay (share of traffic
       removed against its own latency). The finder itself is already the
       gate for whether a literal fits.
-- [ ] **Measure the gate end to end (setup-dependent, later, with the
-      pre-gate):** cost and latency of gate-then-literal
-      against the large model doing the same lookup, on the same questions.
-      This decides whether literals saves anything (ADR-0052 decision 3).
+- [x] **Measure the gate end to end (first run 2026-10-12).**
+      `drush aim:chatbot-eval` (aim_chatbot) runs a gold set through the real
+      assistant in three modes and splits calls and tokens by hosted versus
+      in-house provider (`--inhouse`, default `typesafeai,ollama`, so Jev
+      counts as in-house). 39 questions of `gold.agentblind.yml`, 12
+      literals, per question: `tool` (the chat model calls `aim_literal`)
+      3.4k hosted tokens, 4.4s, 18-22 of 23 correct across runs; `prompt`
+      (values in the system prompt) 1.9k hosted tokens, 2.6s, 23/23; `gate`
+      (finder first, chat model only on a pass) 0.9k hosted tokens, 1.6s,
+      22/23, with the finder answering 23 of 39 questions alone. The finder
+      already runs on Jev here. Gate wins on hosted tokens and time. Still to
+      done at 101 literals too (prompt 5.6k hosted tokens, tool 3.4k, gate
+      0.6k; the chat model under-calls the tool). Restricted
+      values checked too (tool and gate hold, prompt cannot serve both
+      audiences). Still to do: the finder genuinely local for latency. Numbers in literals/adr/how-it-works.md.
+- [ ] **Finder-first gate on the on-site assistant (proven 2026-10-12, not
+      built).** The eval's `gate` mode won on hosted tokens, time and
+      visibility (numbers in literals/adr/how-it-works.md). The Jev call
+      stays: it is the fuzzy match. What is skipped on a hit is the hosted
+      chat model. Plan: an `aim_chatbot` `ChatProcessor` plugin extending
+      `ai_assistant_api_processor` (the seam `/api/deepchat` already uses,
+      chosen per block). It asks `literals.lookup` by question as the
+      visitor; a `match` with a non-empty value returns a fixed template
+      (label, value, link for URLs) with no chat model; anything else, or a
+      finder error or timeout, falls through to the parent processor, tool
+      still available. A block config switch keeps the old path. Keep it
+      small: last message only (a follow-up like "and the accounts one?" goes
+      to the chat model), check a hit and a miss render in the widget
+      (streaming), audit hit and pass counts with IDs only, never the
+      question. Open: whether gate replies go into the stored history; a
+      Jev-written sentence around the value instead of the bare template
+      (one more in-house call, zero hosted). Still unmeasured: local Jev
+      latency. The `aim_literal` tool stays for MCP and external agents.
 - [ ] **Copy controls** ("copy value", "copy link") on chat answers, shown by
       role or permission: front-end work; the chat items already carry value,
       label and kind. Waits: cosmetic.
-- [ ] **A blind question set written by Nik** (about 15 to 40 questions,
-      without looking at `eval/gold.seed.yml`), then re-check
-      `chooser_context` and the thresholds. All numbers so far are
-      in-sample.
+- [x] **A blind question set (2026-10-12).** Nik could not write one, so
+      Claude drafted 32 questions (22 answerable, 10 not) from the literal
+      names and gists alone, without opening `eval/gold.seed.yml`; Nik
+      reviewed and approved them (`eval/gold.nikblind.yml`). Baseline, with
+      the four restricted literals run `as: 1`: 16 of 22 hits (73%), 4
+      misses, **2 wrong-confident**, 10 of 10 unanswerable correctly none.
+      Both wrong answers sent "what I've borrowed" and "check my own
+      details" to `login` instead of `my_account` (overlapping gists:
+      "check loans" appears in both). Of the four misses, `cfg_phone` (empty
+      gist) and `balls_email` (nonsense gist) are test fixtures nothing
+      could match, so the fair denominator is 20 answerable, 16 hits. The
+      gists were NOT edited afterwards: that would turn the set into a
+      training set. Judge by wrong-confident, not hit rate; a miss falls
+      back safely, a confident wrong value is the security-relevant failure.
+      Not yet done: a general overlap check (warn when two gists share a
+      phrase), designed without looking at these failures and measured on a
+      fresh set. Still open: re-check `chooser_context` and the thresholds.
+      The set is Claude-drafted, so still not fully independent.
 - [ ] **Revisit example phrasings per literal (raised 2026-10-10).** ADR-0040
       "Deferred and pinned" has the history and the `ALSO` convention.
       Intent-matching systems (Dialogflow, Rasa, Azure custom question
@@ -681,12 +724,17 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
       planned path to revisionable. Revisit only if that changes for an
       unrelated reason.
 
-## Parked ADRs, revisit triggers (retired 2026-10-11)
+## Parked ADRs, revisit triggers (retired 2026-10-11 and 2026-10-12)
 
 - ADR-0012 (fact-to-fact relation graph, multi-hop retrieval): revisit when a
   consumer needs more than the supersede edge in `related`.
 - ADR-0014 (use-case archetype starter kits): revisit when a third Recipe
   beyond `aim_demo_library` and `aim_ollama_local` is wanted.
+- ADR-0044 (Tool API method attributes, drupal/tool MR 162): revisit when the
+  MR merges, or when a new `aim_tool` tool is about to be written.
+- ADR-0055 (decision rationale as entity-scope facts): revisit when a
+  decision-provenance need is real. The test is to hand-model 5 to 10 ADRs
+  as `scope=entity` facts and check recall beats grepping the ADR files.
 
 ## Queue processing (ADR-0031)
 
