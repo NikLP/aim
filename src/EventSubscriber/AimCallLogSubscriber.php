@@ -4,23 +4,24 @@ declare(strict_types=1);
 
 namespace Drupal\aim\EventSubscriber;
 
-use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Component\Uuid\UuidInterface;
-use Drupal\Core\Database\Connection;
-use Drupal\ai\Dto\TokenUsageDto;
 use Drupal\ai\Event\PostGenerateResponseEvent;
 use Drupal\ai\Event\PreGenerateResponseEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
- * Writes one aim_activity_metrics row per aim_* provider call.
+ * Adds a run ID and the call's duration to what ai_logging records.
  *
- * Times the call between drupal/ai's Pre and Post events and reads token
- * usage off the output. Stores activity, run ID, provider, model, tokens
- * and milliseconds only, never prompt or fact text. A call that throws
- * dispatches no Post event and leaves no row.
+ * The ai_logging module stores one ai_log row per aim_* provider call, with
+ * provider, model, tokens and prompt/response text (ADR-0060). It has no
+ * duration or run grouping, so this subscriber times the call between
+ * drupal/ai's Pre and Post events and writes both into the event's debug
+ * data, which ai_logging keeps in the row's extra_data. It runs ahead of
+ * ai_logging's own Post subscriber (priority 10 against its default 0) so
+ * the data is there when the row is built. A call that throws dispatches no
+ * Post event and leaves no row.
  */
-class AimActivityMetricsSubscriber implements EventSubscriberInterface {
+class AimCallLogSubscriber implements EventSubscriberInterface {
 
   /**
    * Start time of each tagged call, keyed by request thread ID.
@@ -37,18 +38,12 @@ class AimActivityMetricsSubscriber implements EventSubscriberInterface {
   protected ?string $runId = NULL;
 
   /**
-   * Constructs an AimActivityMetricsSubscriber.
+   * Constructs an AimCallLogSubscriber.
    *
-   * @param \Drupal\Core\Database\Connection $database
-   *   The database connection.
-   * @param \Drupal\Component\Datetime\TimeInterface $time
-   *   The time service.
    * @param \Drupal\Component\Uuid\UuidInterface $uuid
    *   The UUID generator, for default run IDs.
    */
   public function __construct(
-    protected Connection $database,
-    protected TimeInterface $time,
     protected UuidInterface $uuid,
   ) {}
 
@@ -57,8 +52,8 @@ class AimActivityMetricsSubscriber implements EventSubscriberInterface {
    */
   public static function getSubscribedEvents(): array {
     return [
-      PreGenerateResponseEvent::EVENT_NAME => 'onPreGenerateResponse',
-      PostGenerateResponseEvent::EVENT_NAME => 'onPostGenerateResponse',
+      PreGenerateResponseEvent::EVENT_NAME => ['onPreGenerateResponse', 10],
+      PostGenerateResponseEvent::EVENT_NAME => ['onPostGenerateResponse', 10],
     ];
   }
 
@@ -89,57 +84,44 @@ class AimActivityMetricsSubscriber implements EventSubscriberInterface {
    *   The pre-generate event.
    */
   public function onPreGenerateResponse(PreGenerateResponseEvent $event): void {
-    if ($this->activityOf($event->getTags()) !== NULL) {
+    if ($this->isAimCall($event->getTags())) {
       $this->pendingTimers[$event->getRequestThreadId()] = microtime(TRUE);
     }
   }
 
   /**
-   * Writes the row for a finished aim_* call.
+   * Adds the run ID and duration to a finished aim_* call.
    *
    * @param \Drupal\ai\Event\PostGenerateResponseEvent $event
    *   The post-generate event.
    */
   public function onPostGenerateResponse(PostGenerateResponseEvent $event): void {
-    $activity = $this->activityOf($event->getTags());
     $threadId = $event->getRequestThreadId();
-    if ($activity === NULL || !isset($this->pendingTimers[$threadId])) {
+    if (!isset($this->pendingTimers[$threadId])) {
       return;
     }
-    $ms = (int) round((microtime(TRUE) - $this->pendingTimers[$threadId]) * 1000);
+    $started = $this->pendingTimers[$threadId];
     unset($this->pendingTimers[$threadId]);
-
-    $output = $event->getOutput();
-    $usage = is_object($output) && method_exists($output, 'getTokenUsage') ? $output->getTokenUsage() : NULL;
-    $this->database->insert('aim_activity_metrics')->fields([
-      'created' => $this->time->getRequestTime(),
-      'run_id' => $this->getRunId(),
-      'activity' => $activity,
-      'operation_type' => $event->getOperationType(),
-      'provider' => $event->getProviderId(),
-      'model' => $event->getModelId(),
-      'input_tokens' => $usage instanceof TokenUsageDto ? $usage->input : NULL,
-      'output_tokens' => $usage instanceof TokenUsageDto ? $usage->output : NULL,
-      'duration_ms' => $ms,
-    ])->execute();
+    $event->setDebugData('aim_run_id', $this->getRunId());
+    $event->setDebugData('aim_duration_ms', (int) round((microtime(TRUE) - $started) * 1000));
   }
 
   /**
-   * Finds the aim_* tag on a call.
+   * Tells whether a call carries an aim_* tag.
    *
    * @param array $tags
    *   The call's tags.
    *
-   * @return string|null
-   *   The first tag starting with aim_, or NULL for a call aim does not own.
+   * @return bool
+   *   TRUE for a call aim owns.
    */
-  protected function activityOf(array $tags): ?string {
+  protected function isAimCall(array $tags): bool {
     foreach ($tags as $tag) {
       if (is_string($tag) && str_starts_with($tag, 'aim_')) {
-        return $tag;
+        return TRUE;
       }
     }
-    return NULL;
+    return FALSE;
   }
 
 }

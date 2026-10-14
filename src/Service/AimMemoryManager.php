@@ -763,17 +763,6 @@ class AimMemoryManager {
       return $scores;
     }
 
-    if ($this->configFactory->get('aim.settings')->get('log_query_text')) {
-      // Opt-in personal data, same switch as the recall query text.
-      foreach ($asked as $id => [$key]) {
-        $this->logVerbose('Grounding texts: score @score for "@candidate" against "@passage".', [
-          '@score' => round((float) $scores[$key], 3),
-          '@candidate' => $state[$id],
-          '@passage' => $passage,
-        ]);
-      }
-    }
-
     return $scores;
   }
 
@@ -1966,16 +1955,6 @@ class AimMemoryManager {
         '@score' => round($faithful->getProbability(), 3),
         '@cutoff' => $cutoff,
       ]);
-      if ($this->configFactory->get('aim.settings')->get('log_query_text')) {
-        // Opt-in personal data, same switch as the recall query text.
-        $this->logVerbose('Merge verifier texts (kept @kept, candidate @candidate): A "@a", B "@b", merged "@merged".', [
-          '@kept' => $kept->id(),
-          '@candidate' => $candidate->id(),
-          '@a' => (string) $kept->get('text')->value,
-          '@b' => (string) $candidate->get('text')->value,
-          '@merged' => $mergedText,
-        ]);
-      }
       return $faithful->isLikely($cutoff);
     }
 

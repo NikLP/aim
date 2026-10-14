@@ -35,7 +35,7 @@ DDEV, `drupal11` type, PHP 8.4, MariaDB 11.8, docroot `web/`.
 + `simple_oauth_21`/`simple_oauth_server_metadata`/
 `simple_oauth_client_registration`/`simple_oauth_pkce`/`consumers`
 (OAuth stack, see [DEVELOPING.md](DEVELOPING.md)'s "MCP OAuth"),
-`ai_agents`, `ai_assistant_api`, `ai_chatbot`, `ai_search`,
+`ai_agents`, `ai_assistant_api`, `ai_chatbot`, `ai_search`, `ai_logging`,
 `ai_provider_anthropic`/`ai_provider_amazeeio`/`ai_provider_ollama`,
 `ai_vdb_provider_mariadb`, `search_api`, `views`, `queue_ui`,
 `serialization` (core - required by `mcp_server_tool_bridge`'s schema
@@ -176,7 +176,7 @@ duplicated here.
   non-destructive supersede edge and its JSON provenance), `uid`
   (who wrote it), `grounding_score` (float, empty when unchecked: how
   strongly a decision model found the fact stated in the text it was
-  written from, checked at write time, text never stored -
+  written from, checked at write time; the text is not kept in the fact -
   [ADR-0037](adr/resolved/0037-transient-source-passages-for-grounding.md); see
   [DEVELOPING.md](DEVELOPING.md)'s "Grounded check"), `trusted` (boolean, the draft-to-trusted gate - defaults
   to `aim.settings:default_trusted`, `recall()` excludes untrusted facts
@@ -282,9 +282,13 @@ look at other roles when a permission check unexpectedly fails.
 - **Logging** goes through `logger.channel.aim`: warnings and errors
   always, info/debug only via `AimMemoryManager::logAudit()` /
   `logVerbose()` (gated by `aim.settings` `log_audit` / `log_verbose`).
-  Never log fact text or recall query text (personal data); IDs, scope,
-  uid, subject, decision, score, provider and model ID only. The one
-  exception is the opt-in `log_query_text`. A new write path, action or
+  On this channel put IDs, scope, uid, subject, decision, score, provider
+  and model ID only, not fact or recall query text (the one exception is
+  the opt-in `log_query_text`). Model calls tagged `aim_*` are the
+  exception to "no text": `ai_logging` records their prompts and replies in
+  `ai_log` ([ADR-0060](adr/0060-adopt-ai-logging-for-model-calls.md);
+  stealth mode, off, is the later opt-out); a new tag must be added to
+  `ai_logging.settings:prompt_logging_tags`. A new write path, action or
   decision point should add an audit line; see
   [DEVELOPING.md](DEVELOPING.md)'s "Logging".
 - Hooks live in `src/Hook/AimHooks.php` (`#[Hook(...)]` attributes), not

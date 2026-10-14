@@ -1,6 +1,6 @@
 # ADR-0037: Transient source passages, so a decision model can check a candidate fact against what was actually said
 
-**Status:** Built 2026-10-11 as a write-time check: decisions 1-4 (side
+**Status:** Note 2026-10-14: the model call that carries the passage is now logged with its text by `ai_logging` ([ADR-0060](../0060-adopt-ai-logging-for-model-calls.md)); the fact table still stores none of it. Built 2026-10-11 as a write-time check: decisions 1-4 (side
 table, queue step, retention sweep) replaced by checking while the source
 text is in memory and storing none of it (see "Built" below; first proposed
 as [ADR-0056](../0056-personal-data-write-gate.md) decision 7). Shadow mode on

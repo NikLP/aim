@@ -53,6 +53,7 @@ Still carrying work, proposed, or deferred.
 | [0057](0057-dates-resolved-and-confirmed-before-write.md) | Dates resolved and confirmed before write: the chat assistant states the calendar date in its confirmation, fact text carries the date, an end date sets `expires` (plus the expiry sweep), extraction resolves against the document date, time-limited facts never UPDATE-merged into permanent ones | Proposed 2026-10-11 - design only |
 | [0056](0056-personal-data-write-gate.md) | No personal data stored unless authorised: refuse names and contact details at write time (patterns plus a decision-model check), authorised by `user` scope or a permission, never by a model; grounded check inline, no stored passages | Parked 2026-10-11 (proposed 2026-10-10) - design only; revisit later |
 | [0058](0058-htmx-4-for-admin-forms.md) | htmx 4 for self-saving admin controls: per-row trusted toggle and the role-visibility matrix as candidates | Proposed 2026-10-13 - feasibility study only, nothing built |
+| [0060](0060-adopt-ai-logging-for-model-calls.md) | Model-call logging through `ai_logging`, prompts and replies included; aim adds run ID and duration; stealth mode a later option | Built 2026-10-14; stealth not built |
 | [0059](0059-single-valued-category-and-ingress-labelling.md) | Single-valued, indexed `category` that recall can filter on, set on every write route (labelled on ingress); free tagging becomes a scope-module concern | Proposed 2026-10-14 - design only, nothing built |
 
 ## Resolved

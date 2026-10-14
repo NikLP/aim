@@ -59,7 +59,7 @@ e.g. from `drush php:eval`:
 
 The way to score a decision model: every call goes through
 `aim.backend.decision` and the provider and model set for that activity in
-`aim.settings` (keys stay in Drupal; calls land in `aim_activity_metrics`).
+`aim.settings` (keys stay in Drupal; calls land in `ai_log`, ADR-0060).
 Tasks `grounding` (every wording in the script's `$grounding_qs`, batched
 per passage as live), `merges` (the live verifier question and cutoff) and
 `pairs` (the live pair question). An optional second argument names a set

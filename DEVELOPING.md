@@ -587,12 +587,11 @@ to the model and never stored.
   caller always wins. Decision backend only (`activities.grounding`).
 - **Checking reliability:** the Grounding column (sortable) and the
   "Grounding score below" filter on the facts list; an audit line per
-  verdict (fact ID, score, cutoff, mode, no text); call time and tokens in
-  `aim_activity_metrics` (activity `aim_ground`); the eval set
+  verdict (fact ID, score, cutoff, mode, no text); call time, tokens and the
+  prompt and reply in `ai_log` (tag `aim_ground`); the eval set
   (`aim_benchmark`'s `decision-eval.php -- grounding`) after any model
-  or wording change. With `log_verbose` and `log_query_text` on, each score
-  is logged with the candidate and passage text: opt-in personal data,
-  for diagnosis only.
+  or wording change. The candidate and passage text are in the logged prompt
+  (`ai_log`, ADR-0060).
 - **Known calibration issue:** the strict question penalizes any dropped
   detail, so a clean-up that drops a junk word scores low (the old
   preflight canary's `ZZPREFLIGHT` token, 0.52-0.62). Narrower wordings did
@@ -968,17 +967,17 @@ Channel `aim` (service `logger.channel.aim`). Three tiers:
   trust/untrust/retire/unretire actions.
 - `aim.settings:log_verbose` (debug): recall, embedding cache, extraction.
 - `aim.settings:log_query_text` (debug, needs `log_verbose`): adds the
-  recall query text, for diagnosing poor or empty matches, and the kept,
-  candidate and merged fact text on merge verifier entries, for diagnosing
-  a rejected merge. Off by default; the only place any user-supplied text
-  or fact text is logged. It also adds the
-  question of each literals finder lookup.
+  recall query text, for diagnosing poor or empty matches (its embedding
+  call is untagged, so `ai_logging` never records it). Off by default. It
+  also adds the question of each literals finder lookup. Tagged model calls
+  have their full text in `ai_log` instead (see "Model-call logging").
 
 Gate info/debug calls through `AimMemoryManager::logAudit()` /
 `logVerbose()`; the embedding cache subscriber reads `log_verbose` itself
-(the manager depends on it, so it cannot depend back). Never log fact text
-or recall query text outside `log_query_text` (personal data, and guardrail violation messages can
-quote it): IDs, scope, uid, subject, decision, score, auto-versus-model,
+(the manager depends on it, so it cannot depend back). Do not put fact text
+or recall query text on this channel outside `log_query_text` (guardrail
+violation messages can quote it, and watchdog is not pruned like `ai_log`):
+IDs, scope, uid, subject, decision, score, auto-versus-model,
 provider and model ID only. Consolidation logging lives in the single
 helper `logConsolidation()`, so reworking `decideAndApply()` doesn't
 disturb it.
@@ -1084,11 +1083,31 @@ reindex after import is required regardless. Don't use
 **pre-hashed password** on any exported user account. Anonymous
 authorship on re-import is accepted, not a problem to solve.
 
-## Activity metrics
+## Model-call logging
 
-`AimActivityMetricsSubscriber` writes one `aim_activity_metrics` row per
-provider call tagged `aim_*` (`aim_extract`, `aim_consolidate`,
-`aim_consolidate_verify`): run ID, tag, operation type, provider, model,
-input/output tokens, milliseconds. No prompt or fact text. Group a replay with
-`setRunId()`; a failed call writes no row. Calls the vector index makes
-(untagged) are not recorded.
+Model calls tagged `aim_*` (`aim_extract`, `aim_consolidate`,
+`aim_consolidate_verify`, `aim_consolidate_merge`, `aim_ground`) are
+recorded by `ai_logging` as `ai_log` entities, prompt and response text
+included ([ADR-0060](adr/0060-adopt-ai-logging-for-model-calls.md)). Browse
+them at the Views listing `ai_logs`. `ai_logging.settings` is set by
+`aim_update_10010()`: `prompt_logging` and `prompt_logging_output` on,
+`prompt_logging_tags` listing the tags above (an exact match, no wildcard,
+so **a new aim tag must be added to that list**), retention 10000 entries
+or 90 days. Untagged calls (the vector index's embeddings) are not logged.
+
+`AimCallLogSubscriber` adds `aim_run_id` and `aim_duration_ms` to each call's
+debug data, which lands in `extra_data`; group a replay with `setRunId()`.
+Query with `JSON_VALUE`:
+
+```sql
+SELECT model, COUNT(*), AVG(JSON_VALUE(extra_data, '$.aim_duration_ms')),
+       SUM(tokens_input), SUM(tokens_output)
+FROM ai_log WHERE JSON_VALUE(extra_data, '$.aim_run_id') = :run GROUP BY model;
+```
+
+**Implementers:** these rows hold the text of what visitors and documents
+said. Stealth mode (a presave hook on `ai_log` that blanks `prompt`,
+`output_text`, `response_text`, `configuration` and `extra_data`; blanking
+the prompt alone is not enough, a response can repeat it) is not built and
+is off. Decide before real data goes in; a personal-memory site will want
+it, a business site may not.

@@ -112,7 +112,7 @@ unless noted; synthetic data only for hosted Jev.
    way once the content index exists.
 3. **Real (non-dry) consolidation run** and a queue-worker check of top-N
    consolidation (TODO, ADR-0036).
-4. **Jev token reporting live** (`AimActivityMetricsSubscriber` is built,
+4. **Jev token reporting live** (`AimCallLogSubscriber` is built,
    Jev's reporting is not confirmed) and confirm the Anthropic key in
    watchdog is rotated and the entries cleared (TODO).
 5. **Decision guardrails:** how a caller attaches a guardrail set to a

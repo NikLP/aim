@@ -57,7 +57,7 @@ where chunking and a local model both still have to be built. The finder
 is cheap on exposure because literal values never reach it, and in answer
 mode 1 (literal only) never reach a chat model either.
 
-## Measured per call (`aim_activity_metrics`, 2026-10-02)
+## Measured per call (the former `aim_activity_metrics` table, dropped by ADR-0060; 2026-10-02)
 
 | Call | Model | Calls seen | Input tokens | Output tokens | Time |
 | --- | --- | --- | --- | --- | --- |

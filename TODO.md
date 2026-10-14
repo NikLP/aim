@@ -207,7 +207,7 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       element (one per activity: extraction, consolidation classifier,
       merge verifier, decision), replacing the free-text
       `merge_verifier_model` and the Drush-only `--provider`/`--model`.
-- [x] BUILT 2026-10-02 (`AimActivityMetricsSubscriber`, `src/Backend/`; Jev's token reporting still untested live): activity metrics subscriber (decided 2026-10-02): generalize
+- [x] BUILT 2026-10-02 (`src/Backend/`; the metrics table was replaced by `ai_logging` + `AimCallLogSubscriber` 2026-10-14, ADR-0060; Jev's token reporting still untested live): activity metrics subscriber (decided 2026-10-02): generalize
       `AimEmbeddingCacheSubscriber`'s Pre/Post timer into a subscriber that,
       for calls tagged `aim_*`, writes one row per call (activity, run ID,
       provider, model, input/output tokens, ms), no prompt text. Replaces
@@ -560,12 +560,9 @@ questions" section)
       its own ADR plus sign-off first.
 - [ ] Extraction-input guardrailing, distinct from the existing output-side
       candidate-fact guardrails.
-- [ ] Kernel test for `AimEmbeddingCacheSubscriber` (a second identical
-      query makes zero provider calls, an index-time embed is not cached, a
-      different model ID misses). Verified live instead - see ADR-0017's
-      "Built 2026-09-27". The kernel harness now exists (DEVELOPING.md,
-      "Running the tests"); still uncovered: `recall()` trusted/retired/
-      `user` filtering, the Trust/Untrust actions, `aim_tool` permissions.
+- [ ] Tests still missing (harness: DEVELOPING.md, "Running the tests"):
+      the Retire/Unretire actions, `aim_literal`'s access rules,
+      `consolidate()`, and the ingest form.
 - [ ] Bulk actions for `category` on the admin facts view - deliberately
       not built (2026-09-30) because the field is not in use yet.
       `trusted`/retire/un-retire have them (`src/Plugin/Action/`,
@@ -883,3 +880,12 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
       `target_type`/`target_id` on the admin form
       ([ADR-0027](adr/resolved/0027-entity-scope.md)). Today a targetless
       fact is just neutral for view access, not a security gap.
+
+- [ ] ADR-0060 follow-ups: stealth mode (presave hook on `ai_log` blanking
+      `prompt`, `output_text`, `response_text`, `configuration`,
+      `extra_data`; off by default; optional PII reduction) before real
+      data; fact ID as input debug data at each call site so a log row joins
+      to its fact; port the benchmark/eval queries to `ai_log` with
+      `JSON_VALUE`; upstream asks once proven (duration column on `ai_log`,
+      per-tag retention); test `AimCallLogSubscriber` (none yet, only a live
+      check on 2026-10-14).

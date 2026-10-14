@@ -88,7 +88,7 @@ Four memory categories, composable at retrieval the way Mem0 composes
   [ADR-0056](adr/0056-personal-data-write-gate.md)). A fact written with
   the text it came from is checked against that text by a decision model
   (the grounded check, [ADR-0037](adr/resolved/0037-transient-source-passages-for-grounding.md));
-  the text is never stored, and the check can set `trusted` or only
+  the text is not kept in the fact (its model call is logged, ADR-0060), and the check can set `trusted` or only
   record its score. A
   lightweight `trusted` flag is the draft-to-trusted human-review gate
   ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
@@ -215,9 +215,13 @@ ones it wants. Each submodule has its own requirements and setup:
    (rejected writes, blocked merges, a suspended queue) always go to the
    `aim` log channel. `log_audit` adds writes, consolidation decisions and
    trust/retire actions; `log_verbose` adds recall, embedding cache and
-   extraction detail. Both default off. Fact text is never logged. Recall
-   query text is logged only if you also tick `log_query_text` (personal
-   data, for short investigations).
+   extraction detail. Both default off. Recall query text is logged only if you
+   also tick `log_query_text` (personal data, for short investigations).
+   Separately, the prompts and replies of aim's model calls are recorded by
+   `ai_logging` (admin listing `ai_logs`, pruned at 10000 entries or 90
+   days), so extraction and consolidation decisions can be reviewed. They
+   can contain what visitors and documents said; a stealth option to store
+   nothing is planned, not built (ADR-0060).
 
 To see it working with a story already loaded, apply the
 [community library demo recipe](recipes/aim_demo_library/README.md) to a

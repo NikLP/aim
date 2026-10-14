@@ -132,17 +132,10 @@ function aim_update_10006(): void {
 }
 
 /**
- * Implements hook_schema().
- */
-function aim_schema(): array {
-  return ['aim_activity_metrics' => _aim_activity_metrics_schema()];
-}
-
-/**
  * Returns the aim_activity_metrics table definition.
  *
- * One row per tagged provider call, no prompt or fact text (CLAUDE.md's
- * logging rule).
+ * Kept only so aim_update_10007() can still run on an old site; the table
+ * is dropped again by aim_update_10010() (ADR-0060).
  *
  * @return array
  *   A Schema API table definition.
@@ -215,5 +208,32 @@ function aim_update_10009(): void {
   $definition = $manager->getFieldStorageDefinition('state', 'aim_fact');
   if ($definition) {
     $manager->uninstallFieldStorageDefinition($definition);
+  }
+}
+
+/**
+ * Moves model-call logging to ai_logging and drops aim_activity_metrics.
+ *
+ * Enables ai_logging, captures only aim's own call tags with prompts and
+ * responses, and sets retention high enough for eval work (ADR-0060).
+ * Existing ai_logging settings other than the tag list are kept if the
+ * module was already in use.
+ */
+function aim_update_10010(): void {
+  if (!\Drupal::moduleHandler()->moduleExists('ai_logging')) {
+    \Drupal::service('module_installer')->install(['ai_logging']);
+  }
+  $tags = ['aim_extract', 'aim_consolidate', 'aim_consolidate_verify', 'aim_consolidate_merge', 'aim_ground'];
+  $config = \Drupal::configFactory()->getEditable('ai_logging.settings');
+  $existing = array_filter(array_map('trim', explode(',', (string) $config->get('prompt_logging_tags'))));
+  $config->set('prompt_logging', TRUE)
+    ->set('prompt_logging_output', TRUE)
+    ->set('prompt_logging_tags', implode(',', array_unique(array_merge($existing, $tags))))
+    ->set('prompt_logging_max_messages', 10000)
+    ->set('prompt_logging_max_age', 90)
+    ->save();
+  $schema = \Drupal::database()->schema();
+  if ($schema->tableExists('aim_activity_metrics')) {
+    $schema->dropTable('aim_activity_metrics');
   }
 }

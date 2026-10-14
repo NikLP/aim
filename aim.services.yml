@@ -86,17 +86,15 @@ services:
     tags:
       - { name: event_subscriber }
 
-  aim.activity_metrics_subscriber:
-    class: Drupal\aim\EventSubscriber\AimActivityMetricsSubscriber
+  aim.call_log_subscriber:
+    class: Drupal\aim\EventSubscriber\AimCallLogSubscriber
     arguments:
-      - '@database'
-      - '@datetime.time'
       - '@uuid'
     tags:
       - { name: event_subscriber }
 
-  Drupal\aim\EventSubscriber\AimActivityMetricsSubscriber:
-    alias: aim.activity_metrics_subscriber
+  Drupal\aim\EventSubscriber\AimCallLogSubscriber:
+    alias: aim.call_log_subscriber
 
   aim.backend.decision:
     class: Drupal\aim\Backend\DecisionBackend
