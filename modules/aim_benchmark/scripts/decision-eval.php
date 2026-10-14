@@ -78,7 +78,15 @@ if ($task === 'grounding') {
   }
   // One call per passage, every candidate and wording in it (as live).
   $scores = [];
-  foreach ($groups as $passage => $idx) {
+  // Chunked so a call stays within 16 questions (subq's cap) at any wording
+  // count; Jev takes more, so this changes call count, not scores.
+  $chunks = [];
+  foreach ($groups as $passage => $all) {
+    foreach (array_chunk($all, max(1, intdiv(16, count($grounding_qs)))) as $chunk) {
+      $chunks[] = [$passage, $chunk];
+    }
+  }
+  foreach ($chunks as [$passage, $idx]) {
     $state = ['text' => $data['passages'][$passage]];
     $questions = [];
     foreach ($idx as $n => $i) {

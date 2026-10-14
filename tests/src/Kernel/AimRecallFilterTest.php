@@ -8,11 +8,6 @@ use Drupal\Component\Serialization\Yaml;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
-use Drupal\search_api\Backend\BackendInterface;
-use Drupal\search_api\Entity\Index;
-use Drupal\search_api\Entity\Server;
-use Drupal\search_api\Query\Condition;
-use Drupal\search_api\Query\QueryInterface;
 use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -20,14 +15,17 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 /**
  * What recall() asks the index for, and what it drops afterwards.
  *
- * The search backend is a fake that applies the query's conditions to the
- * stored facts and ranks them by a score the test sets, so the conditions
- * recall() builds (scope, subject, user, trusted) and the filtering it does
- * itself (retired, distance, gap, limit) are tested without a vector store.
+ * The search backend is FakeVectorSearch, which applies the query's
+ * conditions to the stored facts and ranks them by a score the test sets, so
+ * the conditions recall() builds (scope, subject, user, trusted) and the
+ * filtering it does itself (retired, distance, gap, limit) are tested without
+ * a vector store.
  */
 #[Group('aim')]
 #[RunTestsInSeparateProcesses]
 class AimRecallFilterTest extends KernelTestBase {
+
+  use FakeVectorSearchTrait;
 
   /**
    * {@inheritdoc}
@@ -57,9 +55,6 @@ class AimRecallFilterTest extends KernelTestBase {
     $this->installEntitySchema('user');
     $this->installEntitySchema('literal');
     $this->installEntitySchema('aim_fact');
-    $this->installEntitySchema('search_api_task');
-    $this->installSchema('search_api', ['search_api_item']);
-    $this->installConfig(['search_api']);
 
     $path = $this->container->get('extension.list.module')->getPath('aim');
     $this->config('aim.settings')
@@ -74,79 +69,10 @@ class AimRecallFilterTest extends KernelTestBase {
       'settings' => ['requires_account' => TRUE],
     ])->save();
 
-    Server::create([
-      'id' => 'aim_test',
-      'name' => 'AIM test',
-      'status' => TRUE,
-      'backend' => 'search_api_test',
-    ])->save();
-    Index::create([
-      'id' => 'aim_vector_index',
-      'name' => 'AIM vector index',
-      'status' => TRUE,
-      'server' => 'aim_test',
-      'datasource_settings' => ['entity:aim_fact' => []],
-      'tracker_settings' => ['default' => []],
-      'options' => ['index_directly' => FALSE],
-    ])->save();
-    $this->container->get('state')->set('search_api_test.backend.method.search', [static::class, 'fakeSearch']);
+    $this->installFakeVectorIndex();
 
     // Uid 1 bypasses every access check; keep it out of the way.
     User::create(['uid' => 1, 'name' => 'root', 'status' => 1])->save();
-  }
-
-  /**
-   * Search backend override: filter by the query's conditions, rank by score.
-   *
-   * @param \Drupal\search_api\Backend\BackendInterface $backend
-   *   The test backend.
-   * @param \Drupal\search_api\Query\QueryInterface $query
-   *   The query recall() built.
-   */
-  public static function fakeSearch(BackendInterface $backend, QueryInterface $query): void {
-    $index = $query->getIndex();
-    $fieldsHelper = \Drupal::service('search_api.fields_helper');
-    $scores = \Drupal::state()->get('aim_recall_test.scores', []);
-
-    $items = [];
-    foreach (AimFact::loadMultiple() as $fact) {
-      foreach ($query->getConditionGroup()->getConditions() as $condition) {
-        if ($condition instanceof Condition && !static::factMatches($fact, $condition)) {
-          continue 2;
-        }
-      }
-      $item = $fieldsHelper->createItemFromObject($index, $fact->getTypedData(), NULL, $index->getDatasource('entity:aim_fact'));
-      $item->setScore($scores[$fact->id()] ?? 0.1);
-      $items[$item->getId()] = $item;
-    }
-    uasort($items, fn ($a, $b) => $a->getScore() <=> $b->getScore());
-
-    $limit = $query->getOption('limit');
-    if ($limit !== NULL) {
-      $items = array_slice($items, (int) $query->getOption('offset', 0), (int) $limit, TRUE);
-    }
-    $query->getResults()->setResultItems($items)->setResultCount(count($items));
-  }
-
-  /**
-   * Whether a fact satisfies one equality condition.
-   *
-   * @param \Drupal\aim\Entity\AimFact $fact
-   *   The fact.
-   * @param \Drupal\search_api\Query\Condition $condition
-   *   The condition.
-   *
-   * @return bool
-   *   TRUE if it matches.
-   */
-  protected static function factMatches(AimFact $fact, Condition $condition): bool {
-    $actual = match ($condition->getField()) {
-      'scope' => $fact->bundle(),
-      'subject' => (string) $fact->get('subject')->value,
-      'user' => (int) $fact->get('user')->target_id,
-      'trusted' => (bool) $fact->get('trusted')->value,
-    };
-    return $actual === $condition->getValue();
   }
 
   /**
@@ -277,16 +203,6 @@ class AimRecallFilterTest extends KernelTestBase {
     ]);
     $fact->save();
     return $fact;
-  }
-
-  /**
-   * Sets the score the fake search gives each fact.
-   *
-   * @param array $scores
-   *   Scores keyed by fact ID. Unlisted facts score 0.1.
-   */
-  protected function setScores(array $scores): void {
-    $this->container->get('state')->set('aim_recall_test.scores', $scores);
   }
 
   /**

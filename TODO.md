@@ -298,6 +298,29 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       here earlier never landed (code, install, sync and live all 0.09).
       The prompt line and ADD-as-UPDATE only run on the chat backend, which
       this site does not use for consolidation: unmeasured.
+- [ ] **subq as the decision host (tried 2026-10-14, left switched on in live
+      config only, not exported; Jev key kept aside).** `host`
+      `https://api.subq.ai/v1`, model `subq-snap-preview` on consolidation,
+      verifier and grounding. Wire-compatible with the TypeSafe provider; on
+      the existing sets pairs 24/24, merges AUC 1.00, grounding AUC 0.99-1.00
+      (`narrow_ok`, 1 false trust, 1 false hold at 0.7), about 0.25-0.4 s per
+      call, 469 input tokens per call on average (`ai_log`). Open:
+      - **16-question cap.** subq rejects over 16 `questions` with a 422.
+        `checkGrounding()` sends one per candidate with no chunking, so an
+        extraction or ingest of 17+ facts fails: shadow mode logs a warning
+        and leaves `grounding_score` empty; enforce mode fails closed and
+        leaves all of them untrusted. Chunk candidates in groups of 16 inside
+        `checkGrounding()` (one extra call per 16). Pairs and merges send one
+        question and are unaffected. `decision-eval.php` already chunks.
+      - **`/models` shape.** subq returns OpenAI-style `{data:[{id}]}`, not
+        `{models:[{name}]}`; the provider's key check failed until
+        `TypeSafeAiClient::listModels()` was patched locally (handoff to
+        upstream; `composer update` would overwrite it).
+      - **Thresholds** (0.8 verifier, 0.7 grounding) were tuned on Jev; the
+        easy sets say nothing about harder pairs. Retention and training
+        policy of subq are unread: synthetic data only, as with Jev.
+      - Switching back is `host` plus three `activities.*.model` values;
+        run `config:export` whichever way it ends.
 - [ ] **Atomic extraction.** Check the extraction prompt asks for one claim per
       fact: a compound fact ("60 minutes, and printing costs 10p") makes a
       later update a partial overwrite the verifier has to untangle.
@@ -561,8 +584,10 @@ questions" section)
 - [ ] Extraction-input guardrailing, distinct from the existing output-side
       candidate-fact guardrails.
 - [ ] Tests still missing (harness: DEVELOPING.md, "Running the tests"):
-      the Retire/Unretire actions, `aim_literal`'s access rules,
-      `consolidate()`, and the ingest form.
+      the model-judged paths of `consolidate()` (UPDATE merge, verifier,
+      guardrail-blocked merge: needs a choice-answering fake decision
+      backend), the ingest form's extract mode and file upload, the Tool
+      API/MCP transport, and the user-scope role-visibility settings form.
 - [ ] Bulk actions for `category` on the admin facts view - deliberately
       not built (2026-09-30) because the field is not in use yet.
       `trusted`/retire/un-retire have them (`src/Plugin/Action/`,
@@ -889,3 +914,8 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
       `JSON_VALUE`; upstream asks once proven (duration column on `ai_log`,
       per-tag retention); test `AimCallLogSubscriber` (none yet, only a live
       check on 2026-10-14).
+- [ ] Metrics backend decided against for now (2026-10-14): nothing runs one
+      on this site, and `ai_log` + `JSON_VALUE` answers the eval questions.
+      Cheapest chart route if wanted: a Views chart over `ai_log` (untried).
+      A production site wanting budgets or alerts enables `ai_observability`
+      plus `opentelemetry_metrics` itself; no aim code needed (ADR-0060).

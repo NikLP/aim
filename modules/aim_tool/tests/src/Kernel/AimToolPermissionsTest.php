@@ -89,6 +89,16 @@ class AimToolPermissionsTest extends KernelTestBase {
   }
 
   /**
+   * The literal lookup tool opens to either literals read permission.
+   */
+  public function testLiteralToolAccess(): void {
+    $this->assertTrue($this->tool('aim_literal')->access($this->createUser(['view literals'])));
+    $this->assertTrue($this->tool('aim_literal')->access($this->createUser(['view restricted literals'])));
+    $this->assertFalse($this->tool('aim_literal')->access($this->createUser(['recall aim facts'])));
+    $this->assertFalse($this->tool('aim_literal')->access($this->createUser([])));
+  }
+
+  /**
    * The flat permission is not enough: the fact's scope needs create access.
    */
   public function testRememberChecksScopeCreateAccess(): void {
