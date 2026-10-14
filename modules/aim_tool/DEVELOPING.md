@@ -9,8 +9,8 @@ module reference in [../../DEVELOPING.md](../../DEVELOPING.md).
 ## Tool API + MCP exposure
 
 `aim_tool` ships `#[Tool]` plugins `aim_remember`/`aim_recall` wrapping
-`AimMemoryManager` directly (any scope, gated on `store aim memory`/
-`read aim memory`, not the admin UI's single `administer aim memory`).
+`AimMemoryManager` directly (any scope, gated on `remember aim facts`/
+`recall aim facts`, not the admin UI's single `administer aim`).
 `mcp_server_tool_bridge` exposes both over MCP via config-only
 `mcp_tool_config` entities (`config/optional`, installs automatically
 once the bridge module is enabled). `aim_remember` also takes an

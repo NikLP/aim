@@ -64,7 +64,7 @@ use Drupal\aim\Form\AimScopeForm;
     'delete-form' => '/admin/structure/aim-scopes/{aim_scope}/delete',
     'collection' => '/admin/structure/aim-scopes',
   ],
-  admin_permission: 'administer aim memory',
+  admin_permission: 'administer aim',
   bundle_of: 'aim_fact',
   label_count: [
     'singular' => '@count scope',

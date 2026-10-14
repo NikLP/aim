@@ -457,7 +457,7 @@ are recommendations.
       not built yet) is to set `trusted` automatically, so it guards a workflow that is not
       running. Decide whether it is for a human clearing what the verifier
       rejects (then likely one `review` permission, not one per scope) or
-      goes, with the trust actions falling back to `administer aim memory`.
+      goes, with the trust actions falling back to `administer aim`.
       Left as is for now.
 - [ ] **Record who trusted a fact (raised 2026-10-11).** Add `trusted_by`
       (user reference) and `trusted_at` (timestamp) base fields, set by the
@@ -493,7 +493,7 @@ are recommendations.
       is the only gate. The tool description asking the model to confirm
       first is prompt-level, not enforced. Proposed: in `remember()`,
       reject `subject != currentUser` unless the caller has
-      `administer aim memory` or a new permission for writing about
+      `administer aim` or a new permission for writing about
       others; later option, accept it but force `trusted=FALSE` so the
       per-scope trust permission reviews it. Same class of gap as the
       `trusted` override on `remember()` above. Not built.
@@ -715,8 +715,8 @@ questions" section)
 
 ## aim_tool: declare permissions on the tools (raised 2026-10-01, tool 1.0.0-beta11)
 
-- [ ] Add `permission: 'read aim memory'` to `AimRecall`'s `#[Tool]` and
-      `permission: 'store aim memory'` to `AimRemember`'s. Label-only
+- [ ] Add `permission: 'recall aim facts'` to `AimRecall`'s `#[Tool]` and
+      `permission: 'remember aim facts'` to `AimRemember`'s. Label-only
       change: Tool API reads it without instantiating the plugin (Tool
       Explorer, catalogs, `tool:info`, which shows `None` today) and
       checks it before input is processed. **Keep both `checkAccess()`

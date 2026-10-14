@@ -53,7 +53,7 @@ not something `aim`'s own `composer.json` should carry (it just
    `simple_oauth.settings`'s `public_key`/`private_key` must point at it.
 3. Confirm `aim_tool_oauth`'s shipped config took: two `oauth2_scope`
    entities (`aim:remember`, `aim:recall`) with `granularity_id:
-   permission` set, pointed at `store aim memory`/`read aim memory`. A
+   permission` set, pointed at `remember aim facts`/`recall aim facts`. A
    scope with no granularity crashes `Oauth2ScopeProvider::
    getPermissions()` the moment a real client completes the flow -
    surfaces client-side as a generic "couldn't connect", not a

@@ -238,8 +238,8 @@ duplicated here.
 
 ## Permissions
 
-`administer aim memory` (flat admin bypass, `restrict access: true`);
-`ingest aim memory` (the Content > AIM > Ingest form at
+`administer aim` (flat admin bypass, `restrict access: true`);
+`ingest aim facts` (the Content > AIM > Ingest form at
 `/admin/content/aim-facts/ingest`, `restrict access: true`; implies write
 access to every scope, no per-scope check, see
 [ADR-0016](adr/0016-document-ingestion-ui.md)).
@@ -248,9 +248,9 @@ Per-scope, dynamically generated via `BundlePermissionHandlerTrait`:
 `trust {scope} aim facts` (`restrict access`; gates the custom `trust`
 entity access operation used only by the Trust/Untrust bulk actions, so
 a scope's reviewer can flip the `trusted` flag without update access to
-the fact's text; retire/unretire stay on `administer aim memory`).
+the fact's text; retire/unretire stay on `administer aim`).
 The `trusted` override on `remember()` is not gated by it yet. Tool API/MCP:
-`store aim memory` / `read aim memory` (`aim_tool`). A
+`remember aim facts` / `recall aim facts` (`aim_tool`). A
 `user_scope_role_visibility` matrix (`/admin/config/aim/user-scope-access`)
 additionally grants `scope=user` visibility by viewer-role/subject-role
 pairing, ORed against `view user aim facts` - see

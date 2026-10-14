@@ -16,4 +16,4 @@ umbrella: false
 parent: null
 granularity_id: permission
 granularity_configuration:
-  permission: 'read aim memory'
+  permission: 'recall aim facts'

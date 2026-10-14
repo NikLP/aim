@@ -516,10 +516,10 @@ class AimMemoryManager {
    * Checks whether an account may create a fact of the given scope.
    *
    * Wraps AimFactAccessControlHandler's per-scope create-access check
-   * ("create {scope} aim facts", with "administer aim memory" as bypass)
+   * ("create {scope} aim facts", with "administer aim" as bypass)
    * for a caller outside a normal entity form context. Added so aim_tool's
    * aim_remember Tool plugin can check it too - previously that plugin
-   * only checked the flat "store aim memory" permission and never this
+   * only checked the flat "remember aim facts" permission and never this
    * per-scope one, so the per-scope permissions bound the admin UI only,
    * not Tool API/MCP writes.
    *

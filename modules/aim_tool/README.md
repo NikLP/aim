@@ -22,8 +22,8 @@ with `mcp_server_tool_bridge` 1.0.0-beta3). `aim_recall` drops facts past
 ## Getting started
 
 1. Enable `aim` and `aim_tool`.
-2. Grant `store aim memory`/`read aim memory` to the roles that should be
-   able to call these tools (separate from `administer aim memory`, the
+2. Grant `remember aim facts`/`recall aim facts` to the roles that should be
+   able to call these tools (separate from `administer aim`, the
    admin UI's blanket permission).
 3. For MCP exposure, also enable `mcp_server_tool_bridge` - its config
    entities for `aim_remember`/`aim_recall` install automatically.

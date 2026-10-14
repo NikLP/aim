@@ -4,7 +4,7 @@ aim.admin_config:
     _controller: '\Drupal\system\Controller\SystemController::systemAdminMenuBlockPage'
     _title: 'AIM'
   requirements:
-    _permission: 'administer aim memory'
+    _permission: 'administer aim'
 
 aim.settings:
   path: '/admin/config/aim/settings'
@@ -12,7 +12,7 @@ aim.settings:
     _form: '\Drupal\aim\Form\AimSettingsForm'
     _title: 'AIM settings'
   requirements:
-    _permission: 'administer aim memory'
+    _permission: 'administer aim'
 
 aim.user_scope_access:
   path: '/admin/config/aim/user-scope-access'
@@ -20,7 +20,7 @@ aim.user_scope_access:
     _form: '\Drupal\aim\Form\AimScopeUserAccessForm'
     _title: 'AIM user-scope visibility'
   requirements:
-    _permission: 'administer aim memory'
+    _permission: 'administer aim'
 
 aim.status:
   path: '/admin/config/aim/status'
@@ -28,7 +28,7 @@ aim.status:
     _controller: '\Drupal\aim\Controller\AimStatusController::build'
     _title: 'AIM status'
   requirements:
-    _permission: 'administer aim memory'
+    _permission: 'administer aim'
 
 aim.ingest:
   path: '/admin/content/aim-facts/ingest'
@@ -36,4 +36,4 @@ aim.ingest:
     _form: '\Drupal\aim\Form\AimIngestForm'
     _title: 'Ingest'
   requirements:
-    _permission: 'ingest aim memory'
+    _permission: 'ingest aim facts'

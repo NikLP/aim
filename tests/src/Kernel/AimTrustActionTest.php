@@ -90,7 +90,7 @@ class AimTrustActionTest extends KernelTestBase {
     $this->assertFalse($site->access('update', $reviewer), 'trusting does not grant editing');
 
     $this->assertFalse($this->action('aim_fact_trust')->access($site, $this->createUser(['view site aim facts'])));
-    $this->assertTrue($this->action('aim_fact_trust')->access($site, $this->createUser(['administer aim memory'])));
+    $this->assertTrue($this->action('aim_fact_trust')->access($site, $this->createUser(['administer aim'])));
   }
 
   /**

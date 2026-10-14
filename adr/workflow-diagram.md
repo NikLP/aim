@@ -30,10 +30,10 @@ flowchart TD
 
   subgraph IN["Write paths in"]
     A1["drush aim:remember<br/>(single, or --file batch)<br/>used by agents such as Claude Code<br/>via the aim-memory skill"]
-    A2["MCP / Tool API aim_remember<br/>needs 'store aim memory' plus<br/>per-scope 'create {scope} aim facts'<br/>source default tool:aim_remember"]
+    A2["MCP / Tool API aim_remember<br/>needs 'remember aim facts' plus<br/>per-scope 'create {scope} aim facts'<br/>source default tool:aim_remember"]
     A3["Chatbot FunctionCall AimRemember<br/>scope forced to site<br/>source chatbot:aim_chatbot"]
     A4["drush aim:extract file<br/>aim-discovery skill runs this<br/>(not aim:remember)"]
-    A5["Ingest form, mode 1: extract (planned)<br/>upload prose (.txt), needs<br/>'ingest aim memory'<br/>same path as aim:extract"]
+    A5["Ingest form, mode 1: extract (planned)<br/>upload prose (.txt), needs<br/>'ingest aim facts'<br/>same path as aim:extract"]
     A6["Ingest form, mode 2: one fact per line (planned)<br/>no model call, scope and subject<br/>chosen once on the form<br/>each line goes to remember()"]
   end
 
@@ -179,7 +179,7 @@ flowchart TD
   classDef bad fill:#fdd,stroke:#c53030,color:#4a0000
 
   C1["drush aim:recall<br/>max distance only if --max-distance given<br/>(none by default)"]:::code
-  C2["MCP / Tool API aim_recall<br/>needs 'read aim memory'<br/>scope=user with no subject_uid:<br/>defaults to the calling account<br/>max distance default = recall_max_distance"]:::code
+  C2["MCP / Tool API aim_recall<br/>needs 'recall aim facts'<br/>scope=user with no subject_uid:<br/>defaults to the calling account<br/>max distance default = recall_max_distance"]:::code
   C3["Chatbot FunctionCall AimRecall<br/>scope forced to site, limit 5<br/>max distance = recall_max_distance"]:::code
 
   C1 --> RC

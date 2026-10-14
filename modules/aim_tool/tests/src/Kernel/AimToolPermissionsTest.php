@@ -73,8 +73,8 @@ class AimToolPermissionsTest extends KernelTestBase {
    * Each tool needs its own flat permission, and the two are independent.
    */
   public function testFlatPermissions(): void {
-    $writer = $this->createUser(['store aim memory']);
-    $reader = $this->createUser(['read aim memory']);
+    $writer = $this->createUser(['remember aim facts']);
+    $reader = $this->createUser(['recall aim facts']);
     $nobody = $this->createUser([]);
 
     $this->assertTrue($this->tool('aim_remember')->access($writer));
@@ -92,7 +92,7 @@ class AimToolPermissionsTest extends KernelTestBase {
    * The flat permission is not enough: the fact's scope needs create access.
    */
   public function testRememberChecksScopeCreateAccess(): void {
-    $this->actAs($this->createUser(['store aim memory', 'create site aim facts']));
+    $this->actAs($this->createUser(['remember aim facts', 'create site aim facts']));
 
     $ok = $this->remember(['text' => 'Open at nine.', 'scope' => 'site']);
     $this->assertTrue($ok->getResultStatus());
@@ -108,7 +108,7 @@ class AimToolPermissionsTest extends KernelTestBase {
    * The admin permission bypasses the per-scope check.
    */
   public function testAdminBypassesScopeCheck(): void {
-    $this->actAs($this->createUser(['store aim memory', 'administer aim memory']));
+    $this->actAs($this->createUser(['remember aim facts', 'administer aim']));
     $this->assertTrue($this->remember(['text' => 'A role fact.', 'scope' => 'role'])->getResultStatus());
   }
 
@@ -116,7 +116,7 @@ class AimToolPermissionsTest extends KernelTestBase {
    * A batch applies the scope check per entry and keeps going.
    */
   public function testBatchChecksEachEntry(): void {
-    $this->actAs($this->createUser(['store aim memory', 'create site aim facts']));
+    $this->actAs($this->createUser(['remember aim facts', 'create site aim facts']));
 
     $tool = $this->remember([
       'facts' => [
@@ -137,7 +137,7 @@ class AimToolPermissionsTest extends KernelTestBase {
    * A user-scope fact with no subject is about the calling account.
    */
   public function testUserScopeDefaultsToCaller(): void {
-    $caller = $this->createUser(['store aim memory', 'create user aim facts']);
+    $caller = $this->createUser(['remember aim facts', 'create user aim facts']);
     $this->actAs($caller);
 
     $this->assertTrue($this->remember(['text' => 'I like tea.', 'scope' => 'user'])->getResultStatus());
@@ -150,7 +150,7 @@ class AimToolPermissionsTest extends KernelTestBase {
    * A call with neither text nor a scope fails with a message, not a write.
    */
   public function testMissingInputFails(): void {
-    $this->actAs($this->createUser(['store aim memory', 'create site aim facts']));
+    $this->actAs($this->createUser(['remember aim facts', 'create site aim facts']));
 
     $this->assertFalse($this->remember([])->getResultStatus());
     $noScope = $this->remember(['text' => 'No scope given.']);

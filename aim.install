@@ -237,3 +237,46 @@ function aim_update_10010(): void {
     $schema->dropTable('aim_activity_metrics');
   }
 }
+
+/**
+ * Renames the four aim permissions and moves existing grants to the new names.
+ *
+ * Drupal drops a grant whose permission no longer exists, so each role
+ * keeps what it had. Also rewrites the permission names stored in the aim
+ * OAuth scopes and the admin facts view.
+ */
+function aim_update_10011(): void {
+  $map = [
+    'store aim memory' => 'remember aim facts',
+    'read aim memory' => 'recall aim facts',
+    'ingest aim memory' => 'ingest aim facts',
+    'administer aim memory' => 'administer aim',
+  ];
+
+  foreach (\Drupal::entityTypeManager()->getStorage('user_role')->loadMultiple() as $role) {
+    $changed = FALSE;
+    foreach ($map as $old => $new) {
+      if (in_array($old, $role->getPermissions(), TRUE)) {
+        $role->revokePermission($old)->grantPermission($new);
+        $changed = TRUE;
+      }
+    }
+    if ($changed) {
+      $role->save();
+    }
+  }
+
+  $factory = \Drupal::configFactory();
+  $names = array_merge(
+    $factory->listAll('simple_oauth.oauth2_scope.aim_'),
+    $factory->listAll('views.view.aim_facts'),
+  );
+  foreach ($names as $name) {
+    $config = $factory->getEditable($name);
+    $raw = json_encode($config->getRawData());
+    $replaced = str_replace(array_keys($map), array_values($map), $raw);
+    if ($replaced !== $raw) {
+      $config->setData(json_decode($replaced, TRUE))->save();
+    }
+  }
+}

@@ -8,8 +8,8 @@ submodules; this file only covers what is specific to `aim_tool`.
 
 ## Permissions
 
-`store aim memory` / `read aim memory` (`aim_tool.permissions.yml`, both
-`restrict access: true`), separate from the flat `administer aim memory`
+`remember aim facts` / `recall aim facts` (`aim_tool.permissions.yml`, both
+`restrict access: true`), separate from the flat `administer aim`
 the admin UI uses. `AimRemember`'s tool plugin additionally checks the
 real per-scope `create {scope} aim facts` permission via
 `AimMemoryManager::checkCreateAccess()` - the flat permission only gates
@@ -37,7 +37,7 @@ use of the tool at all, not which scopes it can write.
 - `src/Plugin/tool/Tool/AimLiteral.php` - `aim_literal`, a thin wrapper over
   the `literals.lookup` service (key, search words, or a question when
   `literals_finder` is enabled), gated on `view literals` (or `view
-  restricted literals`), not `read aim memory`: literals check access per
+  restricted literals`), not `recall aim facts`: literals check access per
   value, so a signed-in member can use it in chat. The lookup tool
   an aim site uses; `literals_tool`'s `literals:lookup` wraps the same
   service for sites without aim. Only the attribute (ID, descriptions) and

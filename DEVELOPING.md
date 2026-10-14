@@ -729,7 +729,7 @@ as the current account, so `AimFactAccessControlHandler`'s per-scope
 permission applies per result. Being anonymous is not a reason to bypass:
 an anonymous web or MCP caller gets only what anonymous may view. So the
 chatbot recalls nothing for a visitor whose role lacks
-`view site aim facts`, and a caller with only `read aim memory` cannot
+`view site aim facts`, and a caller with only `recall aim facts` cannot
 recall their own `scope=user` facts via `aim_recall` without
 `view user aim facts`.
 
@@ -998,7 +998,7 @@ via the container, so only a hand-constructed instance is affected).
 ## Admin UI
 
 - `/admin/content/aim-facts` (View `views.view.aim_facts`, gated
-  `administer aim memory`) - table of every fact, "still live" for an
+  `administer aim`) - table of every fact, "still live" for an
   empty `expires`, `uid` ("Extracted by") and `subject`/`user`
   ("about") both shown, `trusted` shown and editable inline via the
   Edit link - this is the review queue ADR-0002's addendum leans on, not
@@ -1006,7 +1006,7 @@ via the container, so only a hand-constructed instance is affected).
 - `/admin/content/aim-facts/add` - bundle picker, then a standard
   `ContentEntityForm` per scope (`/admin/content/aim-facts/add/{aim_scope}`).
   Gated by the per-scope `create {scope} aim facts` permission (or
-  `administer aim memory`).
+  `administer aim`).
 - `/admin/config/system/queue-ui` - manual consolidation-queue trigger.
 - `/admin/config/aim/settings` (`AimSettingsForm`, `#config_target`-backed)
   - consolidation thresholds, the chatbot recall cutoff,

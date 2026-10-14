@@ -20,8 +20,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Runs a real semantic query against aim_vector_index.
  *
- * Same read path as drush aim:recall. Gated on "read aim memory" -
- * separate from AimRemember's "store aim memory" permission, since a
+ * Same read path as drush aim:recall. Gated on "recall aim facts" -
+ * separate from AimRemember's "remember aim facts" permission, since a
  * caller able to search facts should not automatically be able to write
  * them, or vice versa. Unlike aim_chatbot's aim_chatbot:recall, this is
  * not locked to scope=site - see AimRemember's docblock for why a Tool
@@ -31,7 +31,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * matching AimRemember's same default and keeping "recall my facts" the
  * ergonomic no-argument case for scope=user.
  *
- * "read aim memory" only gates use of this tool at all - the real
+ * "recall aim facts" only gates use of this tool at all - the real
  * per-scope "view {scope} aim facts" permission still applies per result:
  * AimMemoryManager::executeSearchQuery() runs this query as the calling
  * account and never bypasses access (only Drush and consolidation do), so
@@ -161,7 +161,7 @@ final class AimRecall extends ToolBase {
    * {@inheritdoc}
    */
   protected function checkAccess(array $values, AccountInterface $account, bool $return_as_object = FALSE): bool|AccessResultInterface {
-    $access = AccessResult::allowedIfHasPermission($account, 'read aim memory');
+    $access = AccessResult::allowedIfHasPermission($account, 'recall aim facts');
     return $return_as_object ? $access : $access->isAllowed();
   }
 

@@ -1,10 +1,10 @@
-administer aim memory:
-  title: 'Administer AIM facts'
-  description: 'Create, edit, and delete memory facts.'
+administer aim:
+  title: 'Administer AIM'
+  description: 'Configure AIM and create, edit and delete facts in every scope.'
   restrict access: true
 
-ingest aim memory:
-  title: 'Ingest documents into AIM memory'
+ingest aim facts:
+  title: 'Ingest documents into AIM'
   description: 'Upload a document or fact file on the AIM ingest form, which extracts facts with a model and saves them in any scope the file names.'
   restrict access: true
 

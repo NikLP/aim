@@ -63,7 +63,7 @@ use Drupal\user\EntityOwnerTrait;
     'delete-form' => '/admin/content/aim-facts/{aim_fact}/delete',
     'delete-multiple-form' => '/admin/content/aim-facts/delete',
   ],
-  admin_permission: 'administer aim memory',
+  admin_permission: 'administer aim',
   base_table: 'aim_fact',
 )]
 class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityChangedInterface {

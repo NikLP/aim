@@ -201,7 +201,7 @@ ones it wants. Each submodule has its own requirements and setup:
 3. Try it: `drush aim:remember "some fact" --scope=site`, then
    `drush aim:recall "some fact"`. For an unattended pipeline,
    `drush aim:extract <file>` classifies and stores facts from raw text; the
-   Content > AIM facts > Ingest form (`ingest aim memory`) does the same, plus
+   Content > AIM facts > Ingest form (`ingest aim facts`) does the same, plus
    one-fact-per-line and JSON imports without a model. A fact with an end
    date (`--expires=2026-10-16`) retires itself once it passes; add
    `drush aim:expire` to the crontab (Drupal cron also runs it).

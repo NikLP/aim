@@ -23,7 +23,7 @@ Open decisions for Nik (these set what is allowed, so they come first):
 1. **Retention for review traces**: suggest 30 days, then deleted unless
    promoted into a dataset (promotion = a human reviewed and redacted it).
 2. **Who may read traces**: suggest a new restricted permission, not
-   `administer aim memory`.
+   `administer aim`.
 3. **Real versus synthetic**: suggest eval datasets are synthetic or
    redacted-by-a-human only; raw real traces are review material, never a
    dataset or a prompt to a hosted judge. Hosted judges see only data that

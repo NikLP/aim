@@ -261,7 +261,7 @@ display:
       access:
         type: perm
         options:
-          perm: 'administer aim memory'
+          perm: 'administer aim'
       cache:
         type: tag
       empty:

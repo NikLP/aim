@@ -90,3 +90,30 @@ bound how long.
 - **A second always-on aim-only store.** Rejected as duplication. A snapshot
   of selected runs for eval baselines is fine, written from `ai_log` on
   demand.
+
+## Reviewed and not adopted (2026-10-14)
+
+Checked against the installed `ai` 1.6.x suite while deciding this:
+
+- **Batch embeddings** (`EmbeddingsCollectionInput`): indexing already
+  batches inside the standalone `ai_search`; aim's one direct embeddings call
+  (`embedText()`) embeds a single string. Nothing to change.
+- **Request metadata bag** (`setRequestMetadataValue()`): neither
+  `ai_observability` nor `ai_logging` reads it, so it would carry data to no
+  consumer. Input debug data (`setDebugDataValue()`) is what reaches
+  `ai_log`, and is what decision 2 uses.
+- **`ChatMemory` plugins**: `AimChatbotSourceTextSubscriber` reads the
+  agent's own chat history, and the demo recipe already uses
+  `private_tempstore_pool`. No change.
+- **Moderation guardrail and AI Reranker**: available, not needed yet;
+  check them before building a custom equivalent for ADR-0002 or ADR-0036.
+- **`ai_observability`** would be the route to token and latency metrics in
+  an external system (OpenTelemetry counters and spans); it needs a collector
+  and backend, which this site does not run.
+- **`ai_search` dependency**: aim declared the bundled `ai:ai_search`, which
+  the suite removes in 1.6.0. Fixed to the standalone
+  `ai_search:ai_search` the site already ran.
+- **`AimMariaDBProvider` shim**: unchanged. The HNSW `M`/`ef_search`
+  overrides are fixed in the provider's 1.0.x head (#3605665) and go once a
+  release carries them; the other three (#3609961, #3626257, #3626262) are
+  not fixed upstream.

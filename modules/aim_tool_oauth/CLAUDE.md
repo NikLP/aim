@@ -12,7 +12,7 @@ to `aim_tool_oauth`.
 - `config/install/simple_oauth.oauth2_scope.aim_remember.yml` /
   `aim_recall.yml` - two `oauth2_scope` entities with
   `granularity_id: permission`, pointed at `aim_tool`'s
-  `store aim memory`/`read aim memory` permissions. A scope with no
+  `remember aim facts`/`recall aim facts` permissions. A scope with no
   granularity crashes `Oauth2ScopeProvider::getPermissions()` the moment
   a real client completes the flow.
 - `aim_tool_oauth.install` - `hook_install()`/`hook_uninstall()` set/unset

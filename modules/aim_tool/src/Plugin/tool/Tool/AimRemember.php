@@ -28,16 +28,16 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * Unlike aim_chatbot's aim_chatbot:remember, this is not locked to
  * scope=site: a Tool API caller here is a real, authenticated Drupal
- * account (gated on the "store aim memory" permission below - separate
- * from AimRecall's "read aim memory", not the single blanket
- * administer aim memory the admin UI uses, since write and read are
+ * account (gated on the "remember aim facts" permission below - separate
+ * from AimRecall's "recall aim facts", not the single blanket
+ * administer aim the admin UI uses, since write and read are
  * different trust levels for a non-admin caller), not an anonymous chat
  * visitor, so scope/subject are caller-supplied - the same
  * shape ADR-0006 established for the drush CLI adapter, over Tool API/MCP
  * transport instead of a shell. See ADR-0013 for why this is a separate
  * plugin from the chatbot's rather than a shared one.
  *
- * "store aim memory" only gates use of this tool at all - rememberOne()
+ * "remember aim facts" only gates use of this tool at all - rememberOne()
  * additionally checks the real per-scope "create {scope} aim facts"
  * permission for the candidate's actual scope (AimMemoryManager::
  * checkCreateAccess()), so the same permission the admin UI's entity add
@@ -390,7 +390,7 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
       $subject = (string) $this->currentUser->id();
     }
 
-    // checkAccess() below only checks the flat "store aim memory"
+    // checkAccess() below only checks the flat "remember aim facts"
     // permission, gating use of this tool at all - it does not know the
     // per-candidate scope (especially for a facts batch, where each entry
     // can have its own). Check the real per-scope "create {scope} aim
@@ -431,7 +431,7 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
    * {@inheritdoc}
    */
   protected function checkAccess(array $values, AccountInterface $account, bool $return_as_object = FALSE): bool|AccessResultInterface {
-    $access = AccessResult::allowedIfHasPermission($account, 'store aim memory');
+    $access = AccessResult::allowedIfHasPermission($account, 'remember aim facts');
     return $return_as_object ? $access : $access->isAllowed();
   }
 

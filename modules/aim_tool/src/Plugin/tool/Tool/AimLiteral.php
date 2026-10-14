@@ -24,7 +24,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * one lookup under aim's name and need not enable literals_tool. Asking by
  * question uses literals_finder when it is enabled; aim does not depend on
  * it, and the finder stays out of recall. Use of the tool needs "view
- * literals", not "read aim memory": a literal is not an aim fact, and each
+ * literals", not "recall aim facts": a literal is not an aim fact, and each
  * value is access-checked for the caller anyway (a missing literal and one
  * the caller may not see give the same "none"). So a signed-in member can
  * look values up in chat.

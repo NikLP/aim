@@ -17,9 +17,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Access control handler for the aim_fact entity type.
  *
  * The default handler only ever checks the flat admin_permission
- * (administer aim memory) for every operation, so the per-scope
+ * (administer aim) for every operation, so the per-scope
  * view/create permissions AimPermissions generates do nothing without
- * this. update/delete are deliberately left on administer aim memory
+ * this. update/delete are deliberately left on administer aim
  * only - not asked to be scoped, see CLAUDE.md.
  *
  * The custom "trust" operation (trust/untrust bulk actions) is allowed by
