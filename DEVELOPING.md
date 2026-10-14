@@ -943,6 +943,20 @@ count - trivial at PoC scale, a real line item at volume.
 
 ---
 
+## Running the tests
+
+Kernel tests need a database that is not the site's own. Create it once
+(`ddev exec "mysql -uroot -proot -e 'CREATE DATABASE IF NOT EXISTS phpunit; GRANT ALL ON phpunit.* TO db@\"%\"'"`),
+then:
+
+```bash
+ddev exec "cd /var/www/html && SIMPLETEST_DB='mysql://db:db@db/phpunit' SIMPLETEST_BASE_URL=http://web vendor/bin/phpunit -c web/core/phpunit.xml.dist web/modules/custom/aim/tests web/modules/custom/aim/modules/aim_chatbot/tests"
+```
+
+A model-backed step is faked with `FakeDecisionBackend`; no test calls a
+provider. An entity access handler caches per entity and account, so a test
+that changes settings between two `access()` calls resets it first.
+
 ## Logging
 
 Channel `aim` (service `logger.channel.aim`). Three tiers:

@@ -302,3 +302,31 @@ stored embeddings; one corpus size.
 - The `subject` filter for role/case scope has the same post-filter
   weakness and could get a BTREE index from the same hook. Out of scope
   here; worth doing with it.
+
+## Addendum 2026-10-14: is the 5x over-fetch still needed?
+
+Re-measured on a scratch table (4,000 synthetic vectors built as noisy copies
+of 32 real embeddings, M=16, cosine; users holding 1, 10, 100 and 1,000 facts,
+the last 25% of the table; k=10, 20 probes per user; two noise levels; the
+table was dropped afterward and no live data was touched). Compared exact
+search (`IGNORE INDEX`) with the HNSW result fetched at 1x, 2x and 5x the
+limit, then truncated to the limit as `recall()` does:
+
+- At the shipped `mhnsw_ef_search=100` (ADR-0023): recall was 100% at 1x, 2x
+  and 5x for every user at both noise levels. The over-fetch did no
+  measurable work.
+- At MariaDB's default `ef_search=20`: one gap, the 1,000-fact user at the
+  tighter noise level: 90% at 1x, 92.5% at 2x, 95% at 5x.
+
+Limits: one corpus size, synthetic vectors (not real embeddings; the
+`aim_benchmark` method in DEVELOPING.md "Rechecking accuracy" was not used
+because that module is not enabled on this site), k=10 only.
+
+**Recommendation:** leave the 5x as is for now. It costs little (tens of rows;
+the embedding call dominates). Before lowering it to 2x, repeat the
+measurement with `aim_benchmark` on a real-embedding corpus at the table sizes
+that matter (ADR-0018's crossover lies between 100 and 1,000 facts and was not
+located). If `ef_search` is ever lowered or the status check
+(`AimStatusChecker`) reports it unset, the over-fetch matters again. The
+factor is a constant in `AimMemoryManager::recall()`; a setting is warranted
+only if sites need different values (TODO.md, "Recall over-fetch").

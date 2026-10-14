@@ -7,7 +7,7 @@ configure: aim.settings
 dependencies:
   - drupal:taxonomy
   - ai:ai
-  - ai:ai_search
+  - ai_search:ai_search
   - ai_vdb_provider_mariadb:ai_vdb_provider_mariadb
   - search_api:search_api
   - drupal:views

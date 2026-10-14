@@ -12,7 +12,7 @@ updated when one is done. Hosted Jev takes synthetic or public data only
 | --- | --- | --- | --- |
 | **A. Model evals** | The configured provider through Drupal (`decision-eval.php`, `aim.backend.decision`), fixed hand-written sets, no aim write path. Never the model's API directly. | `modules/aim_benchmark/scripts/` | Can the model make this judgment at all? |
 | **B. Module runs** | The module: `drush aim:remember` / `aim:extract` / `aim:consolidate` / `aim:recall` on a snapshot, real backends, real queue. | `demo/ingest-test/`, `aim_benchmark` commands | Does aim, wired to a model, do the right thing end to end? |
-| **C. Automated tests** | PHPUnit (kernel/unit). One kernel test so far (below). | `tests/src/Kernel/` | Does a class behave, without a live site? |
+| **C. Automated tests** | PHPUnit (kernel/unit): grounding, literal tokens, scope plugins, role visibility, expiry. Command in DEVELOPING.md. | `tests/src/Kernel/` | Does a class behave, without a live site? |
 
 The drift audit (ADR-0043) so far is type A only. Nothing in aim calls it
 yet, so a pass there says nothing about the module.

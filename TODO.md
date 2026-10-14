@@ -173,6 +173,15 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       Access is the intersection: the literal's own view rule and the
       field's `$item->access('view', $account)`; document that choice.
 
+## Case picker widget (raised 2026-10-14, pinned)
+
+- [ ] Pinned: a widget to pick from existing in-scope cases when writing a
+      `scope=case` fact, instead of typing a case ID or minting a new one
+      each time (`AimScopeCase::defaultSubject()` mints when `subject` is
+      empty). Needs a "list existing case subjects the viewer may see" query
+      first, and case-scope view access is still unbuilt, so the list would
+      leak case IDs across viewers until it is.
+
 ## Recipes (raised 2026-09-27)
 
 - [ ] Apply `recipes/aim_demo_library` to an isolated scratch site (its
@@ -427,7 +436,11 @@ are recommendations.
 - [ ] Parked (ADR-0057 time stance): recency/importance re-rank,
       weights default 0, needs a gold set.
 - [ ] Parked (ADR-0057 time stance): access counter / last-recalled.
-- [ ] Later, on a real recall miss: RRF keyword path via `search_api_db`.
+- [ ] Later, on a real recall miss: RRF keyword path via `search_api_db`
+      (hybrid keyword + vector recall; second keyword-only index fused in
+      PHP, feasibility checked in [ADR-0036](adr/0036-memory-algorithm-appraisal.md)
+      "Checked 2026-10-02"; open question there: whether a keyword-only
+      hit may bypass the ADR-0019 distance cutoff).
 
 ## Governance
 
@@ -547,15 +560,12 @@ questions" section)
       its own ADR plus sign-off first.
 - [ ] Extraction-input guardrailing, distinct from the existing output-side
       candidate-fact guardrails.
-- [ ] The whole module has no test infrastructure yet (no `tests/`
-      directory, checked 2026-09-27 building `AimEmbeddingCacheSubscriber`
-      above) - first real gap is a kernel test for that subscriber (a
-      second identical query makes zero provider calls, an index-time
-      embed is not cached, a different model ID misses), deferred at
-      build time rather than standing up a test harness from scratch for
-      one class. Verified live instead - see ADR-0017's "Built
-      2026-09-27". Whatever sets up `tests/src/Kernel` first should cover
-      this too.
+- [ ] Kernel test for `AimEmbeddingCacheSubscriber` (a second identical
+      query makes zero provider calls, an index-time embed is not cached, a
+      different model ID misses). Verified live instead - see ADR-0017's
+      "Built 2026-09-27". The kernel harness now exists (DEVELOPING.md,
+      "Running the tests"); still uncovered: `recall()` trusted/retired/
+      `user` filtering, the Trust/Untrust actions, `aim_tool` permissions.
 - [ ] Bulk actions for `category` on the admin facts view - deliberately
       not built (2026-09-30) because the field is not in use yet.
       `trusted`/retire/un-retire have them (`src/Plugin/Action/`,
@@ -635,7 +645,58 @@ questions" section)
 - [ ] Retention/erasure policy for retired facts (prune or archive old
       `expires` rows out of `aim_fact`) - retired facts about a person are
       still personal data. Own ADR when needed, see ADR-0022's
-      Consequences.
+      Consequences. Design sketch (2026-10-14, from the Oracle "enterprise
+      brain" article): erase by **tombstone**, not delete. An `aim:erase`
+      command (by user or fact) blanks `text` on the target and on every fact
+      linked to it through `superseded_by`, both directions, because a
+      consolidation UPDATE builds a merged fact from two inputs and erasing
+      one leaves its content alive in the merge. Also drop the rows from the
+      vector index, write an audit line (IDs only), keep ids, dates and the
+      supersede chain so the trail survives. ADR-0056's `personal_data` flag
+      is how it finds candidates. Check first what else holds text:
+      `superseded_by_reason` (meant to hold none), ADR-0037's
+      `aim_fact_source` (7 days), the unbuilt `aim_rejection` quarantine, and
+      the edit-history item under Governance (revisions would keep old text).
+- [ ] **Recall audit line (raised 2026-10-14).** `recall()` logs only counts
+      and best score, and only at the verbose tier, so "what did the agent
+      know when it acted" cannot be answered. Add an audit-tier line per
+      recall: uid, scope, returned fact IDs (IDs are not personal data).
+      Same data the eval plan's trace keeps, see
+      [eval/DRAFT-eval-plan.md](eval/DRAFT-eval-plan.md) section 6. Facts
+      are superseded not deleted, so IDs plus the timestamp reconstruct what
+      was visible, except for in-place text edits (see edit history above).
+- [ ] **Cross-user writes (raised 2026-10-14, decide when the use case is
+      pinned).** `aim_remember` takes a caller-supplied `subject` and checks
+      only `create user aim facts`, so anyone holding it can write a
+      scope=user fact about any account
+      (`AimRemember::saveOne()`, `AimMemoryManager::remember()`). Mitigated
+      for now: new facts start untrusted and are not recalled until trusted.
+      Legitimate in some cases (staff noting facts about a customer). When it
+      matters, use two scope instances sharing one plugin with different
+      `settings` ([ADR-0028](adr/resolved/0028-scope-type-plugin.md)): `user`
+      own-subject-only, and a separate scope where writing about others is
+      allowed. No new mechanism needed. Recall side is fine: a caller-supplied
+      `user` for someone else's facts returns nothing the viewer cannot see.
+- [ ] **Recall over-fetch is a code constant (noted 2026-10-14).**
+      `recall()` asks for `$limit * 5` when filtering by user
+      (`AimMemoryManager::recall()`), measured in ADR-0018 before HNSW tuning
+      (ADR-0023) closed most of the gap, and never re-measured since. Costs
+      little (tens of rows, the embedding call dominates), so it stays. Re-measured 2026-10-14 (ADR-0018 addendum): 1x already gave 100% at ef_search=100 on a synthetic corpus; repeat with `aim_benchmark` before lowering. If it
+      ever needs tuning: re-run ADR-0018's probe method with the tuned HNSW
+      settings at 1x, 2x and 5x and change the constant; a setting is only
+      worth adding if different sites need different values. `ai_search`
+      separately doubles its batch for access checks and retries up to 10
+      times; that is upstream.
+- [ ] **Idle lock for MCP callers (raised 2026-10-14, not verified).**
+      Autologout ends Drupal sessions, but an MCP client holds an OAuth
+      bearer token that outlives the session, so it likely does nothing here.
+      First lever is configuration: short access and refresh token lifetimes
+      per consumer in `simple_oauth` (refresh rotation then acts as a sliding
+      idle window). Activity-based locking would need a small cron or event
+      piece revoking tokens unused for N minutes. Search drupal.org for an
+      existing module before building; not done yet.
+- [ ] **Single-valued, filterable category, labelled on ingress** - see
+      [ADR-0059](adr/0059-single-valued-category-and-ingress-labelling.md).
 - [ ] `simple_oauth`'s signing keys are a plain file pair
       (`simple-oauth:generate-keys`) per `aim_tool_oauth`'s setup runbook -
       no Key module support today. Tried 2026-09-27: `key` module and
@@ -709,6 +770,17 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
 - [ ] EU AI Act Article 50 disclosure - evaluate `drupal/ai_disclosure`
       before public launch.
 - [ ] Fact-to-fact authored relations graph.
+- [ ] Export / portability (raised 2026-10-14, from a second-brain feature
+      appraisal): a Drush command and admin action dumping facts to
+      Markdown and JSON (scope, text, category, source, asserted,
+      expires, trusted, retired/superseded edges), honoring the viewer's
+      access. Counterpart to ingest, so there is no lock-in; the
+      `aim_demo_library` recipe's `facts.json` shows the import shape.
+- [ ] Review digest (raised 2026-10-14): a periodic summary (email or
+      dashboard block) of facts added, untrusted awaiting review, expired
+      or stale, and rejected candidates. Self-maintaining upkeep against
+      the neglect risk; likely the delivery mechanism for the scheduled
+      staleness review below. Queue/cron per ADR-0003, never `hook_cron`.
 - [ ] Scheduled TTL/staleness review - mechanism undecided now that
       Content Moderation isn't happening (ADR-0002 addendum, 2026-09-28);
       don't build ad hoc.

@@ -6,6 +6,7 @@ namespace Drupal\aim_chatbot\Drush\Commands;
 
 use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Cache\Cache;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Session\AccountSwitcherInterface;
 use Drupal\Core\Session\AnonymousUserSession;
@@ -27,8 +28,8 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 /**
  * End-to-end comparison of two ways to answer a one-shot value lookup.
  *
- * Answers TODO.md's "Measure the gate end to end" (ADR-0052 decision 3). Runs a gold
- * set through the real assistant twice: "tool" (the assistant calls
+ * Answers TODO.md's "Measure the gate end to end" (ADR-0052 decision 3).
+ * Runs a gold set through the real assistant twice: "tool" (the assistant calls
  * aim_literal itself, the shipped design) and "prompt" (no tool, the
  * viewer's readable literals listed in the system prompt, so the large model
  * does the same lookup alone), and "gate" (the finder decides first: a
@@ -70,6 +71,8 @@ final class AimChatbotEvalCommands extends DrushCommands {
    *   The literal lookup, which runs the finder.
    * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $dispatcher
    *   The event dispatcher.
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
+   *   The config factory.
    */
   public function __construct(
     protected AiAssistantApiRunner $runner,
@@ -78,6 +81,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
     protected LiteralReader $reader,
     protected LiteralLookup $lookup,
     protected EventDispatcherInterface $dispatcher,
+    protected ConfigFactoryInterface $configFactory,
   ) {
     parent::__construct();
   }
@@ -96,6 +100,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
       $container->get('literals.reader'),
       $container->get('literals.lookup'),
       $container->get('event_dispatcher'),
+      $container->get('config.factory'),
     );
   }
 
@@ -252,12 +257,22 @@ final class AimChatbotEvalCommands extends DrushCommands {
       $this->dispatcher->removeListener(PostGenerateResponseEvent::EVENT_NAME, $post);
       $this->dispatcher->removeListener(AgentToolPreExecuteEvent::EVENT_NAME, $tool);
       unset($GLOBALS['config']['ai_agents.ai_agent.' . $agentId]);
-      \Drupal::configFactory()->reset('ai_agents.ai_agent.' . $agentId);
+      $this->configFactory->reset('ai_agents.ai_agent.' . $agentId);
       Cache::invalidateTags(['config:ai_agents.ai_agent.' . $agentId]);
     }
 
     $this->io()->section('Summary (per-question means; answerable correct, leaks, errors)');
-    $this->io()->table(['Mode', 'Correct', 'Leaks', 'Errors', 'Calls hosted / in-house', 'Tok hosted', 'Tok in-house', 'Gate hits', 'Time'], $summary);
+    $this->io()->table([
+      'Mode',
+      'Correct',
+      'Leaks',
+      'Errors',
+      'Calls hosted / in-house',
+      'Tok hosted',
+      'Tok in-house',
+      'Gate hits',
+      'Time',
+    ], $summary);
     $this->io()->writeln(sprintf('%d questions run, %d skipped (expected literal no longer exists).', count($usable), $skipped));
     if ($options['dump']) {
       file_put_contents($options['dump'], json_encode($dump, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
@@ -336,8 +351,8 @@ final class AimChatbotEvalCommands extends DrushCommands {
    * Overrides the agent config for a mode, for this process only.
    *
    * @param string $mode
-   *   The mode: "tool" leaves the agent alone; "prompt" drops the lookup tool and lists
-   *   the anonymous-readable literals in the system prompt.
+   *   The mode: "tool" leaves the agent alone; "prompt" drops the lookup
+   *   tool and lists the anonymous-readable literals in the system prompt.
    * @param string $agentId
    *   The ai_agent ID.
    */
@@ -345,7 +360,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
     $name = 'ai_agents.ai_agent.' . $agentId;
     unset($GLOBALS['config'][$name]);
     if ($mode === 'gate') {
-      $config = \Drupal::configFactory()->getEditable($name)->getRawData();
+      $config = $this->configFactory->getEditable($name)->getRawData();
       $prompt = preg_replace('/When a visitor needs an exact value.*$/s', '', (string) $config['system_prompt']);
       $prompt .= "You have no lookup tool. If a visitor asks for an exact value such as a phone number or a web address and it is not in your recalled facts, say you don't have it recorded.";
       $tools = $config['tools'];
@@ -353,7 +368,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
       $GLOBALS['config'][$name] = ['system_prompt' => $prompt, 'tools' => $tools];
     }
     elseif ($mode === 'prompt') {
-      $config = \Drupal::configFactory()->getEditable($name)->getRawData();
+      $config = $this->configFactory->getEditable($name)->getRawData();
       $lines = [];
       foreach ($this->entityTypeManager->getStorage('literal')->loadMultiple() as $literal) {
         $item = $this->reader->readItem((string) $literal->id(), new AnonymousUserSession());
@@ -368,7 +383,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
       $tools['tool:aim_literal'] = FALSE;
       $GLOBALS['config'][$name] = ['system_prompt' => $prompt, 'tools' => $tools];
     }
-    \Drupal::configFactory()->reset($name);
+    $this->configFactory->reset($name);
     Cache::invalidateTags(['config:' . $name]);
   }
 

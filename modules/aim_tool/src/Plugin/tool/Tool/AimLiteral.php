@@ -88,7 +88,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     'gist' => new OutputDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Gist'),
-      description: new TranslatableMarkup('What this value is, in the site\'s own words. Check that it fits what was asked before presenting the value, and say so if it does not. Empty unless the outcome is match.'),
+      description: new TranslatableMarkup('What this value is, in simple language terms. Check that it fits what was asked before presenting the value, and say so if it does not. Empty unless the outcome is match.'),
     ),
   ],
 )]
