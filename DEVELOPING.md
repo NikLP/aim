@@ -973,6 +973,17 @@ candidates are `aim_tool_oauth` (against `agent_access`), the settings form,
 and borrowing `ai_eval`'s judge statistics. Not much plumbing; the larger
 size win is the `AimMemoryManager` split.
 
+`AimMemoryManager` split (2026-10-15, 2,490 to 1,384 lines): consolidation
+moved to `AimConsolidationService` (`aim.consolidation`; callers are the
+queue worker, `aim:consolidate` and the test), settings and thresholds to
+`AimSettings` (`aim.settings_reader`), the grounded check to
+`AimGroundingChecker`. The manager keeps one-line delegators for the
+settings getters and `checkGrounding()` and aliases the `DEFAULT_*`
+constants, so existing callers are untouched; move callers to the new
+services over time and drop the delegators. Still in the manager:
+`remember`/`ingestText`/`extractFacts` and `recall`/`executeSearchQuery`,
+candidates for the next two services.
+
 ## Running the tests
 
 Kernel tests need a database that is not the site's own. Create it once

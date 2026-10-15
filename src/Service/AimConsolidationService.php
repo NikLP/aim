@@ -27,10 +27,10 @@ use Drupal\search_api\SearchApiException;
  * access and recall). Nothing else in the manager calls into this class.
  * See CLAUDE.md decision 4 and the consolidation ADRs.
  */
-class ConsolidationService {
+class AimConsolidationService {
 
   /**
-   * Constructs a ConsolidationService object.
+   * Constructs a AimConsolidationService object.
    *
    * @param \Drupal\aim\Service\AimMemoryManager $manager
    *   The memory manager, for loading, saving, settings and search.

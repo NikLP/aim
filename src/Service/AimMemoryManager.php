@@ -22,8 +22,6 @@ use Drupal\ai\Guardrail\Result\RewriteInputResult;
 use Drupal\ai\Guardrail\Result\StopResult;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
-use Drupal\ai\OperationType\Decision\DecisionInput;
-use Drupal\ai\OperationType\Decision\Value\NoulQuestion;
 use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Backend\ActivityBackendInterface;
 use Drupal\aim\Entity\AimFact;
@@ -63,93 +61,14 @@ class AimMemoryManager {
    */
   protected const CONSOLIDATE_QUEUE_ID = 'aim_consolidate';
 
-  /**
-   * The grounded check's question, %1$s being the candidate's state key.
-   *
-   * The "strict" wording measured in aim_benchmark's decision-eval.php
-   * grounding task (ADR-0037 addenda): naming the failure kinds stops
-   * proposals and wishes passing as settled facts. Narrower wordings were
-   * tested 2026-10-11 and not adopted.
-   */
-  protected const GROUNDING_QUESTION = 'Does the text state the fact in %1$s? Answer no if %1$s adds, changes or drops any detail, gives an old value the text has replaced, pins a detail on the wrong person or thing, or states as settled something the text only proposes, hedges or reports second-hand.';
+  // Shipped defaults live in AimSettings; kept here for existing callers.
+  public const DEFAULT_AUTO_THRESHOLD = AimSettings::DEFAULT_AUTO_THRESHOLD;
 
-  /**
-   * The grounding cutoff when activities.grounding.threshold is unset.
-   *
-   * Hosted Jev split supported from unsupported candidates at about 0.76 on
-   * the 44-item eval set (tuned on that set, so optimistic).
-   */
-  protected const GROUNDING_DEFAULT_THRESHOLD = 0.7;
+  public const DEFAULT_AMBIGUOUS_THRESHOLD = AimSettings::DEFAULT_AMBIGUOUS_THRESHOLD;
 
-  /**
-   * Shipped default for aim.settings' auto_threshold, and a fallback.
-   *
-   * The live, admin-editable value is aim.settings:auto_threshold
-   * (/admin/config/aim/settings) - see getAutoThreshold(). This constant is
-   * only the value config/install ships on a fresh install, and the
-   * fallback if that config is ever missing entirely. Public and shared
-   * between the CLI sweep's option default and the queue worker, so the two
-   * can't drift out of sync the way AimCommands' hardcoded provider/model
-   * defaults already did twice earlier this project. Empirically set
-   * against ollama__nomic-embed-text:latest (see
-   * CLAUDE.md's "Consolidation" section) - recalibrated 2026-09-10 from an
-   * earlier 0.05/0.20 pair that was calibrated against amazeeio's
-   * mistral-embed and never re-checked after the site's embeddings_engine
-   * was switched to a local Ollama model.
-   *
-   * First pass set this to 0.12 from two known duplicate pairs (cosine
-   * distance 0.059 and 0.082). That was too loose - live testing produced
-   * a real false auto-merge at 0.1186 ("Nik likes chocolate biscuits" vs.
-   * "Nik likes chocolate digestives", genuinely distinct preferences, not
-   * a restatement) that got silently retired with zero LLM review. Pulled
-   * back to sit clearly below that observed false positive - this small
-   * embedding model apparently packs "same topic, different content" much
-   * closer to "restated duplicate" than mistral-embed did, so the safe
-   * auto-merge band is narrower here than the first calibration assumed.
-   * Still not a large sample - re-check as real data grows, and favor the
-   * ambiguous (LLM-reviewed) band over widening this one on a hunch.
-   */
-  public const DEFAULT_AUTO_THRESHOLD = 0.09;
+  public const DEFAULT_NEIGHBOR_LIMIT = AimSettings::DEFAULT_NEIGHBOR_LIMIT;
 
-  /**
-   * Shipped default for aim.settings' ambiguous_threshold, and a fallback.
-   *
-   * See DEFAULT_AUTO_THRESHOLD - same relationship to the live config value,
-   * read via getAmbiguousThreshold(). Set to cover the observed
-   * distinct-but-topically-related band (0.29-0.41) for an LLM judgment
-   * call, while still excluding clearly unrelated pairs (0.67+).
-   */
-  public const DEFAULT_AMBIGUOUS_THRESHOLD = 0.45;
-
-  /**
-   * Shipped default for aim.settings' neighbor_limit, and a fallback.
-   *
-   * How many nearest neighbors consolidation compares a fact against, read
-   * via getNeighborLimit(). Each neighbor inside the ambiguous band can
-   * cost one classification call, so this bounds the worst-case cost per
-   * fact. Measured 2026-10-02 on the live site: 1 found 40 decisions, 3
-   * found 86, including two merges 1 never saw.
-   */
-  public const DEFAULT_NEIGHBOR_LIMIT = 3;
-
-  /**
-   * Shipped default for aim.settings' recall_max_distance, and a fallback.
-   *
-   * See DEFAULT_AUTO_THRESHOLD - same relationship to the live config value,
-   * read via getRecallMaxDistance(). Measured 2026-09-19 against
-   * ollama__nomic-embed-text:latest on the live site-scope facts, question
-   * text against fact text (not fact against fact, so the consolidation
-   * thresholds above don't apply): answerable questions' best match
-   * 0.12-0.29 (full questions and terse keyword queries alike),
-   * near-topic-but-unanswerable 0.25-0.33, off-topic 0.51-0.64. 0.45 sits
-   * in the empty band between the last two, with room either way.
-   * It cannot separate an answerable question from a near-topic
-   * unanswerable one (their ranges overlap) - that stays the model's call.
-   * The off-topic floor drifts down as the corpus grows and diversifies
-   * (more candidates, more coincidental near matches), so recheck it then,
-   * not only when the embeddings model changes.
-   */
-  public const DEFAULT_RECALL_MAX_DISTANCE = 0.45;
+  public const DEFAULT_RECALL_MAX_DISTANCE = AimSettings::DEFAULT_RECALL_MAX_DISTANCE;
 
   /**
    * Constructs an AimMemoryManager object.
@@ -197,6 +116,10 @@ class AimMemoryManager {
    * @param \Drupal\literals\LiteralReader $literalReader
    *   The literals reader. recall() uses it to replace [literal:key] tokens
    *   in fact text as the viewing account.
+   * @param \Drupal\aim\Service\AimSettings $settings
+   *   The settings reader (thresholds, activity models, grounding mode).
+   * @param \Drupal\aim\Service\AimGroundingChecker $groundingChecker
+   *   The grounded check (ADR-0037).
    */
   public function __construct(
     protected AiProviderPluginManager $aiProvider,
@@ -212,17 +135,9 @@ class AimMemoryManager {
     protected LoggerChannelInterface $logger,
     protected ActivityBackendInterface $decisionBackend,
     protected LiteralReader $literalReader,
+    protected AimSettings $settings,
+    protected AimGroundingChecker $groundingChecker,
   ) {}
-
-  /**
-   * Grounding scores fetched this request, keyed by passage and candidate.
-   *
-   * Lets a caller check a whole batch in one call, after which remember()
-   * finds each fact's score here instead of calling again.
-   *
-   * @var array<string, float|null>
-   */
-  protected array $groundingCache = [];
 
   /**
    * Logs an audit event at info level, if aim.settings:log_audit is on.
@@ -290,78 +205,6 @@ class AimMemoryManager {
     $scopeEntity = $this->entityTypeManager->getStorage('aim_scope')->load($scope);
     $settings = $scopeEntity?->get('settings') ?? [];
     return (bool) ($settings['requires_account'] ?? FALSE);
-  }
-
-  /**
-   * Returns the live auto-merge threshold from aim.settings.
-   *
-   * Falls back to DEFAULT_AUTO_THRESHOLD only if the config value is
-   * missing (e.g. aim.settings was deleted outside of a normal uninstall) -
-   * config/install ships a real value, so this should not normally be hit.
-   *
-   * @return float
-   *   Score at or below which a neighbor is retired automatically.
-   */
-  public function getAutoThreshold(): float {
-    $value = $this->configFactory->get('aim.settings')->get('auto_threshold');
-    return $value !== NULL ? (float) $value : self::DEFAULT_AUTO_THRESHOLD;
-  }
-
-  /**
-   * Returns the live ambiguous threshold from aim.settings.
-   *
-   * See getAutoThreshold() - same fallback behavior.
-   *
-   * @return float
-   *   Score at or below which an ambiguous neighbor gets a classification
-   *   call.
-   */
-  public function getAmbiguousThreshold(): float {
-    $value = $this->configFactory->get('aim.settings')->get('ambiguous_threshold');
-    return $value !== NULL ? (float) $value : self::DEFAULT_AMBIGUOUS_THRESHOLD;
-  }
-
-  /**
-   * Returns how many nearest neighbors consolidation compares a fact to.
-   *
-   * See getAutoThreshold() - same fallback behavior.
-   *
-   * @return int
-   *   At least 1.
-   */
-  public function getNeighborLimit(): int {
-    $value = $this->configFactory->get('aim.settings')->get('neighbor_limit');
-    return $value !== NULL ? max(1, (int) $value) : self::DEFAULT_NEIGHBOR_LIMIT;
-  }
-
-  /**
-   * Returns the live recall cutoff from aim.settings.
-   *
-   * See getAutoThreshold() - same fallback behavior. Applied by callers
-   * that must abstain on a poor match: aim_chatbot:recall and aim_tool's
-   * aim_recall pass it to recall() as $maxDistance; recall() itself does
-   * not apply it unless asked.
-   *
-   * @return float
-   *   Distance above which a recalled fact is too dissimilar to present as
-   *   relevant.
-   */
-  public function getRecallMaxDistance(): float {
-    $value = $this->configFactory->get('aim.settings')->get('recall_max_distance');
-    return $value !== NULL ? (float) $value : self::DEFAULT_RECALL_MAX_DISTANCE;
-  }
-
-  /**
-   * Returns the recall gap callers apply to trim loose matches.
-   *
-   * @return float
-   *   Keep only facts whose distance is within this of the best match's. 0
-   *   (the default) turns the trim off. Like getRecallMaxDistance(), it is
-   *   applied only when a caller passes it to recall(): the model-facing
-   *   recall tools do, consolidation's neighbor search does not.
-   */
-  public function getRecallGap(): float {
-    return (float) $this->configFactory->get('aim.settings')->get('recall_gap');
   }
 
   /**
@@ -612,178 +455,102 @@ class AimMemoryManager {
   }
 
   /**
-   * Resolves the site-wide default chat provider and model.
+   * Delegates to AimSettings::getAutoThreshold().
    *
-   * Mirrors `AiAssistantApiRunner::getProviderAndModel()`'s own
-   * `__default__` handling - a caller with no opinion on which provider to
-   * use should resolve this instead of hardcoding one, so it follows
-   * whatever `ai.settings`' `default_providers.chat` is currently set to
-   * rather than drifting out of sync with it. Written after a hardcoded
-   * `'anthropic'`/`'claude-sonnet-5'` default in `AimCommands` had to be
-   * hand-edited twice already this project when the site's working
-   * provider changed.
+   * @see \Drupal\aim\Service\AimSettings::getAutoThreshold()
+   */
+  public function getAutoThreshold(): float {
+    return $this->settings->getAutoThreshold();
+  }
+
+  /**
+   * Delegates to AimSettings::getAmbiguousThreshold().
    *
-   * @return array|null
-   *   An array with keys 'provider_id' and 'model_id', or NULL if no
-   *   default chat provider is configured.
+   * @see \Drupal\aim\Service\AimSettings::getAmbiguousThreshold()
+   */
+  public function getAmbiguousThreshold(): float {
+    return $this->settings->getAmbiguousThreshold();
+  }
+
+  /**
+   * Delegates to AimSettings::getNeighborLimit().
+   *
+   * @see \Drupal\aim\Service\AimSettings::getNeighborLimit()
+   */
+  public function getNeighborLimit(): int {
+    return $this->settings->getNeighborLimit();
+  }
+
+  /**
+   * Delegates to AimSettings::getRecallMaxDistance().
+   *
+   * @see \Drupal\aim\Service\AimSettings::getRecallMaxDistance()
+   */
+  public function getRecallMaxDistance(): float {
+    return $this->settings->getRecallMaxDistance();
+  }
+
+  /**
+   * Delegates to AimSettings::getRecallGap().
+   *
+   * @see \Drupal\aim\Service\AimSettings::getRecallGap()
+   */
+  public function getRecallGap(): float {
+    return $this->settings->getRecallGap();
+  }
+
+  /**
+   * Delegates to AimSettings::getDefaultChatProvider().
+   *
+   * @see \Drupal\aim\Service\AimSettings::getDefaultChatProvider()
    */
   public function getDefaultChatProvider(): ?array {
-    return $this->aiProvider->getDefaultProviderForOperationType('chat');
+    return $this->settings->getDefaultChatProvider();
   }
 
   /**
-   * Resolves the backend and model configured for an activity.
+   * Delegates to AimSettings::getModelFor().
    *
-   * Reads aim.settings:activities.{activity}; an empty chat choice falls
-   * back to the site default chat provider. A decision backend has no site
-   * default, so it needs an explicit choice.
-   *
-   * @param string $activity
-   *   One of extraction, consolidation, verifier or grounding. Extraction is
-   *   always chat, grounding always decision.
-   *
-   * @return array|null
-   *   An array with keys 'provider_id', 'model_id' and 'backend', or NULL if
-   *   neither a choice nor a usable default is configured.
+   * @see \Drupal\aim\Service\AimSettings::getModelFor()
    */
   public function getModelFor(string $activity): ?array {
-    $choice = $this->configFactory->get('aim.settings')->get('activities.' . $activity) ?? [];
-    $backend = $activity === 'grounding' || (($choice['backend'] ?? 'chat') === 'decision' && $activity !== 'extraction') ? 'decision' : 'chat';
-    if (!empty($choice['provider']) && !empty($choice['model'])) {
-      return ['provider_id' => $choice['provider'], 'model_id' => $choice['model'], 'backend' => $backend];
-    }
-    if ($backend === 'decision') {
-      return NULL;
-    }
-    $default = $this->getDefaultChatProvider();
-    return !empty($default['provider_id']) && !empty($default['model_id']) ? $default + ['backend' => 'chat'] : NULL;
+    return $this->settings->getModelFor($activity);
   }
 
   /**
-   * Returns the decision-backend model for an activity, if it uses one.
+   * Delegates to AimSettings::decisionModelFor().
    *
-   * @param string $activity
-   *   One of consolidation, verifier or grounding.
-   *
-   * @return array|null
-   *   A [provider_id, model_id] pair, or NULL when the activity uses the
-   *   chat backend or has no decision model chosen.
+   * @see \Drupal\aim\Service\AimSettings::decisionModelFor()
    */
   public function decisionModelFor(string $activity): ?array {
-    $choice = $this->getModelFor($activity);
-    return ($choice['backend'] ?? NULL) === 'decision' ? [$choice['provider_id'], $choice['model_id']] : NULL;
+    return $this->settings->decisionModelFor($activity);
   }
 
   /**
-   * Returns the grounded check's mode: off, shadow or enforce.
+   * Delegates to AimSettings::getGroundingMode().
    *
-   * Shadow records each fact's score and leaves trusted alone; enforce also
-   * sets trusted from the score (ADR-0037).
-   *
-   * @return string
-   *   The mode, off when unset or unknown.
+   * @see \Drupal\aim\Service\AimSettings::getGroundingMode()
    */
   public function getGroundingMode(): string {
-    $mode = $this->configFactory->get('aim.settings')->get('grounding_mode');
-    return in_array($mode, ['shadow', 'enforce'], TRUE) ? $mode : 'off';
+    return $this->settings->getGroundingMode();
   }
 
   /**
-   * Returns the score at or above which a fact counts as grounded.
+   * Delegates to AimSettings::getGroundingThreshold().
    *
-   * @return float
-   *   aim.settings:activities.grounding.threshold, or the shipped default
-   *   when unset or 0.
+   * @see \Drupal\aim\Service\AimSettings::getGroundingThreshold()
    */
   public function getGroundingThreshold(): float {
-    $threshold = (float) ($this->configFactory->get('aim.settings')->get('activities.grounding.threshold') ?? 0);
-    return $threshold > 0 ? $threshold : self::GROUNDING_DEFAULT_THRESHOLD;
+    return $this->settings->getGroundingThreshold();
   }
 
   /**
-   * Asks the decision model whether a passage states each candidate fact.
+   * Delegates to AimGroundingChecker::checkGrounding().
    *
-   * One call for the whole list: every candidate goes into the state next
-   * to the passage with its own question, which measured as fast and as
-   * accurate as one call per fact (ADR-0037 addendum). Scores already
-   * fetched this request are reused. The passage is never stored; with
-   * log_query_text on, it is logged with each score for diagnosis.
-   *
-   * @param string $passage
-   *   The text the facts were written from.
-   * @param string[] $candidates
-   *   Candidate fact texts, keyed however the caller likes.
-   *
-   * @return array
-   *   A grounding probability (0 to 1) per candidate, same keys, or NULL for
-   *   each candidate when the check is off, has no decision model, or failed.
+   * @see \Drupal\aim\Service\AimGroundingChecker::checkGrounding()
    */
   public function checkGrounding(string $passage, array $candidates): array {
-    $scores = array_fill_keys(array_keys($candidates), NULL);
-    $passage = trim($passage);
-    if ($this->getGroundingMode() === 'off' || $passage === '' || !$candidates) {
-      return $scores;
-    }
-    $model = $this->decisionModelFor('grounding');
-    if ($model === NULL) {
-      $this->logger->warning('Grounding is @mode but no decision model is chosen for it in the AIM settings; facts are not checked.', ['@mode' => $this->getGroundingMode()]);
-      return $scores;
-    }
-
-    $state = ['text' => $passage];
-    $questions = [];
-    $asked = [];
-    foreach ($candidates as $key => $candidate) {
-      $hash = hash('sha256', $passage . "\0" . $candidate);
-      if (array_key_exists($hash, $this->groundingCache)) {
-        $scores[$key] = $this->groundingCache[$hash];
-        continue;
-      }
-      $id = 'candidate_' . (count($asked) + 1);
-      $state[$id] = (string) $candidate;
-      $questions[$id] = new NoulQuestion(sprintf(self::GROUNDING_QUESTION, $id));
-      $asked[$id] = [$key, $hash];
-    }
-    if (!$asked) {
-      return $scores;
-    }
-
-    try {
-      $response = $this->decisionBackend->run('grounding', new DecisionInput($state, $questions), $model[0], $model[1]);
-      foreach ($asked as $id => [$key, $hash]) {
-        $scores[$key] = $this->groundingCache[$hash] = $response->getNoul($id)->getProbability();
-      }
-    }
-    catch (\Exception $e) {
-      $this->logger->warning('Grounding check failed to run for @count candidate(s): @message', [
-        '@count' => count($asked),
-        '@message' => $e->getMessage(),
-      ]);
-      return $scores;
-    }
-
-    return $scores;
-  }
-
-  /**
-   * Field values a grounding score sets on a new fact.
-   *
-   * @param float|null $score
-   *   The checkGrounding() score, NULL when it could not be had.
-   * @param bool|null $trusted
-   *   The caller's explicit trusted value, which enforce mode never
-   *   overrides.
-   *
-   * @return array
-   *   grounding_score, plus trusted in enforce mode: TRUE at or above the
-   *   threshold, FALSE below it or when the check failed (fail closed).
-   */
-  protected function groundingValues(?float $score, ?bool $trusted): array {
-    $values = ['grounding_score' => $score];
-    if ($trusted === NULL && $this->getGroundingMode() === 'enforce') {
-      $values['trusted'] = $score !== NULL && $score >= $this->getGroundingThreshold();
-    }
-    return $values;
+    return $this->groundingChecker->checkGrounding($passage, $candidates);
   }
 
   /**
@@ -957,7 +724,7 @@ class AimMemoryManager {
 
     $grounded = $sourceText !== NULL && $this->getGroundingMode() !== 'off';
     if ($grounded) {
-      $values += $this->groundingValues($this->checkGrounding($sourceText, [$text])[0], $trusted);
+      $values += $this->groundingChecker->groundingValues($this->checkGrounding($sourceText, [$text])[0], $trusted);
     }
 
     if ($targetType !== NULL) {
@@ -1107,7 +874,7 @@ class AimMemoryManager {
         $values['trusted'] = $trusted;
       }
       if ($grounded) {
-        $values += $this->groundingValues($scores[$i] ?? NULL, $trusted);
+        $values += $this->groundingChecker->groundingValues($scores[$i] ?? NULL, $trusted);
       }
 
       $entity = $storage->create($values);

@@ -22,6 +22,19 @@ services:
     tags:
       - { name: module_install.uninstall_validator }
 
+  aim.settings_reader:
+    class: Drupal\aim\Service\AimSettings
+    arguments:
+      - '@config.factory'
+      - '@ai.provider'
+
+  aim.grounding_checker:
+    class: Drupal\aim\Service\AimGroundingChecker
+    arguments:
+      - '@aim.settings_reader'
+      - '@logger.channel.aim'
+      - '@aim.backend.decision'
+
   aim.memory_manager:
     class: Drupal\aim\Service\AimMemoryManager
     arguments:
@@ -38,9 +51,11 @@ services:
       - '@logger.channel.aim'
       - '@aim.backend.decision'
       - '@literals.reader'
+      - '@aim.settings_reader'
+      - '@aim.grounding_checker'
 
   aim.consolidation:
-    class: Drupal\aim\Service\ConsolidationService
+    class: Drupal\aim\Service\AimConsolidationService
     arguments:
       - '@aim.memory_manager'
       - '@ai.provider'
@@ -50,7 +65,7 @@ services:
       - '@logger.channel.aim'
       - '@aim.backend.decision'
 
-  Drupal\aim\Service\ConsolidationService:
+  Drupal\aim\Service\AimConsolidationService:
     alias: aim.consolidation
 
   # Class alias so autowired consumers (the auto-registered AimHooks

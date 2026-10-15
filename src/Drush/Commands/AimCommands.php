@@ -7,7 +7,7 @@ namespace Drupal\aim\Drush\Commands;
 use Drupal\aim\AimStatusChecker;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
-use Drupal\aim\Service\ConsolidationService;
+use Drupal\aim\Service\AimConsolidationService;
 use Drush\Attributes as CLI;
 use Drush\Commands\AutowireTrait;
 use Drush\Commands\DrushCommands;
@@ -30,14 +30,14 @@ final class AimCommands extends DrushCommands {
    *
    * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
    *   The aim memory manager.
-   * @param \Drupal\aim\Service\ConsolidationService $consolidation
+   * @param \Drupal\aim\Service\AimConsolidationService $consolidation
    *   The consolidation service, used by aim:consolidate.
    * @param \Drupal\aim\AimStatusChecker $statusChecker
    *   The status checker, used by aim:status.
    */
   public function __construct(
     protected AimMemoryManager $memoryManager,
-    protected ConsolidationService $consolidation,
+    protected AimConsolidationService $consolidation,
     protected AimStatusChecker $statusChecker,
   ) {
     parent::__construct();
