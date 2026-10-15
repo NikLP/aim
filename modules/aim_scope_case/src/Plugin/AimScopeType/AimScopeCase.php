@@ -20,7 +20,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Subject auto-minting for scope=case aim_fact entities.
  *
- * Moved out of core aim's AimMemoryManager::remember() (ADR-0026's
+ * Moved out of core aim's AimRememberService::remember() (ADR-0026's
  * follow-up audit flagged this as scope-specific behavior, not a config
  * flag, so requires_account's settings-based mechanism didn't apply -
  * needed defaultSubject() added to AimScopeTypeInterface instead).

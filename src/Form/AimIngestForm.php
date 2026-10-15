@@ -9,6 +9,7 @@ use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
+use Drupal\aim\Service\AimRememberService;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -30,11 +31,14 @@ final class AimIngestForm extends FormBase {
    *
    * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
    *   The aim memory manager.
+   * @param \Drupal\aim\Service\AimRememberService $rememberService
+   *   The remember service, which does the writing.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    *   The entity type manager.
    */
   public function __construct(
     protected AimMemoryManager $memoryManager,
+    protected AimRememberService $rememberService,
     protected EntityTypeManagerInterface $entityTypeManager,
   ) {}
 
@@ -42,7 +46,7 @@ final class AimIngestForm extends FormBase {
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container): static {
-    return new static($container->get('aim.memory_manager'), $container->get('entity_type.manager'));
+    return new static($container->get('aim.memory_manager'), $container->get('aim.remember'), $container->get('entity_type.manager'));
   }
 
   /**
@@ -192,7 +196,7 @@ final class AimIngestForm extends FormBase {
     $result = ['created' => [], 'errors' => [], 'skipped' => 0, 'blocked' => 0, 'mode' => $mode];
     try {
       if ($mode === 'extract') {
-        $r = $this->memoryManager->ingestText($text, $source, trim((string) $form_state->getValue('subject_uid')) ?: NULL);
+        $r = $this->rememberService->ingestText($text, $source, trim((string) $form_state->getValue('subject_uid')) ?: NULL);
         $result = $r + $result;
         if ($r['extracted'] === 0) {
           $this->messenger()->addWarning($this->t('The model returned no facts worth remembering.'));
@@ -219,7 +223,7 @@ final class AimIngestForm extends FormBase {
             }
           }
         }
-        $r = $this->memoryManager->rememberBatch($entries, $source);
+        $r = $this->rememberService->rememberBatch($entries, $source);
         $result['created'] = $r['created'];
         $result['errors'] = $r['errors'];
         $result['total'] = count($entries);

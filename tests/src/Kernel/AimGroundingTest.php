@@ -108,7 +108,7 @@ class AimGroundingTest extends KernelTestBase {
     $this->assertTrue((bool) $this->remember('At the line.', self::PASSAGE)->get('trusted')->value);
 
     // An explicit trusted value from the caller wins.
-    $memory = $this->container->get('aim.memory_manager');
+    $memory = $this->container->get('aim.remember');
     $kept = $memory->remember('Overridden.', 'site', NULL, 'test', trusted: TRUE, sourceText: self::PASSAGE);
     $this->assertTrue((bool) $kept->get('trusted')->value);
 
@@ -140,7 +140,7 @@ class AimGroundingTest extends KernelTestBase {
    */
   public function testBatchIsOneCall(): void {
     $this->setMode('enforce');
-    $result = $this->container->get('aim.memory_manager')->createFactsFromCandidates([
+    $result = $this->container->get('aim.remember')->createFactsFromCandidates([
       ['scope' => 'site', 'subject' => '', 'text' => self::GOOD],
       ['scope' => 'site', 'subject' => '', 'text' => self::BAD],
     ], 'test', NULL, NULL, self::PASSAGE);
@@ -198,7 +198,7 @@ class AimGroundingTest extends KernelTestBase {
    *   The saved fact.
    */
   protected function remember(string $text, ?string $sourceText): AimFact {
-    return $this->container->get('aim.memory_manager')->remember($text, 'site', NULL, 'test', sourceText: $sourceText);
+    return $this->container->get('aim.remember')->remember($text, 'site', NULL, 'test', sourceText: $sourceText);
   }
 
 }

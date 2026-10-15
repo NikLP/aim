@@ -91,12 +91,12 @@ class AimScopeBehaviorTest extends KernelTestBase {
    * A case fact written without a subject gets a minted case ID.
    */
   public function testCaseMintsSubject(): void {
-    $a = $this->memory()->remember('First case note.', 'case');
-    $b = $this->memory()->remember('Second case note.', 'case');
+    $a = $this->container->get('aim.remember')->remember('First case note.', 'case');
+    $b = $this->container->get('aim.remember')->remember('Second case note.', 'case');
     $this->assertMatchesRegularExpression('/^case-[0-9a-f]{8}$/', $a->get('subject')->value);
     $this->assertNotSame($a->get('subject')->value, $b->get('subject')->value);
 
-    $kept = $this->memory()->remember('Named case note.', 'case', 'case-fixed');
+    $kept = $this->container->get('aim.remember')->remember('Named case note.', 'case', 'case-fixed');
     $this->assertSame('case-fixed', $kept->get('subject')->value);
   }
 
@@ -104,7 +104,7 @@ class AimScopeBehaviorTest extends KernelTestBase {
    * A scope with no plugin mints nothing and requires no account.
    */
   public function testPluginlessScopesAreNeutral(): void {
-    $site = $this->memory()->remember('A site fact.', 'site');
+    $site = $this->container->get('aim.remember')->remember('A site fact.', 'site');
     $this->assertSame('', (string) $site->get('subject')->value);
     $this->assertFalse($this->memory()->scopeRequiresAccount('site'));
     $this->assertFalse($this->memory()->scopeRequiresAccount('role'));
@@ -117,12 +117,12 @@ class AimScopeBehaviorTest extends KernelTestBase {
   public function testUserScopeRequiresAccount(): void {
     $account = $this->makeUser('alex');
 
-    $fact = $this->memory()->remember('Alex prefers email.', 'user', (string) $account->id());
+    $fact = $this->container->get('aim.remember')->remember('Alex prefers email.', 'user', (string) $account->id());
     $this->assertSame((int) $account->id(), (int) $fact->get('user')->target_id);
 
     foreach ([NULL, '', '9999', 'alex'] as $bad) {
       try {
-        $this->memory()->remember('Nobody.', 'user', $bad);
+        $this->container->get('aim.remember')->remember('Nobody.', 'user', $bad);
         $this->fail('Expected a rejected subject: ' . var_export($bad, TRUE));
       }
       catch (\InvalidArgumentException) {
@@ -136,7 +136,7 @@ class AimScopeBehaviorTest extends KernelTestBase {
    */
   public function testUnknownScopeRejected(): void {
     $this->expectException(\InvalidArgumentException::class);
-    $this->memory()->remember('Text.', 'nonsense');
+    $this->container->get('aim.remember')->remember('Text.', 'nonsense');
   }
 
   /**
@@ -144,14 +144,14 @@ class AimScopeBehaviorTest extends KernelTestBase {
    */
   public function testEntityScopeFollowsTargetAccess(): void {
     $target = $this->makeUser('target');
-    $fact = $this->memory()->remember('About the target.', 'entity', NULL, 'test', targetType: 'user', targetId: (string) $target->id());
+    $fact = $this->container->get('aim.remember')->remember('About the target.', 'entity', NULL, 'test', targetType: 'user', targetId: (string) $target->id());
 
     $this->grant('profiles', ['access user profiles']);
     $this->assertTrue($fact->access('view', $this->makeUser('seer', ['profiles'])));
     $this->assertFalse($fact->access('view', $this->makeUser('blind')));
 
     // A dangling target is neutral, so nobody is granted access.
-    $orphan = $this->memory()->remember('About nothing.', 'entity', NULL, 'test', targetType: 'user', targetId: '9999');
+    $orphan = $this->container->get('aim.remember')->remember('About nothing.', 'entity', NULL, 'test', targetType: 'user', targetId: '9999');
     $this->assertFalse($orphan->access('view', $this->makeUser('seer2', ['profiles'])));
   }
 
@@ -163,7 +163,7 @@ class AimScopeBehaviorTest extends KernelTestBase {
     $this->grant('manager', []);
     $this->grant('other', []);
     $subject = $this->makeUser('subject', ['staff']);
-    $fact = $this->memory()->remember('Subject fact.', 'user', (string) $subject->id());
+    $fact = $this->container->get('aim.remember')->remember('Subject fact.', 'user', (string) $subject->id());
 
     $manager = $this->makeUser('boss', ['manager']);
     $peer = $this->makeUser('peer', ['staff']);
@@ -206,7 +206,7 @@ class AimScopeBehaviorTest extends KernelTestBase {
    */
   public function testRememberRejectsPastExpiry(): void {
     $this->expectException(\InvalidArgumentException::class);
-    $this->memory()->remember('Late.', 'site', NULL, 'test', expires: 1000);
+    $this->container->get('aim.remember')->remember('Late.', 'site', NULL, 'test', expires: 1000);
   }
 
   /**

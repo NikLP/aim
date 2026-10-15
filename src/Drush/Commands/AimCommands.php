@@ -9,6 +9,7 @@ use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimConsolidationService;
 use Drupal\aim\Service\AimRecallService;
+use Drupal\aim\Service\AimRememberService;
 use Drush\Attributes as CLI;
 use Drush\Commands\AutowireTrait;
 use Drush\Commands\DrushCommands;
@@ -33,6 +34,8 @@ final class AimCommands extends DrushCommands {
    *   The aim memory manager.
    * @param \Drupal\aim\Service\AimConsolidationService $consolidation
    *   The consolidation service, used by aim:consolidate.
+   * @param \Drupal\aim\Service\AimRememberService $rememberService
+   *   The remember service, used by the write commands.
    * @param \Drupal\aim\Service\AimRecallService $recallService
    *   The recall service, used by aim:recall.
    * @param \Drupal\aim\AimStatusChecker $statusChecker
@@ -41,6 +44,7 @@ final class AimCommands extends DrushCommands {
   public function __construct(
     protected AimMemoryManager $memoryManager,
     protected AimConsolidationService $consolidation,
+    protected AimRememberService $rememberService,
     protected AimRecallService $recallService,
     protected AimStatusChecker $statusChecker,
   ) {
@@ -91,7 +95,7 @@ final class AimCommands extends DrushCommands {
 
     $source = $options['source'] ?? ('extract:' . basename($file));
     try {
-      $result = $this->memoryManager->ingestText($text, $source, $options['subject-uid'] ?: NULL, $provider_id, $model_id);
+      $result = $this->rememberService->ingestText($text, $source, $options['subject-uid'] ?: NULL, $provider_id, $model_id);
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {
       $this->io()->error($e->getMessage());
@@ -198,8 +202,8 @@ final class AimCommands extends DrushCommands {
     }
 
     try {
-      [$category, $asserted] = $this->memoryManager->parseFactFields($options);
-      $fact = $this->memoryManager->remember($text, $options['scope'], $options['subject'], $options['source'], $category, $asserted, NULL, $options['target-type'], $options['target-id'], expires: $this->memoryManager->parseExpires($options));
+      [$category, $asserted] = $this->rememberService->parseFactFields($options);
+      $fact = $this->rememberService->remember($text, $options['scope'], $options['subject'], $options['source'], $category, $asserted, NULL, $options['target-type'], $options['target-id'], expires: $this->rememberService->parseExpires($options));
     }
     catch (\InvalidArgumentException $e) {
       $this->io()->error($e->getMessage());
@@ -217,7 +221,7 @@ final class AimCommands extends DrushCommands {
    * Saves every fact object in a JSON file, one bootstrap for the batch.
    *
    * One bad entry is reported and skipped rather than aborting the rest of
-   * the file (see AimMemoryManager::rememberBatch()).
+   * the file (see AimRememberService::rememberBatch()).
    *
    * @param string $file
    *   Path to a JSON file containing an array of fact objects. Each object
@@ -238,7 +242,7 @@ final class AimCommands extends DrushCommands {
       return;
     }
 
-    $result = $this->memoryManager->rememberBatch($entries);
+    $result = $this->rememberService->rememberBatch($entries);
     foreach ($result['errors'] as $i => $message) {
       $this->io()->warning("Entry $i: $message" . (str_starts_with($message, 'missing') ? ', skipped.' : ''));
     }

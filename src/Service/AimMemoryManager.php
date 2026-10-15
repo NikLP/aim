@@ -12,9 +12,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\ai\AiProviderPluginManager;
-use Drupal\ai\Dto\StructuredOutputSchema;
 use Drupal\ai\Guardrail\AiGuardrailRepository;
 use Drupal\ai\Guardrail\NonDeterministicGuardrailInterface;
 use Drupal\ai\Guardrail\Result\PassResult;
@@ -22,11 +20,8 @@ use Drupal\ai\Guardrail\Result\RewriteInputResult;
 use Drupal\ai\Guardrail\Result\StopResult;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
-use Drupal\aim\AimScopeTypePluginManagerInterface;
-use Drupal\aim\Backend\ActivityBackendInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
-use Drupal\literals\LiteralReader;
 use Drupal\search_api\IndexInterface;
 use Drupal\search_api\Query\QueryInterface as SearchApiQueryInterface;
 use Drupal\search_api\Query\ResultSetInterface;
@@ -89,19 +84,10 @@ class AimMemoryManager {
    *   \Drupal\aim\Entity\AimScope) instead of a hardcoded list, so a
    *   fifth scope added via a new aim_scope config entity passes
    *   validation here automatically, no code change needed.
-   * @param \Drupal\aim\AimScopeTypePluginManagerInterface $scopeAccessManager
-   *   The scope access plugin manager, used to ask a scope's own plugin
-   *   (if any) for a default subject when the caller omits one - e.g.
-   *   aim_scope_case's plugin mints a new case ID, so every caller (MCP
-   *   client, drush, a future ECA action) gets the same format for free
-   *   instead of each needing to invent and agree on its own.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory, used to read aim.settings' admin-editable
    *   consolidation thresholds and extraction/consolidation prompts (see
    *   /admin/config/aim/settings, Drupal\aim\Form\AimSettingsForm).
-   * @param \Drupal\Core\Session\AccountProxyInterface $currentUser
-   *   The current user: the author uid in audit lines, and the viewer
-   *   recall() replaces literal tokens as.
    * @param \Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber $embeddingCache
    *   The query-embedding cache subscriber (ADR-0017), activated by
    *   executeSearchQuery() for the duration of a query's execute() call.
@@ -109,12 +95,6 @@ class AimMemoryManager {
    *   The aim logger channel. Warnings and errors are always logged; the
    *   info and debug tiers are gated by aim.settings' log_audit and
    *   log_verbose (see logAudit() and logVerbose()).
-   * @param \Drupal\aim\Backend\ActivityBackendInterface $decisionBackend
-   *   The Decision API backend, used for an activity whose
-   *   aim.settings:activities backend is "decision".
-   * @param \Drupal\literals\LiteralReader $literalReader
-   *   The literals reader. recall() uses it to replace [literal:key] tokens
-   *   in fact text as the viewing account.
    * @param \Drupal\aim\Service\AimSettings $settings
    *   The settings reader (thresholds, activity models, grounding mode).
    * @param \Drupal\aim\Service\AimGroundingChecker $groundingChecker
@@ -127,13 +107,9 @@ class AimMemoryManager {
     protected AiGuardrailRepository $guardrailRepository,
     protected QueueFactory $queueFactory,
     protected EntityTypeBundleInfoInterface $bundleInfo,
-    protected AimScopeTypePluginManagerInterface $scopeAccessManager,
     protected ConfigFactoryInterface $configFactory,
-    protected AccountProxyInterface $currentUser,
     protected AimEmbeddingCacheSubscriber $embeddingCache,
     protected LoggerChannelInterface $logger,
-    protected ActivityBackendInterface $decisionBackend,
-    protected LiteralReader $literalReader,
     protected AimSettings $settings,
     protected AimGroundingChecker $groundingChecker,
   ) {}
@@ -553,23 +529,6 @@ class AimMemoryManager {
   }
 
   /**
-   * Logs a fact's grounding verdict. IDs and the score only, no text.
-   *
-   * @param \Drupal\aim\Entity\AimFact $fact
-   *   The saved fact.
-   */
-  protected function logGrounding(AimFact $fact): void {
-    $score = $fact->get('grounding_score')->value;
-    $this->logAudit('Grounding check for fact @id: score @score, cutoff @cutoff, mode @mode, trusted @trusted.', [
-      '@id' => $fact->id(),
-      '@score' => $score === NULL ? 'none (check failed or no model)' : round((float) $score, 3),
-      '@cutoff' => $this->getGroundingThreshold(),
-      '@mode' => $this->getGroundingMode(),
-      '@trusted' => $fact->get('trusted')->value ? 'yes' : 'no',
-    ]);
-  }
-
-  /**
    * Runs a search_api query, checking entity access unless told not to.
    *
    * Same idiom as core's entity query accessCheck(): access is checked by
@@ -609,465 +568,6 @@ class AimMemoryManager {
   }
 
   /**
-   * Creates an aim_fact directly, no chat call.
-   *
-   * Unlike extractFacts(), this does not decide what is worth remembering -
-   * it stores exactly what the caller (typically an agent that already did
-   * that reasoning) hands it.
-   *
-   * @param string $text
-   *   The fact text, one short statement.
-   * @param string $scope
-   *   One of user, role, site, case.
-   * @param string|null $subject
-   *   Who or what the fact is about. For scope=user, a uid of a real
-   *   account on this site. Ignored for site scope. For scope=case, an
-   *   existing case ID to continue - omit to start a new case, which mints
-   *   one and stamps it onto the created fact.
-   * @param string|null $source
-   *   Provenance tag for this fact.
-   * @param string[] $category
-   *   Category term names to resolve against the aim_category vocabulary.
-   *   A name with no matching term is skipped, not created.
-   * @param int|null $asserted
-   *   When this fact became true in reality, as a Unix timestamp, if known
-   *   and different from now. NULL means "same as created".
-   * @param bool|null $trusted
-   *   Explicit trusted value for this fact, bypassing
-   *   aim.settings:default_trusted. NULL (the default) leaves the field
-   *   unset so AimFact::getDefaultTrusted() applies the site's configured
-   *   policy - the right fallback for every LLM/human-mixed caller the
-   *   draft-to-trusted gate exists for. Pass TRUE only for curated data
-   *   that was never subject to that gate in the first place, e.g. demo
-   *   seed data.
-   * @param string|null $targetType
-   *   The referenced entity's type ID, for scope=entity (e.g. node).
-   *   Ignored for every other scope.
-   * @param string|null $targetId
-   *   The referenced entity's ID, for scope=entity. Ignored for every
-   *   other scope.
-   * @param string|null $sourceText
-   *   The text this fact was written from (a visitor's message, a
-   *   document), for the grounded check (ADR-0037). Checked, never stored.
-   *   NULL leaves the fact unchecked.
-   * @param int|null $expires
-   *   When this fact stops being true, as a Unix timestamp (ADR-0057).
-   *   retireExpired() retires it once this passes. NULL means no end date.
-   *   Must be in the future.
-   *
-   * @return \Drupal\aim\Entity\AimFact
-   *   The created fact.
-   *
-   * @throws \InvalidArgumentException
-   *   If scope is invalid, scope=user and subject does not resolve to a real
-   *   account, or the text fails a guardrail check.
-   */
-  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL, ?int $expires = NULL): AimFact {
-    $allowed = $this->allowedScopes();
-    if (!in_array($scope, $allowed, TRUE)) {
-      throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
-    }
-
-    $values = [
-      'scope' => $scope,
-      'text' => $text,
-      'source' => $source,
-    ];
-
-    if ($this->scopeRequiresAccount($scope)) {
-      // A fact in a scope that requires a real account (ADR-0007,
-      // aim_scope_user's requires_account setting for scope=user)
-      // has to be about one:
-      // subject is a genuine entity_reference (user), not a free-text string
-      // that merely happens to hold a uid - that drift is exactly what let
-      // "1" and "Nik" address the same person without ever matching.
-      if (empty($subject)) {
-        throw new \InvalidArgumentException('subject is required for scope=' . $scope . ': a uid of a real account on this site.');
-      }
-      $account = $this->resolveAccountByUid($subject);
-      if (!$account) {
-        throw new \InvalidArgumentException('No user account found for subject "' . $subject . '". A scope=' . $scope . ' fact must be about a real account.');
-      }
-      $values['user'] = $account->id();
-      $values['subject'] = '';
-    }
-    elseif (empty($subject)) {
-      // No subject given: ask this scope's access plugin (if any) for a
-      // default instead of leaving the field empty - e.g. aim_scope_case's
-      // plugin mints a new case ID.
-      $plugin = $this->scopeAccessManager->getTypePlugin($scope);
-      $values['subject'] = $plugin?->defaultSubject() ?? '';
-    }
-    else {
-      $values['subject'] = $subject;
-    }
-
-    if (!empty($category)) {
-      $values['category'] = $this->resolveCategoryTerms($category);
-    }
-
-    if ($asserted !== NULL) {
-      $values['asserted'] = $asserted;
-    }
-
-    if ($expires !== NULL) {
-      if ($expires <= $this->time->getRequestTime()) {
-        throw new \InvalidArgumentException('Invalid expires ' . gmdate('Y-m-d', $expires) . ', it is already past.');
-      }
-      $values['expires'] = $expires;
-    }
-
-    if ($trusted !== NULL) {
-      $values['trusted'] = $trusted;
-    }
-
-    $grounded = $sourceText !== NULL && $this->getGroundingMode() !== 'off';
-    if ($grounded) {
-      $values += $this->groundingChecker->groundingValues($this->checkGrounding($sourceText, [$text])[0], $trusted);
-    }
-
-    if ($targetType !== NULL) {
-      $values['target_type'] = $targetType;
-    }
-
-    if ($targetId !== NULL) {
-      $values['target_id'] = $targetId;
-    }
-
-    /** @var \Drupal\aim\Entity\AimFact $entity */
-    $entity = $this->entityTypeManager->getStorage('aim_fact')->create($values);
-    try {
-      $this->saveFact($entity);
-    }
-    catch (\InvalidArgumentException $e) {
-      // The violation message can quote the rejected text, so it is not
-      // logged.
-      $this->logger->warning('Write rejected for scope @scope (uid @uid): failed validation or a guardrail.', [
-        '@scope' => $scope,
-        '@uid' => $this->currentUser->id(),
-      ]);
-      throw $e;
-    }
-
-    $this->logAudit('Fact @id written (scope @scope, subject @subject, uid @uid, trusted @trusted).', [
-      '@id' => $entity->id(),
-      '@scope' => $scope,
-      '@subject' => $values['user'] ?? $values['subject'] ?? '',
-      '@uid' => $this->currentUser->id(),
-      '@trusted' => $entity->get('trusted')->value ? 'yes' : 'no',
-    ]);
-    if ($grounded) {
-      $this->logGrounding($entity);
-    }
-
-    return $entity;
-  }
-
-  /**
-   * Resolves category names against the aim_category vocabulary.
-   *
-   * Admin-curated, not model-invented (CLAUDE.md's "Ideas raised" section):
-   * a name with no matching term is silently skipped rather than creating
-   * one on the fly, same posture as resolveAccount() not fabricating an
-   * account.
-   *
-   * @param string[] $names
-   *   Category term names to resolve.
-   *
-   * @return int[]
-   *   The matching term IDs. Names with no match are omitted.
-   */
-  protected function resolveCategoryTerms(array $names): array {
-    $storage = $this->entityTypeManager->getStorage('taxonomy_term');
-    $tids = [];
-    foreach ($names as $name) {
-      $name = trim($name);
-      if ($name === '') {
-        continue;
-      }
-      $terms = $storage->loadByProperties(['vid' => 'aim_category', 'name' => $name]);
-      if ($terms) {
-        $tids[] = (int) reset($terms)->id();
-      }
-    }
-    return $tids;
-  }
-
-  /**
-   * Creates aim_fact entities from candidate facts, e.g. from extractFacts().
-   *
-   * @param array $facts
-   *   A list of ['scope' => ..., 'subject' => ..., 'text' => ...] arrays.
-   * @param string $source
-   *   Provenance tag stored on every created fact.
-   * @param string|null $subjectUid
-   *   A uid of a real account to attach to any candidate the model
-   *   classifies as scope=user. See ADR-0011: extraction never
-   *   resolves scope=user against the model's own freeform subject text -
-   *   a document naming someone is no guarantee that person has an account
-   *   on this site. NULL means no such account was supplied, so every
-   *   scope=user candidate is skipped.
-   * @param bool|null $trusted
-   *   Explicit trusted value applied to every fact created from $facts,
-   *   bypassing aim.settings:default_trusted. See remember()'s own
-   *   $trusted docblock - NULL is the right default here too, since this
-   *   method's callers are extraction paths the draft-to-trusted gate
-   *   exists for.
-   * @param string|null $sourceText
-   *   The text the candidates were extracted from, for the grounded check
-   *   (ADR-0037): one call for every candidate. Never stored. NULL leaves
-   *   the facts unchecked.
-   *
-   * @return array
-   *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[]), 'skipped'
-   *   (int, the number of user-scope candidates skipped because no
-   *   $subjectUid was supplied), and 'blocked' (int, the number of
-   *   candidates a guardrail rejected, per decision 7).
-   *
-   * @throws \InvalidArgumentException
-   *   If $subjectUid is given but does not resolve to a real account.
-   */
-  public function createFactsFromCandidates(array $facts, string $source, ?string $subjectUid = NULL, ?bool $trusted = NULL, ?string $sourceText = NULL): array {
-    $storage = $this->entityTypeManager->getStorage('aim_fact');
-    $created = [];
-    $skipped = 0;
-    $blocked = 0;
-
-    $subjectAccount = NULL;
-    if (!empty($subjectUid)) {
-      $subjectAccount = $this->resolveAccountByUid($subjectUid);
-      if (!$subjectAccount) {
-        throw new \InvalidArgumentException('No user account found for subject-uid "' . $subjectUid . '". A user-scope fact must be about a real account.');
-      }
-    }
-
-    $grounded = $sourceText !== NULL && $this->getGroundingMode() !== 'off';
-    $scores = $grounded ? $this->checkGrounding($sourceText, array_column($facts, 'text')) : [];
-
-    foreach (array_values($facts) as $i => $fact) {
-      $values = [
-        'text' => $fact['text'],
-        'source' => $source,
-      ];
-
-      if ($this->scopeRequiresAccount($fact['scope'])) {
-        // Never resolve the model's own freeform subject text against the
-        // accounts table (ADR-0011) - a source document naming someone is
-        // no guarantee that person is this site's user. Only a caller-
-        // supplied $subjectAccount, resolved once above, can attach a
-        // candidate in such a scope to a real account.
-        if (!$subjectAccount) {
-          $skipped++;
-          continue;
-        }
-        $values['scope'] = $fact['scope'];
-        $values['user'] = $subjectAccount->id();
-        $values['subject'] = '';
-      }
-      else {
-        $values['scope'] = $fact['scope'];
-        $values['subject'] = $fact['subject'] ?? '';
-      }
-
-      if ($trusted !== NULL) {
-        $values['trusted'] = $trusted;
-      }
-      if ($grounded) {
-        $values += $this->groundingChecker->groundingValues($scores[$i] ?? NULL, $trusted);
-      }
-
-      $entity = $storage->create($values);
-      try {
-        // Guardrail check runs inside save() now, via hook_aim_fact_presave()
-        // - still per-candidate, since a rejected save throws before the
-        // loop's next iteration. One rejected fact should not abort the
-        // rest of an extraction batch, the same posture already taken for
-        // an unresolvable user-scope subject above. saveFact() unwraps the
-        // EntityStorageException SqlContentEntityStorage::save() wraps a
-        // presave hook's exception in, back to the \InvalidArgumentException
-        // this catch expects - see saveFact()'s own docblock.
-        $this->saveFact($entity);
-      }
-      catch (\InvalidArgumentException) {
-        $blocked++;
-        $this->logger->warning('Extracted candidate rejected for scope @scope (uid @uid): failed validation or a guardrail.', [
-          '@scope' => $fact['scope'],
-          '@uid' => $this->currentUser->id(),
-        ]);
-        continue;
-      }
-      $created[] = $entity;
-      $this->logAudit('Fact @id written from extraction (scope @scope, subject @subject, uid @uid, trusted @trusted).', [
-        '@id' => $entity->id(),
-        '@scope' => $fact['scope'],
-        '@subject' => $values['user'] ?? $values['subject'],
-        '@uid' => $this->currentUser->id(),
-        '@trusted' => $entity->get('trusted')->value ? 'yes' : 'no',
-      ]);
-      if ($grounded) {
-        $this->logGrounding($entity);
-      }
-    }
-
-    if ($skipped > 0) {
-      $this->logVerbose('Extraction skipped @skipped user-scope candidates: no subject-uid supplied.', ['@skipped' => $skipped]);
-    }
-
-    return ['created' => $created, 'skipped' => $skipped, 'blocked' => $blocked];
-  }
-
-  /**
-   * Extracts facts from prose with a model and saves them.
-   *
-   * Shared by aim:extract and the ingest form (ADR-0016, mode 1).
-   *
-   * @param string $text
-   *   The document text. Sent whole in one prompt, no chunking.
-   * @param string $source
-   *   Provenance tag stored on every created fact.
-   * @param string|null $subjectUid
-   *   A uid of a real account to attach scope=user candidates to. NULL skips
-   *   them.
-   * @param string|null $providerId
-   *   The chat provider, or NULL for the extraction activity's configured one.
-   * @param string|null $modelId
-   *   The chat model, or NULL for the extraction activity's configured one.
-   *
-   * @return array
-   *   The createFactsFromCandidates() result plus 'extracted' (int, how many
-   *   candidates the model returned).
-   *
-   * @throws \InvalidArgumentException
-   *   If $subjectUid does not resolve to a real account.
-   * @throws \RuntimeException
-   *   If no provider/model is given and none is configured.
-   */
-  public function ingestText(string $text, string $source, ?string $subjectUid = NULL, ?string $providerId = NULL, ?string $modelId = NULL): array {
-    if (empty($providerId) || empty($modelId)) {
-      $default = $this->getModelFor('extraction');
-      if ($default === NULL) {
-        throw new \RuntimeException('No extraction model is configured. Set one at /admin/config/ai/settings or in the AIM settings.');
-      }
-      $providerId = $default['provider_id'];
-      $modelId = $default['model_id'];
-    }
-
-    $facts = $this->extractFacts(trim($text), $providerId, $modelId);
-    if (empty($facts)) {
-      return ['created' => [], 'skipped' => 0, 'blocked' => 0, 'extracted' => 0];
-    }
-    $result = $this->createFactsFromCandidates($facts, $source, $subjectUid ?: NULL, NULL, trim($text));
-    $result['extracted'] = count($facts);
-    return $result;
-  }
-
-  /**
-   * Saves a list of fact entries through remember(), one failure at a time.
-   *
-   * Shared by aim:remember --file and the ingest form's JSON and one-fact-
-   * per-line modes. One bad entry (missing text or scope, an invalid value,
-   * a rejected guardrail) is recorded and skipped, never aborting the rest.
-   *
-   * @param array $entries
-   *   Fact objects with the keys text, scope, subject, source,
-   *   category (string or array), asserted, target_type, target_id. Unknown
-   *   keys are ignored.
-   * @param string|null $defaultSource
-   *   The source for entries that name none.
-   *
-   * @return array
-   *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[] keyed by
-   *   entry index) and 'errors' (string messages keyed by entry index).
-   */
-  public function rememberBatch(array $entries, ?string $defaultSource = NULL): array {
-    $created = [];
-    $errors = [];
-    foreach ($entries as $i => $entry) {
-      if (!is_array($entry) || empty($entry['text'])) {
-        $errors[$i] = 'missing text';
-        continue;
-      }
-      if (empty($entry['scope'])) {
-        $errors[$i] = 'missing scope';
-        continue;
-      }
-      try {
-        [$category, $asserted] = $this->parseFactFields($entry);
-        $created[$i] = $this->remember(
-          $entry['text'],
-          $entry['scope'],
-          $entry['subject'] ?? NULL,
-          $entry['source'] ?? $defaultSource,
-          $category,
-          $asserted,
-          NULL,
-          $entry['target_type'] ?? NULL,
-          $entry['target_id'] ?? NULL,
-          expires: $this->parseExpires($entry),
-        );
-      }
-      catch (\InvalidArgumentException $e) {
-        $errors[$i] = $e->getMessage();
-      }
-    }
-    return ['created' => $created, 'errors' => $errors];
-  }
-
-  /**
-   * Parses the category/asserted fields of a fact entry.
-   *
-   * @param array $fields
-   *   Raw values, from a command line or a decoded JSON entry.
-   *
-   * @return array
-   *   [$category, $asserted], typed as remember() expects them.
-   *
-   * @throws \InvalidArgumentException
-   *   If asserted cannot be parsed.
-   */
-  public function parseFactFields(array $fields): array {
-    $category = [];
-    if (!empty($fields['category'])) {
-      $category = is_array($fields['category']) ? $fields['category'] : explode(',', $fields['category']);
-      $category = array_map('trim', $category);
-    }
-
-    $asserted = NULL;
-    if (($fields['asserted'] ?? NULL) !== NULL) {
-      $asserted = strtotime($fields['asserted']);
-      if ($asserted === FALSE) {
-        throw new \InvalidArgumentException('Invalid asserted "' . $fields['asserted'] . '", expected a date strtotime() can parse.');
-      }
-    }
-
-    return [$category, $asserted];
-  }
-
-  /**
-   * Parses the expires field of a fact entry.
-   *
-   * @param array $fields
-   *   A fact entry or command options, possibly with an expires date.
-   *
-   * @return int|null
-   *   A Unix timestamp (end of that day, UTC), or NULL when not given.
-   *
-   * @throws \InvalidArgumentException
-   *   If expires cannot be parsed.
-   */
-  public function parseExpires(array $fields): ?int {
-    $value = $fields['expires'] ?? NULL;
-    if ($value === NULL || $value === '') {
-      return NULL;
-    }
-    $parsed = strtotime((string) $value . ' 23:59:59 UTC');
-    if ($parsed === FALSE) {
-      throw new \InvalidArgumentException('Invalid expires "' . $value . '", expected a calendar date such as 2026-10-16.');
-    }
-    return $parsed;
-  }
-
-  /**
    * Retires every live fact whose expires date has passed (ADR-0057).
    *
    * Soft retirement, like consolidation's: the fact stays for audit and
@@ -1093,83 +593,6 @@ class AimMemoryManager {
       ]);
     }
     return count($ids);
-  }
-
-  /**
-   * Calls the configured chat provider and returns structured facts.
-   *
-   * The instruction prompt is aim.settings:extraction_prompt (admin-
-   * editable at /admin/config/aim/settings), not hardcoded - only the
-   * requested output shape below (the facts/scope/subject/text schema)
-   * stays code-defined, since it's parsed by PHP downstream.
-   *
-   * @param string $text
-   *   The source text to extract facts from.
-   * @param string $providerId
-   *   The AI provider plugin ID.
-   * @param string $modelId
-   *   The chat model ID.
-   *
-   * @return array
-   *   A list of ['scope' => ..., 'subject' => ..., 'text' => ...] arrays.
-   */
-  public function extractFacts(string $text, string $providerId, string $modelId): array {
-    $prompt = strtr($this->configFactory->get('aim.settings')->get('extraction_prompt'), [
-      '{text}' => $text,
-    ]);
-
-    $schema = new StructuredOutputSchema(
-      name: 'aim_extracted_facts',
-      description: 'Atomic facts extracted from source text.',
-      strict: TRUE,
-      json_schema: [
-        'type' => 'object',
-        'additionalProperties' => FALSE,
-        'properties' => [
-          'facts' => [
-            'type' => 'array',
-            'items' => [
-              'type' => 'object',
-              'additionalProperties' => FALSE,
-              'properties' => [
-                'scope' => [
-                  'type' => 'string',
-                  // The live aim_scope bundles, not a literal list, so a
-                  // scope added as config is extractable with no code
-                  // change (see CLAUDE.md's "Scope as a config entity").
-                  'enum' => $this->allowedScopes(),
-                ],
-                'subject' => ['type' => 'string'],
-                'text' => ['type' => 'string'],
-              ],
-              'required' => ['scope', 'subject', 'text'],
-            ],
-          ],
-        ],
-        'required' => ['facts'],
-      ],
-    );
-
-    $input = new ChatInput([new ChatMessage('user', $prompt)]);
-    $input->setChatStructuredJsonSchema($schema);
-
-    $provider = $this->aiProvider->createInstance($providerId);
-    $output = $provider->chat($input, $modelId, ['aim_extract']);
-    $response_text = $output->getNormalized()->getText();
-
-    $decoded = json_decode($response_text, TRUE);
-    if (!is_array($decoded) || !isset($decoded['facts']) || !is_array($decoded['facts'])) {
-      throw new \RuntimeException("Model response was not the expected JSON shape: $response_text");
-    }
-
-    $this->logVerbose('Extraction returned @count candidate facts (provider @provider, model @model, uid @uid).', [
-      '@count' => count($decoded['facts']),
-      '@provider' => $providerId,
-      '@model' => $modelId,
-      '@uid' => $this->currentUser->id(),
-    ]);
-
-    return $decoded['facts'];
   }
 
 }

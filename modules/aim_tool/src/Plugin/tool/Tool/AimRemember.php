@@ -11,6 +11,7 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Service\AimMemoryManager;
+use Drupal\aim\Service\AimRememberService;
 use Drupal\tool\Attribute\Tool;
 use Drupal\tool\ExecutableResult;
 use Drupal\tool\Tool\ToolBase;
@@ -70,7 +71,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * value can't drive its own scope_fields the way the single-call inputs
  * do. rememberOne() still only reads target_type/target_id by name out of
  * scope_fields, matching the only two field-bearing base fields any
- * shipped scope type declares today (AimMemoryManager::remember() itself
+ * shipped scope type declares today (AimRememberService::remember() itself
  * still takes them as two fixed parameters, not a generic bag) - a future
  * scope type adding a third field would need remember()'s own signature
  * widened too, not just this file; not built, see TODO.md.
@@ -201,6 +202,11 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
   protected AimMemoryManager $memoryManager;
 
   /**
+   * The remember service.
+   */
+  protected AimRememberService $rememberService;
+
+  /**
    * The aim scope type plugin manager.
    */
   protected AimScopeTypePluginManagerInterface $scopeTypeManager;
@@ -211,6 +217,7 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->memoryManager = $container->get('aim.memory_manager');
+    $instance->rememberService = $container->get('aim.remember');
     $instance->scopeTypeManager = $container->get('plugin.manager.aim_scope_type');
     return $instance;
   }
@@ -402,7 +409,7 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
     }
 
     try {
-      $fact = $this->memoryManager->remember(
+      $fact = $this->rememberService->remember(
         $fields['text'],
         $scope,
         $subject,
@@ -413,7 +420,7 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
         $scopeFields['target_type'] ?? NULL,
         $scopeFields['target_id'] ?? NULL,
         $sourceText,
-        $this->memoryManager->parseExpires($fields),
+        $this->rememberService->parseExpires($fields),
       );
     }
     catch (\InvalidArgumentException $e) {

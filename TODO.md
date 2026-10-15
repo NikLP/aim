@@ -487,9 +487,9 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       add role-granularity scope(s) to `aim_tool_oauth` and re-test on
       the live site; (b) check upstream whether a permission scope
       granting a permission the user's role lacks is intended; (c) note
-      for any recommendation: `agent_access` is experimental and not
-      covered by the security advisory policy. Scratch copy
-      `~/websites/aim-scratch` (DDEV stopped) is safe to delete.
+      for any recommendation: `agent_access` is pre-release and not under
+      the security advisory policy; accepted as fine for now. Scratch
+      copy removed.
 - [ ] **Redacting guardrail.** Drupal AI's PII guardrails only block; none
       removes the PII, yet the rewrite mechanism exists
       (`runGuardrails()` already handles `RewriteInputResult`). Sketch:
@@ -776,7 +776,7 @@ questions" section)
       pinned).** `aim_remember` takes a caller-supplied `subject` and checks
       only `create user aim facts`, so anyone holding it can write a
       scope=user fact about any account
-      (`AimRemember::saveOne()`, `AimMemoryManager::remember()`). Mitigated
+      (`AimRemember::saveOne()`, `AimRememberService::remember()`). Mitigated
       for now: new facts start untrusted and are not recalled until trusted.
       Legitimate in some cases (staff noting facts about a customer). When it
       matters, use two scope instances sharing one plugin with different
@@ -960,7 +960,7 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
       lifecycle works correctly through the real API - but a site
       operator using `drush pmu` on a scope-field-providing submodule
       should expect to hit this until it's actually root-caused.
-- [ ] Widen `AimMemoryManager::remember()`'s `$targetType`/`$targetId`
+- [ ] Widen `AimRememberService::remember()`'s `$targetType`/`$targetId`
       positional parameters into one generic scope-fields bag - found
       2026-09-29 while building ADR-0028 piece 4, not built.
       Piece 4 made the Tool API/MCP *schema* genuinely generic, but

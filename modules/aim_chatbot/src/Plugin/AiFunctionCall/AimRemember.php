@@ -12,6 +12,7 @@ use Drupal\ai\Base\FunctionCallBase;
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
 use Drupal\aim\Service\AimMemoryManager;
+use Drupal\aim\Service\AimRememberService;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -54,6 +55,11 @@ final class AimRemember extends FunctionCallBase implements ExecutableFunctionCa
   protected AimMemoryManager $memoryManager;
 
   /**
+   * The remember service.
+   */
+  protected AimRememberService $rememberService;
+
+  /**
    * The conversation the fact comes from, for the grounded check.
    */
   protected ?string $sourceText = NULL;
@@ -77,6 +83,7 @@ final class AimRemember extends FunctionCallBase implements ExecutableFunctionCa
     /** @var static $instance */
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->memoryManager = $container->get('aim.memory_manager');
+    $instance->rememberService = $container->get('aim.remember');
     return $instance;
   }
 
@@ -91,7 +98,7 @@ final class AimRemember extends FunctionCallBase implements ExecutableFunctionCa
     }
 
     try {
-      $fact = $this->memoryManager->remember($text, self::FACT_SCOPE, NULL, 'chatbot:aim_chatbot', sourceText: $this->sourceText, expires: $this->memoryManager->parseExpires(['expires' => $this->getContextValue('expires')]));
+      $fact = $this->rememberService->remember($text, self::FACT_SCOPE, NULL, 'chatbot:aim_chatbot', sourceText: $this->sourceText, expires: $this->rememberService->parseExpires(['expires' => $this->getContextValue('expires')]));
       $this->setOutput('Saved fact ' . $fact->id() . ': ' . $text);
     }
     catch (\InvalidArgumentException $e) {

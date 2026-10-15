@@ -44,13 +44,9 @@ services:
       - '@Drupal\ai\Guardrail\AiGuardrailRepository'
       - '@queue'
       - '@entity_type.bundle.info'
-      - '@plugin.manager.aim_scope_type'
       - '@config.factory'
-      - '@current_user'
       - '@aim.embedding_cache_subscriber'
       - '@logger.channel.aim'
-      - '@aim.backend.decision'
-      - '@literals.reader'
       - '@aim.settings_reader'
       - '@aim.grounding_checker'
 
@@ -79,6 +75,23 @@ services:
 
   Drupal\aim\Service\AimRecallService:
     alias: aim.recall
+
+  aim.remember:
+    class: Drupal\aim\Service\AimRememberService
+    arguments:
+      - '@aim.memory_manager'
+      - '@aim.settings_reader'
+      - '@aim.grounding_checker'
+      - '@ai.provider'
+      - '@entity_type.manager'
+      - '@datetime.time'
+      - '@config.factory'
+      - '@current_user'
+      - '@logger.channel.aim'
+      - '@plugin.manager.aim_scope_type'
+
+  Drupal\aim\Service\AimRememberService:
+    alias: aim.remember
 
   # Class alias so autowired consumers (the auto-registered AimHooks
   # service, src/Hook/AimHooks.php) can type-hint AimMemoryManager

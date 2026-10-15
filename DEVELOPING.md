@@ -977,7 +977,7 @@ or look (a real candidate, not yet decided). Only read, nothing replaced.
 | `aim_benchmark` decision-eval scripts and JSON sets | look, partial | `ai_eval` has dataset sources, a binary groundedness judge, judge validation, agreement stats and confidence intervals. Its graders judge agent responses through chat, not typed Decision calls, so the runner stays; the stats and judge validation are worth borrowing |
 | `AimIngestForm` | keep | Extraction into facts; contrib chunking is for indexing, not extraction |
 | `AimSettingsForm` (450 lines) | look | Mostly `ai_provider_configuration` elements and thresholds; not read line by line |
-| `aim_tool_oauth` | keep, fix gap | Tried `agent_access` 1.0.0-alpha2 on a scratch DDEV copy (2026-10-15, scripted OAuth 2.1 PKCE client, not Claude itself). It does not replace our scopes: it ships only `drupal:mcp:connect` and `drupal:content:read` plus two read-only entity tools, nothing for aim. A permission-granularity scope puts exactly its one permission on the token, so with connect-only `aim_recall` is denied and `aim:recall`/`aim:remember` are still needed. Two findings hit our scopes too: (1) `aim:remember` carries only `remember aim facts`, so a non-admin's `aim_remember` fails with "No permission to create user-scope facts" (the per-scope `create {scope} aim facts` is not on the token); (2) permission-granularity scopes drop the user's real roles from the token, so the user-scope role-visibility matrix returns nothing for every non-admin. A role-granularity scope (token roles = that role) fixed both in the test: alice saw her own and a peer's fact, a manager saw staff facts via the matrix, `remember` worked, and users outside the role could not get a session. Also seen: a permission scope granted `access mcp server` to a user whose role lacks it (scope seems to grant, not intersect; verify upstream before calling it a bug); `entity_list` returns per-entity-checked rows but leaks total counts for `aim_fact`, `ai_log`, `consumer`, `oauth2_token`. `agent_access` is experimental and not covered by the security advisory policy, so do not adopt it for production on that basis alone. Next: ship role-granularity scope(s) from `aim_tool_oauth` and drop or document the permission ones |
+| `aim_tool_oauth` | keep, fix gap | Tried `agent_access` 1.0.0-alpha2 on a scratch DDEV copy (2026-10-15, scripted OAuth 2.1 PKCE client, not Claude itself). It does not replace our scopes: it ships only `drupal:mcp:connect` and `drupal:content:read` plus two read-only entity tools, nothing for aim. A permission-granularity scope puts exactly its one permission on the token, so with connect-only `aim_recall` is denied and `aim:recall`/`aim:remember` are still needed. Two findings hit our scopes too: (1) `aim:remember` carries only `remember aim facts`, so a non-admin's `aim_remember` fails with "No permission to create user-scope facts" (the per-scope `create {scope} aim facts` is not on the token); (2) permission-granularity scopes drop the user's real roles from the token, so the user-scope role-visibility matrix returns nothing for every non-admin. A role-granularity scope (token roles = that role) fixed both in the test: alice saw her own and a peer's fact, a manager saw staff facts via the matrix, `remember` worked, and users outside the role could not get a session. Also seen: a permission scope granted `access mcp server` to a user whose role lacks it (scope seems to grant, not intersect; verify upstream before calling it a bug); `entity_list` returns per-entity-checked rows but leaks total counts for `aim_fact`, `ai_log`, `consumer`, `oauth2_token`. `agent_access` is pre-release and not under the security advisory policy; accepted as fine for now. Next: ship role-granularity scope(s) from `aim_tool_oauth` and drop or document the permission ones |
 | `aim_tool` / `aim_chatbot` | not audited | Next: Tool API permission declarations (TODO.md "aim_tool: declare permissions") |
 
 Result so far: the Decision-API rows turned out to be keep, so the real
@@ -985,19 +985,23 @@ candidates are `aim_tool_oauth` (against `agent_access`), the settings form,
 and borrowing `ai_eval`'s judge statistics. Not much plumbing; the larger
 size win is the `AimMemoryManager` split.
 
-`AimMemoryManager` split (2026-10-15, 2,490 to 1,175 lines): consolidation
-moved to `AimConsolidationService` (`aim.consolidation`; callers are the
-queue worker, `aim:consolidate` and the test), settings and thresholds to
-`AimSettings` (`aim.settings_reader`), the grounded check to
-`AimGroundingChecker`, recall to `AimRecallService` (`aim.recall`; no
-delegator, callers are the two recall tools, `aim:recall`, the benchmark
-command and two tests). The manager keeps one-line delegators for the
-settings getters and `checkGrounding()` and aliases the `DEFAULT_*`
-constants, so existing callers are untouched; move callers to the new
-services over time and drop the delegators. Still in the manager:
-`remember`/`ingestText`/`extractFacts` (about 600 lines, the next
-candidate) plus loading, saving, guardrails, access and
-`executeSearchQuery()`.
+`AimMemoryManager` split (2026-10-15, 2,490 to about 600 lines), one
+service per job, each `Aim*` named:
+
+| Service | ID | Holds |
+| --- | --- | --- |
+| `AimMemoryManager` | `aim.memory_manager` | Loading, saving, guardrails, access, account lookup, `executeSearchQuery()`, expiry sweep |
+| `AimRememberService` | `aim.remember` | `remember`, `ingestText`, `rememberBatch`, `extractFacts`, `createFactsFromCandidates`, field parsing |
+| `AimRecallService` | `aim.recall` | `recall`, `formatFactLine` |
+| `AimConsolidationService` | `aim.consolidation` | The sweep, per-fact path, neighbor search, classify, verify, merge |
+| `AimGroundingChecker` | `aim.grounding_checker` | The grounded check (ADR-0037) |
+| `AimSettings` | `aim.settings_reader` | Thresholds, per-activity models, grounding mode and cutoff |
+
+The new services depend on the manager, never the reverse, so the manager
+has no delegators for them: callers use the service directly. The one
+exception is `AimSettings` and `checkGrounding()`, which the manager still
+delegates to (and it aliases the `DEFAULT_*` constants) because about ten
+callers use them; move those over time and drop the delegators.
 
 ## Running the tests
 

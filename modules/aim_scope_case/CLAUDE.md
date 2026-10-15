@@ -13,7 +13,7 @@ is specific to `aim_scope_case`.
   `AimScopeTypeInterface` plugin (ADR-0025). `defaultSubject()` mints a
   new case ID (`case-` + 8 hex chars) when a `scope=case` fact is created
   with no caller-supplied subject, moved here from a hardcoded
-  `$scope === 'case'` branch in core `aim`'s `AimMemoryManager::remember()`
+  `$scope === 'case'` branch in core `aim`'s `AimRememberService::remember()`
   (ADR-0026's follow-up audit). `checkViewAccess()` stays neutral -
   case-scope access control is a separate, still-unbuilt problem (who may
   view a case-scoped fact isn't designed yet), not addressed by this
