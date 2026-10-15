@@ -98,6 +98,18 @@ class AimRecallFilterTest extends KernelTestBase {
   }
 
   /**
+   * A past-due fact is not recalled, even before the expiry sweep retires it.
+   */
+  public function testExpiredNotRecalledBeforeSweep(): void {
+    $now = $this->container->get('datetime.time')->getRequestTime();
+    $this->fact('Live.');
+    $this->fact('Later.', ['expires' => $now + 86400]);
+    $this->fact('Past due.', ['expires' => $now - 100]);
+
+    $this->assertEqualsCanonicalizing(['Live.', 'Later.'], $this->texts());
+  }
+
+  /**
    * Scope and subject narrow the results.
    */
   public function testScopeAndSubjectFilters(): void {

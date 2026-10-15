@@ -1477,6 +1477,12 @@ class AimMemoryManager {
       if (!$fact->get('retired')->isEmpty()) {
         continue;
       }
+      // A past-due fact is withheld before the expiry sweep retires it
+      // (ADR-0057), so expiry holds to the date, not the next cron run.
+      $expires = $fact->get('expires')->value;
+      if ($expires !== NULL && (int) $expires <= $this->time->getRequestTime()) {
+        continue;
+      }
 
       // Tokens resolve as the viewing account at read time, so the value is
       // never stored in the fact. A fact naming a literal this viewer cannot

@@ -942,6 +942,37 @@ count - trivial at PoC scale, a real line item at volume.
 
 ---
 
+## Plumbing audit (2026-10-15, first pass)
+
+What aim's custom code does that Drupal AI contrib could do instead,
+checked against the installed `ai`, `ai_search`, `ai_logging`, `ai_eval`
+(Composer-present, not enabled) and `ai_observability`. Prompted by George
+Kastanis's measure that about a fifth of his own code was plumbing. Verdict
+is keep (memory rules or no contrib equivalent), thin (already an adapter),
+or look (a real candidate, not yet decided). Only read, nothing replaced.
+
+| Piece | Verdict | Why |
+| --- | --- | --- |
+| `AimMemoryManager` remember/recall/consolidate | keep | The memory rules; split planned (TODO.md), no contrib equivalent |
+| `AimCallLogSubscriber` | thin | Adds run ID and duration to `ai_logging` rows; `ai_logging` has neither |
+| `AimEmbeddingCacheSubscriber` | keep | No query-embedding cache found in `ai` or `ai_search` (ADR-0017) |
+| `AimMariaDBProvider` | thin | Shim over `ai_vdb_provider_mariadb`, deleted as upstream fixes land (ADR-0023) |
+| `ExcludeRetired` processor | keep | Aim-specific Search API rule |
+| `AimStatusChecker`, status page | keep | Checks aim's DB state; `ai_observability` is OTel traces, not this |
+| Grounded check, merge verifier (`checkGrounding`, `verifyMerge`) | keep | Read the runner: Decision guardrails filter the input or output of a Decision call (stop with a score). Our checks are Decision calls whose answers aim acts on, so they are not guardrails. Guardrails could instead be attached to those calls |
+| `ActivityBackendInterface`, `ChatBackend`, `DecisionBackend` | keep | `DecisionBackend` wraps the core Decision operation; `ChatBackend` is the fallback for models that are not decision models (sovereignty, ADR-0004) |
+| Redaction (not built) | contrib helps | `RegexpGuardrail` already supports Decision calls but only stops; a redacting guardrail would extend that pattern, so the pattern-PII piece of TODO.md's redaction item is the small upstream contribution |
+| `aim_benchmark` decision-eval scripts and JSON sets | look, partial | `ai_eval` has dataset sources, a binary groundedness judge, judge validation, agreement stats and confidence intervals. Its graders judge agent responses through chat, not typed Decision calls, so the runner stays; the stats and judge validation are worth borrowing |
+| `AimIngestForm` | keep | Extraction into facts; contrib chunking is for indexing, not extraction |
+| `AimSettingsForm` (450 lines) | look | Mostly `ai_provider_configuration` elements and thresholds; not read line by line |
+| `aim_tool_oauth` | look | Zero PHP (two scope configs and an install file). The `agent_access` project (drupal.org, experimental, not under the security advisory policy) wires Simple OAuth, Tool API and MCP Server so an agent acts as the connecting user, via `dr recipe`; needs core ^11.4 (this site is 11.4.10) and leaves keys and role choice to the admin. Same stack we built by hand. Try it on a scratch DDEV before deciding; our scopes may still be needed on top |
+| `aim_tool` / `aim_chatbot` | not audited | Next: Tool API permission declarations (TODO.md "aim_tool: declare permissions") |
+
+Result so far: the Decision-API rows turned out to be keep, so the real
+candidates are `aim_tool_oauth` (against `agent_access`), the settings form,
+and borrowing `ai_eval`'s judge statistics. Not much plumbing; the larger
+size win is the `AimMemoryManager` split.
+
 ## Running the tests
 
 Kernel tests need a database that is not the site's own. Create it once

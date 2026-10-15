@@ -465,6 +465,79 @@ are recommendations.
       "Checked 2026-10-02"; open question there: whether a keyword-only
       hit may bypass the ADR-0019 distance cutoff).
 
+## Outside advice (raised 2026-10-15, George Kastanis, OpenBrain author)
+
+Source: a chat with George Kastanis, a Drupal AI key player who built
+OpenBrain, an in-house second brain. His points, and where each landed:
+
+- [ ] **Plumbing audit (do soon).** He measured about a fifth of his custom
+      code as plumbing Drupal AI contrib now covers. List every aim service,
+      form and plugin and mark each: memory rules (keep) or plumbing
+      (contrib covers it, or could). Check against the Agent Access recipe
+      (a login per person for Claude/ChatGPT), Tool API tool permissions,
+      `ai_logging`, and the Guardrails rewrite mechanism. Less code also
+      answers the neglect risk. Output: a table in DEVELOPING.md, then
+      deletions.
+- [ ] **Redacting guardrail.** Drupal AI's PII guardrails only block; none
+      removes the PII, yet the rewrite mechanism exists
+      (`runGuardrails()` already handles `RewriteInputResult`). Sketch:
+      (a) deterministic redaction for pattern PII (email, phone, IBAN) as
+      a guardrail plugin, upstreamable on its own; (b) for names, a
+      decision-model pass (ADR-0056's single call); (c) aim-specific: in
+      `scope=user` the `user` reference already carries identity, so the
+      name in the text is redundant and can go; (d) the strongest form:
+      move the value into `literals` with an audience and leave a
+      `[literal:key]` token, so redaction is reversible and
+      access-controlled, not destructive. Folds into ADR-0056 (parked);
+      decide on (a) first as the small visible contribution.
+- [ ] **Privacy review (top-level, before any real data).** "True privacy"
+      is not available, so define levels and say what each protects
+      against. Known leak paths to list: admin roles hold every permission
+      (a hide-from-admins rule needs its own access check); AI Search
+      checks entity access per hit, so `AimFactAccessControlHandler` is the
+      line - needs a test that a private `scope=user` fact is absent from
+      `recall()` for an admin and for another user; `ai_log` stores model
+      prompts and replies in clear (ADR-0060); a hosted model sees every
+      candidate fact (CLAUDE.md scope note); embeddings leak meaning.
+      George's rule: when unsure, make it private.
+- [ ] **Subject / user / uid audit.** The identity-ish fields have drifted:
+      `uid` (author), `user` (who a `scope=user` fact is about, was
+      `subject_uid`), `subject` (generic per-scope key, minted case IDs),
+      `target_type`/`target_id` (entity scope). Write one table: field,
+      meaning, which scopes, who sets it, what checks it (see the
+      authorship gap under "PoC deviations"). Then decide what is
+      redundant. Output: a short section in DEVELOPING.md.
+- [ ] **Importers (open question).** George's view: importing from real
+      systems (time tracking, git, chat, meetings), plus PII removal,
+      privacy levels and numeric questions ("hours on project X last
+      month"), is what no one else does and where aim would stand out.
+      Not decided. Two cautions: each connector is its own product (auth,
+      schema, upkeep - the neglect risk), and numeric questions are
+      structured data plus a query tool, not vector memory. Cheapest probe:
+      one importer feeding the existing ingest path (see "Ingestion"),
+      to learn whether extraction copes with structured exhaust. Imports
+      make the redaction item above urgent.
+- [ ] **Human curation of the trust gate.** None yet: nobody holds
+      `trust {scope} aim facts` and the grounded check is in shadow mode
+      (see "Loop back to the trust permission" under Governance). Decide
+      the reviewer workflow before claiming draft-to-trusted is a feature.
+- [ ] **Packaging.** Not a one-line installer. `demo/preflight.js` lives in
+      the site shell, not the module; consider a module-level check (a
+      Drush command or status report) so installs are verifiable. Heavy
+      parts already swappable (`DecisionBackend`, provider shim, Ollama
+      embeddings); document the swap points. George suggested a site
+      template after the module exists. Unresearched here: check what
+      Drupal CMS site templates require against `aim_demo_library`.
+- [ ] **OpenKB (later).** Position aim as the governed fact layer beside
+      it, possibly feeding the planned RAG idea; one ADR when that
+      starts. Earlier appraisal: it is a wiki, not a fact memory.
+- Not a new item: merging. Consolidation is already non-destructive
+  (retire plus `superseded_by`), which meets his "keep originals so you can
+  undo". Jev as a judge is also largely done: one question per call, gate
+  and grounding eval sets built (44 items), thresholds separate per
+  activity. What remains is under "Decision models" (per-model question
+  text, enforce decision).
+
 ## Governance
 
 - [ ] Close [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s

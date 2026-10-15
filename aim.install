@@ -280,3 +280,16 @@ function aim_update_10011(): void {
     }
   }
 }
+
+/**
+ * Logs the demo assistant's chat turns too, for eval review (ADR-0060).
+ *
+ * Adds the aim_chatbot agent's call tag to the ai_logging list. ai_logging
+ * matches tags exactly, and ai_agents tags every call an agent makes with
+ * ai_agents_ plus the agent ID.
+ */
+function aim_update_10012(): void {
+  $config = \Drupal::configFactory()->getEditable('ai_logging.settings');
+  $existing = array_filter(array_map('trim', explode(',', (string) $config->get('prompt_logging_tags'))));
+  $config->set('prompt_logging_tags', implode(',', array_unique(array_merge($existing, ['ai_agents_aim_chatbot']))))->save();
+}
