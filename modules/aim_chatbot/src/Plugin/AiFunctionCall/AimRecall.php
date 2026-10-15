@@ -12,6 +12,7 @@ use Drupal\ai\Base\FunctionCallBase;
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
 use Drupal\aim\Service\AimMemoryManager;
+use Drupal\aim\Service\AimRecallService;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -50,12 +51,18 @@ final class AimRecall extends FunctionCallBase implements ExecutableFunctionCall
   protected AimMemoryManager $memoryManager;
 
   /**
+   * The recall service.
+   */
+  protected AimRecallService $recallService;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): FunctionCallInterface|static {
     /** @var static $instance */
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->memoryManager = $container->get('aim.memory_manager');
+    $instance->recallService = $container->get('aim.recall');
     return $instance;
   }
 
@@ -72,7 +79,7 @@ final class AimRecall extends FunctionCallBase implements ExecutableFunctionCall
     try {
       // Abstain on a poor match: a non-empty result set only means the
       // index had *something*, not that it was relevant.
-      $rows = $this->memoryManager->recall($text, self::FACT_SCOPE, NULL, NULL, self::RESULT_LIMIT, $this->memoryManager->getRecallMaxDistance(), FALSE, $this->memoryManager->getRecallGap());
+      $rows = $this->recallService->recall($text, self::FACT_SCOPE, NULL, NULL, self::RESULT_LIMIT, $this->memoryManager->getRecallMaxDistance(), FALSE, $this->memoryManager->getRecallGap());
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {
       $this->setOutput('Could not search memory: ' . $e->getMessage());
@@ -84,7 +91,7 @@ final class AimRecall extends FunctionCallBase implements ExecutableFunctionCall
       return;
     }
 
-    $lines = array_map(fn (array $row): string => $this->memoryManager->formatFactLine($row), $rows);
+    $lines = array_map(fn (array $row): string => $this->recallService->formatFactLine($row), $rows);
     $this->setOutput("Relevant facts:\n" . implode("\n", $lines));
   }
 

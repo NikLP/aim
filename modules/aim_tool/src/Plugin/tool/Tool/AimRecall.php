@@ -9,6 +9,7 @@ use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Service\AimMemoryManager;
+use Drupal\aim\Service\AimRecallService;
 use Drupal\tool\Attribute\Tool;
 use Drupal\tool\ExecutableResult;
 use Drupal\tool\Tool\ToolBase;
@@ -105,6 +106,11 @@ final class AimRecall extends ToolBase {
   protected AimMemoryManager $memoryManager;
 
   /**
+   * The recall service.
+   */
+  protected AimRecallService $recallService;
+
+  /**
    * {@inheritdoc}
    *
    * See AimRemember for why create() rather than the (final) constructor.
@@ -112,6 +118,7 @@ final class AimRecall extends ToolBase {
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->memoryManager = $container->get('aim.memory_manager');
+    $instance->recallService = $container->get('aim.recall');
     return $instance;
   }
 
@@ -125,7 +132,7 @@ final class AimRecall extends ToolBase {
     }
 
     try {
-      $rows = $this->memoryManager->recall(
+      $rows = $this->recallService->recall(
         $values['text'],
         $values['scope'] ?? NULL,
         $values['subject'] ?? NULL,
@@ -150,7 +157,7 @@ final class AimRecall extends ToolBase {
       );
     }
 
-    $lines = array_map(fn (array $row): string => $this->memoryManager->formatFactLine($row), $rows);
+    $lines = array_map(fn (array $row): string => $this->recallService->formatFactLine($row), $rows);
     return ExecutableResult::success(
       new TranslatableMarkup('Found @count relevant fact(s).', ['@count' => count($rows)]),
       ['results' => implode("\n", $lines)],

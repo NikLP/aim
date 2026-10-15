@@ -8,6 +8,7 @@ use Drupal\aim\AimStatusChecker;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimConsolidationService;
+use Drupal\aim\Service\AimRecallService;
 use Drush\Attributes as CLI;
 use Drush\Commands\AutowireTrait;
 use Drush\Commands\DrushCommands;
@@ -32,12 +33,15 @@ final class AimCommands extends DrushCommands {
    *   The aim memory manager.
    * @param \Drupal\aim\Service\AimConsolidationService $consolidation
    *   The consolidation service, used by aim:consolidate.
+   * @param \Drupal\aim\Service\AimRecallService $recallService
+   *   The recall service, used by aim:recall.
    * @param \Drupal\aim\AimStatusChecker $statusChecker
    *   The status checker, used by aim:status.
    */
   public function __construct(
     protected AimMemoryManager $memoryManager,
     protected AimConsolidationService $consolidation,
+    protected AimRecallService $recallService,
     protected AimStatusChecker $statusChecker,
   ) {
     parent::__construct();
@@ -281,7 +285,7 @@ final class AimCommands extends DrushCommands {
     ],
   ): void {
     try {
-      $rows = $this->memoryManager->recall(
+      $rows = $this->recallService->recall(
         $text,
         $options['scope'] ?: NULL,
         $options['subject'] ?: NULL,

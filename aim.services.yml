@@ -68,6 +68,18 @@ services:
   Drupal\aim\Service\AimConsolidationService:
     alias: aim.consolidation
 
+  aim.recall:
+    class: Drupal\aim\Service\AimRecallService
+    arguments:
+      - '@aim.memory_manager'
+      - '@datetime.time'
+      - '@config.factory'
+      - '@current_user'
+      - '@literals.reader'
+
+  Drupal\aim\Service\AimRecallService:
+    alias: aim.recall
+
   # Class alias so autowired consumers (the auto-registered AimHooks
   # service, src/Hook/AimHooks.php) can type-hint AimMemoryManager
   # directly, same pattern the annotations module (dotdev suite) uses for

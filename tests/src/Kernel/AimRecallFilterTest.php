@@ -224,7 +224,7 @@ class AimRecallFilterTest extends KernelTestBase {
    *   The rows.
    */
   protected function recall(?string $scope = NULL, ?string $subject = NULL, ?string $subjectUid = NULL, int $limit = 10, ?float $maxDistance = NULL, bool $includeUntrusted = FALSE, ?float $gap = NULL): array {
-    return $this->container->get('aim.memory_manager')->recall('anything', $scope, $subject, $subjectUid, $limit, $maxDistance, $includeUntrusted, $gap, FALSE);
+    return $this->container->get('aim.recall')->recall('anything', $scope, $subject, $subjectUid, $limit, $maxDistance, $includeUntrusted, $gap, FALSE);
   }
 
   /**

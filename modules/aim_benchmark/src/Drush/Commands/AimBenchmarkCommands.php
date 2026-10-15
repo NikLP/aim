@@ -6,6 +6,7 @@ namespace Drupal\aim_benchmark\Drush\Commands;
 
 use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
 use Drupal\aim\Service\AimMemoryManager;
+use Drupal\aim\Service\AimRecallService;
 use Drupal\aim_benchmark\Service\AimBenchmarkGenerator;
 use Drush\Attributes as CLI;
 use Drush\Commands\AutowireTrait;
@@ -29,7 +30,9 @@ final class AimBenchmarkCommands extends DrushCommands {
    *
    * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
    *   The aim memory manager, for allowedScopes()/scopeRequiresAccount()
-   *   validation and the reindex()/recall() calls being timed.
+   *   validation and the reindex() calls being timed.
+   * @param \Drupal\aim\Service\AimRecallService $recallService
+   *   The recall service, whose recall() calls are timed.
    * @param \Drupal\aim_benchmark\Service\AimBenchmarkGenerator $generator
    *   The synthetic fact generator.
    * @param \Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber $embeddingCache
@@ -38,6 +41,7 @@ final class AimBenchmarkCommands extends DrushCommands {
    */
   public function __construct(
     protected AimMemoryManager $memoryManager,
+    protected AimRecallService $recallService,
     protected AimBenchmarkGenerator $generator,
     protected AimEmbeddingCacheSubscriber $embeddingCache,
   ) {
@@ -137,7 +141,7 @@ final class AimBenchmarkCommands extends DrushCommands {
         for ($i = 0; $i < $queryCount; $i++) {
           $start = microtime(TRUE);
           try {
-            $this->memoryManager->recall($sampleQueries[$i % count($sampleQueries)], $scope, NULL, $subjectUid, 10, accessCheck: FALSE);
+            $this->recallService->recall($sampleQueries[$i % count($sampleQueries)], $scope, NULL, $subjectUid, 10, accessCheck: FALSE);
           }
           catch (\InvalidArgumentException | \RuntimeException $e) {
             $this->io()->error($e->getMessage());

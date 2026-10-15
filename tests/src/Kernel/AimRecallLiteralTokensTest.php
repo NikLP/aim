@@ -186,7 +186,7 @@ class AimRecallLiteralTokensTest extends KernelTestBase {
    *   The recalled texts, in fact ID order.
    */
   protected function recallTexts(): array {
-    $rows = $this->container->get('aim.memory_manager')->recall('library phone', 'site', NULL, NULL, 10);
+    $rows = $this->container->get('aim.recall')->recall('library phone', 'site', NULL, NULL, 10);
     return array_column($rows, 'text');
   }
 

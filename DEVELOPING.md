@@ -776,6 +776,18 @@ options, `ai_assistant_api.ai_assistant.aim_demo_assistant`'s
 on any embeddings swap. Anthropic has no embeddings API - never point
 `embeddings_engine` at it.
 
+**Caveat when swapping a decision model:** the activities in
+`aim.settings:activities` name their own provider and model, but the
+literals finder does not - it reads the AI module's default for the
+`decision` operation type (`ai.settings:default_providers.decision`,
+`LiteralChooser`). Changing a model in one place leaves the other on the old
+ID; the finder then fails with the provider's "unknown model" error, which
+`aim_literal` reports as "no matching literal", so the assistant tells the
+visitor a value is not recorded when it is. After any decision-model swap,
+update both, set `moderation` and `text_classification` defaults too so no
+default names a retired model, and check with `drush literals:eval`. (A
+finder-level provider/model setting would remove this trap; not built.)
+
 **Local Ollama** (`ai_provider_ollama`): points at the *host's* Ollama
 install (`http://host.docker.internal:11434`), not a container-local one
 - don't run a second Ollama daemon in its own DDEV addon container
@@ -973,16 +985,19 @@ candidates are `aim_tool_oauth` (against `agent_access`), the settings form,
 and borrowing `ai_eval`'s judge statistics. Not much plumbing; the larger
 size win is the `AimMemoryManager` split.
 
-`AimMemoryManager` split (2026-10-15, 2,490 to 1,384 lines): consolidation
+`AimMemoryManager` split (2026-10-15, 2,490 to 1,175 lines): consolidation
 moved to `AimConsolidationService` (`aim.consolidation`; callers are the
 queue worker, `aim:consolidate` and the test), settings and thresholds to
 `AimSettings` (`aim.settings_reader`), the grounded check to
-`AimGroundingChecker`. The manager keeps one-line delegators for the
+`AimGroundingChecker`, recall to `AimRecallService` (`aim.recall`; no
+delegator, callers are the two recall tools, `aim:recall`, the benchmark
+command and two tests). The manager keeps one-line delegators for the
 settings getters and `checkGrounding()` and aliases the `DEFAULT_*`
 constants, so existing callers are untouched; move callers to the new
 services over time and drop the delegators. Still in the manager:
-`remember`/`ingestText`/`extractFacts` and `recall`/`executeSearchQuery`,
-candidates for the next two services.
+`remember`/`ingestText`/`extractFacts` (about 600 lines, the next
+candidate) plus loading, saving, guardrails, access and
+`executeSearchQuery()`.
 
 ## Running the tests
 
