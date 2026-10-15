@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\aim\Plugin\Validation\Constraint;
 
+use Drupal\Core\DependencyInjection\AutowireTrait;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\aim\Service\AimMemoryManager;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 
@@ -15,6 +15,8 @@ use Symfony\Component\Validator\ConstraintValidator;
  * Validates AimGuardrailsConstraint against a field's current text.
  */
 final class AimGuardrailsConstraintValidator extends ConstraintValidator implements ContainerInjectionInterface {
+
+  use AutowireTrait;
 
   /**
    * Constructs an AimGuardrailsConstraintValidator object.
@@ -25,13 +27,6 @@ final class AimGuardrailsConstraintValidator extends ConstraintValidator impleme
   public function __construct(
     protected AimMemoryManager $memoryManager,
   ) {}
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container): static {
-    return new static($container->get('aim.memory_manager'));
-  }
 
   /**
    * {@inheritdoc}

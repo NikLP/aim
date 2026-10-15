@@ -10,7 +10,6 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Base class for bulk actions that change one field on an aim_fact.
@@ -37,13 +36,6 @@ abstract class AimFactActionBase extends ActionBase implements ContainerFactoryP
    */
   public function __construct(array $configuration, $plugin_id, $plugin_definition, protected AimMemoryManager $memoryManager, protected AccountProxyInterface $currentUser) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
-    return new static($configuration, $plugin_id, $plugin_definition, $container->get('aim.memory_manager'), $container->get('current_user'));
   }
 
   /**

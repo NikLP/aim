@@ -10,7 +10,6 @@ use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Soft-retires facts by stamping retired, like consolidation does.
@@ -40,13 +39,6 @@ class RetireFactAction extends AimFactActionBase {
    */
   public function __construct(array $configuration, $plugin_id, $plugin_definition, AimMemoryManager $memoryManager, AccountProxyInterface $currentUser, protected TimeInterface $time) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $memoryManager, $currentUser);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
-    return new static($configuration, $plugin_id, $plugin_definition, $container->get('aim.memory_manager'), $container->get('current_user'), $container->get('datetime.time'));
   }
 
   /**

@@ -13,7 +13,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimConsolidationService;
 use Drupal\aim\Service\AimSettings;
-use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Consolidates one newly-written aim_fact against its nearest neighbor.
@@ -57,24 +57,10 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
     protected AimMemoryManager $memoryManager,
     protected AimSettings $settings,
     protected AimConsolidationService $consolidation,
+    #[Autowire(service: 'logger.channel.aim')]
     protected LoggerChannelInterface $logger,
   ) {
     parent::__construct($configuration, $pluginId, $pluginDefinition);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): static {
-    return new static(
-      $configuration,
-      $plugin_id,
-      $plugin_definition,
-      $container->get('aim.memory_manager'),
-      $container->get('aim.settings_reader'),
-      $container->get('aim.consolidation'),
-      $container->get('logger.channel.aim'),
-    );
   }
 
   /**
