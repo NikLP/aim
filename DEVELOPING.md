@@ -715,6 +715,19 @@ then export the index config.
   above, not running `search-api:clear` again. After a `DROP TABLE`-and-
   reindex cycle, reindex directly and skip `search-api:clear` entirely.
 
+- `AimMemoryManager::reindex()` (used by `aim:extract --index`, the ingest
+  form and the consolidation worker) clears the items it indexes from
+  Search API's post-request queue. With `index_directly` on, a fact saved
+  earlier in the same request is also queued for indexing at the end of it;
+  that second pass used to delete the fact's vector row and insert nothing
+  (ai_search's chunk slicing starts at `processed_chunks`, which the first
+  pass left equal to `total_chunks`), while the tracker still said indexed,
+  so `search-api:index` reported "up to date" and only `aim:status` parity
+  showed the gap. Found and fixed 2026-10-15. If parity fails anyway:
+  `drush search-api:reset-tracker aim_vector_index` then
+  `drush search-api:index aim_vector_index` (the reset also zeroes
+  `processed_chunks`). Upstream status in TODO.md.
+
 ### `checkViewAccess()` and skipping access on recall
 
 `AimMemoryManager::executeSearchQuery()` and `recall()` take

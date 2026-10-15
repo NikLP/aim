@@ -696,6 +696,32 @@ questions" section)
       guardrail-blocked merge: needs a choice-answering fake decision
       backend), the ingest form's extract mode and file upload, the Tool
       API/MCP transport, and the user-scope role-visibility settings form.
+- [ ] Upstream: ai_search re-index of an already fully indexed item (raised
+      2026-10-15). `indexItemsWithChunkSlicing()` starts at the item's
+      `processed_chunks`, so a second `indexItems()` on an item whose
+      `processed_chunks` already equals `total_chunks` deletes its vector
+      row, slices past the end, inserts nothing and reports success. aim
+      hit it via `index_directly` plus `reindex()` (fixed locally, see
+      DEVELOPING.md "Vector search"). Same mechanism as the closed
+      #3584035, which only resets progress on clear/reset-tracker
+      (`ChunkTrackingResetEventSubscriber`), not on a plain re-index. Not
+      #3584058 (that one is about chunk recompute cost). Searched the open
+      and closed queue 2026-10-15, no duplicate found. Before filing:
+      reproduce on a bare ai_search index with `index_directly` and call
+      `indexItems()` twice in one request. A fix upstream would reset or
+      ignore `processed_chunks` when the tracker already lists the item as
+      indexed, or the backend could treat offset >= total as offset 0.
+      When fixed upstream, drop the post-request queue clearing in
+      `AimMemoryManager::reindex()`.
+- [ ] Autowire the four tool and chatbot plugins (`aim_tool` and
+      `aim_chatbot`, `AimRecall` and `AimRemember` each). Left on their
+      `create()` overrides 2026-10-15: `ToolBase::create()` and
+      `FunctionCallBase::create()` build the instance with `new static(...)`
+      and never call `createInstanceAutowired()`, so `#[Required]` setters
+      would not run. Needs the parents to autowire (upstream in `tool` and
+      `ai`) or hand-wiring the parent constructors, which is worse than
+      today's override. Revisit when either parent adopts
+      `AutowiredInstanceTrait`.
 - [ ] Bulk actions for `category` on the admin facts view - deliberately
       not built (2026-09-30) because the field is not in use yet.
       `trusted`/retire/un-retire have them (`src/Plugin/Action/`,
