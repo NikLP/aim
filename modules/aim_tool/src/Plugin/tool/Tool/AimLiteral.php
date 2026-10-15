@@ -58,7 +58,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     'outcome' => new OutputDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Outcome'),
-      description: new TranslatableMarkup('match, ambiguous, candidates or none.'),
+      description: new TranslatableMarkup('match, ambiguous, candidates, none or unavailable (the lookup could not run: not the same as none, do not say the value is not recorded).'),
     ),
     'key' => new OutputDefinition(
       data_type: 'string',

@@ -33,7 +33,12 @@ mode stays off, as already noted in ADR-0060 decision 4 and DEVELOPING.md
 "Model-call logging". Still open: chat-turn capture and retention, real
 versus synthetic datasets, disclosure.
 
-Original questions (1 to 3 are answered above):
+Also decided 2026-10-15 (Nik): real visitor questions may enter a dataset
+only after a human has redacted them (for now); text logging is opt-in for
+new sites (this site keeps it on); disclosure wording goes to a later policy
+discussion (TODO.md, "Policy discussion: disclosure of logged chats").
+
+Original questions (1 to 3 answered above; 4 and 5 answered here):
 1. **Retention**: `ai_log` is already 90 days / 10000 entries (ADR-0060).
    Decide if that is right for text-bearing rows, and set a shorter figure
    (suggest 30 days) for assistant chat traces, deleted unless promoted into

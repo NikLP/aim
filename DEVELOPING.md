@@ -431,12 +431,16 @@ to the `aim_benchmark` submodule - see
 drush aim:status
 ```
 
-Five checks `config:status` can't do, because they're runtime DB state,
+Checks `config:status` can't do, because they're runtime DB state,
 not config: vector index parity (live fact count vs. `aim_fact_vectors` row
 count), orphan vector rows, the `mariadb` VDB provider plugin still
 resolving to `AimMariaDBProvider`, the collection table's build-time HNSW
 `M` and the server's `mhnsw_ef_search`, and `aim.settings:recall_max_distance`
-actually being set rather than silently using the in-code fallback. Exits
+actually being set rather than silently using the in-code fallback, no
+fact overdue for the expiry sweep, and every configured model still existing
+with its provider (the AI module's chat, decision and embeddings defaults,
+plus any activity that names its own: a retired model is otherwise found by
+a failed call). Exits
 1 if any check fails, 0 otherwise - safe to use in a preflight script.
 Covers the database-side items in "Upgrading an existing site" below, in
 place of walking them by hand.

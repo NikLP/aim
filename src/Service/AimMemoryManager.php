@@ -25,6 +25,7 @@ use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
 use Drupal\search_api\IndexInterface;
 use Drupal\search_api\Query\QueryInterface as SearchApiQueryInterface;
 use Drupal\search_api\Query\ResultSetInterface;
+use Drupal\search_api\Utility\PostRequestIndexingInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
@@ -87,6 +88,9 @@ class AimMemoryManager {
    *   The aim logger channel. Warnings and errors are always logged; the
    *   info and debug tiers are gated by aim.settings' log_audit and
    *   log_verbose (see logAudit() and logVerbose()).
+   * @param \Drupal\search_api\Utility\PostRequestIndexingInterface $postRequestIndexing
+   *   Search API's post-request queue (index_directly), which reindex()
+   *   clears of the items it indexes itself.
    */
   public function __construct(
     #[Autowire(service: 'ai.provider')]
@@ -100,6 +104,7 @@ class AimMemoryManager {
     protected AimEmbeddingCacheSubscriber $embeddingCache,
     #[Autowire(service: 'logger.channel.aim')]
     protected LoggerChannelInterface $logger,
+    protected PostRequestIndexingInterface $postRequestIndexing,
   ) {}
 
   /**
@@ -414,7 +419,18 @@ class AimMemoryManager {
    */
   public function reindex(): ?int {
     $index = $this->loadVectorIndex();
-    return $index ? $index->indexItems() : NULL;
+    if (!$index) {
+      return NULL;
+    }
+    $pending = $index->getTrackerInstance()->getRemainingItems();
+    $indexed = $index->indexItems();
+    // With index_directly on, the facts saved earlier in this request are
+    // also queued for indexing at the end of it. Left queued, that second
+    // pass deletes each fact's vector row and re-inserts nothing:
+    // ai_search's chunk slicing starts at the item's processed_chunks, which
+    // the first pass left at its total. Confirmed live 2026-10-15.
+    $this->postRequestIndexing->removeFromIndexing($index->id(), $pending);
+    return $indexed;
   }
 
   /**

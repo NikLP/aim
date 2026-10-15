@@ -8,6 +8,7 @@ use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\AiVdbProviderPluginManager;
 use Drupal\aim\Service\AimSettings;
 use Drupal\aim\Vdb\AimMariaDBProvider;
@@ -45,6 +46,9 @@ final class AimStatusChecker {
    *   entity - via the entity query API rather than raw SQL.
    * @param \Drupal\Component\Datetime\TimeInterface $time
    *   The time service, used to tell an overdue expiry from a fresh one.
+   * @param \Drupal\ai\AiProviderPluginManager $aiProvider
+   *   The AI provider plugin manager, used to confirm the configured models
+   *   still exist with their providers.
    */
   public function __construct(
     protected Connection $database,
@@ -53,6 +57,8 @@ final class AimStatusChecker {
     protected AiVdbProviderPluginManager $vdbProviders,
     protected EntityTypeManagerInterface $entityTypeManager,
     protected TimeInterface $time,
+    #[Autowire(service: 'ai.provider')]
+    protected AiProviderPluginManager $aiProvider,
   ) {}
 
   /**
@@ -72,6 +78,7 @@ final class AimStatusChecker {
       'hnsw_tuning' => $this->checkHnswTuning(),
       'recall_cutoff' => $this->checkRecallCutoff(),
       'expiry_sweep' => $this->checkExpirySweep(),
+      'models' => $this->checkModels(),
     ];
   }
 
@@ -257,6 +264,63 @@ final class AimStatusChecker {
       'label' => 'Recall cutoff configured',
       'ok' => $ok,
       'detail' => $detail,
+    ];
+  }
+
+  /**
+   * Checks that every model aim and the finder rely on still exists.
+   *
+   * Covers the AI module's default for chat, decision and embeddings (the
+   * literals finder reads the decision default) and each aim activity that
+   * names its own provider and model. A provider that retires a model leaves
+   * the setting pointing at nothing; the first sign is otherwise a failed
+   * call.
+   *
+   * @return array
+   *   ['label' => string, 'ok' => bool, 'detail' => string].
+   */
+  private function checkModels(): array {
+    $targets = [];
+    foreach (['chat', 'decision', 'embeddings'] as $operation) {
+      $default = $this->aiProvider->getDefaultProviderForOperationType($operation) ?? [];
+      $targets["default $operation"] = [
+        $operation,
+        (string) ($default['provider_id'] ?? ''),
+        (string) ($default['model_id'] ?? ''),
+      ];
+    }
+    $activities = $this->configFactory->get('aim.settings')->get('activities') ?? [];
+    foreach ($activities as $name => $activity) {
+      if (!empty($activity['provider']) && !empty($activity['model'])) {
+        $operation = ($activity['backend'] ?? 'chat') === 'decision' ? 'decision' : 'chat';
+        $targets["activity $name"] = [$operation, (string) $activity['provider'], (string) $activity['model']];
+      }
+    }
+
+    $problems = [];
+    foreach ($targets as $label => [$operation, $providerId, $modelId]) {
+      if ($providerId === '' || $modelId === '') {
+        $problems[] = "$label: no provider or model set";
+        continue;
+      }
+      try {
+        $models = $this->aiProvider->createInstance($providerId)->getConfiguredModels($operation);
+      }
+      catch (\Throwable) {
+        $problems[] = "$label: provider $providerId is not usable";
+        continue;
+      }
+      if (!isset($models[$modelId])) {
+        $problems[] = "$label: $providerId does not list model $modelId";
+      }
+    }
+
+    return [
+      'label' => 'Configured models exist',
+      'ok' => !$problems,
+      'detail' => $problems
+        ? implode('; ', $problems) . ' - fix at /admin/config/ai/settings (defaults) or the aim settings (activities)'
+        : count($targets) . ' model setting(s) checked',
     ];
   }
 

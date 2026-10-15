@@ -915,6 +915,15 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
       Content Moderation isn't happening (ADR-0002 addendum, 2026-09-28);
       don't build ad hoc.
 - [ ] Pre-extraction summarization as a dedup lever.
+- [ ] **Policy discussion: disclosure of logged chats (raised 2026-10-15).**
+      Chat turns and model-call prompts are now stored in `ai_log` (90 days,
+      ADR-0060) for evaluation. A site that keeps real visitors' chats needs
+      its privacy notice to say so (what is kept, why, how long, who can read
+      it); ties to the parked PII gate (ADR-0056, decide before real data),
+      stealth mode (ADR-0060 decision 4) and the Article 50 disclosure item.
+      Decided for now: eval datasets may use real visitor questions only
+      when a human has redacted them; text logging is opt-in for new sites
+      (this site has it on). Draft: eval/DRAFT-eval-plan.md.
 - [ ] Source-boundary policy per site archetype (a Guardrail set per
       archetype).
 - [ ] Graduated-detail retrieval (L0/L1/L2) - source unverified, candidate
