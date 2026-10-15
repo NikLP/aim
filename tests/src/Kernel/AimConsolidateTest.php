@@ -171,7 +171,7 @@ class AimConsolidateTest extends KernelTestBase {
    *   The consolidate() result.
    */
   protected function sweep(?string $scope = NULL, bool $dryRun = FALSE): array {
-    return $this->container->get('aim.memory_manager')->consolidate($scope, 'fake', 'fake-model', self::AUTO, self::AMBIGUOUS, $dryRun);
+    return $this->container->get('aim.consolidation')->consolidate($scope, 'fake', 'fake-model', self::AUTO, self::AMBIGUOUS, $dryRun);
   }
 
   /**

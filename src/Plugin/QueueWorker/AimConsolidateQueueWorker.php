@@ -11,6 +11,7 @@ use Drupal\Core\Queue\QueueWorkerBase;
 use Drupal\Core\Queue\SuspendQueueException;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Service\AimMemoryManager;
+use Drupal\aim\Service\ConsolidationService;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -41,6 +42,8 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
    *   The plugin implementation definition.
    * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
    *   The aim memory manager.
+   * @param \Drupal\aim\Service\ConsolidationService $consolidation
+   *   The consolidation service.
    * @param \Drupal\Core\Logger\LoggerChannelInterface $logger
    *   The aim logger channel.
    */
@@ -49,6 +52,7 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
     string $pluginId,
     mixed $pluginDefinition,
     protected AimMemoryManager $memoryManager,
+    protected ConsolidationService $consolidation,
     protected LoggerChannelInterface $logger,
   ) {
     parent::__construct($configuration, $pluginId, $pluginDefinition);
@@ -63,6 +67,7 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
       $plugin_id,
       $plugin_definition,
       $container->get('aim.memory_manager'),
+      $container->get('aim.consolidation'),
       $container->get('logger.channel.aim'),
     );
   }
@@ -105,7 +110,7 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
       throw new SuspendQueueException($cause);
     }
 
-    $this->memoryManager->consolidateFact(
+    $this->consolidation->consolidateFact(
       $fact,
       $provider['provider_id'],
       $provider['model_id'],

@@ -478,6 +478,18 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       `ai_logging`, and the Guardrails rewrite mechanism. Less code also
       answers the neglect risk. Output: a table in DEVELOPING.md, then
       deletions.
+- [ ] **Agent Access recipe trial (done 2026-10-15; follow-ups open).**
+      Result: not a replacement for `aim_tool_oauth`; see DEVELOPING.md
+      "Plumbing audit". It adds no aim scopes or tools, and permission-
+      granularity scopes (ours and its) lose the user's roles, so the
+      role-visibility matrix returns nothing for non-admin tokens and
+      `aim:remember` lacks `create {scope} aim facts`. Follow-ups: (a)
+      add role-granularity scope(s) to `aim_tool_oauth` and re-test on
+      the live site; (b) check upstream whether a permission scope
+      granting a permission the user's role lacks is intended; (c) note
+      for any recommendation: `agent_access` is experimental and not
+      covered by the security advisory policy. Scratch copy
+      `~/websites/aim-scratch` (DDEV stopped) is safe to delete.
 - [ ] **Redacting guardrail.** Drupal AI's PII guardrails only block; none
       removes the PII, yet the rewrite mechanism exists
       (`runGuardrails()` already handles `RewriteInputResult`). Sketch:

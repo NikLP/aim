@@ -7,6 +7,7 @@ namespace Drupal\aim\Drush\Commands;
 use Drupal\aim\AimStatusChecker;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
+use Drupal\aim\Service\ConsolidationService;
 use Drush\Attributes as CLI;
 use Drush\Commands\AutowireTrait;
 use Drush\Commands\DrushCommands;
@@ -29,11 +30,14 @@ final class AimCommands extends DrushCommands {
    *
    * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
    *   The aim memory manager.
+   * @param \Drupal\aim\Service\ConsolidationService $consolidation
+   *   The consolidation service, used by aim:consolidate.
    * @param \Drupal\aim\AimStatusChecker $statusChecker
    *   The status checker, used by aim:status.
    */
   public function __construct(
     protected AimMemoryManager $memoryManager,
+    protected ConsolidationService $consolidation,
     protected AimStatusChecker $statusChecker,
   ) {
     parent::__construct();
@@ -378,7 +382,7 @@ final class AimCommands extends DrushCommands {
     $ambiguous_threshold = $options['ambiguous-threshold'] !== NULL ? (float) $options['ambiguous-threshold'] : $this->memoryManager->getAmbiguousThreshold();
 
     try {
-      $result = $this->memoryManager->consolidate(
+      $result = $this->consolidation->consolidate(
         $options['scope'] ?: NULL,
         $provider_id,
         $model_id,
