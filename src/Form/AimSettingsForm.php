@@ -12,21 +12,23 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\aim\Service\AimSettings;
 
 /**
- * Settings form for aim's tunable numeric thresholds and LLM prompts.
+ * Settings form for aim's models, thresholds, prompts and logging.
  *
- * Everything here previously lived as hardcoded class constants and heredoc
- * strings on AimMemoryManager (no admin path to change them without a code
- * deploy) - see CLAUDE.md's "Admin settings" section. The structured-output
- * JSON schemas (decision/scope enums) stay code-defined in AimMemoryManager:
- * only the prose instructions around them are editable here, since the
- * schema shape is parsed by PHP downstream and isn't safe to hand to a text
- * field.
+ * Everything here was once hardcoded in the memory manager, with no admin
+ * path to change it without a code deploy. The structured-output JSON
+ * schemas (decision/scope enums) stay code-defined in
+ * AimConsolidationService and AimRememberService: only the prose
+ * instructions around them are editable
+ * here, since the schema shape is parsed by PHP downstream and isn't safe
+ * to hand to a text field.
  *
- * Each element carries a #config_target, so ConfigFormBase loads the
+ * Most elements carry a #config_target, so ConfigFormBase loads the
  * default value, validates the submitted value against aim.schema.yml's
- * constraints (the 0..1 Range on each distance threshold), and saves it - no
- * submitForm() of its own. validateForm() only adds the checks the schema
- * can't express: the cross-field ordering of the two thresholds, and the
+ * constraints (the 0..1 Range on each distance threshold), and saves it.
+ * The Models tab is the exception: its provider pickers are built and
+ * saved by submitForm() into the nested `activities` map and
+ * `grounding_mode`. validateForm() adds the checks the schema can't
+ * express: the cross-field ordering of the two thresholds, and the
  * placeholder tokens each prompt must keep.
  */
 final class AimSettingsForm extends ConfigFormBase {
@@ -331,11 +333,20 @@ final class AimSettingsForm extends ConfigFormBase {
       '#required' => TRUE,
     ];
 
+    $form['prompts']['merge_verify_prompt'] = [
+      '#type' => 'textarea',
+      '#title' => $this->t('Merge verification prompt'),
+      '#description' => $this->t('Used by the merge verifier when it is a chat model (a decision model is asked typed questions instead and ignores this text). Must contain <code>{kept_text}</code>, <code>{candidate_text}</code> and <code>{merged_text}</code>. Tuned by hand against real merge faults: change it only with a way to re-check.'),
+      '#config_target' => 'aim.settings:merge_verify_prompt',
+      '#rows' => 14,
+      '#required' => TRUE,
+    ];
+
     $form['logging'] = [
       '#type' => 'details',
       '#group' => 'settings_tabs',
       '#title' => $this->t('Logging & Debug'),
-      '#description' => $this->t('Warnings and errors (rejected writes, blocked merges, a suspended queue) are always logged to the <em>aim</em> channel. Fact text and recall query text are never logged.'),
+      '#description' => $this->t('Warnings and errors (rejected writes, blocked merges, a suspended queue) are always logged to the <em>aim</em> channel, which carries IDs and counts, not fact or query text. Separately, the <em>ai_logging</em> module module records the prompt and reply of each aim model call (extraction, consolidation, merge, verifier, grounded check, chatbot), and that text includes facts and source passages. It is kept per its own limits at /admin/config/ai/logging/settings (ADR-0060).'),
       '#open' => FALSE,
     ];
     $form['logging']['log_audit'] = [
@@ -429,6 +440,21 @@ final class AimSettingsForm extends ConfigFormBase {
       if (!str_contains((string) $form_state->getValue('merge_prompt'), $placeholder)) {
         $form_state->setErrorByName('merge_prompt', $this->t('The merge writer prompt must contain the placeholder %placeholder.', ['%placeholder' => $placeholder]));
       }
+    }
+
+    $verify_prompt = (string) $form_state->getValue('merge_verify_prompt');
+    foreach (['{kept_text}', '{candidate_text}', '{merged_text}'] as $placeholder) {
+      if (!str_contains($verify_prompt, $placeholder)) {
+        $form_state->setErrorByName('merge_verify_prompt', $this->t('The merge verification prompt must contain the placeholder %placeholder.', ['%placeholder' => $placeholder]));
+      }
+    }
+
+    // A grounded check in shadow or enforce mode with no model chosen would
+    // quietly do nothing.
+    $grounding_mode = $form_state->getValue(['models', 'grounding', 'grounding_mode']) ?: 'off';
+    $grounding_model = $form_state->getValue(['models', 'grounding', 'decision']) ?? [];
+    if ($grounding_mode !== 'off' && (empty($grounding_model['provider']) || empty($grounding_model['model']))) {
+      $form_state->setErrorByName('models][grounding][decision', $this->t('The grounded check is set to %mode but has no decision model. Choose one, or set the mode to Off.', ['%mode' => $grounding_mode]));
     }
 
     // A decision classifier hands UPDATE merges to the default chat model.

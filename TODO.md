@@ -366,6 +366,11 @@ are recommendations.
       authorised). Then: a `pii` eval set and task in `decision-eval.php`,
       the `aim_personal_data` guardrail set, the extraction prompt change,
       and the demo's raw email fact moved into a literal.
+      Revisit triggers (decide later, 2026-10-15): before real personal
+      data goes in, or before the chat widget is reopened to anyone outside
+      (an outside tester could type their own email, phone or IBAN into it,
+      and it would be stored and sent to the hosted model). The redacting
+      guardrail (Outside advice, below) is parked with it.
 - [ ] If accepted, `aim_rejection` keeps no text for `personal_data`
       rejections, and ADR-0037 is built inline (no `aim_fact_source`).
 
@@ -414,9 +419,11 @@ are recommendations.
 
 **Indexing and settings**
 
-- [ ] Expose `index_directly` on the AIM settings form (writes the index
-      entity, then needs `config:export`). Needed when embeddings move to
-      hosted (Jev). Warn when it is on with a hosted provider.
+- [x] `index_directly`: decided 2026-10-15 not to expose it on the settings
+      form (it would write the index entity and need a config export, and
+      switching to hosted embeddings is rare and deliberate). Instead
+      `aim:status` and /admin/config/aim/status carry an "Index directly"
+      check that fails when it is on with a non-Ollama embeddings provider.
 - [ ] Open question: could Guardrails and the Decision API do the same
       job (see "Decision models")? Not yet written down elsewhere.
 

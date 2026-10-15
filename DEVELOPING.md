@@ -440,7 +440,8 @@ actually being set rather than silently using the in-code fallback, no
 fact overdue for the expiry sweep, and every configured model still existing
 with its provider (the AI module's chat, decision and embeddings defaults,
 plus any activity that names its own: a retired model is otherwise found by
-a failed call). Exits
+a failed call), and `index_directly` not being on with a hosted embeddings
+provider (each write would wait on it and send it the fact text). Exits
 1 if any check fails, 0 otherwise - safe to use in a preflight script.
 Covers the database-side items in "Upgrading an existing site" below, in
 place of walking them by hand.

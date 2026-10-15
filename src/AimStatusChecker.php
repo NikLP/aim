@@ -79,6 +79,7 @@ final class AimStatusChecker {
       'recall_cutoff' => $this->checkRecallCutoff(),
       'expiry_sweep' => $this->checkExpirySweep(),
       'models' => $this->checkModels(),
+      'index_directly' => $this->checkIndexDirectly(),
     ];
   }
 
@@ -262,6 +263,42 @@ final class AimStatusChecker {
 
     return [
       'label' => 'Recall cutoff configured',
+      'ok' => $ok,
+      'detail' => $detail,
+    ];
+  }
+
+  /**
+   * Warns when index_directly is on with a hosted embeddings provider.
+   *
+   * With index_directly on, a fact's text is sent to the embeddings provider
+   * during the request that saves it, so a hosted provider adds its latency
+   * and failures to every write and receives each fact as it is written
+   * (ADR-0015 addendum: this site runs it with local Ollama).
+   *
+   * @return array
+   *   ['label' => string, 'ok' => bool, 'detail' => string].
+   */
+  private function checkIndexDirectly(): array {
+    $direct = (bool) $this->configFactory->get('search_api.index.aim_vector_index')->get('options.index_directly');
+    $engine = (string) $this->configFactory->get('search_api.server.aim_vector')->get('backend_config.embeddings_engine');
+    $provider = explode('__', $engine)[0];
+
+    if (!$direct) {
+      $detail = 'off, facts are embedded by the indexing run';
+      $ok = TRUE;
+    }
+    elseif ($provider === 'ollama') {
+      $detail = 'on with local embeddings (' . $engine . ')';
+      $ok = TRUE;
+    }
+    else {
+      $detail = 'on with a hosted embeddings provider (' . ($engine ?: 'none set') . '): each write waits on it and sends the fact text to it - turn it off at /admin/config/search/search-api/index/aim_vector_index/edit, or use a local provider';
+      $ok = FALSE;
+    }
+
+    return [
+      'label' => 'Index directly',
       'ok' => $ok,
       'detail' => $detail,
     ];
