@@ -25,6 +25,7 @@ use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
 use Drupal\search_api\IndexInterface;
 use Drupal\search_api\Query\QueryInterface as SearchApiQueryInterface;
 use Drupal\search_api\Query\ResultSetInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Read/write access to aim's memory store.
@@ -88,6 +89,7 @@ class AimMemoryManager {
    *   log_verbose (see logAudit() and logVerbose()).
    */
   public function __construct(
+    #[Autowire(service: 'ai.provider')]
     protected AiProviderPluginManager $aiProvider,
     protected EntityTypeManagerInterface $entityTypeManager,
     protected TimeInterface $time,
@@ -96,6 +98,7 @@ class AimMemoryManager {
     protected EntityTypeBundleInfoInterface $bundleInfo,
     protected ConfigFactoryInterface $configFactory,
     protected AimEmbeddingCacheSubscriber $embeddingCache,
+    #[Autowire(service: 'logger.channel.aim')]
     protected LoggerChannelInterface $logger,
   ) {}
 

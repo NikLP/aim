@@ -39,6 +39,12 @@ final class FakeVectorSearch {
           continue 2;
         }
       }
+      // The real backend checks entity access per hit unless the query asks
+      // to bypass it (AimMemoryManager::executeSearchQuery()).
+      if (!$query->getOption('search_api_bypass_access') && !$fact->access('view')) {
+        continue;
+      }
+
       $item = $fieldsHelper->createItemFromObject($index, $fact->getTypedData(), NULL, $index->getDatasource('entity:aim_fact'));
       $item->setScore($scores[$fact->id()] ?? 0.1);
       $items[$item->getId()] = $item;

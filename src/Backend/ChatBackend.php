@@ -16,6 +16,7 @@ use Drupal\ai\OperationType\Decision\Value\ChoiceQuestion;
 use Drupal\ai\OperationType\Decision\Value\NoulAnswer;
 use Drupal\ai\OperationType\Decision\Value\NoulQuestion;
 use Drupal\ai\OperationType\Decision\Value\QuestionInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Bridges a Decision input onto a structured-output chat call.
@@ -35,6 +36,7 @@ class ChatBackend implements ActivityBackendInterface {
    *   The AI provider plugin manager.
    */
   public function __construct(
+    #[Autowire(service: 'ai.provider')]
     protected AiProviderPluginManager $aiProvider,
   ) {}
 

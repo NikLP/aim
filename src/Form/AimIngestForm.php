@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Drupal\aim\Form;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\DependencyInjection\AutowireTrait;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRememberService;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 /**
@@ -20,6 +20,8 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
  * created.
  */
 final class AimIngestForm extends FormBase {
+
+  use AutowireTrait;
 
   /**
    * Largest accepted upload, in bytes. Extraction sends the file whole.
@@ -41,13 +43,6 @@ final class AimIngestForm extends FormBase {
     protected AimRememberService $rememberService,
     protected EntityTypeManagerInterface $entityTypeManager,
   ) {}
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container): static {
-    return new static($container->get('aim.memory_manager'), $container->get('aim.remember'), $container->get('entity_type.manager'));
-  }
 
   /**
    * {@inheritdoc}

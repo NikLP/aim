@@ -15,6 +15,7 @@ use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Entity\AimFact;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * The write path: remember, ingest, extract and batch-create aim facts.
@@ -53,12 +54,15 @@ class AimRememberService {
     protected AimMemoryManager $manager,
     protected AimSettings $settings,
     protected AimGroundingChecker $groundingChecker,
+    #[Autowire(service: 'ai.provider')]
     protected AiProviderPluginManager $aiProvider,
     protected EntityTypeManagerInterface $entityTypeManager,
     protected TimeInterface $time,
     protected ConfigFactoryInterface $configFactory,
     protected AccountProxyInterface $currentUser,
+    #[Autowire(service: 'logger.channel.aim')]
     protected LoggerChannelInterface $logger,
+    #[Autowire(service: 'plugin.manager.aim_scope_type')]
     protected AimScopeTypePluginManagerInterface $scopeAccessManager,
   ) {}
 

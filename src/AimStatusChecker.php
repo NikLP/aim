@@ -11,6 +11,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\ai\AiVdbProviderPluginManager;
 use Drupal\aim\Service\AimSettings;
 use Drupal\aim\Vdb\AimMariaDBProvider;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Reports on the database-side state the vector search feature depends on.
@@ -48,6 +49,7 @@ final class AimStatusChecker {
   public function __construct(
     protected Connection $database,
     protected ConfigFactoryInterface $configFactory,
+    #[Autowire(service: 'ai.vdb_provider')]
     protected AiVdbProviderPluginManager $vdbProviders,
     protected EntityTypeManagerInterface $entityTypeManager,
     protected TimeInterface $time,

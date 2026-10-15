@@ -6,10 +6,10 @@ namespace Drupal\aim\Form;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\TypedConfigManagerInterface;
+use Drupal\Core\DependencyInjection\AutowireTrait;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\aim\Service\AimSettings;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Settings form for aim's tunable numeric thresholds and LLM prompts.
@@ -31,6 +31,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  */
 final class AimSettingsForm extends ConfigFormBase {
 
+  use AutowireTrait;
+
   /**
    * Constructs an AimSettingsForm.
    *
@@ -47,17 +49,6 @@ final class AimSettingsForm extends ConfigFormBase {
     protected AimSettings $settings,
   ) {
     parent::__construct($configFactory, $typedConfigManager);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container): static {
-    return new static(
-      $container->get('config.factory'),
-      $container->get('config.typed'),
-      $container->get(AimSettings::class),
-    );
   }
 
   /**

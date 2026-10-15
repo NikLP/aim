@@ -16,81 +16,45 @@ services:
 
   aim.scope_uninstall_validator:
     class: Drupal\aim\ScopeUninstallValidator
-    arguments:
-      - '@config.manager'
-      - '@entity_type.manager'
+    autowire: true
     tags:
       - { name: module_install.uninstall_validator }
 
   aim.settings_reader:
     class: Drupal\aim\Service\AimSettings
-    arguments:
-      - '@config.factory'
-      - '@ai.provider'
+    autowire: true
 
   Drupal\aim\Service\AimSettings:
     alias: aim.settings_reader
 
   aim.grounding_checker:
     class: Drupal\aim\Service\AimGroundingChecker
-    arguments:
-      - '@aim.settings_reader'
-      - '@logger.channel.aim'
-      - '@aim.backend.decision'
+    autowire: true
+
+  Drupal\aim\Service\AimGroundingChecker:
+    alias: aim.grounding_checker
 
   aim.memory_manager:
     class: Drupal\aim\Service\AimMemoryManager
-    arguments:
-      - '@ai.provider'
-      - '@entity_type.manager'
-      - '@datetime.time'
-      - '@Drupal\ai\Guardrail\AiGuardrailRepository'
-      - '@queue'
-      - '@entity_type.bundle.info'
-      - '@config.factory'
-      - '@aim.embedding_cache_subscriber'
-      - '@logger.channel.aim'
+    autowire: true
 
   aim.consolidation:
     class: Drupal\aim\Service\AimConsolidationService
-    arguments:
-      - '@aim.settings_reader'
-      - '@aim.memory_manager'
-      - '@ai.provider'
-      - '@entity_type.manager'
-      - '@datetime.time'
-      - '@config.factory'
-      - '@logger.channel.aim'
-      - '@aim.backend.decision'
+    autowire: true
 
   Drupal\aim\Service\AimConsolidationService:
     alias: aim.consolidation
 
   aim.recall:
     class: Drupal\aim\Service\AimRecallService
-    arguments:
-      - '@aim.memory_manager'
-      - '@datetime.time'
-      - '@config.factory'
-      - '@current_user'
-      - '@literals.reader'
+    autowire: true
 
   Drupal\aim\Service\AimRecallService:
     alias: aim.recall
 
   aim.remember:
     class: Drupal\aim\Service\AimRememberService
-    arguments:
-      - '@aim.memory_manager'
-      - '@aim.settings_reader'
-      - '@aim.grounding_checker'
-      - '@ai.provider'
-      - '@entity_type.manager'
-      - '@datetime.time'
-      - '@config.factory'
-      - '@current_user'
-      - '@logger.channel.aim'
-      - '@plugin.manager.aim_scope_type'
+    autowire: true
 
   Drupal\aim\Service\AimRememberService:
     alias: aim.remember
@@ -106,12 +70,7 @@ services:
   # (/admin/config/aim/status) - see AimStatusChecker's own docblock.
   aim.status_checker:
     class: Drupal\aim\AimStatusChecker
-    arguments:
-      - '@database'
-      - '@config.factory'
-      - '@ai.vdb_provider'
-      - '@entity_type.manager'
-      - '@datetime.time'
+    autowire: true
 
   Drupal\aim\AimStatusChecker:
     alias: aim.status_checker
@@ -134,18 +93,13 @@ services:
 
   aim.embedding_cache_subscriber:
     class: Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber
-    arguments:
-      - '@cache.aim_embeddings'
-      - '@datetime.time'
-      - '@logger.channel.aim'
-      - '@config.factory'
+    autowire: true
     tags:
       - { name: event_subscriber }
 
   aim.call_log_subscriber:
     class: Drupal\aim\EventSubscriber\AimCallLogSubscriber
-    arguments:
-      - '@uuid'
+    autowire: true
     tags:
       - { name: event_subscriber }
 
@@ -154,11 +108,13 @@ services:
 
   aim.backend.decision:
     class: Drupal\aim\Backend\DecisionBackend
-    arguments: ['@ai.provider']
+    autowire: true
+
 
   aim.backend.chat:
     class: Drupal\aim\Backend\ChatBackend
-    arguments: ['@ai.provider']
+    autowire: true
+
 
   # Class alias, same reason as AimMemoryManager's above - aim_benchmark's
   # Drush commands type-hint this directly to toggle aim:benchmark's cache

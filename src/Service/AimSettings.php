@@ -6,6 +6,7 @@ namespace Drupal\aim\Service;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\ai\AiProviderPluginManager;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Reads aim's admin-editable settings, with shipped defaults as fallbacks.
@@ -104,6 +105,7 @@ class AimSettings {
    */
   public function __construct(
     protected ConfigFactoryInterface $configFactory,
+    #[Autowire(service: 'ai.provider')]
     protected AiProviderPluginManager $aiProvider,
   ) {}
 

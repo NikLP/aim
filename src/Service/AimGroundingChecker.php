@@ -8,6 +8,7 @@ use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\ai\OperationType\Decision\DecisionInput;
 use Drupal\ai\OperationType\Decision\Value\NoulQuestion;
 use Drupal\aim\Backend\ActivityBackendInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * The grounded check (ADR-0037): does a passage state each candidate fact?
@@ -49,7 +50,9 @@ class AimGroundingChecker {
    */
   public function __construct(
     protected AimSettings $settings,
+    #[Autowire(service: 'logger.channel.aim')]
     protected LoggerChannelInterface $logger,
+    #[Autowire(service: 'aim.backend.decision')]
     protected ActivityBackendInterface $decisionBackend,
   ) {}
 

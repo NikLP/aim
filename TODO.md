@@ -490,6 +490,19 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       for any recommendation: `agent_access` is pre-release and not under
       the security advisory policy; accepted as fine for now. Scratch
       copy removed.
+- [ ] **`aim_tool_oauth` per-tool scope gate is inert (found 2026-10-15).**
+      `mcp_server_oauth` 1.0.0-alpha1 finds a tool's config by matching
+      the wire name against `<base>.<config_id>` (its tests use
+      `tool_api.protected_tool`), but `mcp_server_tool_bridge` 1.0.0-beta3
+      names tools `tool_api__<config_id>`. No config matches, so the
+      scopes we set on `aim_recall`/`aim_remember` are never checked: a
+      token without them still calls the tools (seen in the trial; only
+      the Drupal permission was enforced). The scopes still matter for
+      the permission they carry. To do: file or find an upstream issue
+      (name-format mismatch between the two modules), confirm on the live
+      site, and until fixed do not rely on the per-tool scopes for
+      anything. Also: role-based scope(s) in `aim_tool_oauth` (see the
+      trial item above).
 - [ ] **Redacting guardrail.** Drupal AI's PII guardrails only block; none
       removes the PII, yet the rewrite mechanism exists
       (`runGuardrails()` already handles `RewriteInputResult`). Sketch:
@@ -512,7 +525,17 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       prompts and replies in clear (ADR-0060); a hosted model sees every
       candidate fact (CLAUDE.md scope note); embeddings leak meaning.
       George's rule: when unsure, make it private.
-- [ ] **Subject / user / uid audit.** The identity-ish fields have drifted:
+      First pass BUILT 2026-10-15: `tests/src/Kernel/AimPrivacyTest.php`
+      runs `recall()` through entity access (the fake search backend now
+      applies it like the real one). Findings: a viewer with only the site
+      permission, or no permissions, sees no user-scope fact; the shared-role
+      fallback and the role-visibility matrix show it as designed; an
+      administrator role sees every user's facts (the gap George named, pinned
+      as today's behavior); `accessCheck: FALSE` (Drush) shows everything.
+      Not covered: the subject seeing their own fact with no shared role (no
+      rule gives it), `ai_log` prompt text, and the real AI Search per-hit
+      check (the fake stands in for it).
+- [ ] **PINNED (2026-10-15, Nik: parked until we regroup). Subject / user / uid audit.** The identity-ish fields have drifted:
       `uid` (author), `user` (who a `scope=user` fact is about, was
       `subject_uid`), `subject` (generic per-scope key, minted case IDs),
       `target_type`/`target_id` (entity scope). Write one table: field,

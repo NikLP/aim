@@ -8,6 +8,7 @@ use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\OperationType\Decision\DecisionInput;
 use Drupal\ai\OperationType\Decision\DecisionInterface;
 use Drupal\ai\OperationType\Decision\DecisionResponse;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Calls decision() on a provider that implements the Decision operation type.
@@ -21,6 +22,7 @@ class DecisionBackend implements ActivityBackendInterface {
    *   The AI provider plugin manager.
    */
   public function __construct(
+    #[Autowire(service: 'ai.provider')]
     protected AiProviderPluginManager $aiProvider,
   ) {}
 

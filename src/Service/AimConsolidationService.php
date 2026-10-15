@@ -19,6 +19,7 @@ use Drupal\aim\Backend\ActivityBackendInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\search_api\IndexInterface;
 use Drupal\search_api\SearchApiException;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Consolidates aim facts: finds near-duplicates and contradictions, merges.
@@ -52,11 +53,14 @@ class AimConsolidationService {
   public function __construct(
     protected AimSettings $settings,
     protected AimMemoryManager $manager,
+    #[Autowire(service: 'ai.provider')]
     protected AiProviderPluginManager $aiProvider,
     protected EntityTypeManagerInterface $entityTypeManager,
     protected TimeInterface $time,
     protected ConfigFactoryInterface $configFactory,
+    #[Autowire(service: 'logger.channel.aim')]
     protected LoggerChannelInterface $logger,
+    #[Autowire(service: 'aim.backend.decision')]
     protected ActivityBackendInterface $decisionBackend,
   ) {}
 

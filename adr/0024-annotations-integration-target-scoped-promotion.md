@@ -144,3 +144,9 @@ entity and site subjects.
   `aim`-owned entity; no node dependency in core `aim`).
 - Whether [ADR-0012](resolved/0012-fact-relation-graph.md)'s entity linking
   bears on target-linked facts: out of scope, a "see also".
+- A possible injection point (2026-10-15, from the `agent_access` trial):
+  Tool Belt's `entity_metadata` MCP tool describes an entity type's bundles
+  and fields. Annotations target entity type + bundle + field, so notes
+  about what a field means could ride on that tool's output. Not built,
+  and the tool is not enabled on this site; instance-level notes would
+  still go through `scope=entity` facts.

@@ -13,6 +13,7 @@ use Drupal\ai\Event\PreGenerateResponseEvent;
 use Drupal\ai\OperationType\Embeddings\EmbeddingsInput;
 use Drupal\ai\OperationType\Embeddings\EmbeddingsOutput;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Caches query-time embeddings on drupal/ai's provider events (ADR-0017).
@@ -74,8 +75,10 @@ class AimEmbeddingCacheSubscriber implements EventSubscriberInterface {
    *   this class's debug logging.
    */
   public function __construct(
+    #[Autowire(service: 'cache.aim_embeddings')]
     protected CacheBackendInterface $cache,
     protected TimeInterface $time,
+    #[Autowire(service: 'logger.channel.aim')]
     protected LoggerChannelInterface $logger,
     protected ConfigFactoryInterface $configFactory,
   ) {}

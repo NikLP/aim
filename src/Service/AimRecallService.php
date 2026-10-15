@@ -9,6 +9,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\literals\LiteralReader;
 use Drupal\search_api\SearchApiException;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Semantic recall over aim's vector index.
@@ -37,6 +38,7 @@ class AimRecallService {
     protected TimeInterface $time,
     protected ConfigFactoryInterface $configFactory,
     protected AccountProxyInterface $currentUser,
+    #[Autowire(service: 'literals.reader')]
     protected LiteralReader $literalReader,
   ) {}
 
