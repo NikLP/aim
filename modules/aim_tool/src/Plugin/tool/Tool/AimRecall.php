@@ -8,8 +8,8 @@ use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRecallService;
+use Drupal\aim\Service\AimSettings;
 use Drupal\tool\Attribute\Tool;
 use Drupal\tool\ExecutableResult;
 use Drupal\tool\Tool\ToolBase;
@@ -101,9 +101,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 final class AimRecall extends ToolBase {
 
   /**
-   * The aim memory manager.
+   * The settings reader.
    */
-  protected AimMemoryManager $memoryManager;
+  protected AimSettings $settings;
 
   /**
    * The recall service.
@@ -117,7 +117,7 @@ final class AimRecall extends ToolBase {
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
-    $instance->memoryManager = $container->get('aim.memory_manager');
+    $instance->settings = $container->get('aim.settings_reader');
     $instance->recallService = $container->get('aim.recall');
     return $instance;
   }
@@ -138,9 +138,9 @@ final class AimRecall extends ToolBase {
         $values['subject'] ?? NULL,
         $userFilter,
         (int) ($values['limit'] ?? 10),
-        isset($values['max_distance']) ? (float) $values['max_distance'] : $this->memoryManager->getRecallMaxDistance(),
+        isset($values['max_distance']) ? (float) $values['max_distance'] : $this->settings->getRecallMaxDistance(),
         FALSE,
-        $this->memoryManager->getRecallGap(),
+        $this->settings->getRecallGap(),
       );
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {

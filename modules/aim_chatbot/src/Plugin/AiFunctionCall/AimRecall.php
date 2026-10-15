@@ -11,8 +11,8 @@ use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
-use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRecallService;
+use Drupal\aim\Service\AimSettings;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -46,9 +46,9 @@ final class AimRecall extends FunctionCallBase implements ExecutableFunctionCall
   private const RESULT_LIMIT = 5;
 
   /**
-   * The aim memory manager.
+   * The settings reader.
    */
-  protected AimMemoryManager $memoryManager;
+  protected AimSettings $settings;
 
   /**
    * The recall service.
@@ -61,7 +61,7 @@ final class AimRecall extends FunctionCallBase implements ExecutableFunctionCall
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): FunctionCallInterface|static {
     /** @var static $instance */
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
-    $instance->memoryManager = $container->get('aim.memory_manager');
+    $instance->settings = $container->get('aim.settings_reader');
     $instance->recallService = $container->get('aim.recall');
     return $instance;
   }
@@ -79,7 +79,7 @@ final class AimRecall extends FunctionCallBase implements ExecutableFunctionCall
     try {
       // Abstain on a poor match: a non-empty result set only means the
       // index had *something*, not that it was relevant.
-      $rows = $this->recallService->recall($text, self::FACT_SCOPE, NULL, NULL, self::RESULT_LIMIT, $this->memoryManager->getRecallMaxDistance(), FALSE, $this->memoryManager->getRecallGap());
+      $rows = $this->recallService->recall($text, self::FACT_SCOPE, NULL, NULL, self::RESULT_LIMIT, $this->settings->getRecallMaxDistance(), FALSE, $this->settings->getRecallGap());
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {
       $this->setOutput('Could not search memory: ' . $e->getMessage());

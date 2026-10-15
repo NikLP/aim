@@ -55,15 +55,6 @@ class AimMemoryManager {
    */
   protected const CONSOLIDATE_QUEUE_ID = 'aim_consolidate';
 
-  // Shipped defaults live in AimSettings; kept here for existing callers.
-  public const DEFAULT_AUTO_THRESHOLD = AimSettings::DEFAULT_AUTO_THRESHOLD;
-
-  public const DEFAULT_AMBIGUOUS_THRESHOLD = AimSettings::DEFAULT_AMBIGUOUS_THRESHOLD;
-
-  public const DEFAULT_NEIGHBOR_LIMIT = AimSettings::DEFAULT_NEIGHBOR_LIMIT;
-
-  public const DEFAULT_RECALL_MAX_DISTANCE = AimSettings::DEFAULT_RECALL_MAX_DISTANCE;
-
   /**
    * Constructs an AimMemoryManager object.
    *
@@ -95,10 +86,6 @@ class AimMemoryManager {
    *   The aim logger channel. Warnings and errors are always logged; the
    *   info and debug tiers are gated by aim.settings' log_audit and
    *   log_verbose (see logAudit() and logVerbose()).
-   * @param \Drupal\aim\Service\AimSettings $settings
-   *   The settings reader (thresholds, activity models, grounding mode).
-   * @param \Drupal\aim\Service\AimGroundingChecker $groundingChecker
-   *   The grounded check (ADR-0037).
    */
   public function __construct(
     protected AiProviderPluginManager $aiProvider,
@@ -110,8 +97,6 @@ class AimMemoryManager {
     protected ConfigFactoryInterface $configFactory,
     protected AimEmbeddingCacheSubscriber $embeddingCache,
     protected LoggerChannelInterface $logger,
-    protected AimSettings $settings,
-    protected AimGroundingChecker $groundingChecker,
   ) {}
 
   /**
@@ -427,105 +412,6 @@ class AimMemoryManager {
   public function reindex(): ?int {
     $index = $this->loadVectorIndex();
     return $index ? $index->indexItems() : NULL;
-  }
-
-  /**
-   * Delegates to AimSettings::getAutoThreshold().
-   *
-   * @see \Drupal\aim\Service\AimSettings::getAutoThreshold()
-   */
-  public function getAutoThreshold(): float {
-    return $this->settings->getAutoThreshold();
-  }
-
-  /**
-   * Delegates to AimSettings::getAmbiguousThreshold().
-   *
-   * @see \Drupal\aim\Service\AimSettings::getAmbiguousThreshold()
-   */
-  public function getAmbiguousThreshold(): float {
-    return $this->settings->getAmbiguousThreshold();
-  }
-
-  /**
-   * Delegates to AimSettings::getNeighborLimit().
-   *
-   * @see \Drupal\aim\Service\AimSettings::getNeighborLimit()
-   */
-  public function getNeighborLimit(): int {
-    return $this->settings->getNeighborLimit();
-  }
-
-  /**
-   * Delegates to AimSettings::getRecallMaxDistance().
-   *
-   * @see \Drupal\aim\Service\AimSettings::getRecallMaxDistance()
-   */
-  public function getRecallMaxDistance(): float {
-    return $this->settings->getRecallMaxDistance();
-  }
-
-  /**
-   * Delegates to AimSettings::getRecallGap().
-   *
-   * @see \Drupal\aim\Service\AimSettings::getRecallGap()
-   */
-  public function getRecallGap(): float {
-    return $this->settings->getRecallGap();
-  }
-
-  /**
-   * Delegates to AimSettings::getDefaultChatProvider().
-   *
-   * @see \Drupal\aim\Service\AimSettings::getDefaultChatProvider()
-   */
-  public function getDefaultChatProvider(): ?array {
-    return $this->settings->getDefaultChatProvider();
-  }
-
-  /**
-   * Delegates to AimSettings::getModelFor().
-   *
-   * @see \Drupal\aim\Service\AimSettings::getModelFor()
-   */
-  public function getModelFor(string $activity): ?array {
-    return $this->settings->getModelFor($activity);
-  }
-
-  /**
-   * Delegates to AimSettings::decisionModelFor().
-   *
-   * @see \Drupal\aim\Service\AimSettings::decisionModelFor()
-   */
-  public function decisionModelFor(string $activity): ?array {
-    return $this->settings->decisionModelFor($activity);
-  }
-
-  /**
-   * Delegates to AimSettings::getGroundingMode().
-   *
-   * @see \Drupal\aim\Service\AimSettings::getGroundingMode()
-   */
-  public function getGroundingMode(): string {
-    return $this->settings->getGroundingMode();
-  }
-
-  /**
-   * Delegates to AimSettings::getGroundingThreshold().
-   *
-   * @see \Drupal\aim\Service\AimSettings::getGroundingThreshold()
-   */
-  public function getGroundingThreshold(): float {
-    return $this->settings->getGroundingThreshold();
-  }
-
-  /**
-   * Delegates to AimGroundingChecker::checkGrounding().
-   *
-   * @see \Drupal\aim\Service\AimGroundingChecker::checkGrounding()
-   */
-  public function checkGrounding(string $passage, array $candidates): array {
-    return $this->groundingChecker->checkGrounding($passage, $candidates);
   }
 
   /**

@@ -32,6 +32,8 @@ class AimConsolidationService {
   /**
    * Constructs a AimConsolidationService object.
    *
+   * @param \Drupal\aim\Service\AimSettings $settings
+   *   The settings reader.
    * @param \Drupal\aim\Service\AimMemoryManager $manager
    *   The memory manager, for loading, saving, settings and search.
    * @param \Drupal\ai\AiProviderPluginManager $aiProvider
@@ -48,6 +50,7 @@ class AimConsolidationService {
    *   The decision backend.
    */
   public function __construct(
+    protected AimSettings $settings,
     protected AimMemoryManager $manager,
     protected AiProviderPluginManager $aiProvider,
     protected EntityTypeManagerInterface $entityTypeManager,
@@ -216,7 +219,7 @@ class AimConsolidationService {
   protected function consolidateAgainstNeighbors(IndexInterface $index, AimFact $fact, string $providerId, string $modelId, float $autoThreshold, float $ambiguousThreshold, bool $dryRun, array &$handledPairs, array &$retired): array {
     $rows = [];
 
-    $neighbors = $this->findNeighbors($index, $fact, $retired, $ambiguousThreshold, $this->manager->getNeighborLimit());
+    $neighbors = $this->findNeighbors($index, $fact, $retired, $ambiguousThreshold, $this->settings->getNeighborLimit());
     foreach ($neighbors as [$neighbor, $score]) {
       $ids = [(int) $fact->id(), (int) $neighbor->id()];
       sort($ids);
@@ -460,7 +463,7 @@ class AimConsolidationService {
    *   If the response is not the expected JSON shape.
    */
   protected function modelConfirmsMerge(AimFact $kept, AimFact $candidate, string $mergedText, string $providerId, string $modelId): bool {
-    $decision_model = $this->manager->decisionModelFor('verifier');
+    $decision_model = $this->settings->decisionModelFor('verifier');
     if ($decision_model !== NULL) {
       $input = new DecisionInput(
         [
@@ -803,7 +806,7 @@ class AimConsolidationService {
    *   RETIRE, NOOP. merged_text is only meaningful for UPDATE.
    */
   protected function classifyPair(AimFact $kept, AimFact $candidate, string $providerId, string $modelId): array {
-    $decision_model = $this->manager->decisionModelFor('consolidation');
+    $decision_model = $this->settings->decisionModelFor('consolidation');
     if ($decision_model !== NULL) {
       $input = new DecisionInput(
         [
@@ -901,7 +904,7 @@ class AimConsolidationService {
    *   If the reply is malformed.
    */
   protected function writeMerge(AimFact $kept, AimFact $candidate): ?string {
-    $default = $this->manager->getDefaultChatProvider();
+    $default = $this->settings->getDefaultChatProvider();
     if (empty($default['provider_id']) || empty($default['model_id'])) {
       return NULL;
     }

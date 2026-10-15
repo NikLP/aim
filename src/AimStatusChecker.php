@@ -9,7 +9,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\ai\AiVdbProviderPluginManager;
-use Drupal\aim\Service\AimMemoryManager;
+use Drupal\aim\Service\AimSettings;
 use Drupal\aim\Vdb\AimMariaDBProvider;
 
 /**
@@ -248,7 +248,7 @@ final class AimStatusChecker {
       $detail = (string) $value;
     }
     else {
-      $detail = 'not set, silently using the in-code default ' . AimMemoryManager::DEFAULT_RECALL_MAX_DISTANCE . ' - recalibrate for this site\'s dataset (ADR-0019)';
+      $detail = 'not set, silently using the in-code default ' . AimSettings::DEFAULT_RECALL_MAX_DISTANCE . ' - recalibrate for this site\'s dataset (ADR-0019)';
     }
 
     return [

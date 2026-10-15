@@ -12,6 +12,7 @@ use Drupal\Core\Queue\SuspendQueueException;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimConsolidationService;
+use Drupal\aim\Service\AimSettings;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -42,6 +43,8 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
    *   The plugin implementation definition.
    * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
    *   The aim memory manager.
+   * @param \Drupal\aim\Service\AimSettings $settings
+   *   The settings reader.
    * @param \Drupal\aim\Service\AimConsolidationService $consolidation
    *   The consolidation service.
    * @param \Drupal\Core\Logger\LoggerChannelInterface $logger
@@ -52,6 +55,7 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
     string $pluginId,
     mixed $pluginDefinition,
     protected AimMemoryManager $memoryManager,
+    protected AimSettings $settings,
     protected AimConsolidationService $consolidation,
     protected LoggerChannelInterface $logger,
   ) {
@@ -67,6 +71,7 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
       $plugin_id,
       $plugin_definition,
       $container->get('aim.memory_manager'),
+      $container->get('aim.settings_reader'),
       $container->get('aim.consolidation'),
       $container->get('logger.channel.aim'),
     );
@@ -97,7 +102,7 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
     // not on a web request.
     $this->memoryManager->reindex();
 
-    $provider = $this->memoryManager->getModelFor('consolidation');
+    $provider = $this->settings->getModelFor('consolidation');
     if (empty($provider['provider_id']) || empty($provider['model_id'])) {
       // No default chat provider configured - a queue-wide precondition,
       // not a problem with this one item. SuspendQueueException is core's
@@ -114,8 +119,8 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
       $fact,
       $provider['provider_id'],
       $provider['model_id'],
-      $this->memoryManager->getAutoThreshold(),
-      $this->memoryManager->getAmbiguousThreshold(),
+      $this->settings->getAutoThreshold(),
+      $this->settings->getAmbiguousThreshold(),
     );
   }
 

@@ -10,6 +10,7 @@ use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimConsolidationService;
 use Drupal\aim\Service\AimRecallService;
 use Drupal\aim\Service\AimRememberService;
+use Drupal\aim\Service\AimSettings;
 use Drush\Attributes as CLI;
 use Drush\Commands\AutowireTrait;
 use Drush\Commands\DrushCommands;
@@ -38,6 +39,8 @@ final class AimCommands extends DrushCommands {
    *   The remember service, used by the write commands.
    * @param \Drupal\aim\Service\AimRecallService $recallService
    *   The recall service, used by aim:recall.
+   * @param \Drupal\aim\Service\AimSettings $settings
+   *   The settings reader.
    * @param \Drupal\aim\AimStatusChecker $statusChecker
    *   The status checker, used by aim:status.
    */
@@ -46,6 +49,7 @@ final class AimCommands extends DrushCommands {
     protected AimConsolidationService $consolidation,
     protected AimRememberService $rememberService,
     protected AimRecallService $recallService,
+    protected AimSettings $settings,
     protected AimStatusChecker $statusChecker,
   ) {
     parent::__construct();
@@ -386,8 +390,8 @@ final class AimCommands extends DrushCommands {
     // NULL (the default) follows the live aim.settings value
     // (/admin/config/aim/settings) rather than a hardcoded default, same
     // posture as resolveChatProvider() following ai.settings.
-    $auto_threshold = $options['auto-threshold'] !== NULL ? (float) $options['auto-threshold'] : $this->memoryManager->getAutoThreshold();
-    $ambiguous_threshold = $options['ambiguous-threshold'] !== NULL ? (float) $options['ambiguous-threshold'] : $this->memoryManager->getAmbiguousThreshold();
+    $auto_threshold = $options['auto-threshold'] !== NULL ? (float) $options['auto-threshold'] : $this->settings->getAutoThreshold();
+    $ambiguous_threshold = $options['ambiguous-threshold'] !== NULL ? (float) $options['ambiguous-threshold'] : $this->settings->getAmbiguousThreshold();
 
     try {
       $result = $this->consolidation->consolidate(
@@ -489,7 +493,7 @@ final class AimCommands extends DrushCommands {
       return [$options['provider'], $options['model']];
     }
 
-    $default = $this->memoryManager->getModelFor($activity);
+    $default = $this->settings->getModelFor($activity);
     if ($default === NULL) {
       $this->io()->error('No --provider/--model given, and no default chat provider is configured. Set one at /admin/config/ai/settings, or pass --provider and --model explicitly.');
       return NULL;

@@ -10,6 +10,7 @@ use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\AimScopeTypePluginManagerInterface;
+use Drupal\aim\Service\AimGroundingChecker;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRememberService;
 use Drupal\tool\Attribute\Tool;
@@ -207,6 +208,11 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
   protected AimRememberService $rememberService;
 
   /**
+   * The grounded check.
+   */
+  protected AimGroundingChecker $groundingChecker;
+
+  /**
    * The aim scope type plugin manager.
    */
   protected AimScopeTypePluginManagerInterface $scopeTypeManager;
@@ -218,6 +224,7 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->memoryManager = $container->get('aim.memory_manager');
     $instance->rememberService = $container->get('aim.remember');
+    $instance->groundingChecker = $container->get('aim.grounding_checker');
     $instance->scopeTypeManager = $container->get('plugin.manager.aim_scope_type');
     return $instance;
   }
@@ -339,7 +346,7 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
     if ($sourceText !== NULL) {
       // One grounding call for the whole batch; each remember() below then
       // finds its score already fetched.
-      $this->memoryManager->checkGrounding($sourceText, array_filter(array_map(fn ($entry) => (string) ($entry['text'] ?? ''), $facts)));
+      $this->groundingChecker->checkGrounding($sourceText, array_filter(array_map(fn ($entry) => (string) ($entry['text'] ?? ''), $facts)));
     }
     foreach ($facts as $i => $entry) {
       if (empty($entry['text'])) {

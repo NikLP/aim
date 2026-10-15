@@ -8,7 +8,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\aim\Service\AimMemoryManager;
+use Drupal\aim\Service\AimSettings;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -38,13 +38,13 @@ final class AimSettingsForm extends ConfigFormBase {
    *   The config factory.
    * @param \Drupal\Core\Config\TypedConfigManagerInterface $typedConfigManager
    *   The typed config manager.
-   * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
-   *   The memory manager, asked for the site default chat provider.
+   * @param \Drupal\aim\Service\AimSettings $settings
+   *   The settings reader, asked for the site default chat provider.
    */
   public function __construct(
     ConfigFactoryInterface $configFactory,
     TypedConfigManagerInterface $typedConfigManager,
-    protected AimMemoryManager $memoryManager,
+    protected AimSettings $settings,
   ) {
     parent::__construct($configFactory, $typedConfigManager);
   }
@@ -56,7 +56,7 @@ final class AimSettingsForm extends ConfigFormBase {
     return new static(
       $container->get('config.factory'),
       $container->get('config.typed'),
-      $container->get(AimMemoryManager::class),
+      $container->get(AimSettings::class),
     );
   }
 
@@ -442,7 +442,7 @@ final class AimSettingsForm extends ConfigFormBase {
 
     // A decision classifier hands UPDATE merges to the default chat model.
     if (($form_state->getValue(['models', 'consolidation', 'backend']) ?? 'chat') === 'decision'
-      && empty($this->memoryManager->getDefaultChatProvider())) {
+      && empty($this->settings->getDefaultChatProvider())) {
       $form_state->setErrorByName('models][consolidation][backend', $this->t('A decision classifier needs a site default chat provider (to write merged facts). Set one at /admin/config/ai/settings.'));
     }
   }

@@ -998,10 +998,8 @@ service per job, each `Aim*` named:
 | `AimSettings` | `aim.settings_reader` | Thresholds, per-activity models, grounding mode and cutoff |
 
 The new services depend on the manager, never the reverse, so the manager
-has no delegators for them: callers use the service directly. The one
-exception is `AimSettings` and `checkGrounding()`, which the manager still
-delegates to (and it aliases the `DEFAULT_*` constants) because about ten
-callers use them; move those over time and drop the delegators.
+has no delegators: callers use the service they need directly (settings
+readers take `AimSettings`, the grounded check takes `AimGroundingChecker`).
 
 ## Running the tests
 

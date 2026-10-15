@@ -28,6 +28,9 @@ services:
       - '@config.factory'
       - '@ai.provider'
 
+  Drupal\aim\Service\AimSettings:
+    alias: aim.settings_reader
+
   aim.grounding_checker:
     class: Drupal\aim\Service\AimGroundingChecker
     arguments:
@@ -47,12 +50,11 @@ services:
       - '@config.factory'
       - '@aim.embedding_cache_subscriber'
       - '@logger.channel.aim'
-      - '@aim.settings_reader'
-      - '@aim.grounding_checker'
 
   aim.consolidation:
     class: Drupal\aim\Service\AimConsolidationService
     arguments:
+      - '@aim.settings_reader'
       - '@aim.memory_manager'
       - '@ai.provider'
       - '@entity_type.manager'
