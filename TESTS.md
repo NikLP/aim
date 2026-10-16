@@ -1,7 +1,7 @@
 # Tests and evals
 
 Everything still to be tested or evaluated, in one place. Status as of
-2026-10-05. Items are gathered from [TODO.md](TODO.md), the ADRs and
+2026-10-16. Items are gathered from [TODO.md](TODO.md), the ADRs and
 `tests/ingest-test/`; the source is named on each so the original can be
 updated when one is done. Hosted Jev takes synthetic or public data only
 (ADR-0021 addendum).
@@ -12,7 +12,7 @@ updated when one is done. Hosted Jev takes synthetic or public data only
 | --- | --- | --- | --- |
 | **A. Model evals** | The configured provider through Drupal (`decision-eval.php`, `aim.backend.decision`), fixed hand-written sets, no aim write path. Never the model's API directly. | `modules/aim_benchmark/scripts/` | Can the model make this judgment at all? |
 | **B. Module runs** | The module: `drush aim:remember` / `aim:extract` / `aim:consolidate` / `aim:recall` on a snapshot, real backends, real queue. | `tests/ingest-test/`, `aim_benchmark` commands | Does aim, wired to a model, do the right thing end to end? |
-| **C. Automated tests** | PHPUnit (kernel/unit): grounding, literal tokens, scope plugins, role visibility, expiry. Command in DEVELOPING.md. | `tests/src/Kernel/` | Does a class behave, without a live site? |
+| **C. Automated tests** | PHPUnit (kernel/unit): 54 tests, every model step faked. Command in DEVELOPING.md. | `tests/src/Kernel/`, `tests/src/Unit/`, `modules/aim_chatbot/tests/` | Does a class behave, without a live site? |
 
 The drift audit (ADR-0043) so far is type A only. Nothing in aim calls it
 yet, so a pass there says nothing about the module.
@@ -32,6 +32,11 @@ yet, so a pass there says nothing about the module.
 - B. Live verification of the embedding cache (ADR-0017), top-N
   consolidation dry run (40 vs 86 decisions), Ollama vs hosted recall
   latency (33-35 ms vs 450-540 ms, `aim_benchmark`).
+- B. Demo pre-flight (`recipes/aim_demo_library/preflight/preflight.js`, run
+  from the site wrapper `demo/preflight.js`): site, Ollama, vector index,
+  the OAuth handshake, all scopes over MCP, MCP abstention, save-then-search
+  and the chat widget in a browser. Run before each demo, not a regression
+  suite.
 
 ## Next: model evals (A)
 
@@ -144,34 +149,47 @@ unless noted; synthetic data only for hosted Jev.
 
 ## Automated tests (C)
 
-`Kernel/AimRecallLiteralTokensTest` (2026-10-10): `recall()` resolves
-`[literal:key]` tokens as the viewing account (staff, member, anonymous); a
-fact naming a literal the viewer cannot read is withheld, or shows
-`[redacted]` with `show_redacted_facts` on; a changed, unpublished or
-deleted literal reads as it is now, and the stored fact keeps the token.
-The vector search is stubbed: `aim_vector_index` sits on
-`search_api_test`'s backend with its `search` method overridden to return
-every fact, and only `aim.settings` is installed from aim's config (the
-real server needs MariaDB vectors). Reuse that setup for the items below.
+54 tests, none calls a provider (`FakeDecisionBackend`; the vector search is
+stubbed by `FakeVectorSearchTrait`, since the real server needs MariaDB
+vectors).
+
+| Class | Covers |
+| --- | --- |
+| `Kernel/AimRecallFilterTest` | Untrusted, retired and expired facts excluded; scope, subject and user filters; order, limit, max distance, gap |
+| `Kernel/AimRecallLiteralTokensTest` | `[literal:key]` resolved per viewer, withheld or `[redacted]`, read live (ADR-0040) |
+| `Kernel/AimPrivacyTest` | User-scope visibility: strangers, shared role, role-visibility matrix, administrator, bypass |
+| `Kernel/AimScopeBehaviorTest` | Shipped scope config, case ID minting, `requires_account`, entity-scope view access, role visibility, expiry sweep |
+| `Kernel/AimConsolidateTest` | Near-duplicate retire, dry run, distant facts, scope separation, retired facts ignored |
+| `Kernel/AimGroundingTest` | Grounded check modes (shadow, enforce, off), fail-closed, one call per batch |
+| `Kernel/AimIngestTest` | Ingest form lines and JSON modes, validation |
+| `Kernel/AimTrustActionTest`, `AimRetireActionTest` | Bulk trust/retire actions and their access checks |
+| `Unit/AimEmbeddingCacheSubscriberTest` | Embedding cache hit, bypass, key identity (ADR-0017) |
+| `Unit/AimCallTagsTest` | Every `aim_*` call tag is in `ai_logging`'s prompt-logging list |
+| `aim_chatbot/.../AimChatbotSourceTextSubscriberTest` | Chat source text handling |
+
+Run (needs a separate `phpunit` database, see DEVELOPING.md's "Running the
+tests"):
 
 ```bash
-ddev exec "cd /var/www/html && SIMPLETEST_DB='sqlite://localhost/sites/default/files/aim-test.sqlite' vendor/bin/phpunit -c web/core web/modules/custom/aim/tests"
+ddev exec "cd /var/www/html && SIMPLETEST_DB='mysql://db:db@db/phpunit' SIMPLETEST_BASE_URL=http://web vendor/bin/phpunit -c web/core/phpunit.xml.dist web/modules/custom/aim/tests web/modules/custom/aim/modules/aim_chatbot/tests"
 ```
 
-Still to write, in this order:
+Still to write:
 
-1. `AimEmbeddingCacheSubscriber` (ADR-0017): a second identical query makes
-   zero provider calls, an index-time embed is not cached, a different
-   model ID misses. Use a call-counting stub provider. Kernel setup needs
-   `aim` plus `ai_search`, `ai_vdb_provider_mariadb`, `search_api` and
-   `taxonomy`, which is why it was deferred.
-2. Scope access plugins (`AimScopeUser` role-visibility matrix,
-   `AimScopeEntity` view-access mirroring), which are silent-fail if
-   `plugin` is reverted by a stale `drush cim`.
-3. Consolidation decisions with a stub backend: top-N neighbors, supersede
-   edge, verifier threshold, non-destructive retire.
+1. Consolidation beyond the near-duplicate sweep: top-N neighbors, supersede
+   edge and verifier threshold with a stub backend (the retire path is
+   covered, the merge path is not).
+2. A stale-`drush cim` guard: scope `plugin` reverted to null must fail a
+   test, not fail silent (`testShippedScopeConfig` checks the shipped
+   config, not the live one).
+3. Tool API / MCP: `aim_recall` and `aim_remember` permission and scope
+   checks (`aim_tool`, `aim_tool_oauth` have no tests).
 
-## Literals: automated tests (C), when the module exists
+## Literals: automated tests (C)
+
+The module now exists with its own tests (`literals/tests/`, see its
+TESTS.md). These design-time items may now be covered there; check it
+before writing them again:
 
 - No candidate the caller cannot view reaches the chooser or the result
   (access filter runs first, ADR-0040 "The parts, settled").

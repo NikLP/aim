@@ -56,7 +56,7 @@ bolted-on vector service.
 
 ## Scope model
 
-Four memory categories, composable at retrieval the way Mem0 composes
+Five memory categories, composable at retrieval the way Mem0 composes
 `user_id`/`agent_id`/`run_id`:
 
 - **User/developer memory** - per-account, permission-gated.
@@ -190,7 +190,7 @@ ones it wants. Each submodule has its own requirements and setup:
 ## Getting started
 
 1. Enable `aim` plus whichever scopes you want (`aim_scope_user`/
-   `aim_scope_role`/`aim_scope_site`/`aim_scope_case`), and
+   `aim_scope_role`/`aim_scope_site`/`aim_scope_case`/`aim_scope_entity`), and
    `aim_chatbot`/`aim_tool` as needed. `aim_chatbot`'s tools are
    hardcoded to `scope: site`, so it needs `aim_scope_site` installed
    too.
@@ -228,4 +228,6 @@ To see it working with a story already loaded, apply the
 fresh site (untested so far, see its README).
 
 Full command reference and the developer API are in
-[DEVELOPING.md](DEVELOPING.md).
+[DEVELOPING.md](DEVELOPING.md). What is tested, and what is not yet, is in
+[TESTS.md](TESTS.md) (54 PHPUnit tests, run command in DEVELOPING.md's
+"Running the tests").
