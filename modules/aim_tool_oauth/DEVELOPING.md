@@ -79,6 +79,63 @@ not something `aim`'s own `composer.json` should carry (it just
    (including `registration_endpoint`) comes back `https://`, and a real
    `POST /oauth/register` returns a genuine `client_id`.
 
+## Role scopes for non-admin users
+
+`aim:recall` and `aim:remember` are permission-granularity: each puts one
+permission on the token and carries no role. Admins hide the consequences
+because they hold every permission. A non-admin MCP user gets:
+
+- **Connect fails** (403 on initialize): no aim scope carries
+  `access mcp server`.
+- **`aim_remember` is refused** ("No permission to create {scope}-scope
+  facts"): the token lacks `create {scope} aim facts`.
+- **`aim_recall` returns nothing for `scope=user`**: the role-visibility
+  matrix (`AimScopeUser`) reads `$account->getRoles()`, and the token's
+  roles are only what its scopes carry.
+
+Fix: add a **role-granularity** scope per role that should use aim over
+MCP, at `/admin/config/people/simple_oauth/oauth2_scope`:
+`granularity_id: role`, `granularity_configuration: {role: <role id>}`,
+grant types `authorization_code` and `refresh_token`. The token then
+carries that real role, so its permissions apply and the matrix works.
+
+The role itself must hold `access mcp server`, `recall aim facts`/
+`remember aim facts`, `create {scope} aim facts` for the scopes it writes,
+and **`grant simple_oauth codes`**: without the last, the consent screen
+fails with "The 'grant simple_oauth codes' permission is required" and no
+code is issued. A user outside the role and lacking those permissions
+cannot connect (403 on initialize) even if the consent step passes.
+
+Verified live 2026-10-15 (OAuth 2.1 PKCE script, throwaway roles/users/
+scopes, all deleted afterwards): a staff user connected, recalled own and a
+peer's user-scope facts (shared-role fallback) and remembered; a manager
+saw staff facts through the matrix (and none with the matrix emptied); a
+role scope without `aim:recall` was refused (-32603); aim scopes alone
+could not connect (403); a user with no role permissions got a token but
+403 on connect.
+
+- **No role scope ships with the module.** It ships no roles and role ids
+  are site-specific. The `aim_demo_library` recipe defines no custom roles
+  either.
+- **Clients request two scopes**: the role scope plus the matching aim
+  scope (`aim:recall` or `aim:remember`). Tools still require their aim
+  scope, so a role scope alone is rejected, and the permissions add up.
+- **Scopes narrow, never escalate**: a token's effective permissions are
+  the scope's permissions AND the user's own (tested live 2026-10-15: a
+  permission scope for `access mcp server` did not connect a user whose
+  roles lack it). Hence a role needs the permissions itself, and the role
+  scope is what carries them onto the token.
+- **Breadth**: a role scope grants everything the role can do. Exposure is
+  bounded to the MCP tools exposed.
+- **Rejected alternative**: having `AimScopeUser` look up the real user's
+  roles instead of the token's. Scopes would then stop limiting role
+  visibility.
+- A blocked call reaches the client as JSON-RPC -32603 "Internal server
+  error" (logged `insufficient_scope`), not a 403.
+- Per-tool scope enforcement needs `mcp_server_oauth` with upstream fix
+  #3604047 (this site pins `1.x-dev#fb92204`; swap for the first release
+  containing it).
+
 ## Gotchas
 
 - The OAuth admin form's "Required scopes" selector only offers scopes an

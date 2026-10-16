@@ -247,3 +247,17 @@ already say. A small, uniform corpus has fewer close matches for an unrelated
 query to land on, so its off-topic floor is higher and its band different.
 Cutoff for the MCP tool and drush was built the same day (see "Not built").
 
+
+## Addendum 2026-10-15: this site's cutoff raised to 0.52
+
+Review of real assistant chats found "upcoming events" and "what's on this
+week" returning nothing or one of two weekly events, because the nearest
+site facts sat at 0.51-0.55. A 12-should-find / 7-should-not sweep (queries
+taken from the chat log plus rewordings) found 10/12 at 0.48, 11/12 at 0.50
+and 12/12 at 0.52, with one more should-not query returning rows (4/7 against
+3/7); 0.56 and above returned rows for all 7. The site now runs 0.52. The
+`aim_demo_library` recipe still ships 0.48 (calibrated to its dataset). The
+sweep set is small and partly written after the failures were seen: re-run it
+on a larger labeled set before trusting 0.52 elsewhere. Misses that remain
+(wifi password, password reset) are not recall misses: the assistant called
+only the literal lookup or only recall and stopped (see TODO.md).

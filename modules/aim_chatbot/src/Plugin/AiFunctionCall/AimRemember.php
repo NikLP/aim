@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\aim_chatbot\Plugin\AiFunctionCall;
 
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\ai\Attribute\FunctionCall;
@@ -60,6 +61,11 @@ final class AimRemember extends FunctionCallBase implements ExecutableFunctionCa
   protected AimRememberService $rememberService;
 
   /**
+   * The current user, whose permission to add facts is checked.
+   */
+  protected AccountInterface $currentUser;
+
+  /**
    * The conversation the fact comes from, for the grounded check.
    */
   protected ?string $sourceText = NULL;
@@ -84,6 +90,7 @@ final class AimRemember extends FunctionCallBase implements ExecutableFunctionCa
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->memoryManager = $container->get('aim.memory_manager');
     $instance->rememberService = $container->get('aim.remember');
+    $instance->currentUser = $container->get('current_user');
     return $instance;
   }
 
@@ -97,9 +104,20 @@ final class AimRemember extends FunctionCallBase implements ExecutableFunctionCa
       return;
     }
 
+    // The same per-scope permission the admin form and the Tool API enforce:
+    // being able to chat is not being allowed to change what the site
+    // remembers. Say so plainly so the assistant can tell the visitor.
+    if (!$this->memoryManager->checkCreateAccess(self::FACT_SCOPE, $this->currentUser)->isAllowed()) {
+      $this->setOutput('Not saved: this visitor is not allowed to add facts to the library\'s memory. Tell them plainly that you cannot save things for them.');
+      return;
+    }
+
     try {
-      $fact = $this->rememberService->remember($text, self::FACT_SCOPE, NULL, 'chatbot:aim_chatbot', sourceText: $this->sourceText, expires: $this->rememberService->parseExpires(['expires' => $this->getContextValue('expires')]));
-      $this->setOutput('Saved fact ' . $fact->id() . ': ' . $text);
+      // A visitor's say-so is not approved site knowledge: the fact waits
+      // untrusted for a reviewer, whatever the site's default or the
+      // grounded check says, so one chat cannot change what others are told.
+      $fact = $this->rememberService->remember($text, self::FACT_SCOPE, NULL, 'chatbot:aim_chatbot', trusted: FALSE, sourceText: $this->sourceText, expires: $this->rememberService->parseExpires(['expires' => $this->getContextValue('expires')]));
+      $this->setOutput('Saved fact ' . $fact->id() . ' (waiting for staff review; it is not shared with other visitors until approved): ' . $text);
     }
     catch (\InvalidArgumentException $e) {
       $this->setOutput('Could not save fact: ' . $e->getMessage());

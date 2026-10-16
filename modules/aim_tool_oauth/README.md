@@ -26,5 +26,9 @@ Full setup runbook (dependency chain, composer gotcha, key generation,
 HTTPS exposure, client registration) is in
 [DEVELOPING.md](DEVELOPING.md#setup) - follow it in order, it's fiddly.
 
+Non-admin users need a role-granularity scope (one per role, added by the
+site) alongside `aim:recall`/`aim:remember`, and that role needs `access mcp server` and `grant simple_oauth codes`; see
+[DEVELOPING.md](DEVELOPING.md#role-scopes-for-non-admin-users).
+
 Decision record: [ADR-0013](../../adr/resolved/0013-mcp-tool-exposure.md)'s OAuth
 addendum.

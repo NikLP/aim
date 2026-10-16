@@ -71,8 +71,40 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       0.6k; the chat model under-calls the tool). Restricted
       values checked too (tool and gate hold, prompt cannot serve both
       audiences). Still to do: the finder genuinely local for latency. Numbers in literals/adr/how-it-works.md.
-- [ ] **Finder-first gate on the on-site assistant (proven 2026-10-12, not
-      built).** The eval's `gate` mode won on hosted tokens, time and
+- [ ] **Tool routing: the assistant stops after one tool (found 2026-10-15).**
+      With recall at 0.52, repeats of the same question: "I forgot my
+      password" found the reset link 1 in 5 times (the other 4 it called only
+      `aim_recall`), "what is the wifi password" 0 in 5 (it called only
+      `aim_literal`, "none", and stopped; the answer is a fact, not a
+      literal). The persona says not to retry the lookup tool, so a "none"
+      ends the turn without checking memory. Options: a persona line telling
+      it to check memory once when the lookup finds nothing (cheap, measure
+      with a repeat run); or the finder-first gate below, which makes the
+      routing code rather than the model's choice. Repeat harness: ask each
+      question 5 times and count.
+- [x] **Finder-first gate: BUILT 2026-10-15 (`AimGateProcessor`), live on
+      this site's chat block.** Password reset 5/5 (was 1/5), main phone, fines
+      and room booking answered in under a second with no chat model. Still
+      open: (1) **accept/pass widget, PARKED 2026-10-15 (Nik).** Wifi
+      password 0/5: the finder says none and the model does not then call
+      recall. Direction, not decided in detail: do not inject facts into the
+      model; show the closest literal (a lower "suggest" bar, finder to
+      return score and margin) as a candidate reply with "that answers it" /
+      "ask the assistant" controls, the second re-sending with the gate
+      bypassed (ADR-0052 decision 3's "think harder"). Cautions: showing a
+      raw closest *fact* may read oddly or badly (fragments, token text,
+      a near-miss presented as an answer), so prefer literals first and
+      test fact candidates before offering them. **Track outcomes either
+      way:** the high-confidence gate answer has no "that was right" control
+      today; add one (and log accept, pass and no-click, IDs only) because
+      even a low click rate is data, and no-click is a signal. Needs
+      front-end work in the ai_chatbot widget (unchecked how it takes custom
+      controls); (2) **gist overlap** - "where do I log in?" falls through
+      (login and password_reset gists overlap), then the model fails or runs
+      out of steps; sharpen the gists; (3) a processor test (none yet) and a
+      gate-hit line in the review queue. Original entry follows.
+- [ ] (earlier plan text, kept for the open points) **Finder-first gate on
+      the on-site assistant (proven 2026-10-12).** The eval's `gate` mode won on hosted tokens, time and
       visibility (numbers in literals/adr/how-it-works.md). The Jev call
       stays: it is the fuzzy match. What is skipped on a hit is the hosted
       chat model. Plan: an `aim_chatbot` `ChatProcessor` plugin extending
@@ -200,6 +232,19 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       has a much smaller window, so chunk size should be per model
       (see `adr/model-call-budget.md`).
 - [x] Ingest form (ADR-0016 Mode 1) BUILT 2026-10-02: Batch API for large files is the follow-up.
+- [ ] **PARKED 2026-10-15 (Nik): file ingest from Claude.ai over MCP.** Idea:
+      `aim_media_upload` (filename + text/base64 content -> Media entity in
+      the private file store, returns the ID) plus `aim_ingest` (media ID ->
+      the ADR-0016 pipeline, facts untrusted). Both gated on `ingest aim
+      facts` plus an `aim_tool_oauth` scope. Limit: Claude.ai can only hand a
+      file to an MCP tool as an argument, so bytes go through model context
+      (fine for small text, poor for PDFs/images/large files). WebMCP is a
+      possible route, UNVERIFIED (checked 2026-10-16): its spec lists binary
+      inputs as an open question, doesn't name Claude.ai as a caller, and is
+      Chrome 146+ behind a flag. Revisit when binary input is resolved.
+      Small text files could skip the upload and pass text straight to
+      `aim_ingest`.
+      Raise the PII gate (ADR-0056) before real files go through.
 
 ## Decision models (raised 2026-10-02, ADR-0021/0037)
 
@@ -492,8 +537,9 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       role-visibility matrix returns nothing for non-admin tokens and
       `aim:remember` lacks `create {scope} aim facts`. Follow-ups: (a)
       add role-granularity scope(s) to `aim_tool_oauth` and re-test on
-      the live site; (b) check upstream whether a permission scope
-      granting a permission the user's role lacks is intended; (c) note
+      the live site; (b) DONE 2026-10-15: a permission scope does not
+      grant a permission the user's roles lack (tested live: effective =
+      scope AND user), so no upstream issue; (c) note
       for any recommendation: `agent_access` is pre-release and not under
       the security advisory policy; accepted as fine for now. Scratch
       copy removed.
@@ -508,8 +554,23 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       the permission they carry. To do: file or find an upstream issue
       (name-format mismatch between the two modules), confirm on the live
       site, and until fixed do not rely on the per-tool scopes for
-      anything. Also: role-based scope(s) in `aim_tool_oauth` (see the
-      trial item above).
+      anything. Update: upstream fixed this (#3604047, in 1.x-dev
+      fb92204; no release yet). Installed on this site 2026-10-15 pinned
+      as `1.x-dev#fb92204`; the subscriber now resolves `tool_api__aim_recall`/
+      `aim_remember` to their configs. Verified live 2026-10-15 with a throwaway
+      non-admin user (since deleted): a token without `aim:recall`/
+      `aim:remember` is refused (logged `insufficient_scope`, but the
+      client sees JSON-RPC -32603 "Internal server error", not a 403);
+      with the scope it works. Same test found: no aim scope carries
+      `access mcp server`, so a non-admin cannot connect at all (403 on
+      initialize); and `aim_remember` with `aim:remember` still fails
+      "No permission to create site-scope facts" for a role that holds
+      it. Both are fixed by the role-scope change (documented 2026-10-15 in aim_tool_oauth's DEVELOPING.md; live re-test done 2026-10-15, see that file). Still to do: swap the
+      pin for the first release containing the fix. No upstream issue needed from us. Once enforced, a role scope alone is
+      rejected (403 insufficient_scope) by tools requiring `aim:recall`/
+      `aim:remember`, so clients must request the role scope plus the
+      aim scope; design the role-scope change (trial item above) for
+      that and test after the upgrade.
 - [ ] **Redacting guardrail.** Drupal AI's PII guardrails only block; none
       removes the PII, yet the rewrite mechanism exists
       (`runGuardrails()` already handles `RewriteInputResult`). Sketch:

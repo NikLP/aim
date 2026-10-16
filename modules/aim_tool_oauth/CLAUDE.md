@@ -15,6 +15,14 @@ to `aim_tool_oauth`.
   `remember aim facts`/`recall aim facts` permissions. A scope with no
   granularity crashes `Oauth2ScopeProvider::getPermissions()` the moment
   a real client completes the flow.
+- **No role scope ships here, by design.** The two shipped scopes are
+  permission-granularity, so a non-admin token lacks `access mcp server`,
+  `create {scope} aim facts` and the user's roles (the user-scope matrix
+  reads them). Sites add one role-granularity scope per role; clients
+  request it together with the aim scope. The role also needs
+  `grant simple_oauth codes`, or the consent screen fails. Retest scripts
+  live in `scripts/`. See
+  [DEVELOPING.md](DEVELOPING.md#role-scopes-for-non-admin-users).
 - `aim_tool_oauth.install` - `hook_install()`/`hook_uninstall()` set/unset
   `mcp_server_oauth` third-party settings (`authentication_mode:
   required`, `scopes`) on `aim_tool`'s own `mcp_tool_config` entities.

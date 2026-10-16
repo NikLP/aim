@@ -21,6 +21,17 @@ the `site` bundle this hardcode relies on is guaranteed installed.
 - `src/Plugin/AiFunctionCall/AimRemember.php` / `AimRecall.php` - the two
   tools, both backed by `aim.memory_manager` directly (no extraction LLM
   call - same write path as `drush aim:remember`/`aim:recall`).
+- `src/Plugin/ChatProcessor/AimGateProcessor.php` (`aim_chatbot_gate`,
+  extends the AI Assistant API processor) - the finder-first gate. Asks the
+  literals finder about the last message with its own stricter thresholds
+  (`gate_match_threshold` 0.8, `gate_choice_margin` 0.4, calibrated on the
+  74-item gold sets: 30 hits, 1 arguable wrong match, against 5 at the finder
+  defaults); a clear match is answered from a fixed template (label, value,
+  the gist so a wrong match shows), no chat model; anything else, or any
+  finder error, goes to the assistant as before. Per-block settings switch
+  it (`gate`), and changing `chat_processor_plugin` back to
+  `ai_assistant_api_processor` restores the old path. Audit lines carry IDs
+  only. Needs `literals_finder` to do anything; without it, a pass-through.
 - `src/EventSubscriber/AimChatbotSourceTextSubscriber.php` - before the
   remember tool runs, passes it the visitor's last message plus the
   assistant turn before it, for the grounded check
