@@ -1,6 +1,6 @@
 # DRAFT: eval plan (assertions, labeling, data retention)
 
-Status: draft for Nik's approval, 2026-10-13. Not built. Nothing here changes
+Status: draft, 2026-10-13, updated 2026-10-16. Decisions taken are in section 1; the open work is in TODO.md ("Chat quality and evals"). Not built. Not built. Nothing here changes
 code or config. Context: Hamel Husain, "Your AI Product Needs Evals".
 
 ## 1. Data requirements: what evals need versus what we keep today

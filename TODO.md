@@ -8,6 +8,64 @@ open items already on record in the ADRs and [CLAUDE.md](CLAUDE.md)/
 Expect entries folded in from other threads independently - don't treat
 this list as exhaustive.
 
+## Chat quality and evals: open after the 2026-10-15/16 session
+
+State: finder-first gate live, recall forced (`require_usage`, `max_loops` 7),
+persona says "recall first", chat writes untrusted and permission-checked,
+turns about 4.7 s with 2 hosted calls (details in the Literals entry below
+and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
+
+- [ ] **Shared ai_logging settings (decided in principle, not built).** The
+      `ai_logging` settings are site-wide and aim's update hooks overwrite
+      the site's retention (10000 / 90 days) and switch prompt logging on.
+      Plan: hooks only append aim's tags and never lower or overwrite
+      retention; an explicit opt-in aim setting for recording model-call
+      text; `aim:status` shows the shared settings and flags an uncaptured
+      aim tag; document that retention has no per-tag control (upstream
+      candidate, ADR-0060). New installs: opt-in. This site keeps it on.
+- [ ] **Short category queries ("any upcoming events?") return only the book
+      sale.** The Code Club and Baby Rhyme Time facts sit just past the
+      0.52 cutoff for that word. Fix in the system, never by rewording
+      facts or gists (feedback rule, Nik 2026-10-16): keyword matching
+      alongside the vectors (below), a broader second recall when the first
+      is thin, or a relevance step over a wider candidate set. Then the
+      accept/pass widget as the safety net (parked, Literals entry).
+- [ ] **Latency and cost of the fall-through path.** 2 hosted calls per turn
+      (recall, answer). Options if it must drop: run recall in code and hand
+      the model the facts for that turn only (not the stored history), or
+      drop the assistant's own lookup tool now the gate runs the finder.
+      Test against the 74-item gold set before dropping anything.
+- [ ] **Processor test.** `AimGateProcessor` has no PHPUnit test; the finder
+      overrides and the "unavailable" outcome do. Also no test for the
+      chat remember permission check or the untrusted default.
+- [ ] **Review process.** Use `ai_logging`'s threads screen
+      (`/admin/config/ai/logging/threads`) for reading chats; there is no
+      verdict field, so labeling needs ai_eval or a small field. ai_eval
+      itself (drupal.org/project/ai_eval, in composer.json, not enabled) is
+      untried: trial one agent-mode target on the labeled set before
+      deciding whether `AimChatbotEvalCommands` can go. The eval plan and
+      its decisions are in `eval/DRAFT-eval-plan.md`; the assertion list
+      there is mostly not yet kernel tests.
+- [ ] **Parked by Nik:** visitor/staff assistant split (staff agent with
+      remember; fine for a demo, not essential), the accept/pass widget with
+      outcome tracking, a combined MCP "ask" tool that does finder-first
+      then recall on the server.
+- [ ] **Do not commit `config/sync/key.key.amazeeio_ai*.yml` (found
+      2026-10-16).** The live keys now use the `config` provider (the key
+      value sits in the config itself, after the amazee re-authorisation),
+      and a `config:export` wrote the plaintext values into the tracked
+      sync directory. Either put the keys back on the `file`/env provider
+      and re-export, or keep these three files out of git (config_ignore or
+      `.gitignore`) before the next commit. Check with
+      `git diff config/sync/key.key.*` (values not shown here).
+- [ ] **Housekeeping.** `aim_chatbot`'s shipped block still uses the plain
+      processor (only this site's block uses the gate). Test facts 141, 148,
+      149, 150 are retired, not deleted. Recipe `literals_base` no longer
+      grants `view restricted literals` to authenticated. The `login` literal
+      resolves to nothing for signed-in visitors (the widget is signed-in
+      only), so "where do I log in" correctly finds nothing; the assistant
+      does not yet say "you are already signed in".
+
 ## Literals (raised 2026-10-08, from the literals session; design in [ADR-0052](../literals/adr/0052-what-literals-is-for.md) addendum, module notes in [literals/CLAUDE.md](../literals/CLAUDE.md))
 
 The literals side is built (store, resolvers, tokens including `:link`,
