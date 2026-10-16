@@ -1,0 +1,6 @@
+public/
+docs/*.md
+!docs/index.md
+docs/modules/
+docs/recipes/
+docs/adr/

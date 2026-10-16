@@ -1,0 +1,30 @@
+################
+# GitLabCI template for Drupal projects, with a docs site "pages" job.
+# Full documentation: https://project.pages.drupalcode.org/gitlab_templates/
+################
+include:
+  - project: $_GITLAB_TEMPLATES_REPO
+    ref: $_GITLAB_TEMPLATES_REF
+    file:
+      - '/includes/include.drupalci.main.yml'
+      - '/includes/include.drupalci.variables.yml'
+      - '/includes/include.drupalci.workflows.yml'
+
+# Override the default pages job: bin/build-docs.sh copies the READMEs,
+# DEVELOPING files and ADRs into docs/, then runs mkdocs build into public/.
+pages:
+  stage: build
+  rules:
+    - if: '$SKIP_PAGES == "1"'
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PROJECT_ROOT_NAMESPACE == "project"
+    - if: $CI_PROJECT_ROOT_NAMESPACE == "issue"
+      when: manual
+      allow_failure: true
+  image: python:3.12
+  script:
+    - pip install mkdocs-material
+    - bin/build-docs.sh
+  artifacts:
+    paths:
+      - public

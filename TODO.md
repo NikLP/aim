@@ -71,6 +71,13 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
 The literals side is built (store, resolvers, tokens including `:link`,
 finder, tool, search). What remains is aim's side. Order is a suggestion.
 
+- [ ] **Reassess showing the literal key (2026-10-16).** The key (machine
+      name) is hidden on the literal edit form (shown on add only, core's
+      machine_name element) because the form has little room, so on an
+      existing literal it is visible only in the URL. Decide whether a
+      collection list column, or the `[literal:key]` token read-only in the
+      sidebar, is worth the space.
+
 - [x] **Token replacement on recall.** `aim` replaces `[literal:key]` and
       `[literal:key:link]` in fact text at recall time as the viewing
       account, in code it controls (no text-format filter, no page cache
@@ -285,6 +292,22 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       schema validation. Then confirm `aim:remember --file` loads all 31
       facts and the demo questions in the recipe README's "Running the demo"
       answer as before.
+
+## Docs site (raised 2026-10-16)
+
+- [ ] Build and check the MkDocs Material site, written 2026-10-16 but never
+      built: `pip install mkdocs-material` in a virtualenv, then
+      `bin/build-docs.sh`. Expect broken-link warnings from ADRs that link
+      to unpublished files (`src/`, `CLAUDE.md`), and confirm the nav
+      matches the files copied. It publishes only once aim is a project on
+      drupal.org and `.gitlab-ci.yml`'s `pages` job runs there, at
+      `project.pages.drupalcode.org/aim`.
+- [ ] The look is the Drupal.org project-pages stylesheet copied from the
+      Site Agent project, **for research purposes only** (note on the home
+      page, footer and `docs/assets/NOTICE.md`). Before a public release,
+      swap it for aim's own palette or get clearance. ZT Gatha is not
+      bundled (free for personal use only), so headings use Noto Sans.
+      `docs/assets/aim.svg` is a placeholder logo.
 
 ## Ingestion
 
