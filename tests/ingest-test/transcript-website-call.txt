@@ -1,0 +1,3 @@
+Notes from a call with Northlight Digital about the website. Present: Sam Okafor and two people from Northlight.
+
+They said site search is the next big job. It will use Search API and the library wants events and opening hours to come first in the results. It has to work with screen readers. Northlight first thought three weeks, but after looking at the events calendar they now say five weeks. Launch is planned for the week of 3 November. Sam mentioned in passing that the weather was awful on the way in. Northlight support is still weekdays 9am to 5pm, and urgent problems go to the on-call number. They also reminded us that editors must add alt text to every image, which has caused problems before.

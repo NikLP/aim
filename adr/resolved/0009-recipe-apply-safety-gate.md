@@ -50,7 +50,7 @@ in config/install" section). This decision is about a Recipe an LLM
   surface actually gets built - don't assume a from-scratch gate is
   needed.
 - The discovery-conversation half of this surface has a real precedent
-  already built for the *other* product surface: `.claude/skills/
+  already built for the *other* product surface: `skills/
   aim-discovery/` (the "grill") is a structured interview Skill that
   distills a conversation into a summary and runs it through `aim:extract`
   - explicitly scoped to only populate memory, not generate a Recipe.

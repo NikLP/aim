@@ -160,7 +160,7 @@ rely on truncation (truncation is an error, not a degraded score).
 
 `aim_benchmark/scripts/decision-eval-grounding.json`: 44 hand-written
 items (21 supported, 16 unsupported, 7 misattributed) over the three
-`demo/ingest-test` prose files plus six one-line chat messages. Labels
+`tests/ingest-test` prose files plus six one-line chat messages. Labels
 human-verified by Nik 2026-10-10, no changes. `jev-latest`, three runs, scores stable to about 0.05:
 
 | Wording | AUC | Wrongly trusted at 0.50 | Wrongly held at 0.50 | Supported min |

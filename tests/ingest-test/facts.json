@@ -1,0 +1,470 @@
+[
+ {
+  "scope": "site",
+  "text": "The library runs a home delivery service for housebound members, with deliveries every Wednesday.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The library holds a rare maps collection in the local history room, viewable by appointment.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Toddler Storytime takes place every Friday at 11am in the Children's Room.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The ground-floor cafe is run by Dockside Coffee and is open from 9am to 4pm on weekdays.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The adult book club meets on the first Monday of every month at 7pm in the reading room.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Inter-library loans cost 3 pounds per item and usually arrive within 10 days.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Members can read digital newspapers and magazines for free through PressReader with their library card.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "A family history help desk runs every Wednesday from 2pm to 4pm.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "There are four study pods on the first floor, each bookable for up to 2 hours.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The car park has 20 spaces, parking is free for 2 hours, and there are two blue badge bays by the entrance.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Lost property is kept at the main desk for 4 weeks and then given to charity.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Scanning to email is free at the public computers.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The Summer Reading Challenge is open to children aged 4 to 11 and runs from July to August.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "A quiet hour for sensory-friendly visits runs every Tuesday from 9am to 10am.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The library has a seed library in spring where members can take and swap seeds for free.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "A language cafe meets every Thursday at 6pm in the meeting room.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Drop-in tech help sessions are held on Mondays at 10am.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The Library of Things lets members borrow tools, a telescope and a sewing machine for one week.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Accessible toilets and a baby changing room are on the ground floor.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Bicycle racks are available outside the main entrance.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The library offers free printing of up to 10 pages a week for jobseekers.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The local history room has a digitised archive of the Harbourside Gazette from 1890 to 1960.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The library hosts a monthly knitting circle on the third Saturday at 10am.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Members can request a book purchase through a form at the main desk.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The makerspace is open to teenagers on Saturday afternoons for supervised sessions.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The library lends out ukuleles to members with a valid card for two weeks.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "There is a community noticeboard by the entrance for local events, with a 4 week limit on postings.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The library has a free wellbeing talk series on the second Thursday of each month at 6pm.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The library opens at 9am on weekdays and closes at 8pm.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Library membership costs nothing for residents of the borough.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Baby Rhyme Time is held on Tuesdays at 10:30 in the Children's Room.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Wi-Fi in the library is free and has no password: join Harbourside_Public.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Only assistance dogs may enter the library.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Printing at the library costs 10p a page in black and white.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Code Club for ages 9 to 13 now meets every Wednesday at 4:30pm in the makerspace.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "From November, public computers can be booked for 90 minutes at a time.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Community groups can now book a meeting room for free for up to 6 hours at a time.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Members can now borrow up to 25 items at a time.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "From next year the annual book sale will be held on the second weekend of June.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The library is now open on Sundays from 11am to 5pm.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The library charges 20p per day for overdue items.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Dogs of all breeds are welcome in the reading room.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Borrowing history is kept for 12 months for every member.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "asdf test 123",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "Remember to buy milk.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "<script>alert(1)</script> The library is open on weekends.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "site",
+  "text": "The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. The library history is long. ",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "role",
+  "subject": "content_editor",
+  "text": "Editors should use sentence case for headings.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "role",
+  "subject": "content_editor",
+  "text": "Event images must be at least 1200 pixels wide.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "role",
+  "subject": "content_editor",
+  "text": "Content must be proofread by a second editor before it is published.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "role",
+  "subject": "content_editor",
+  "text": "Every image needs alt text before an editor publishes it.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "role",
+  "subject": "content_editor",
+  "text": "News post summaries can now be up to 200 characters.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "role",
+  "subject": "communications_manager",
+  "text": "Press releases that mention funding need legal sign-off.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "role",
+  "subject": "communications_manager",
+  "text": "The Communications Manager approves every social media campaign.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "role",
+  "subject": "communications_manager",
+  "text": "Only the Communications Manager is allowed to publish press releases.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "role",
+  "subject": "administrator",
+  "text": "Administrators review the user list every quarter.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "role",
+  "subject": "administrator",
+  "text": "Administrators must remove accounts for staff who have left within a week.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "user",
+  "subject": "3",
+  "text": "Alex prefers email to phone calls.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "user",
+  "subject": "3",
+  "text": "Alex works Tuesday to Saturday.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "user",
+  "subject": "3",
+  "text": "Alex leads the Code Club volunteers.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "user",
+  "subject": "3",
+  "text": "Alex is the library's events coordinator.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "user",
+  "subject": "3",
+  "text": "Alex wants a monthly summary of event attendance.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "user",
+  "subject": "3",
+  "text": "Alex likes to be contacted by email rather than phone.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "user",
+  "subject": "3",
+  "text": "Alex now works Monday to Friday.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-summer-reading",
+  "text": "The Summer Reading Challenge theme for 2027 is Ocean Explorers.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-summer-reading",
+  "text": "The challenge runs from 12 July to 31 August.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-summer-reading",
+  "text": "Children collect a sticker for each book they finish, up to six stickers.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-summer-reading",
+  "text": "Children who collect six stickers get a medal at the finale event.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-summer-reading",
+  "text": "The finale event is on Saturday 4 September in the main hall.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-summer-reading",
+  "text": "The challenge is free to join for children aged 4 to 11.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-summer-reading",
+  "text": "Volunteers must have a DBS check before helping at challenge sessions.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-summer-reading",
+  "text": "The Children's Librarian orders sticker supplies by 1 June.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-summer-reading",
+  "text": "The challenge theme this year is Ocean Explorers.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-summer-reading",
+  "text": "The finale event has moved to Saturday 11 September.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-site-search",
+  "text": "The library is adding site search to the website using Search API.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-site-search",
+  "text": "Search results should prioritise events and opening hours.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-site-search",
+  "text": "Search must work with screen readers.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-site-search",
+  "text": "Northlight Digital estimates search will take three weeks.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-site-search",
+  "text": "Search launches in the week of 3 November.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "case",
+  "subject": "case-site-search",
+  "text": "Northlight Digital now estimates search will take five weeks.",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "entity",
+  "text": "The Welcome page should mention the new Library of Things.",
+  "target_type": "node",
+  "target_id": "1",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "entity",
+  "text": "The Welcome page photo was updated in September.",
+  "target_type": "node",
+  "target_id": "1",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "entity",
+  "text": "The Welcome page has the opening hours in a sidebar block.",
+  "target_type": "node",
+  "target_id": "1",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "entity",
+  "text": "This account belongs to the events coordinator.",
+  "target_type": "user",
+  "target_id": "3",
+  "source": "ingest-test"
+ },
+ {
+  "scope": "entity",
+  "text": "This account holder has volunteer DBS clearance.",
+  "target_type": "user",
+  "target_id": "3",
+  "source": "ingest-test"
+ }
+]

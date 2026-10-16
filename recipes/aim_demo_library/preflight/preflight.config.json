@@ -1,0 +1,7 @@
+{
+  "chatQuestion": "When are you open on Sundays?",
+  "chatExpect": "(12|noon).*(4|four)",
+  "mcpQuestion": "When is the library open on Sundays?",
+  "mcpExpect": "Sunday",
+  "offTopic": "quantum chromodynamics lattice gauge theory"
+}

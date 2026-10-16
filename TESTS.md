@@ -2,7 +2,7 @@
 
 Everything still to be tested or evaluated, in one place. Status as of
 2026-10-05. Items are gathered from [TODO.md](TODO.md), the ADRs and
-`demo/ingest-test/`; the source is named on each so the original can be
+`tests/ingest-test/`; the source is named on each so the original can be
 updated when one is done. Hosted Jev takes synthetic or public data only
 (ADR-0021 addendum).
 
@@ -11,7 +11,7 @@ updated when one is done. Hosted Jev takes synthetic or public data only
 | Kind | Goes through | Lives in | Answers |
 | --- | --- | --- | --- |
 | **A. Model evals** | The configured provider through Drupal (`decision-eval.php`, `aim.backend.decision`), fixed hand-written sets, no aim write path. Never the model's API directly. | `modules/aim_benchmark/scripts/` | Can the model make this judgment at all? |
-| **B. Module runs** | The module: `drush aim:remember` / `aim:extract` / `aim:consolidate` / `aim:recall` on a snapshot, real backends, real queue. | `demo/ingest-test/`, `aim_benchmark` commands | Does aim, wired to a model, do the right thing end to end? |
+| **B. Module runs** | The module: `drush aim:remember` / `aim:extract` / `aim:consolidate` / `aim:recall` on a snapshot, real backends, real queue. | `tests/ingest-test/`, `aim_benchmark` commands | Does aim, wired to a model, do the right thing end to end? |
 | **C. Automated tests** | PHPUnit (kernel/unit): grounding, literal tokens, scope plugins, role visibility, expiry. Command in DEVELOPING.md. | `tests/src/Kernel/` | Does a class behave, without a live site? |
 
 The drift audit (ADR-0043) so far is type A only. Nothing in aim calls it
@@ -99,7 +99,7 @@ unless noted; synthetic data only for hosted Jev.
 
 ## Next: module runs (B)
 
-1. **Ingest test, end to end.** `demo/ingest-test/` (85 synthetic facts,
+1. **Ingest test, end to end.** `tests/ingest-test/` (85 synthetic facts,
    `expected.json` gives the intended outcome per fact: new, restatement,
    update, contradiction, junk, blocked). Snapshot first
    (`ddev snapshot --name pre-ingest-test`), run `aim:remember --file`,

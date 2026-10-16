@@ -100,7 +100,7 @@ memory`) shares one code path with drush: `AimMemoryManager::ingestText()`
 one-fact-per-line and JSON modes), `parseFactFields()`. Uploads are read
 from the request and never saved as a File entity; capped at 100 KB
 (`AimIngestForm::MAX_BYTES`). Submit is synchronous; consolidation stays
-queued. Test data: `demo/ingest-test/`.
+queued. Test data: `tests/ingest-test/`.
 
 **Skill:** `skills/aim-discovery/` ("the grill") - a structured
 discovery interview that distills each topic into a summary and runs it
@@ -1112,7 +1112,7 @@ ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>
 - **`aim_demo_library`**: a fictional community library (site identity,
   chat persona, recall cutoff, `index_directly`) plus its 31 facts and
   three literals as default content in `content/`. This site's demo kit
-  (`demo/` in the site shell) is reset with it. The first archetype
+  (its pre-flight and reset steps are in the recipe README) is reset with it. The first archetype
   starter kit ([ADR-0014](adr/resolved/0014-usecase-archetype-starter-kits.md)).
   Details and caveats in its [README](recipes/aim_demo_library/README.md).
 - **Facts as recipe content skip `remember()`.** Core's importer saves

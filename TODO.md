@@ -283,7 +283,7 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
 - [ ] Apply `recipes/aim_demo_library` to an isolated scratch site (its
       own database) and fix whatever breaks: it has only passed core's
       schema validation. Then confirm `aim:remember --file` loads all 31
-      facts and the demo questions in the site repo's `demo/README.md`
+      facts and the demo questions in the recipe README's "Running the demo"
       answer as before.
 
 ## Ingestion
@@ -688,8 +688,8 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       `trust {scope} aim facts` and the grounded check is in shadow mode
       (see "Loop back to the trust permission" under Governance). Decide
       the reviewer workflow before claiming draft-to-trusted is a feature.
-- [ ] **Packaging.** Not a one-line installer. `demo/preflight.js` lives in
-      the site shell, not the module; consider a module-level check (a
+- [ ] **Packaging.** Not a one-line installer. `recipes/aim_demo_library/preflight/preflight.js` lives in
+      the recipe, not the module proper; consider a module-level check (a
       Drush command or status report) so installs are verifiable. Heavy
       parts already swappable (`DecisionBackend`, provider shim, Ollama
       embeddings); document the swap points. George suggested a site
@@ -1015,7 +1015,7 @@ questions" section)
       declared", and `AimRemember` may need its own extra rules. A typo'd
       permission name denies every ordinary account but not admins, so
       test as a non-admin. Denial now precedes input validation (different
-      error message when both apply): re-run `node demo/preflight.js`
+      error message when both apply): re-run the recipe's `preflight/preflight.js` (`node demo/preflight.js` on this site)
       afterward. Optional - safe to leave undone.
 
 ## aim_tool: schema discoverability and typed output (raised 2026-10-05, from Matt Glaman's "Define the capability once, call it anywhere")

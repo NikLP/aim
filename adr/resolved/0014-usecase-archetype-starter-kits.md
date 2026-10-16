@@ -17,7 +17,7 @@ left it open rather than designed:
 > per site archetype (commerce, brochure, LMS, ...). Real scope of work,
 > not a byproduct of the storage/extraction plumbing.
 
-`.claude/skills/aim-discovery/` ("the grill") already proves the
+`skills/aim-discovery/` ("the grill") already proves the
 mechanism end to end - a structured interview distilled per-topic and run
 through `aim:extract`, mostly `scope: site` - but it is one generic
 interview, not an archetype-specific one. CLAUDE.md's "Ideas raised, not
@@ -91,7 +91,7 @@ assuming one needs to be written from scratch.
   (the one closest to existing PoC content, likely personal/user
   assistant memory) end to end before committing to a second.
 - **Separate Skills vs. one parameterized Skill.** Whether each archetype
-  is its own `.claude/skills/aim-discovery-<archetype>/` directory or one
+  is its own `skills/aim-discovery-<archetype>/` directory or one
   Skill that takes an archetype argument and varies its question set
   internally - not decided, affects how much duplication vs. indirection
   the mechanism carries.

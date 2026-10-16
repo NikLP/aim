@@ -34,7 +34,7 @@ implementation of memory access - it's the same write/read path with the
 LLM-mediated decision step removed.
 
 What transfers from the Hermes precedent: framing this as one memory
-*capability* with two directions (the `.claude/skills/aim-memory/`
+*capability* with two directions (the `skills/aim-memory/`
 Skill), not N narrow tool-shaped instructions to reach for separately.
 What deliberately doesn't transfer: Hermes's substring-matched `replace`/
 `remove` against a tiny prompt-injected store. `aim_fact` is ID/UUID and

@@ -1,0 +1,597 @@
+[
+ {
+  "index": 0,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The library runs a home delivery service for housebound members, with "
+ },
+ {
+  "index": 1,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The library holds a rare maps collection in the local history room, vi"
+ },
+ {
+  "index": 2,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Toddler Storytime takes place every Friday at 11am in the Children's R"
+ },
+ {
+  "index": 3,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The ground-floor cafe is run by Dockside Coffee and is open from 9am t"
+ },
+ {
+  "index": 4,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The adult book club meets on the first Monday of every month at 7pm in"
+ },
+ {
+  "index": 5,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Inter-library loans cost 3 pounds per item and usually arrive within 1"
+ },
+ {
+  "index": 6,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Members can read digital newspapers and magazines for free through Pre"
+ },
+ {
+  "index": 7,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "A family history help desk runs every Wednesday from 2pm to 4pm."
+ },
+ {
+  "index": 8,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "There are four study pods on the first floor, each bookable for up to "
+ },
+ {
+  "index": 9,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The car park has 20 spaces, parking is free for 2 hours, and there are"
+ },
+ {
+  "index": 10,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Lost property is kept at the main desk for 4 weeks and then given to c"
+ },
+ {
+  "index": 11,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Scanning to email is free at the public computers."
+ },
+ {
+  "index": 12,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The Summer Reading Challenge is open to children aged 4 to 11 and runs"
+ },
+ {
+  "index": 13,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "A quiet hour for sensory-friendly visits runs every Tuesday from 9am t"
+ },
+ {
+  "index": 14,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The library has a seed library in spring where members can take and sw"
+ },
+ {
+  "index": 15,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "A language cafe meets every Thursday at 6pm in the meeting room."
+ },
+ {
+  "index": 16,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Drop-in tech help sessions are held on Mondays at 10am."
+ },
+ {
+  "index": 17,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The Library of Things lets members borrow tools, a telescope and a sew"
+ },
+ {
+  "index": 18,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Accessible toilets and a baby changing room are on the ground floor."
+ },
+ {
+  "index": 19,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Bicycle racks are available outside the main entrance."
+ },
+ {
+  "index": 20,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The library offers free printing of up to 10 pages a week for jobseeke"
+ },
+ {
+  "index": 21,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The local history room has a digitised archive of the Harbourside Gaze"
+ },
+ {
+  "index": 22,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The library hosts a monthly knitting circle on the third Saturday at 1"
+ },
+ {
+  "index": 23,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Members can request a book purchase through a form at the main desk."
+ },
+ {
+  "index": 24,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The makerspace is open to teenagers on Saturday afternoons for supervi"
+ },
+ {
+  "index": 25,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The library lends out ukuleles to members with a valid card for two we"
+ },
+ {
+  "index": 26,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "There is a community noticeboard by the entrance for local events, wit"
+ },
+ {
+  "index": 27,
+  "scope": "site",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The library has a free wellbeing talk series on the second Thursday of"
+ },
+ {
+  "index": 28,
+  "scope": "site",
+  "expect": "restatement",
+  "relates_to": "hours",
+  "text": "The library opens at 9am on weekdays and closes at 8pm."
+ },
+ {
+  "index": 29,
+  "scope": "site",
+  "expect": "restatement",
+  "relates_to": "membership free",
+  "text": "Library membership costs nothing for residents of the borough."
+ },
+ {
+  "index": 30,
+  "scope": "site",
+  "expect": "restatement",
+  "relates_to": "baby rhyme time",
+  "text": "Baby Rhyme Time is held on Tuesdays at 10:30 in the Children's Room."
+ },
+ {
+  "index": 31,
+  "scope": "site",
+  "expect": "restatement",
+  "relates_to": "wifi",
+  "text": "Wi-Fi in the library is free and has no password: join Harbourside_Pub"
+ },
+ {
+  "index": 32,
+  "scope": "site",
+  "expect": "restatement",
+  "relates_to": "dogs",
+  "text": "Only assistance dogs may enter the library."
+ },
+ {
+  "index": 33,
+  "scope": "site",
+  "expect": "restatement",
+  "relates_to": "printing",
+  "text": "Printing at the library costs 10p a page in black and white."
+ },
+ {
+  "index": 34,
+  "scope": "site",
+  "expect": "update",
+  "relates_to": "code club thursday 4pm",
+  "text": "Code Club for ages 9 to 13 now meets every Wednesday at 4:30pm in the "
+ },
+ {
+  "index": 35,
+  "scope": "site",
+  "expect": "update",
+  "relates_to": "computers 60 minutes",
+  "text": "From November, public computers can be booked for 90 minutes at a time"
+ },
+ {
+  "index": 36,
+  "scope": "site",
+  "expect": "update",
+  "relates_to": "meeting room 4 hours",
+  "text": "Community groups can now book a meeting room for free for up to 6 hour"
+ },
+ {
+  "index": 37,
+  "scope": "site",
+  "expect": "update",
+  "relates_to": "borrow 20 items",
+  "text": "Members can now borrow up to 25 items at a time."
+ },
+ {
+  "index": 38,
+  "scope": "site",
+  "expect": "update",
+  "relates_to": "book sale first weekend",
+  "text": "From next year the annual book sale will be held on the second weekend"
+ },
+ {
+  "index": 39,
+  "scope": "site",
+  "expect": "update",
+  "relates_to": "Sunday 12 to 4",
+  "text": "The library is now open on Sundays from 11am to 5pm."
+ },
+ {
+  "index": 40,
+  "scope": "site",
+  "expect": "contradiction",
+  "relates_to": "no fines since 2022",
+  "text": "The library charges 20p per day for overdue items."
+ },
+ {
+  "index": 41,
+  "scope": "site",
+  "expect": "contradiction",
+  "relates_to": "only assistance dogs",
+  "text": "Dogs of all breeds are welcome in the reading room."
+ },
+ {
+  "index": 42,
+  "scope": "site",
+  "expect": "contradiction",
+  "relates_to": "deleted after 30 days",
+  "text": "Borrowing history is kept for 12 months for every member."
+ },
+ {
+  "index": 43,
+  "scope": "site",
+  "expect": "junk",
+  "relates_to": "",
+  "text": "asdf test 123"
+ },
+ {
+  "index": 44,
+  "scope": "site",
+  "expect": "junk",
+  "relates_to": "",
+  "text": "Remember to buy milk."
+ },
+ {
+  "index": 45,
+  "scope": "site",
+  "expect": "blocked",
+  "relates_to": "markup guardrail",
+  "text": "<script>alert(1)</script> The library is open on weekends."
+ },
+ {
+  "index": 46,
+  "scope": "site",
+  "expect": "blocked",
+  "relates_to": "2000 character guardrail",
+  "text": "The library history is long. The library history is long. The library "
+ },
+ {
+  "index": 47,
+  "scope": "role",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Editors should use sentence case for headings."
+ },
+ {
+  "index": 48,
+  "scope": "role",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Event images must be at least 1200 pixels wide."
+ },
+ {
+  "index": 49,
+  "scope": "role",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Content must be proofread by a second editor before it is published."
+ },
+ {
+  "index": 50,
+  "scope": "role",
+  "expect": "restatement",
+  "relates_to": "alt text",
+  "text": "Every image needs alt text before an editor publishes it."
+ },
+ {
+  "index": 51,
+  "scope": "role",
+  "expect": "update",
+  "relates_to": "160 characters",
+  "text": "News post summaries can now be up to 200 characters."
+ },
+ {
+  "index": 52,
+  "scope": "role",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Press releases that mention funding need legal sign-off."
+ },
+ {
+  "index": 53,
+  "scope": "role",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The Communications Manager approves every social media campaign."
+ },
+ {
+  "index": 54,
+  "scope": "role",
+  "expect": "restatement",
+  "relates_to": "press releases",
+  "text": "Only the Communications Manager is allowed to publish press releases."
+ },
+ {
+  "index": 55,
+  "scope": "role",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Administrators review the user list every quarter."
+ },
+ {
+  "index": 56,
+  "scope": "role",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Administrators must remove accounts for staff who have left within a w"
+ },
+ {
+  "index": 57,
+  "scope": "user",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Alex prefers email to phone calls."
+ },
+ {
+  "index": 58,
+  "scope": "user",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Alex works Tuesday to Saturday."
+ },
+ {
+  "index": 59,
+  "scope": "user",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Alex leads the Code Club volunteers."
+ },
+ {
+  "index": 60,
+  "scope": "user",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Alex is the library's events coordinator."
+ },
+ {
+  "index": 61,
+  "scope": "user",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Alex wants a monthly summary of event attendance."
+ },
+ {
+  "index": 62,
+  "scope": "user",
+  "expect": "restatement",
+  "relates_to": "email",
+  "text": "Alex likes to be contacted by email rather than phone."
+ },
+ {
+  "index": 63,
+  "scope": "user",
+  "expect": "update",
+  "relates_to": "Tuesday to Saturday",
+  "text": "Alex now works Monday to Friday."
+ },
+ {
+  "index": 64,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The Summer Reading Challenge theme for 2027 is Ocean Explorers."
+ },
+ {
+  "index": 65,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The challenge runs from 12 July to 31 August."
+ },
+ {
+  "index": 66,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Children collect a sticker for each book they finish, up to six sticke"
+ },
+ {
+  "index": 67,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Children who collect six stickers get a medal at the finale event."
+ },
+ {
+  "index": 68,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The finale event is on Saturday 4 September in the main hall."
+ },
+ {
+  "index": 69,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The challenge is free to join for children aged 4 to 11."
+ },
+ {
+  "index": 70,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Volunteers must have a DBS check before helping at challenge sessions."
+ },
+ {
+  "index": 71,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The Children's Librarian orders sticker supplies by 1 June."
+ },
+ {
+  "index": 72,
+  "scope": "case",
+  "expect": "restatement",
+  "relates_to": "theme",
+  "text": "The challenge theme this year is Ocean Explorers."
+ },
+ {
+  "index": 73,
+  "scope": "case",
+  "expect": "update",
+  "relates_to": "finale 4 September",
+  "text": "The finale event has moved to Saturday 11 September."
+ },
+ {
+  "index": 74,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The library is adding site search to the website using Search API."
+ },
+ {
+  "index": 75,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Search results should prioritise events and opening hours."
+ },
+ {
+  "index": 76,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Search must work with screen readers."
+ },
+ {
+  "index": 77,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Northlight Digital estimates search will take three weeks."
+ },
+ {
+  "index": 78,
+  "scope": "case",
+  "expect": "new",
+  "relates_to": "",
+  "text": "Search launches in the week of 3 November."
+ },
+ {
+  "index": 79,
+  "scope": "case",
+  "expect": "update",
+  "relates_to": "three weeks",
+  "text": "Northlight Digital now estimates search will take five weeks."
+ },
+ {
+  "index": 80,
+  "scope": "entity",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The Welcome page should mention the new Library of Things."
+ },
+ {
+  "index": 81,
+  "scope": "entity",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The Welcome page photo was updated in September."
+ },
+ {
+  "index": 82,
+  "scope": "entity",
+  "expect": "new",
+  "relates_to": "",
+  "text": "The Welcome page has the opening hours in a sidebar block."
+ },
+ {
+  "index": 83,
+  "scope": "entity",
+  "expect": "new",
+  "relates_to": "",
+  "text": "This account belongs to the events coordinator."
+ },
+ {
+  "index": 84,
+  "scope": "entity",
+  "expect": "new",
+  "relates_to": "",
+  "text": "This account holder has volunteer DBS clearance."
+ }
+]
