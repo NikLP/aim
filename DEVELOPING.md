@@ -102,11 +102,11 @@ from the request and never saved as a File entity; capped at 100 KB
 (`AimIngestForm::MAX_BYTES`). Submit is synchronous; consolidation stays
 queued. Test data: `demo/ingest-test/`.
 
-**Skill:** `.claude/skills/aim-discovery/` ("the grill") - a structured
+**Skill:** `skills/aim-discovery/` ("the grill") - a structured
 discovery interview that distills each topic into a summary and runs it
 through `aim:extract`, mostly `scope: site`.
 
-**Skill:** `.claude/skills/aim-memory/` - reach for `aim:remember`/
+**Skill:** `skills/aim-memory/` - reach for `aim:remember`/
 `aim:recall` continuously through a session, framed as one capability
 with two directions.
 

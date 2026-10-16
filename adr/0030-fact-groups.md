@@ -8,7 +8,7 @@
 Consolidation and `recall()` compare facts within one scope and, for
 non-account scopes, one `subject` (`AimMemoryManager::findNearestNeighbor()`
 filters on `scope`, then `user` or `subject`). Two consequences surfaced
-while planning repeated grill sessions ([aim-discovery](../../../../../.claude/skills/aim-discovery/)):
+while planning repeated grill sessions ([aim-discovery](../skills/aim-discovery/)):
 
 - Each session that omits a subject mints a fresh case ID
   (`AimScopeCase::defaultSubject()`), so three sessions about one project
