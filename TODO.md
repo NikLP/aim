@@ -102,7 +102,13 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       controls); (2) **gist overlap** - "where do I log in?" falls through
       (login and password_reset gists overlap), then the model fails or runs
       out of steps; sharpen the gists; (3) a processor test (none yet) and a
-      gate-hit line in the review queue. Original entry follows.
+      gate-hit line in the review queue. **Update 2026-10-15 evening:**
+      forcing recall (`require_usage`, `max_loops` 7) fixed the wifi
+      question 0/5 -> 5/5; cafe and website-contact questions 5/5. "Where do
+      I log in" is not a fault: the `login` literal resolves to nothing for a
+      signed-in visitor and the widget is signed-in only. Events is still
+      partial (book sale only, 5/5 runs): the weekly clubs sit past the
+      recall cutoff for the word "events". Original entry follows.
 - [ ] (earlier plan text, kept for the open points) **Finder-first gate on
       the on-site assistant (proven 2026-10-12).** The eval's `gate` mode won on hosted tokens, time and
       visibility (numbers in literals/adr/how-it-works.md). The Jev call

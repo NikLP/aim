@@ -32,6 +32,13 @@ the `site` bundle this hardcode relies on is guaranteed installed.
   it (`gate`), and changing `chat_processor_plugin` back to
   `ai_assistant_api_processor` restores the old path. Audit lines carry IDs
   only. Needs `literals_finder` to do anything; without it, a pass-through.
+- The agent forces memory: `aim_chatbot:recall` has `require_usage` on, so
+  the assistant cannot answer without having checked memory (the reminder
+  re-enters its loop), and `max_loops` is 7 to fit lookup, recall and the
+  answer. Without it the model picked one of lookup or recall per question
+  and stopped (wifi password 0 of 5, now 5 of 5). Costs about 4-12 s on
+  questions the gate passes (it was 3-5 s). The `aim_demo_library` recipe
+  sets both; re-applying an older recipe would reset them.
 - `src/EventSubscriber/AimChatbotSourceTextSubscriber.php` - before the
   remember tool runs, passes it the visitor's last message plus the
   assistant turn before it, for the grounded check

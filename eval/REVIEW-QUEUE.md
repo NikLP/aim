@@ -1,6 +1,6 @@
-# Review queue
+# Review queue (one-off snapshot, 2026-10-15)
 
-One row per visitor question. Judge against MEMORY-SNAPSHOT.md.
+Not generated any more: the script that built it was removed. Kept because it holds the verdicts Nik reviewed on the first real chat sessions (before the gate, forced recall and untrusted chat writes). For live review use the AI Logging threads screen at /admin/config/ai/logging/threads. One row per visitor question; judge against MEMORY-SNAPSHOT.md.
 
 ## ai_log 206: do you have a staff number?
 
