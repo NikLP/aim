@@ -67,6 +67,7 @@ config:
       setProperties:
         settings.label: "Harbourside Library assistant"
         settings.bot_name: "Library Assistant"
+        settings.placement: bottom-right
         settings.first_message: "Hi! I'm the Harbourside Library assistant. Ask me about opening hours, borrowing, events or services, or tell me something worth remembering for next time."
         visibility:
           user_role:
