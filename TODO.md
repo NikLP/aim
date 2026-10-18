@@ -220,6 +220,20 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       lever, which our "wider alias list pulled near-topic questions in"
       trial contradicts on one in-sample run. Re-test after the blind set
       above, against the in-gist `ALSO` convention.
+- [ ] **Chooser confidence on the `Find:` watchdog line** (raised 2026-10-18,
+      not built; unrelated to the ambiguity fix). Today the line reads
+      `Find: match via chooser (-), literals [pl_loan_period], pool 98` and
+      says nothing of how sure the model was. Proposal: add the top pick, the
+      runner-up and none, e.g. `top pl_loan_period 0.92, next pl_loan_limit
+      0.04, none 0.007`, plus the model id. Makes a borderline match (0.65 vs
+      0.21) visible and tells a real `chose_none` from a near miss when
+      `ai_logging` is off or in stealth mode. Values-free, behind the same
+      debug/stealth switch as the other audit logging. The probabilities are
+      already in the Decision output (`getChoice('choice')->getProbabilities()`),
+      so no extra call. Worth most once real traffic exists; also the
+      natural feed for the threshold-tuning skill (`literals_finder/eval/TUNING.md`).
+      Note `literals_choose` is not in `ai_logging`'s `prompt_logging_tags`, so
+      chooser calls are not in `ai_log` at all today.
 - Parked, with reasons in ADR-0040 "Deferred and pinned": staged choice,
   groups, keyword fallback, per-medium context registry, local-model
   re-measure, `search_api`, tokens in body copy. The `literals_chat` module
@@ -451,6 +465,10 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       - **Thresholds** (0.8 verifier, 0.7 grounding) were tuned on Jev; the
         easy sets say nothing about harder pairs. Retention and training
         policy of subq are unread: synthetic data only, as with Jev.
+      - **`tokens_output` reads 0 on subq decision calls** (all 153 logged
+        in `ai_log`; Jev reported 22). Expected: subq does not count output
+        tokens on decision models (too cheap to bother, per Nik). Ignore it
+        in cost or usage reads; `tokens_input` is real.
       - Switching back is `host` plus three `activities.*.model` values;
         run `config:export` whichever way it ends.
 - [ ] **Atomic extraction.** Check the extraction prompt asks for one claim per

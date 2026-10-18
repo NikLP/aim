@@ -9,6 +9,8 @@ use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
+use Drupal\literals\Entity\Literal;
+use Drupal\literals\Entity\LiteralType;
 use Drupal\user\UserInterface;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -54,6 +56,7 @@ class AimToolPermissionsTest extends KernelTestBase {
     parent::setUp();
     $this->installEntitySchema('user');
     $this->installEntitySchema('aim_fact');
+    $this->installEntitySchema('literal');
     $path = $this->container->get('extension.list.module')->getPath('aim');
     $this->config('aim.settings')
       ->setData(Yaml::decode(file_get_contents($path . '/config/install/aim.settings.yml')))
@@ -96,6 +99,48 @@ class AimToolPermissionsTest extends KernelTestBase {
     $this->assertTrue($this->tool('aim_literal')->access($this->createUser(['view restricted literals'])));
     $this->assertFalse($this->tool('aim_literal')->access($this->createUser(['recall aim facts'])));
     $this->assertFalse($this->tool('aim_literal')->access($this->createUser([])));
+  }
+
+  /**
+   * The literal tool returns a value through literals.lookup, per viewer.
+   */
+  public function testLiteralToolLooksUp(): void {
+    LiteralType::create(['id' => 'text', 'label' => 'Text', 'resolver' => 'text'])->save();
+    foreach (['main_phone' => FALSE, 'staff_line' => TRUE] as $key => $restricted) {
+      Literal::create([
+        'type' => 'text',
+        'name' => ucfirst($key),
+        'id' => $key,
+        'value' => "value-of-$key",
+        'gist' => "The $key",
+        'restricted' => $restricted,
+        'status' => 1,
+      ])->save();
+    }
+
+    $this->actAs($this->createUser(['view literals']));
+    $match = $this->literal(['key' => 'main_phone']);
+    $this->assertTrue($match->getResultStatus());
+    $values = $match->getResult()->getContextValues();
+    $this->assertSame('match', $values['outcome']);
+    $this->assertSame('value-of-main_phone', $values['value']);
+
+    // A restricted literal the caller may not see reads as "none".
+    $hidden = $this->literal(['key' => 'staff_line']);
+    $this->assertSame('none', $hidden->getResult()->getContextValues()['outcome']);
+    $this->assertSame('', $hidden->getResult()->getContextValues()['value']);
+
+    // Search lists candidates and never a value.
+    $search = $this->literal(['search' => 'phone'])->getResult()->getContextValues();
+    $this->assertSame('candidates', $search['outcome']);
+    $this->assertStringContainsString('main_phone', $search['candidates']);
+    $this->assertSame('', $search['value']);
+
+    $this->actAs($this->createUser(['view literals', 'view restricted literals']));
+    $this->assertSame('value-of-staff_line', $this->literal(['key' => 'staff_line'])->getResult()->getContextValues()['value']);
+
+    // A question needs the finder, which is not enabled: failure, not a guess.
+    $this->assertFalse($this->literal(['question' => 'the phone number'])->getResultStatus());
   }
 
   /**
@@ -184,6 +229,20 @@ class AimToolPermissionsTest extends KernelTestBase {
    */
   protected function tool(string $id) {
     return $this->container->get('plugin.manager.tool')->createInstance($id);
+  }
+
+  /**
+   * Runs aim_literal with the given inputs.
+   *
+   * @return \Drupal\tool\Tool\ToolInterface
+   *   The executed tool.
+   */
+  protected function literal(array $inputs) {
+    $tool = $this->tool('aim_literal');
+    foreach ($inputs as $name => $value) {
+      $tool->setInputValue($name, $value);
+    }
+    return $tool->execute();
   }
 
   /**
