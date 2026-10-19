@@ -143,22 +143,6 @@ finder-first gate are built. What remains is aim's side.
       facts and the demo questions in the recipe README's "Running the demo"
       answer as before.
 
-## Docs site (raised 2026-10-16)
-
-- [ ] Build and check the MkDocs Material site, written 2026-10-16 but never
-      built: `pip install mkdocs-material` in a virtualenv, then
-      `bin/build-docs.sh`. Expect broken-link warnings from ADRs that link
-      to unpublished files (`src/`, `CLAUDE.md`), and confirm the nav
-      matches the files copied. It publishes only once aim is a project on
-      drupal.org and `.gitlab-ci.yml`'s `pages` job runs there, at
-      `project.pages.drupalcode.org/aim`.
-- [ ] The look is the Drupal.org project-pages stylesheet copied from the
-      Site Agent project, **for research purposes only** (note on the home
-      page, footer and `docs/assets/NOTICE.md`). Before a public release,
-      swap it for aim's own palette or get clearance. ZT Gatha is not
-      bundled (free for personal use only), so headings use Noto Sans.
-      `docs/assets/aim.svg` is a placeholder logo.
-
 ## Ingestion
 
 - [ ] Chunking for `aim:extract` and the ingest form: today the whole file
