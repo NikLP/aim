@@ -8,5 +8,10 @@ ingest aim facts:
   description: 'Upload a document or fact file on the AIM ingest form, which extracts facts with a model and saves them in any scope the file names.'
   restrict access: true
 
+review aim facts:
+  title: 'Review AIM facts'
+  description: 'Trust and untrust facts in every scope via the bulk actions on the facts listing, without changing their text.'
+  restrict access: true
+
 permission_callbacks:
   - \Drupal\aim\AimPermissions::permissions

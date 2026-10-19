@@ -96,6 +96,11 @@ class AimSettings {
   protected const GROUNDING_DEFAULT_THRESHOLD = 0.7;
 
   /**
+   * Candidates per grounded-check call when none is configured (subq's cap).
+   */
+  protected const GROUNDING_DEFAULT_MAX_QUESTIONS = 16;
+
+  /**
    * Constructs an AimSettings object.
    *
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
@@ -271,6 +276,18 @@ class AimSettings {
   public function getGroundingThreshold(): float {
     $threshold = (float) ($this->configFactory->get('aim.settings')->get('activities.grounding.threshold') ?? 0);
     return $threshold > 0 ? $threshold : self::GROUNDING_DEFAULT_THRESHOLD;
+  }
+
+  /**
+   * Returns how many candidates one grounded-check call may carry.
+   *
+   * @return int
+   *   aim.settings:activities.grounding.max_questions, or the shipped
+   *   default (16, subq's limit) when unset or below 1.
+   */
+  public function getGroundingMaxQuestions(): int {
+    $max = (int) ($this->configFactory->get('aim.settings')->get('activities.grounding.max_questions') ?? 0);
+    return $max > 0 ? $max : self::GROUNDING_DEFAULT_MAX_QUESTIONS;
   }
 
 }

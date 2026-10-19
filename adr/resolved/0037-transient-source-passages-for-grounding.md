@@ -251,3 +251,112 @@ Drupal's own provider (`aim_benchmark/scripts/decision-eval.php`,
   the canary is now "the library's story-time mascot is a fox named
   Fizzwick", no token, and scored 0.84 live (shadow, cutoff 0.7; the old
   canary 0.62). All 13 preflight checks pass.
+
+
+## Addendum (2026-10-18): trust policy per entry path, demote on failure
+
+Status: built 2026-10-19, minus the audit fields (see "Built and changed" at the end). Supersedes the single global
+`default_trusted` for deciding a new fact's starting state; the grounded
+check stays as built.
+
+### Problem
+
+`default_trusted` is one switch for every way a fact can arrive. Set false
+(the shipped default), every chat, MCP and ingest write waits for a
+reviewer, and nobody holds the trust permission, so the queue is never
+worked. Set true (this site), nothing is gated. The grounded check can
+promote or demote, but only where there is source text, and `enforce`
+assumes the untrusted start.
+
+### Decision
+
+1. **Trust policy per entry path.** A new setting, `trust_policy`, maps an
+   entry path to one of three values:
+   - `trusted`: written trusted; the grounded check may demote it.
+   - `untrusted`: written untrusted; the grounded check may promote it
+     (today's `enforce`).
+   - `hold`: written untrusted; never auto-promoted, a person clears it.
+
+   Entry paths are named by the existing `source` field (`chatbot:*`,
+   `tool:*`, ingest form, JSON ingest, recipe), with wildcards and a
+   `default`. A `scope_override` map applies to any path, so policy-bearing
+   scopes (site, role: ADR-0024) can stay untrusted whatever the channel.
+   (Both choices here were changed in the build, below.)
+2. **Resolution order**, most specific first: an explicit `trusted`
+   argument from a caller holding the `trust` permission; `scope_override`;
+   the path rule; `default`. (Changed in the build: path before scope.) This also closes the open `trusted` override
+   bypass on `remember()`: an unprivileged caller's override is ignored.
+3. **Demote on failure.** On a `trusted` path with `grounding_mode:
+   enforce`, a grounding score below the threshold (0.7) sets `trusted`
+   false. A fact with no source text cannot be checked and keeps its
+   starting state.
+4. **Shipped values** keep today's behavior: `default: untrusted` with
+   `grounding_mode: shadow` changes nothing until a site edits the map.
+   This site sets chat, ingest form and recipe to `trusted`, `tool:*` to
+   `untrusted`, `site` and `role` scope to `untrusted`.
+5. **Resolver, not a plugin system yet.** The rules live behind a small
+   `TrustPolicyResolverInterface` with one config-driven implementation.
+   A plugin manager waits for a second implementation, as ADR-0028 did
+   for scope types.
+6. **Chunk grounding questions.** `checkGrounding()` sends candidates in
+   groups of `activities.grounding.max_questions` (default 16, subq's
+   limit; one extra call per group). The cap is the provider's, not
+   aim's: hosted Jev accepts more, so a site raises the setting for its
+   model. Pairs and merges send one question and are unaffected.
+7. **Reviewer list.** One `review` permission (not one per scope; the
+   per-scope `trust` permissions can be split out later) and a view of
+   untrusted facts with the reason, derived rather than stored: no score
+   and untrusted means held by policy; score below threshold means demoted
+   by the check. The untrusted count shows on `aim:status`.
+
+### Not decided here
+
+- `trusted_by` / `trusted_at` base fields ([ADR-0002](../0002-governance-deferred-guardrails-mandatory.md)
+  skipped `trusted_by` on purpose). They answer "who approved this?" for
+  audit and would also feed the reviewer list and ADR-0024 promotion.
+  Deferrable: nothing above needs them, and adding them later is one
+  update hook. Build with this only if the audit claim becomes load-bearing.
+- An end-of-session summary for the chat path (ADR-0029's "shown for
+  confirmation before they count"): needs its own design.
+- Per-assistant overrides: `source` carries the assistant ID, so a rule
+  can already narrow to `chatbot:<assistant>`.
+
+### Consequences
+
+- Operator work drops to reviewing what the system itself doubts; a
+  stalled queue no longer blocks recall on trusted paths.
+- A bad fact on a `trusted` path is live until the check demotes it. Fine
+  for a human-confirmed write; unconfirmed agent writes stay on
+  `untrusted` paths for that reason.
+- Unsourced writes (JSON ingest, MCP without `source_text`) are decided
+  by policy alone; the grounded check cannot help them.
+
+### Built and changed (2026-10-19)
+
+Built: `AimTrustPolicy` (resolver and trust values), chunking, the review
+permission, queue and untrusted-count checks in `aim:status`, update hook
+`aim_update_10013`, kernel tests (`AimGroundingTest`). Two decisions above
+were wrong and changed while building:
+
+- **The channel is named by code, not by `source`.** `source` is a free
+  string any caller sets (the MCP tool takes it as an input), so a policy
+  keyed on it could be claimed by naming it. `remember()` and the batch and
+  extraction methods take a `channel` argument (`AimTrustPolicy::CHANNEL_*`:
+  `chat`, `mcp`, `ingest`, `drush`) that each entry point sets itself.
+- **Channel before scope.** The chat assistant writes only `scope: site`, so
+  a site-scope override ahead of the channel rule would have made a trusted
+  chat channel impossible. Order is now: explicit value, channel rule,
+  scope rule, default. The scope map is a default for scopes, not a floor.
+
+Also: setting names are `trust_policy.default`, `.channels` and `.scopes`
+(an empty default follows `default_trusted`). The shipped config is
+`channels: {chat: hold}`, which is what the old hard-coded `trusted: FALSE`
+in the chat tool did, so nothing changes until a site edits it.
+`trusted: TRUE` from a caller without `administer aim` or the scope's trust
+permission is now ignored (closes the `remember()` bypass); FALSE is always
+honored. The permission is one `review aim facts` (restricted), which also
+passes the trust/untrust bulk actions. The reviewer "view with a reason
+column" is not built: the facts list's Trusted and Grounding filters do the
+job for now, and `aim:status` shows the untrusted count. No audit fields
+(`trusted_by`, `trusted_at`, `trust_basis`): add them before real data
+(ADR-0056).

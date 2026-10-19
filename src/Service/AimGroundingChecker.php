@@ -59,7 +59,8 @@ class AimGroundingChecker {
   /**
    * Asks the decision model whether a passage states each candidate fact.
    *
-   * One call for the whole list: every candidate goes into the state next
+   * One call per group of candidates (activities.grounding.max_questions,
+   * 16 by default): every candidate goes into the state next
    * to the passage with its own question, which measured as fast and as
    * accurate as one call per fact (ADR-0037 addendum). Scores already
    * fetched this request are reused. The passage is never stored; with
@@ -104,42 +105,29 @@ class AimGroundingChecker {
       return $scores;
     }
 
-    try {
-      $response = $this->decisionBackend->run('grounding', new DecisionInput($state, $questions), $model[0], $model[1]);
-      foreach ($asked as $id => [$key, $hash]) {
-        $scores[$key] = $this->groundingCache[$hash] = $response->getNoul($id)->getProbability();
+    // Providers cap the questions in one call (subq: 16), so ask in groups.
+    foreach (array_chunk($asked, $this->settings->getGroundingMaxQuestions(), TRUE) as $group) {
+      $groupState = ['text' => $passage];
+      $groupQuestions = [];
+      foreach (array_keys($group) as $id) {
+        $groupState[$id] = $state[$id];
+        $groupQuestions[$id] = $questions[$id];
       }
-    }
-    catch (\Exception $e) {
-      $this->logger->warning('Grounding check failed to run for @count candidate(s): @message', [
-        '@count' => count($asked),
-        '@message' => $e->getMessage(),
-      ]);
-      return $scores;
+      try {
+        $response = $this->decisionBackend->run('grounding', new DecisionInput($groupState, $groupQuestions), $model[0], $model[1]);
+        foreach ($group as $id => [$key, $hash]) {
+          $scores[$key] = $this->groundingCache[$hash] = $response->getNoul($id)->getProbability();
+        }
+      }
+      catch (\Exception $e) {
+        $this->logger->warning('Grounding check failed to run for @count candidate(s): @message', [
+          '@count' => count($group),
+          '@message' => $e->getMessage(),
+        ]);
+      }
     }
 
     return $scores;
-  }
-
-  /**
-   * Field values a grounding score sets on a new fact.
-   *
-   * @param float|null $score
-   *   The checkGrounding() score, NULL when it could not be had.
-   * @param bool|null $trusted
-   *   The caller's explicit trusted value, which enforce mode never
-   *   overrides.
-   *
-   * @return array
-   *   grounding_score, plus trusted in enforce mode: TRUE at or above the
-   *   threshold, FALSE below it or when the check failed (fail closed).
-   */
-  public function groundingValues(?float $score, ?bool $trusted): array {
-    $values = ['grounding_score' => $score];
-    if ($trusted === NULL && $this->settings->getGroundingMode() === 'enforce') {
-      $values['trusted'] = $score !== NULL && $score >= $this->settings->getGroundingThreshold();
-    }
-    return $values;
   }
 
 }

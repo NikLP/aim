@@ -78,6 +78,8 @@ final class AimStatusChecker {
       'hnsw_tuning' => $this->checkHnswTuning(),
       'recall_cutoff' => $this->checkRecallCutoff(),
       'expiry_sweep' => $this->checkExpirySweep(),
+      'consolidation_queue' => $this->checkConsolidationQueue(),
+      'untrusted_facts' => $this->checkUntrustedFacts(),
       'models' => $this->checkModels(),
       'index_directly' => $this->checkIndexDirectly(),
     ];
@@ -106,6 +108,55 @@ final class AimStatusChecker {
       'detail' => $overdue === 0
         ? 'no live fact is overdue'
         : "$overdue live fact(s) expired over 2 hours ago - run drush aim:expire, and add it to the crontab (or check Drupal cron runs)",
+    ];
+  }
+
+  /**
+   * Checks that the consolidation queue is being drained.
+   *
+   * @return array
+   *   ['label' => string, 'ok' => bool, 'detail' => string].
+   */
+  private function checkConsolidationQueue(): array {
+    $query = $this->database->select('queue', 'q');
+    $query->condition('q.name', 'aim_consolidate');
+    $query->addExpression('COUNT(*)', 'items');
+    $query->addExpression('MIN(q.created)', 'oldest');
+    $result = $query->execute()->fetchAssoc();
+    $items = (int) ($result['items'] ?? 0);
+    $age = $items > 0 ? $this->time->getRequestTime() - (int) $result['oldest'] : 0;
+
+    return [
+      'label' => 'Consolidation queue draining',
+      'ok' => $items === 0 || $age < 7200,
+      'detail' => $items === 0
+        ? 'queue is empty'
+        : ($age < 7200
+          ? "$items item(s) waiting, oldest " . (int) ($age / 60) . ' minute(s) old'
+          : "$items item(s) waiting, the oldest " . (int) ($age / 3600) . ' hour(s) old - add `drush queue:run aim_consolidate` to the crontab (ADR-0003)'),
+    ];
+  }
+
+  /**
+   * Reports how many live facts are untrusted and so held out of recall.
+   *
+   * Informational: always ok. The trust policy and the grounded check decide
+   * how many land here (ADR-0037 addendum 2026-10-18).
+   *
+   * @return array
+   *   ['label' => string, 'ok' => bool, 'detail' => string].
+   */
+  private function checkUntrustedFacts(): array {
+    $storage = $this->entityTypeManager->getStorage('aim_fact');
+    $untrusted = (int) $storage->getQuery()->accessCheck(FALSE)->notExists('retired')->condition('trusted', 0)->count()->execute();
+    $unscored = (int) $storage->getQuery()->accessCheck(FALSE)->notExists('retired')->condition('trusted', 0)->notExists('grounding_score')->count()->execute();
+
+    return [
+      'label' => 'Untrusted facts awaiting review',
+      'ok' => TRUE,
+      'detail' => $untrusted === 0
+        ? 'none'
+        : "$untrusted untrusted ($unscored without a grounding score: held by policy, the rest below the threshold)",
     ];
   }
 

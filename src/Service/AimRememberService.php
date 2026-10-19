@@ -35,6 +35,8 @@ class AimRememberService {
    *   The settings reader.
    * @param \Drupal\aim\Service\AimGroundingChecker $groundingChecker
    *   The grounded check (ADR-0037).
+   * @param \Drupal\aim\Service\AimTrustPolicy $trustPolicy
+   *   The trust policy resolver (ADR-0037 addendum 2026-10-18).
    * @param \Drupal\ai\AiProviderPluginManager $aiProvider
    *   The AI provider plugin manager, for extraction.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
@@ -54,6 +56,7 @@ class AimRememberService {
     protected AimMemoryManager $manager,
     protected AimSettings $settings,
     protected AimGroundingChecker $groundingChecker,
+    protected AimTrustPolicy $trustPolicy,
     #[Autowire(service: 'ai.provider')]
     protected AiProviderPluginManager $aiProvider,
     protected EntityTypeManagerInterface $entityTypeManager,
@@ -65,6 +68,61 @@ class AimRememberService {
     #[Autowire(service: 'plugin.manager.aim_scope_type')]
     protected AimScopeTypePluginManagerInterface $scopeAccessManager,
   ) {}
+
+  /**
+   * Reduces a caller's explicit trusted value to what it may set.
+   *
+   * FALSE is always honored (it only withholds). TRUE needs the admin
+   * permission or the scope's trust permission; from anyone else it is
+   * ignored and the policy decides.
+   *
+   * @param bool|null $trusted
+   *   The caller's explicit value.
+   * @param string $scope
+   *   The fact's scope ID.
+   *
+   * @return bool|null
+   *   The value to honor, or NULL to let the trust policy decide.
+   */
+  protected function honoredTrusted(?bool $trusted, string $scope): ?bool {
+    if ($trusted !== TRUE) {
+      return $trusted;
+    }
+    if ($this->currentUser->hasPermission('administer aim') || $this->currentUser->hasPermission('trust ' . $scope . ' aim facts')) {
+      return TRUE;
+    }
+    $this->logger->warning('Explicit trusted=TRUE ignored for scope @scope (uid @uid): no trust permission.', [
+      '@scope' => $scope,
+      '@uid' => $this->currentUser->id(),
+    ]);
+    return NULL;
+  }
+
+  /**
+   * Field values for a new fact's trusted flag and grounding score.
+   *
+   * @param bool|null $explicit
+   *   The honored explicit trusted value, or NULL.
+   * @param string|null $channel
+   *   The entry channel.
+   * @param string $scope
+   *   The fact's scope ID.
+   * @param bool $checked
+   *   Whether the grounded check ran.
+   * @param float|null $score
+   *   The check's score.
+   *
+   * @return array
+   *   trusted, plus grounding_score when checked. An explicit value wins
+   *   over the policy and the check; the score is still recorded.
+   */
+  protected function trustValues(?bool $explicit, ?string $channel, string $scope, bool $checked, ?float $score): array {
+    $values = $this->trustPolicy->values($this->trustPolicy->resolve($channel, $scope), $checked, $score);
+    if ($explicit !== NULL) {
+      $values['trusted'] = $explicit;
+    }
+    return $values;
+  }
 
   /**
    * Logs a fact's grounding verdict. IDs and the score only, no text.
@@ -108,13 +166,13 @@ class AimRememberService {
    *   When this fact became true in reality, as a Unix timestamp, if known
    *   and different from now. NULL means "same as created".
    * @param bool|null $trusted
-   *   Explicit trusted value for this fact, bypassing
-   *   aim.settings:default_trusted. NULL (the default) leaves the field
-   *   unset so AimFact::getDefaultTrusted() applies the site's configured
-   *   policy - the right fallback for every LLM/human-mixed caller the
-   *   draft-to-trusted gate exists for. Pass TRUE only for curated data
-   *   that was never subject to that gate in the first place, e.g. demo
-   *   seed data.
+   *   Explicit trusted value for this fact, bypassing the trust policy.
+   *   NULL (the default) lets the policy decide (AimTrustPolicy) - the
+   *   right fallback for every LLM/human-mixed caller the draft-to-trusted
+   *   gate exists for. FALSE is always honored. TRUE is honored only for a
+   *   caller holding "administer aim" or the scope's trust permission, and
+   *   is otherwise ignored; use it for curated data that was never subject
+   *   to the gate, e.g. demo seed data.
    * @param string|null $targetType
    *   The referenced entity's type ID, for scope=entity (e.g. node).
    *   Ignored for every other scope.
@@ -129,6 +187,10 @@ class AimRememberService {
    *   When this fact stops being true, as a Unix timestamp (ADR-0057).
    *   retireExpired() retires it once this passes. NULL means no end date.
    *   Must be in the future.
+   * @param string|null $channel
+   *   The entry channel (an AimTrustPolicy::CHANNEL_* constant) the trust
+   *   policy keys on. Named by the calling code, never by $source. NULL
+   *   falls to the scope rule and the default.
    *
    * @return \Drupal\aim\Entity\AimFact
    *   The created fact.
@@ -137,7 +199,7 @@ class AimRememberService {
    *   If scope is invalid, scope=user and subject does not resolve to a real
    *   account, or the text fails a guardrail check.
    */
-  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL, ?int $expires = NULL): AimFact {
+  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL, ?int $expires = NULL, ?string $channel = NULL): AimFact {
     $allowed = $this->manager->allowedScopes();
     if (!in_array($scope, $allowed, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
@@ -192,14 +254,9 @@ class AimRememberService {
       $values['expires'] = $expires;
     }
 
-    if ($trusted !== NULL) {
-      $values['trusted'] = $trusted;
-    }
-
     $grounded = $sourceText !== NULL && $this->settings->getGroundingMode() !== 'off';
-    if ($grounded) {
-      $values += $this->groundingChecker->groundingValues($this->groundingChecker->checkGrounding($sourceText, [$text])[0], $trusted);
-    }
+    $score = $grounded ? $this->groundingChecker->checkGrounding($sourceText, [$text])[0] : NULL;
+    $values += $this->trustValues($this->honoredTrusted($trusted, $scope), $channel, $scope, $grounded, $score);
 
     if ($targetType !== NULL) {
       $values['target_type'] = $targetType;
@@ -292,6 +349,8 @@ class AimRememberService {
    *   The text the candidates were extracted from, for the grounded check
    *   (ADR-0037): one call for every candidate. Never stored. NULL leaves
    *   the facts unchecked.
+   * @param string|null $channel
+   *   The entry channel for the trust policy.
    *
    * @return array
    *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[]), 'skipped'
@@ -302,7 +361,7 @@ class AimRememberService {
    * @throws \InvalidArgumentException
    *   If $subjectUid is given but does not resolve to a real account.
    */
-  public function createFactsFromCandidates(array $facts, string $source, ?string $subjectUid = NULL, ?bool $trusted = NULL, ?string $sourceText = NULL): array {
+  public function createFactsFromCandidates(array $facts, string $source, ?string $subjectUid = NULL, ?bool $trusted = NULL, ?string $sourceText = NULL, ?string $channel = NULL): array {
     $storage = $this->entityTypeManager->getStorage('aim_fact');
     $created = [];
     $skipped = 0;
@@ -344,12 +403,7 @@ class AimRememberService {
         $values['subject'] = $fact['subject'] ?? '';
       }
 
-      if ($trusted !== NULL) {
-        $values['trusted'] = $trusted;
-      }
-      if ($grounded) {
-        $values += $this->groundingChecker->groundingValues($scores[$i] ?? NULL, $trusted);
-      }
+      $values += $this->trustValues($this->honoredTrusted($trusted, $fact['scope']), $channel, $fact['scope'], $grounded, $scores[$i] ?? NULL);
 
       $entity = $storage->create($values);
       try {
@@ -407,6 +461,8 @@ class AimRememberService {
    *   The chat provider, or NULL for the extraction activity's configured one.
    * @param string|null $modelId
    *   The chat model, or NULL for the extraction activity's configured one.
+   * @param string|null $channel
+   *   The entry channel for the trust policy.
    *
    * @return array
    *   The createFactsFromCandidates() result plus 'extracted' (int, how many
@@ -417,7 +473,7 @@ class AimRememberService {
    * @throws \RuntimeException
    *   If no provider/model is given and none is configured.
    */
-  public function ingestText(string $text, string $source, ?string $subjectUid = NULL, ?string $providerId = NULL, ?string $modelId = NULL): array {
+  public function ingestText(string $text, string $source, ?string $subjectUid = NULL, ?string $providerId = NULL, ?string $modelId = NULL, ?string $channel = NULL): array {
     if (empty($providerId) || empty($modelId)) {
       $default = $this->settings->getModelFor('extraction');
       if ($default === NULL) {
@@ -431,7 +487,7 @@ class AimRememberService {
     if (empty($facts)) {
       return ['created' => [], 'skipped' => 0, 'blocked' => 0, 'extracted' => 0];
     }
-    $result = $this->createFactsFromCandidates($facts, $source, $subjectUid ?: NULL, NULL, trim($text));
+    $result = $this->createFactsFromCandidates($facts, $source, $subjectUid ?: NULL, NULL, trim($text), $channel);
     $result['extracted'] = count($facts);
     return $result;
   }
@@ -449,12 +505,14 @@ class AimRememberService {
    *   keys are ignored.
    * @param string|null $defaultSource
    *   The source for entries that name none.
+   * @param string|null $channel
+   *   The entry channel for the trust policy.
    *
    * @return array
    *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[] keyed by
    *   entry index) and 'errors' (string messages keyed by entry index).
    */
-  public function rememberBatch(array $entries, ?string $defaultSource = NULL): array {
+  public function rememberBatch(array $entries, ?string $defaultSource = NULL, ?string $channel = NULL): array {
     $created = [];
     $errors = [];
     foreach ($entries as $i => $entry) {
@@ -479,6 +537,7 @@ class AimRememberService {
           $entry['target_type'] ?? NULL,
           $entry['target_id'] ?? NULL,
           expires: $this->parseExpires($entry),
+          channel: $channel,
         );
       }
       catch (\InvalidArgumentException $e) {

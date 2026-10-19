@@ -65,6 +65,7 @@ class AimFactAccessControlHandler extends EntityAccessControlHandler implements 
       // it, so a per-scope reviewer can flip the trusted flag without
       // gaining update access to the fact's text.
       return AccessResult::allowedIfHasPermission($account, 'trust ' . $entity->bundle() . ' aim facts')
+        ->orIf(AccessResult::allowedIfHasPermission($account, 'review aim facts'))
         ->orIf(AccessResult::allowedIfHasPermission($account, $this->entityType->getAdminPermission()));
     }
     return parent::checkAccess($entity, $operation, $account);

@@ -34,6 +34,13 @@ services:
   Drupal\aim\Service\AimGroundingChecker:
     alias: aim.grounding_checker
 
+  aim.trust_policy:
+    class: Drupal\aim\Service\AimTrustPolicy
+    autowire: true
+
+  Drupal\aim\Service\AimTrustPolicy:
+    alias: aim.trust_policy
+
   aim.memory_manager:
     class: Drupal\aim\Service\AimMemoryManager
     autowire: true

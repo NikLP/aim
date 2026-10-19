@@ -67,9 +67,11 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
    retrieval. ([ADR-0001](adr/resolved/0001-storage-and-scope-model.md))
 3. **Governance** - permissions/roles + a draft-to-trusted gate, built as
    the `trusted` flag rather than Content Moderation; `recall()` skips
-   untrusted facts. New facts start untrusted (`default_trusted: false`)
-   unless a site opts in or the grounded check, in enforce mode, trusts
-   them. ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
+   untrusted facts. A new fact's starting trust comes from
+   `aim.settings:trust_policy` (per entry channel, then per scope, then
+   `default_trusted`); the grounded check, in enforce mode, demotes or
+   promotes it per the policy, and `hold` is never promoted. The chat
+   channel ships as `hold`. ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
    addendum)
 4. **Processing** - Queue API + a dedicated crontab entry, never
    `hook_cron`. ([ADR-0003](adr/resolved/0003-async-processing-dedicated-crontab.md))
@@ -178,8 +180,8 @@ duplicated here.
   strongly a decision model found the fact stated in the text it was
   written from, checked at write time; the text is not kept in the fact -
   [ADR-0037](adr/resolved/0037-transient-source-passages-for-grounding.md); see
-  [DEVELOPING.md](DEVELOPING.md)'s "Grounded check"), `trusted` (boolean, the draft-to-trusted gate - defaults
-  to `aim.settings:default_trusted`, `recall()` excludes untrusted facts
+  [DEVELOPING.md](DEVELOPING.md)'s "Grounded check"), `trusted` (boolean, the draft-to-trusted gate - starts per
+  `aim.settings:trust_policy` (the add form: `default_trusted`), `recall()` excludes untrusted facts
   unless asked otherwise, see
   [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
   addendum).
@@ -239,6 +241,8 @@ duplicated here.
 ## Permissions
 
 `administer aim` (flat admin bypass, `restrict access: true`);
+`review aim facts` (`restrict access`; trust/untrust bulk actions in every
+scope, no text edits - the one reviewer permission, ADR-0037's addendum);
 `ingest aim facts` (the Content > AIM > Ingest form at
 `/admin/content/aim-facts/ingest`, `restrict access: true`; implies write
 access to every scope, no per-scope check, see

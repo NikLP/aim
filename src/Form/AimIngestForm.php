@@ -11,6 +11,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRememberService;
+use Drupal\aim\Service\AimTrustPolicy;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 /**
@@ -191,7 +192,7 @@ final class AimIngestForm extends FormBase {
     $result = ['created' => [], 'errors' => [], 'skipped' => 0, 'blocked' => 0, 'mode' => $mode];
     try {
       if ($mode === 'extract') {
-        $r = $this->rememberService->ingestText($text, $source, trim((string) $form_state->getValue('subject_uid')) ?: NULL);
+        $r = $this->rememberService->ingestText($text, $source, trim((string) $form_state->getValue('subject_uid')) ?: NULL, NULL, NULL, AimTrustPolicy::CHANNEL_INGEST);
         $result = $r + $result;
         if ($r['extracted'] === 0) {
           $this->messenger()->addWarning($this->t('The model returned no facts worth remembering.'));
@@ -218,7 +219,7 @@ final class AimIngestForm extends FormBase {
             }
           }
         }
-        $r = $this->rememberService->rememberBatch($entries, $source);
+        $r = $this->rememberService->rememberBatch($entries, $source, AimTrustPolicy::CHANNEL_INGEST);
         $result['created'] = $r['created'];
         $result['errors'] = $r['errors'];
         $result['total'] = count($entries);

@@ -7,6 +7,7 @@ namespace Drupal\Tests\aim\Kernel;
 use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
 use PHPUnit\Framework\Attributes\Group;
@@ -18,6 +19,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('aim')]
 #[RunTestsInSeparateProcesses]
 class AimGroundingTest extends KernelTestBase {
+
+  use UserCreationTrait;
 
   /**
    * {@inheritdoc}
@@ -107,10 +110,17 @@ class AimGroundingTest extends KernelTestBase {
     $this->backend()->scores['At the line.'] = 0.7;
     $this->assertTrue((bool) $this->remember('At the line.', self::PASSAGE)->get('trusted')->value);
 
-    // An explicit trusted value from the caller wins.
+    // An explicit trusted=TRUE from a caller without the trust permission is
+    // ignored: the policy and the check decide.
     $memory = $this->container->get('aim.remember');
-    $kept = $memory->remember('Overridden.', 'site', NULL, 'test', trusted: TRUE, sourceText: self::PASSAGE);
+    $ignored = $memory->remember('Overridden.', 'site', NULL, 'test', trusted: TRUE, sourceText: self::BAD);
+    $this->assertFalse((bool) $ignored->get('trusted')->value);
+
+    // With the admin permission it wins.
+    $this->setUpCurrentUser([], ['administer aim']);
+    $kept = $memory->remember('Overridden again.', 'site', NULL, 'test', trusted: TRUE, sourceText: self::BAD);
     $this->assertTrue((bool) $kept->get('trusted')->value);
+    $this->assertEqualsWithDelta(0.5, (float) $kept->get('grounding_score')->value, 0.001);
 
     // No source text: unchecked, the site default applies.
     $unchecked = $this->remember('No source.', NULL);
@@ -154,6 +164,59 @@ class AimGroundingTest extends KernelTestBase {
     // cache, no second call.
     $this->remember(self::GOOD, self::PASSAGE);
     $this->assertSame(1, $this->backend()->calls);
+  }
+
+  /**
+   * A channel's policy sets the start of a fact's trust.
+   *
+   * Hold is never promoted, trusted is demoted.
+   */
+  public function testChannelPolicy(): void {
+    $this->setMode('enforce');
+    $this->config('aim.settings')
+      ->set('default_trusted', FALSE)
+      ->set('trust_policy', ['default' => '', 'channels' => ['chat' => 'hold', 'ingest' => 'trusted'], 'scopes' => []])
+      ->save();
+    $memory = $this->container->get('aim.remember');
+
+    // Hold: a well-grounded fact stays untrusted.
+    $held = $memory->remember(self::GOOD, 'site', NULL, 'test', sourceText: self::PASSAGE, channel: 'chat');
+    $this->assertFalse((bool) $held->get('trusted')->value);
+
+    // Trusted: demoted below the threshold, kept above it.
+    $demoted = $memory->remember(self::BAD, 'site', NULL, 'test', sourceText: self::PASSAGE, channel: 'ingest');
+    $this->assertFalse((bool) $demoted->get('trusted')->value);
+    $kept = $memory->remember(self::GOOD, 'site', NULL, 'test', sourceText: self::PASSAGE, channel: 'ingest');
+    $this->assertTrue((bool) $kept->get('trusted')->value);
+
+    // Trusted with no source text cannot be checked and stays trusted.
+    $unchecked = $memory->remember('No source.', 'site', NULL, 'test', channel: 'ingest');
+    $this->assertTrue((bool) $unchecked->get('trusted')->value);
+
+    // No channel rule: the scope rule, then the default.
+    $this->config('aim.settings')->set('trust_policy.scopes', ['site' => 'trusted'])->save();
+    $this->assertTrue((bool) $memory->remember('Scope rule.', 'site', NULL, 'test', channel: 'mcp')->get('trusted')->value);
+    $this->config('aim.settings')->set('trust_policy.scopes', [])->save();
+    $this->assertFalse((bool) $memory->remember('Default.', 'site', NULL, 'test', channel: 'mcp')->get('trusted')->value);
+  }
+
+  /**
+   * Candidates go to the model in groups of max_questions.
+   */
+  public function testChunking(): void {
+    $this->setMode('enforce');
+    $this->config('aim.settings')->set('activities.grounding.max_questions', 2)->save();
+    $facts = [];
+    foreach (['One.', 'Two.', 'Three.', 'Four.', 'Five.'] as $text) {
+      $this->backend()->scores[$text] = 0.9;
+      $facts[] = ['scope' => 'site', 'subject' => '', 'text' => $text];
+    }
+    $result = $this->container->get('aim.remember')->createFactsFromCandidates($facts, 'test', NULL, NULL, self::PASSAGE);
+    $this->assertSame(3, $this->backend()->calls);
+    $this->assertCount(5, $result['created']);
+    foreach ($result['created'] as $fact) {
+      $this->assertEqualsWithDelta(0.9, (float) $fact->get('grounding_score')->value, 0.001);
+    }
   }
 
   /**

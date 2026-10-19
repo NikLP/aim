@@ -13,6 +13,7 @@ use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Service\AimGroundingChecker;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRememberService;
+use Drupal\aim\Service\AimTrustPolicy;
 use Drupal\tool\Attribute\Tool;
 use Drupal\tool\ExecutableResult;
 use Drupal\tool\Tool\ToolBase;
@@ -428,6 +429,7 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
         $scopeFields['target_id'] ?? NULL,
         $sourceText,
         $this->rememberService->parseExpires($fields),
+        AimTrustPolicy::CHANNEL_MCP,
       );
     }
     catch (\InvalidArgumentException $e) {

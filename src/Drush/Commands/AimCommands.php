@@ -11,6 +11,7 @@ use Drupal\aim\Service\AimConsolidationService;
 use Drupal\aim\Service\AimRecallService;
 use Drupal\aim\Service\AimRememberService;
 use Drupal\aim\Service\AimSettings;
+use Drupal\aim\Service\AimTrustPolicy;
 use Drush\Attributes as CLI;
 use Drush\Commands\AutowireTrait;
 use Drush\Commands\DrushCommands;
@@ -99,7 +100,7 @@ final class AimCommands extends DrushCommands {
 
     $source = $options['source'] ?? ('extract:' . basename($file));
     try {
-      $result = $this->rememberService->ingestText($text, $source, $options['subject-uid'] ?: NULL, $provider_id, $model_id);
+      $result = $this->rememberService->ingestText($text, $source, $options['subject-uid'] ?: NULL, $provider_id, $model_id, AimTrustPolicy::CHANNEL_DRUSH);
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {
       $this->io()->error($e->getMessage());
@@ -207,7 +208,7 @@ final class AimCommands extends DrushCommands {
 
     try {
       [$category, $asserted] = $this->rememberService->parseFactFields($options);
-      $fact = $this->rememberService->remember($text, $options['scope'], $options['subject'], $options['source'], $category, $asserted, NULL, $options['target-type'], $options['target-id'], expires: $this->rememberService->parseExpires($options));
+      $fact = $this->rememberService->remember($text, $options['scope'], $options['subject'], $options['source'], $category, $asserted, NULL, $options['target-type'], $options['target-id'], expires: $this->rememberService->parseExpires($options), channel: AimTrustPolicy::CHANNEL_DRUSH);
     }
     catch (\InvalidArgumentException $e) {
       $this->io()->error($e->getMessage());
@@ -246,7 +247,7 @@ final class AimCommands extends DrushCommands {
       return;
     }
 
-    $result = $this->rememberService->rememberBatch($entries);
+    $result = $this->rememberService->rememberBatch($entries, NULL, AimTrustPolicy::CHANNEL_DRUSH);
     foreach ($result['errors'] as $i => $message) {
       $this->io()->warning("Entry $i: $message" . (str_starts_with($message, 'missing') ? ', skipped.' : ''));
     }

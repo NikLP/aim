@@ -393,8 +393,29 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       harder UPDATE/NOOP pairs.
 - [x] Grounded check BUILT 2026-10-11 as a write-time check, nothing
       stored (ADR-0037 "Built"); shadow mode on this site.
+- [ ] Trust policy follow-ups (ADR-0037 addendum 2026-10-19): a settings
+      form for `trust_policy` (config only today); a reason column on the
+      facts list (no score = held by policy, low score = demoted); an
+      end-of-session summary for the chat path (ADR-0029); decide the
+      shipped channel rules for real data; the `tool:`/`mcp` channel on
+      this site still follows `default_trusted: true`.
+- [ ] `review own aim facts` permission (raised 2026-10-19): a user trusts or
+      untrusts facts they wrote (`uid` matches), alongside `review aim facts`
+      (everyone's). An owner check in the `trust` operation of
+      `AimFactAccessControlHandler`. Build with the trust policy settings form.
+- [ ] Trust policy as a module (raised 2026-10-19, not yet): extract
+      `TrustPolicyResolverInterface` from `AimTrustPolicy`, then an optional
+      `aim_trust` submodule (ADR-0026 pattern) when a second rule set or the
+      audit-field bundle (`trusted_by`, `trust_basis`, reviewer view, settings
+      UI) shows up. The resolver becomes a plugin type at that point.
+- [ ] Consolidation queue has no scheduler of its own (found 2026-10-19):
+      the worker has no `cron` key (ADR-0003), so Drupal's automated cron
+      skips it, and no crontab/DDEV/systemd entry was found, yet 28 queued
+      items drained between two checks (cause unknown). Add the
+      `queue:run aim_consolidate` line or decide on a cron key; `aim:status`
+      ("Consolidation queue draining") now flags a stall.
 - [ ] Grounded check follow-ups: (1) review shadow scores on real use,
-      then decide enforce and `default_trusted: false`; (2) the strict
+      then set `grounding_mode: enforce` (the policy decides what it moves); (2) the strict
       question marks faithful clean-ups down (preflight canary 0.52-0.62):
       narrower wordings tested 2026-10-11 and not adopted (ADR-0037
       addendum; eight new eval items, reviewed). Fixed at the
@@ -451,13 +472,9 @@ finder, tool, search). What remains is aim's side. Order is a suggestion.
       the existing sets pairs 24/24, merges AUC 1.00, grounding AUC 0.99-1.00
       (`narrow_ok`, 1 false trust, 1 false hold at 0.7), about 0.25-0.4 s per
       call, 469 input tokens per call on average (`ai_log`). Open:
-      - **16-question cap.** subq rejects over 16 `questions` with a 422.
-        `checkGrounding()` sends one per candidate with no chunking, so an
-        extraction or ingest of 17+ facts fails: shadow mode logs a warning
-        and leaves `grounding_score` empty; enforce mode fails closed and
-        leaves all of them untrusted. Chunk candidates in groups of 16 inside
-        `checkGrounding()` (one extra call per 16). Pairs and merges send one
-        question and are unaffected. `decision-eval.php` already chunks.
+      - [x] **16-question cap.** BUILT 2026-10-19: `checkGrounding()` sends
+        groups of `activities.grounding.max_questions` (default 16). Raise it
+        for a model that takes more (hosted Jev's limit is unchecked).
       - **`/models` shape.** subq returns OpenAI-style `{data:[{id}]}`, not
         `{models:[{name}]}`; the provider's key check failed until
         `TypeSafeAiClient::listModels()` was patched locally (handoff to
@@ -725,7 +742,10 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       one importer feeding the existing ingest path (see "Ingestion"),
       to learn whether extraction copes with structured exhaust. Imports
       make the redaction item above urgent.
-- [ ] **Human curation of the trust gate.** None yet: nobody holds
+- [ ] **Human curation of the trust gate.** Policy, `review aim facts` and
+      the `aim:status` count BUILT 2026-10-19 (ADR-0037 addendum); still no
+      one holds the permission and no reason column on the facts list. None
+      yet: nobody holds
       `trust {scope} aim facts` and the grounded check is in shadow mode
       (see "Loop back to the trust permission" under Governance). Decide
       the reviewer workflow before claiming draft-to-trusted is a feature.
@@ -753,17 +773,20 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       `default_trusted` half is BUILT 2026-09-28 (see "PoC deviations"
       below); per-scope `trust {scope} aim facts` permission BUILT
       2026-09-30 (custom `trust` access operation, used by the Trust/
-      Untrust bulk actions). Still open: the `trusted` override on
-      `remember()` bypasses it - decide whether callers passing
-      `trusted: TRUE` should need the permission.
-- [ ] **Loop back to the trust permission (raised 2026-10-09).** Nobody
+      Untrust bulk actions). The `trusted: TRUE` override on `remember()`
+      now needs `administer aim` or the scope's trust permission (BUILT
+      2026-10-19).
+- [x] Decided 2026-10-18/19: one `review aim facts` permission (built), the
+      per-scope `trust` ones stay for now. Original note: **Loop back to the trust permission (raised 2026-10-09).** Nobody
       holds `trust {scope} aim facts` and the ADR-0037 grounded check (Jev,
       not built yet) is to set `trusted` automatically, so it guards a workflow that is not
       running. Decide whether it is for a human clearing what the verifier
       rejects (then likely one `review` permission, not one per scope) or
       goes, with the trust actions falling back to `administer aim`.
       Left as is for now.
-- [ ] **Record who trusted a fact (raised 2026-10-11).** Add `trusted_by`
+- [ ] **Record who trusted a fact (raised 2026-10-11; deferred 2026-10-19 to
+      before real data, with ADR-0056; add a `trust_basis` field too:
+      reviewer, policy, grounded or override).** Add `trusted_by`
       (user reference) and `trusted_at` (timestamp) base fields, set by the
       Trust/Untrust actions, the edit form and the grounded check (its
       service account). `uid` cannot stand in: it is the author, often a

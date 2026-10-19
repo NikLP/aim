@@ -63,9 +63,9 @@ facts however far, which is what calibrating the cutoff needs);
 the MCP tool do by default with `aim.settings:recall_max_distance`.
 
 Untrusted facts (ADR-0002's addendum) are excluded unless
-`--include-untrusted` is given - the interim way to review what
-`aim.settings:default_trusted` is holding back, until a dedicated review
-queue exists.
+`--include-untrusted` is given - the way to review what the trust policy
+is holding back (also the facts list's Trusted filter; `aim:status` shows the
+count). Reviewers hold `review aim facts`.
 
 Both commands live on `AimCommands`, backed by `AimMemoryManager` (also
 used by `aim_tool` and the chatbot).
@@ -437,7 +437,9 @@ count), orphan vector rows, the `mariadb` VDB provider plugin still
 resolving to `AimMariaDBProvider`, the collection table's build-time HNSW
 `M` and the server's `mhnsw_ef_search`, and `aim.settings:recall_max_distance`
 actually being set rather than silently using the in-code fallback, no
-fact overdue for the expiry sweep, and every configured model still existing
+fact overdue for the expiry sweep, the `aim_consolidate` queue being drained
+(oldest item under two hours; otherwise the crontab line is missing), an
+informational count of untrusted facts, and every configured model still existing
 with its provider (the AI module's chat, decision and embeddings defaults,
 plus any activity that names its own: a retired model is otherwise found by
 a failed call), and `index_directly` not being on with a hosted embeddings
@@ -470,11 +472,10 @@ Central service backing every write/read path. Key public methods:
 
 - `remember(string $text, ?string $scope, ?string $subject, ?string
   $source, ...): AimFact` - validated direct write. The
-  created fact's `trusted` field is not set here - it takes
-  `aim.settings:default_trusted` via `AimFact::getDefaultTrusted()`, a
-  base field default value callback, so every creation path (this,
-  `createFactsFromCandidates()`, the entity add form) gets the same
-  policy uniformly.
+  created fact's `trusted` comes from the trust policy
+  (`AimTrustPolicy`, see "Grounded check") via the `channel` argument; the
+  entity add form still takes `default_trusted` through
+  `AimFact::getDefaultTrusted()`.
 - `recall(string $text, ?string $scope, ..., bool $includeUntrusted =
   FALSE): array` - semantic query, restricted to trusted facts unless
   `$includeUntrusted` is TRUE (ADR-0002's addendum).
@@ -579,17 +580,30 @@ to the model and never stored.
   message plus the assistant turn before it, which needs the assistant's
   session history on). JSON and one-fact-per-line ingest have no source
   text and stay unchecked (`grounding_score` empty).
-- **One call per write, not per fact.** `checkGrounding()` puts every
-  candidate in one Decision call (`candidate_1` ... in the state, one
+- **One call per write, not per fact.** `checkGrounding()` puts the
+  candidates in one Decision call (per group, below) (`candidate_1` ... in the state, one
   strict Noul question each, `GROUNDING_QUESTION`). Extraction and an MCP
   batch check all their facts at once; each `remember()` then finds its
   score in the request cache. About 0.35 s on hosted Jev.
+- **Chunking.** More candidates than
+  `activities.grounding.max_questions` (default 16, subq's cap; raise it
+  for a model that takes more) go in groups, one call each; a failed group
+  leaves only its own scores empty.
+- **Trust policy** (`aim.settings:trust_policy`, `AimTrustPolicy`): each
+  write names its entry channel in code (`chat`, `mcp`, `ingest`, `drush`;
+  never the caller's `source`). Rule order: an explicit `trusted` (FALSE
+  always; TRUE only with `administer aim` or the scope's trust
+  permission), the channel's rule, the scope's rule, `default` (empty
+  follows `default_trusted`). Values: `trusted` (starts trusted, enforce
+  demotes below the threshold), `untrusted` (starts untrusted, enforce
+  promotes at or above it), `hold` (untrusted, never promoted). Shipped:
+  `channels: {chat: hold}`. A fact with no source text keeps its starting
+  state. No UI yet: edit via `drush config:set` or config import.
 - **Modes** (`aim.settings:grounding_mode`, AIM settings > Models >
   Grounded check): `off`; `shadow` records the score and leaves `trusted`
-  alone; `enforce` also sets `trusted` (at or above
+  alone; `enforce` also moves `trusted` per the policy above (threshold
   `activities.grounding.threshold`, default 0.7), untrusted when the check
-  fails or has no model (fail closed). An explicit `trusted` from the
-  caller always wins. Decision backend only (`activities.grounding`).
+  fails or has no model (fail closed). A permitted explicit `trusted` wins. Decision backend only (`activities.grounding`).
 - **Checking reliability:** the Grounding column (sortable) and the
   "Grounding score below" filter on the facts list; an audit line per
   verdict (fact ID, score, cutoff, mode, no text); call time, tokens and the

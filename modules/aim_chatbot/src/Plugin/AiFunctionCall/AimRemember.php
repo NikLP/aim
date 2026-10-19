@@ -14,6 +14,7 @@ use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRememberService;
+use Drupal\aim\Service\AimTrustPolicy;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -113,11 +114,12 @@ final class AimRemember extends FunctionCallBase implements ExecutableFunctionCa
     }
 
     try {
-      // A visitor's say-so is not approved site knowledge: the fact waits
-      // untrusted for a reviewer, whatever the site's default or the
-      // grounded check says, so one chat cannot change what others are told.
-      $fact = $this->rememberService->remember($text, self::FACT_SCOPE, NULL, 'chatbot:aim_chatbot', trusted: FALSE, sourceText: $this->sourceText, expires: $this->rememberService->parseExpires(['expires' => $this->getContextValue('expires')]));
-      $this->setOutput('Saved fact ' . $fact->id() . ' (waiting for staff review; it is not shared with other visitors until approved): ' . $text);
+      // Whether a visitor's say-so is approved site knowledge is the trust
+      // policy's call for the chat channel (shipped: hold, so the fact waits
+      // untrusted for a reviewer and one chat cannot change what others are
+      // told).
+      $fact = $this->rememberService->remember($text, self::FACT_SCOPE, NULL, 'chatbot:aim_chatbot', sourceText: $this->sourceText, expires: $this->rememberService->parseExpires(['expires' => $this->getContextValue('expires')]), channel: AimTrustPolicy::CHANNEL_CHAT);
+      $this->setOutput('Saved fact ' . $fact->id() . ($fact->get('trusted')->value ? ' (shared with other visitors)' : ' (waiting for staff review; it is not shared with other visitors until approved)') . ': ' . $text);
     }
     catch (\InvalidArgumentException $e) {
       $this->setOutput('Could not save fact: ' . $e->getMessage());
