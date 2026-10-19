@@ -14,15 +14,14 @@ persona says "recall first", chat writes untrusted and permission-checked,
 turns about 4.7 s with 2 hosted calls (details in the Literals entry below
 and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
 
-- [ ] **Shared ai_logging settings (decided in principle, not built).** The
-      `ai_logging` settings are site-wide. The update hooks that wrote them
-      were removed (2026-10), so a fresh install records nothing; tag list is
-      `ActivityBackendInterface::LOGGED_TAGS`. Plan: an opt-in setting that
-      only appends aim's tags and never lower or overwrite
-      retention; an explicit opt-in aim setting for recording model-call
-      text; `aim:status` shows the shared settings and flags an uncaptured
-      aim tag; document that retention has no per-tag control (upstream
-      candidate, ADR-0060). New installs: opt-in. This site keeps it on.
+- [ ] **Shared ai_logging settings (decided, deferred 2026-10-19).** The
+      settings are site-wide and aim no longer writes them (tag list:
+      `ActivityBackendInterface::LOGGED_TAGS`; see DEVELOPING.md "Model-call
+      logging"). When a second site needs it: an opt-in aim setting that only
+      appends or removes aim's tags and never touches retention; `aim:status`
+      flags an uncaptured tag, disabled logging or stealth mode and warns
+      under 90 days; the settings form says the settings are shared;
+      per-tag retention goes upstream (ADR-0060). New installs: opt-in.
 - [ ] **Short category queries ("any upcoming events?") return only the book
       sale.** The Code Club and Baby Rhyme Time facts sit just past the
       0.52 cutoff for that word. Fix in the system, never by rewording
@@ -66,95 +65,44 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       only), so "where do I log in" correctly finds nothing; the assistant
       does not yet say "you are already signed in".
 
-## Literals (raised 2026-10-08, from the literals session; design in [ADR-0052](../literals/adr/0052-what-literals-is-for.md) addendum, module notes in [literals/CLAUDE.md](../literals/CLAUDE.md))
+## Literals (design in [ADR-0052](../literals/adr/0052-what-literals-is-for.md) and [ADR-0040](../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md), module notes in [literals/CLAUDE.md](../literals/CLAUDE.md))
 
-The literals side is built (store, resolvers, tokens including `:link`,
-finder, tool, search). What remains is aim's side. Order is a suggestion.
+The literals side and aim's token replacement, `aim_literal` tool and
+finder-first gate are built. What remains is aim's side.
 
-- [ ] **Reassess showing the literal key (2026-10-16).** The key (machine
-      name) is hidden on the literal edit form (shown on add only, core's
-      machine_name element) because the form has little room, so on an
-      existing literal it is visible only in the URL. Decide whether a
-      collection list column, or the `[literal:key]` token read-only in the
-      sidebar, is worth the space.
-
-- [ ] **Convert-a-fact retires the fact.** Promoting an extracted one-shot
-      fact to a literal supersedes it via `superseded_by`; the literal's
-      gist is then the only description. Short form, never one click: a
-      model splits the fact into gist and value, a human picks the type,
-      the literal carries a `source_fact` back-reference. Unblocked: the
-      `retired`/`expires` split was built 2026-10-09 (`aim_update_10009`).
-- [ ] **Answer modes (decided 2026-10-10: a skill, wired up later, not a
-      module setting).** Mode 1, literal only: fixed reply, no
-      large model, the value never reaches a model. Mode 2, literal plus
-      smoothing: the large model writes the reply around the resolved
-      value; default to public (anonymous) values only. Escalation: a
-      "think harder" control on a mode 1 answer re-runs the question
-      through mode 2 or full recall. The public-values-only rule is a trade-off to
-      keep and revisit, not a settled principle.
-- [ ] **Optional pre-gate (setup-dependent, later).** Only matters in a
-      setup where the finder runs on every question; the assistant's
-      tool-call design (2026-10-09) does not. A tiny "is this a lookup?" question with no menu
-      in its prompt, ahead of the finder, so non-lookup traffic does not pay
-      for a menu-sized prompt (about 4,000 tokens at 200 literals). Its
-      failures are safe. Keep only if measured to pay (share of traffic
-      removed against its own latency). The finder itself is already the
-      gate for whether a literal fits.
-- [ ] **Tool routing: the assistant stops after one tool (found 2026-10-15).**
-      With recall at 0.52, repeats of the same question: "I forgot my
-      password" found the reset link 1 in 5 times (the other 4 it called only
-      `aim_recall`), "what is the wifi password" 0 in 5 (it called only
-      `aim_literal`, "none", and stopped; the answer is a fact, not a
-      literal). The persona says not to retry the lookup tool, so a "none"
-      ends the turn without checking memory. Options: a persona line telling
-      it to check memory once when the lookup finds nothing (cheap, measure
-      with a repeat run); or the finder-first gate below, which makes the
-      routing code rather than the model's choice. Repeat harness: ask each
-      question 5 times and count.
-- [ ] **Finder-first gate: open points.** Built (`AimGateProcessor`, live on
-      this site's chat block; design in `modules/aim_chatbot/CLAUDE.md`). Left:
-      whether gate replies go into the stored history; a Jev-written sentence
-      around the value instead of the bare template; local Jev latency
-      unmeasured; a gate-hit line in the review queue; the accept/pass widget
-      (parked, above).
-- [ ] **Gist overlap check.** "where do I log in" and "what I've borrowed"
-      fell through or went wrong-confident because the `login`, `password_reset`
-      and `my_account` gists overlap (blind set, 2026-10-12: 16 of 22 hits, 2
-      wrong-confident). Do NOT reword the gists to pass the set (feedback
-      rule). Build a general check (warn when two gists share a phrase),
-      designed without looking at those failures and measured on a fresh set;
-      re-check `chooser_context` and the thresholds. The set is
-      Claude-drafted, so not fully independent. Also still to do from the
-      gate eval: the finder genuinely local, for latency.
-- [ ] **Copy controls** ("copy value", "copy link") on chat answers, shown by
-      role or permission: front-end work; the chat items already carry value,
-      label and kind. Waits: cosmetic.
-- [ ] **Revisit example phrasings per literal (raised 2026-10-10).** ADR-0040
-      "Deferred and pinned" has the history and the `ALSO` convention.
-      Intent-matching systems (Dialogflow, Rasa, Azure custom question
-      answering) all treat several example phrasings per answer as the main
-      lever, which our "wider alias list pulled near-topic questions in"
-      trial contradicts on one in-sample run. Re-test after the blind set
-      above, against the in-gist `ALSO` convention.
-- [ ] **Chooser confidence on the `Find:` watchdog line** (raised 2026-10-18,
-      not built; unrelated to the ambiguity fix). Today the line reads
-      `Find: match via chooser (-), literals [pl_loan_period], pool 98` and
-      says nothing of how sure the model was. Proposal: add the top pick, the
-      runner-up and none, e.g. `top pl_loan_period 0.92, next pl_loan_limit
-      0.04, none 0.007`, plus the model id. Makes a borderline match (0.65 vs
-      0.21) visible and tells a real `chose_none` from a near miss when
-      `ai_logging` is off or in stealth mode. Values-free, behind the same
-      debug/stealth switch as the other audit logging. The probabilities are
-      already in the Decision output (`getChoice('choice')->getProbabilities()`),
-      so no extra call. Worth most once real traffic exists; also the
-      natural feed for the threshold-tuning skill (`literals_finder/eval/TUNING.md`).
-      Note `literals_choose` is not in `ai_logging`'s `prompt_logging_tags`, so
-      chooser calls are not in `ai_log` at all today.
-- Parked, with reasons in ADR-0040 "Deferred and pinned": staged choice,
-  groups, keyword fallback, per-medium context registry, local-model
-  re-measure, `search_api`, tokens in body copy. The `literals_chat` module
-  is likely to be scrapped; aim's own chat is a demo that survives for now
-  as a non-console way in.
+- [ ] **Unbuilt design from ADR-0052 ("How aim uses literals").**
+      Convert-a-fact (retires the fact, never one click); the two answer
+      modes and "think harder" escalation (a skill, wired up later); the
+      finder as a live recall source; copy controls (front-end only). Pull
+      one out when a site needs it. Optional pre-gate ("is this a lookup?"
+      ahead of the finder) only if measured to pay.
+- [ ] **Example phrasings per literal** (ADR-0040 "Deferred and pinned"):
+      re-test against the in-gist `ALSO` convention after the gist overlap
+      check below.
+- [ ] **Gist overlap check.** The `login`, `password_reset` and `my_account`
+      gists overlap ("where do I log in", "what I've borrowed"; blind set
+      2026-10-12: 16 of 22 hits, 2 wrong-confident). Do NOT reword gists to
+      pass the set (feedback rule). Build a general check (warn when two
+      gists share a phrase), designed without looking at those failures and
+      measured on a fresh set; re-check `chooser_context` and thresholds.
+      The set is Claude-drafted, so not fully independent. Also: the finder
+      genuinely local, for latency.
+- [ ] **Finder-first gate: open points.** Whether gate replies go into the
+      stored history; a Jev-written sentence around the value instead of the
+      bare template; local Jev latency unmeasured; a gate-hit line in the
+      review queue (design in `modules/aim_chatbot/CLAUDE.md`).
+- [ ] **Chooser confidence on the `Find:` watchdog line** (not built).
+      Add top pick, runner-up and none probabilities plus the model id
+      (`top pl_loan_period 0.92, next pl_loan_limit 0.04, none 0.007`),
+      values-free, behind the debug/stealth switch. The probabilities are
+      already in the Decision output. Also add `literals_choose` to
+      `ai_logging`'s tag list: chooser calls are not in `ai_log` today.
+- [ ] **Reassess showing the literal key (2026-10-16).** Hidden on the edit
+      form (shown on add only); decide whether a collection list column or
+      the `[literal:key]` token read-only in the sidebar is worth the space.
+- Parked in ADR-0040 "Deferred and pinned": staged choice, groups, keyword
+  fallback, per-medium context registry, local-model re-measure,
+  `search_api`. The `literals_chat` module is likely to be scrapped.
 
 ## Plugin, skills and the verbal webform demo (raised 2026-10-09, important)
 
