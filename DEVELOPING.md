@@ -1129,6 +1129,11 @@ ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>  # de
   (its pre-flight and reset steps are in the recipe README) is reset with it. The first archetype
   starter kit ([ADR-0014](adr/resolved/0014-usecase-archetype-starter-kits.md)).
   Details and caveats in its [README](recipes/aim_demo_library/README.md).
+- **Scripted tests carry chat history.** The demo assistant uses
+  `allow_history: private_tempstore_pool`, so running it twice in one PHP
+  process (one `drush php:eval`, say) carries the first question's history
+  into the second. Browser sessions are unaffected; use one process per
+  question. Reported 2026-10-19 on a test site, not verified here.
 - **Facts as recipe content skip `remember()`.** Core's importer saves
   entities directly, but calls `validate()` first, so the Guardrails
   constraint on `text` still runs (a violation aborts the apply). With
