@@ -42,9 +42,9 @@ use of the tool at all, not which scopes it can write.
   an aim site uses; `literals_tool`'s `literals:lookup` wraps the same
   service for sites without aim. Only the attribute (ID, descriptions) and
   the permission live here.
-- `config/optional/mcp_server_tool_bridge.mcp_tool_config.*.yml` - MCP
-  exposure config, installs automatically once `mcp_server_tool_bridge`
-  is enabled.
+- MCP exposure (`mcp_server_tool_bridge.mcp_tool_config.*.yml`) ships in
+  `aim_tool_oauth/config/install`, not here: `aim_tool` alone is Tool API
+  only, with no MCP packages needed.
 
 `AimRecall` drops matches past `aim.settings:recall_max_distance` by
 default (an off-topic query returns "No relevant facts found." instead of

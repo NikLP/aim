@@ -12,6 +12,15 @@ appended to `mcp_server.handle`'s `_auth`, not swapped in.
 ## Requirements
 
 - `aim_tool`
+- `drupal/mcp_server_tool_bridge:^1.0.0-beta2` + `drupal/mcp_server:^2.0.0-beta3`
+  + core's `serialization`. Composer cannot require these per submodule, so
+  they are only `suggest`ed by the `aim` package: run
+  `composer require drupal/mcp_server_tool_bridge drupal/mcp_server` (plus the
+  OAuth packages below) **before** `drush en aim_tool_oauth`. This module
+  ships the `mcp_tool_config` entities that expose `aim_recall`,
+  `aim_remember` and `aim_literal` over MCP, so MCP is on exactly when it
+  is enabled. See [aim_tool's DEVELOPING.md](../aim_tool/DEVELOPING.md) for
+  the version-constraint reasoning.
 - `drupal/simple_oauth` + `e0ipso/simple_oauth_21` (OAuth 2.1: PKCE, RFC
   9728 discovery metadata, dynamic client registration - **Packagist-only
   under `e0ipso/`, not a drupal.org project**) + `drupal/mcp_server_oauth`

@@ -3,7 +3,7 @@ status: true
 dependencies:
   enforced:
     module:
-      - aim_tool
+      - aim_tool_oauth
 id: aim_literal
 tool_id: aim_literal
 description: 'Looks up an exact value (phone number, address, link) that aim memory refers to as a literal, by key or search words.'

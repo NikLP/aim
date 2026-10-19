@@ -12,8 +12,8 @@ module reference in [../../DEVELOPING.md](../../DEVELOPING.md).
 `AimMemoryManager` directly (any scope, gated on `remember aim facts`/
 `recall aim facts`, not the admin UI's single `administer aim`).
 `mcp_server_tool_bridge` exposes both over MCP via config-only
-`mcp_tool_config` entities (`config/optional`, installs automatically
-once the bridge module is enabled). `aim_remember` also takes an
+`mcp_tool_config` entities, shipped by `aim_tool_oauth` (`config/install`),
+so MCP is opt-in: enable that module to turn it on. `aim_remember` also takes an
 optional `facts` list for saving several facts in one call/bootstrap, and an
 optional `expires` (`YYYY-MM-DD`, also per `facts` entry): the fact is
 retired after that day by `drush aim:expire` or `hook_cron` (ADR-0057).

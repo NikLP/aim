@@ -15,9 +15,9 @@ with `mcp_server_tool_bridge` 1.0.0-beta3). `aim_recall` drops facts past
 
 - `aim` (this module's parent)
 - `drupal/tool` (`>=1.0.0-beta10`)
-- Optional, for MCP exposure: `drupal/mcp_server_tool_bridge:^1.0.0-beta2`
-  + `drupal/mcp_server:^2.0.0-beta3` + core's `serialization` module - see
-  [DEVELOPING.md](DEVELOPING.md) for the version-constraint reasoning.
+- Nothing else. MCP exposure is opt-in via
+  [aim_tool_oauth](../aim_tool_oauth/README.md), which carries the MCP
+  packages (see its Requirements).
 
 ## Getting started
 
@@ -25,10 +25,9 @@ with `mcp_server_tool_bridge` 1.0.0-beta3). `aim_recall` drops facts past
 2. Grant `remember aim facts`/`recall aim facts` to the roles that should be
    able to call these tools (separate from `administer aim`, the
    admin UI's blanket permission).
-3. For MCP exposure, also enable `mcp_server_tool_bridge` - its config
-   entities for `aim_remember`/`aim_recall` install automatically.
-4. For a remote MCP client with no Drupal session, add
-   [aim_tool_oauth](../aim_tool_oauth/README.md).
+3. For MCP (remote agents such as the Claude.ai connector), install
+   [aim_tool_oauth](../aim_tool_oauth/README.md): it needs the MCP and
+   OAuth packages first, then `drush en aim_tool_oauth`.
 
 Full detail: [DEVELOPING.md](DEVELOPING.md). Decision record:
 [ADR-0013](../../adr/resolved/0013-mcp-tool-exposure.md).

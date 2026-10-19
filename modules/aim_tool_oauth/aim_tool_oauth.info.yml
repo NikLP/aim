@@ -5,4 +5,6 @@ package: AIM
 core_version_requirement: ^11
 dependencies:
   - aim_tool:aim_tool
+  - mcp_server:mcp_server
+  - mcp_server_tool_bridge:mcp_server_tool_bridge
   - mcp_server_oauth:mcp_server_oauth
