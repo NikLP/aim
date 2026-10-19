@@ -98,7 +98,7 @@ class AimSettings {
   /**
    * Candidates per grounded-check call when none is configured (subq's cap).
    */
-  protected const GROUNDING_DEFAULT_MAX_QUESTIONS = 16;
+  protected const GROUNDING_MAX_QUESTIONS = 16;
 
   /**
    * Constructs an AimSettings object.
@@ -287,7 +287,7 @@ class AimSettings {
    */
   public function getGroundingMaxQuestions(): int {
     $max = (int) ($this->configFactory->get('aim.settings')->get('activities.grounding.max_questions') ?? 0);
-    return $max > 0 ? $max : self::GROUNDING_DEFAULT_MAX_QUESTIONS;
+    return $max > 0 ? $max : self::GROUNDING_MAX_QUESTIONS;
   }
 
 }
