@@ -292,8 +292,9 @@ look at other roles when a permission check unexpectedly fails.
   exception to "no text": `ai_logging` records their prompts and replies in
   `ai_log` ([ADR-0060](adr/0060-adopt-ai-logging-for-model-calls.md);
   stealth mode, off, is the later opt-out); a new tag must be added to
-  `ai_logging.settings:prompt_logging_tags`. A new write path, action or
-  decision point should add an audit line; see
+  `ActivityBackendInterface::LOGGED_TAGS` and the site's
+  `ai_logging.settings:prompt_logging_tags` (site-wide, aim doesn't write
+  it). A new write path, action or decision point should add an audit line; see
   [DEVELOPING.md](DEVELOPING.md)'s "Logging".
 - Hooks live in `src/Hook/AimHooks.php` (`#[Hook(...)]` attributes), not
   `aim.module` - core's OOP hook system, same shape as this codebase's

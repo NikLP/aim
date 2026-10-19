@@ -30,6 +30,22 @@ interface ActivityBackendInterface {
   ];
 
   /**
+   * Every tag ai_logging must list in prompt_logging_tags to record aim.
+   *
+   * The logging module matches tags exactly. These are the activity tags
+   * above, plus the merge call and the chatbot agent's calls (ai_agents
+   * applies that tag itself).
+   */
+  public const LOGGED_TAGS = [
+    'aim_extract',
+    'aim_consolidate',
+    'aim_consolidate_verify',
+    'aim_consolidate_merge',
+    'aim_ground',
+    'ai_agents_aim_chatbot',
+  ];
+
+  /**
    * Answers the input's questions.
    *
    * @param string $activity

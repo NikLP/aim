@@ -1177,14 +1177,23 @@ authorship on re-import is accepted, not a problem to solve.
 ## Model-call logging
 
 Model calls tagged `aim_*` (`aim_extract`, `aim_consolidate`,
-`aim_consolidate_verify`, `aim_consolidate_merge`, `aim_ground`) are
+`aim_consolidate_verify`, `aim_consolidate_merge`, `aim_ground`), plus the
+chat assistant's `ai_agents_aim_chatbot` (applied by `ai_agents`), are
 recorded by `ai_logging` as `ai_log` entities, prompt and response text
 included ([ADR-0060](adr/0060-adopt-ai-logging-for-model-calls.md)). Browse
-them at the Views listing `ai_logs`. `ai_logging.settings` is set by
-`aim_update_10010()`: `prompt_logging` and `prompt_logging_output` on,
-`prompt_logging_tags` listing the tags above (an exact match, no wildcard,
-so **a new aim tag must be added to that list**), retention 10000 entries
-or 90 days. Untagged calls (the vector index's embeddings) are not logged.
+them at the Views listing `ai_logs`.
+
+`ai_logging.settings` is **site-wide, shared with every module**, and aim
+no longer writes to it (the update hooks that did were removed). A site
+turns it on at `/admin/config/ai/logging/settings`: `prompt_logging` and
+`prompt_logging_output` on, `prompt_logging_tags` listing
+`ActivityBackendInterface::LOGGED_TAGS` (an exact match, no wildcard, so
+**a new aim tag must be added to both that constant and the site's list**;
+`AimCallTagsTest` guards the constant against the code). Retention has no
+per-tag control. This site runs 10000 entries or 90 days. Untagged calls
+(the vector index's embeddings) are not logged. A fresh install records
+nothing until set up as above. Planned, not built: an opt-in setting plus
+an `aim:status` check (TODO.md).
 
 `AimCallLogSubscriber` adds `aim_run_id` and `aim_duration_ms` to each call's
 debug data, which lands in `extra_data`; group a replay with `setRunId()`.

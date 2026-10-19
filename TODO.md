@@ -16,9 +16,10 @@ turns about 4.7 s with 2 hosted calls (details in the Literals entry below
 and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
 
 - [ ] **Shared ai_logging settings (decided in principle, not built).** The
-      `ai_logging` settings are site-wide and aim's update hooks overwrite
-      the site's retention (10000 / 90 days) and switch prompt logging on.
-      Plan: hooks only append aim's tags and never lower or overwrite
+      `ai_logging` settings are site-wide. The update hooks that wrote them
+      were removed (2026-10), so a fresh install records nothing; tag list is
+      `ActivityBackendInterface::LOGGED_TAGS`. Plan: an opt-in setting that
+      only appends aim's tags and never lower or overwrite
       retention; an explicit opt-in aim setting for recording model-call
       text; `aim:status` shows the shared settings and flags an uncaptured
       aim tag; document that retention has no per-tag control (upstream
