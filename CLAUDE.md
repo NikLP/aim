@@ -9,7 +9,7 @@ See [README.md](README.md) for the pitch and requirements,
 [DEVELOPING.md](DEVELOPING.md) for commands/API/runbooks, and
 [adr/](adr/0000-index.md) for decision records (start with
 [ADR-0010](adr/resolved/0010-drupal-native-agent-memory-rationale.md) for the
-founding rationale). [TODO.md](TODO.md) is the living backlog - don't
+founding rationale). [TODO.md](TODO.md) is the active list and [BACKLOG.md](BACKLOG.md) holds parked and wait-for-trigger items - don't
 duplicate it here.
 
 ## Scope
@@ -278,7 +278,7 @@ look at other roles when a permission check unexpectedly fails.
   preserve (PoC) - just change and reinstall (`drush pmu`/`drush en`).
   Revisit once real data exists that reinstalling would destroy.
 - **`AimMariaDBProvider` stays a thin shim** over `ai_vdb_provider_mariadb`.
-  A workaround lives there only with an upstream issue in TODO.md and is
+  A workaround lives there only with an upstream issue in TODO.md/BACKLOG.md and is
   deleted when the provider ships the fix; generic features go upstream
   first; aim ships values under the provider's own config key names, never
   its own. Rule and per-override table in

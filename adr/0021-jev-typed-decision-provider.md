@@ -175,3 +175,28 @@ the worker by hand (`drush queue:run <queue>`) or in a loop.
 4. **Module stability.** `ai_provider_typesafeai` is 1.1.0-beta1 against
    `drupal/ai` 1.6.x-dev; raise aim's `composer.json` to `^1.6` once 1.6.0
    is tagged.
+
+## Addendum (2026-10-19): subq as a decision host, hard merge set
+
+Moved here from TODO.md.
+
+**subq (tried 2026-10-14).** `host` `https://api.subq.ai/v1`, model
+`subq-snap-preview` on consolidation, verifier and grounding, wire-compatible
+with the TypeSafe provider. On the existing sets: pairs 24/24, merges AUC
+1.00, grounding AUC 0.99-1.00 (`narrow_ok`; one false trust and one false
+hold at 0.7), about 0.25-0.4 s per call, 469 input tokens per call on
+average (`ai_log`). Its `/models` returns OpenAI-style `{data:[{id}]}`, not
+`{models:[{name}]}`, so the provider's key check failed until
+`TypeSafeAiClient::listModels()` was patched locally. `tokens_output` reads 0
+on its decision calls (153 logged; Jev reported 22): not counted by the host,
+`tokens_input` is real. `checkGrounding()` sends groups of
+`activities.grounding.max_questions` (default 16), built 2026-10-19.
+
+**Hard merge set (2026-10-02).** `decision-eval-merges-hard.json`, 20 subtle
+faults: `jev-latest` AUC 1.00, but at the default 0.5 cutoff one bad merge
+(max 0.68) passed and a perfect split sat at 0.81-0.86, hence
+`activities.verifier.threshold` (live 0.8). Extra cross-check noul questions
+(same/new/conflict next to the choice, 55 pairs) were tested and dropped:
+neither of the 2 misses was fixed and "same" does not separate NOOP (median
+0.49). The `merges-split` mode (three small noul questions, minimum score)
+exists in the eval script.

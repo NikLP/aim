@@ -42,7 +42,8 @@ bound how long.
 
 1. **`ai_logging` is a dependency of aim.** It captures only calls tagged
    with aim's activity tags (`aim_extract`, `aim_consolidate`,
-   `aim_consolidate_verify`, `aim_consolidate_merge`, `aim_ground`): its
+   `aim_consolidate_verify`, `aim_consolidate_merge`, `aim_ground`, and the
+   chat agent's `ai_agents_aim_chatbot`, applied by `ai_agents`): its
    `prompt_logging_tags` filter is an exact match, so the list is explicit
    and must grow with any new tag. Untagged calls (the vector index's
    embeddings) are not recorded.
@@ -65,9 +66,13 @@ bound how long.
    merge-verifier text lines under `log_query_text` are now in the logged
    prompts. The recall query line stays: its embedding call is untagged, so
    `ai_log` never sees it.
-6. **Retention is `ai_logging`'s global pruning**, set high enough for eval
-   work (10000 entries, 90 days). Because capture is tag-filtered, the only
-   rows pruned are aim's.
+6. **Retention is `ai_logging`'s global pruning**, a site-wide setting
+   shared with every module and with no per-tag control (an upstream ask).
+   Eval work wants 10000 entries and 90 days; this site sets that. aim no
+   longer writes `ai_logging.settings` (the update hooks that did were
+   removed), so a fresh install records nothing until the site opts in. The
+   tag list lives in `ActivityBackendInterface::LOGGED_TAGS`. Planned, not
+   built: an opt-in aim setting and an `aim:status` check (TODO.md).
 
 ## Consequences
 

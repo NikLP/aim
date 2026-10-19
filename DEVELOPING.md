@@ -282,7 +282,7 @@ integer/decimal/date/boolean attribute reached the insert as `''`, which
 strict mode rejects in a numeric column (`ERROR 1366`), so it is set to
 `NULL` there. The class also has `ensureColumnIndex()`, aim's own BTREE
 helper (below). **It is a shim:** each override needs an upstream issue in
-TODO.md and goes when the provider releases the fix, and aim ships tuned
+TODO.md/BACKLOG.md and goes when the provider releases the fix, and aim ships tuned
 values under the provider's own config key names rather than inventing
 its own (rule and per-override table in
 [ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)). If a symptom
@@ -741,7 +741,7 @@ then export the index config.
   showed the gap. Found and fixed 2026-10-15. If parity fails anyway:
   `drush search-api:reset-tracker aim_vector_index` then
   `drush search-api:index aim_vector_index` (the reset also zeroes
-  `processed_chunks`). Upstream status in TODO.md.
+  `processed_chunks`). Upstream status in TODO.md/BACKLOG.md.
 
 ### `checkViewAccess()` and skipping access on recall
 
@@ -997,7 +997,7 @@ or look (a real candidate, not yet decided). Only read, nothing replaced.
 
 | Piece | Verdict | Why |
 | --- | --- | --- |
-| `AimMemoryManager` remember/recall/consolidate | keep | The memory rules; split planned (TODO.md), no contrib equivalent |
+| `AimMemoryManager` remember/recall/consolidate | keep | The memory rules; split planned (TODO.md/BACKLOG.md), no contrib equivalent |
 | `AimCallLogSubscriber` | thin | Adds run ID and duration to `ai_logging` rows; `ai_logging` has neither |
 | `AimEmbeddingCacheSubscriber` | keep | No query-embedding cache found in `ai` or `ai_search` (ADR-0017) |
 | `AimMariaDBProvider` | thin | Shim over `ai_vdb_provider_mariadb`, deleted as upstream fixes land (ADR-0023) |
@@ -1005,12 +1005,12 @@ or look (a real candidate, not yet decided). Only read, nothing replaced.
 | `AimStatusChecker`, status page | keep | Checks aim's DB state; `ai_observability` is OTel traces, not this |
 | Grounded check, merge verifier (`checkGrounding`, `verifyMerge`) | keep | Read the runner: Decision guardrails filter the input or output of a Decision call (stop with a score). Our checks are Decision calls whose answers aim acts on, so they are not guardrails. Guardrails could instead be attached to those calls |
 | `ActivityBackendInterface`, `ChatBackend`, `DecisionBackend` | keep | `DecisionBackend` wraps the core Decision operation; `ChatBackend` is the fallback for models that are not decision models (sovereignty, ADR-0004) |
-| Redaction (not built) | contrib helps | `RegexpGuardrail` already supports Decision calls but only stops; a redacting guardrail would extend that pattern, so the pattern-PII piece of TODO.md's redaction item is the small upstream contribution |
+| Redaction (not built) | contrib helps | `RegexpGuardrail` already supports Decision calls but only stops; a redacting guardrail would extend that pattern, so the pattern-PII piece of TODO.md/BACKLOG.md's redaction item is the small upstream contribution |
 | `aim_benchmark` decision-eval scripts and JSON sets | look, partial | `ai_eval` has dataset sources, a binary groundedness judge, judge validation, agreement stats and confidence intervals. Its graders judge agent responses through chat, not typed Decision calls, so the runner stays; the stats and judge validation are worth borrowing |
 | `AimIngestForm` | keep | Extraction into facts; contrib chunking is for indexing, not extraction |
 | `AimSettingsForm` (450 lines) | look | Mostly `ai_provider_configuration` elements and thresholds; not read line by line |
 | `aim_tool_oauth` | keep, fix gap | Tried `agent_access` 1.0.0-alpha2 on a scratch DDEV copy (2026-10-15, scripted OAuth 2.1 PKCE client, not Claude itself). It does not replace our scopes: it ships only `drupal:mcp:connect` and `drupal:content:read` plus two read-only entity tools, nothing for aim. A permission-granularity scope puts exactly its one permission on the token, so with connect-only `aim_recall` is denied and `aim:recall`/`aim:remember` are still needed. Two findings hit our scopes too: (1) `aim:remember` carries only `remember aim facts`, so a non-admin's `aim_remember` fails with "No permission to create user-scope facts" (the per-scope `create {scope} aim facts` is not on the token); (2) permission-granularity scopes drop the user's real roles from the token, so the user-scope role-visibility matrix returns nothing for every non-admin. A role-granularity scope (token roles = that role) fixed both in the test: alice saw her own and a peer's fact, a manager saw staff facts via the matrix, `remember` worked, and users outside the role could not get a session. Also seen: a permission scope appeared to grant `access mcp server` to a user whose role lacks it; re-tested on the live site 2026-10-15 with `aim_tool_oauth` scopes and it does not: the effective permission is the scope's permission AND the user's own, so scopes narrow and never escalate; `entity_list` returns per-entity-checked rows but leaks total counts for `aim_fact`, `ai_log`, `consumer`, `oauth2_token`. `agent_access` is pre-release and not under the security advisory policy; accepted as fine for now. The per-tool scope requirement we set on `aim_recall`/`aim_remember` was not enforced under 1.0.0-alpha1: `mcp_server_oauth` matched tools as `<base>.<id>` but the bridge names them `tool_api__<id>`. Fixed upstream (#3604047); this site runs `1.x-dev#fb92204` until a release (TODO.md). Role-granularity scopes are documented, not shipped (role ids are site-specific), and verified live 2026-10-15: the role needs `access mcp server`, the aim permissions and `grant simple_oauth codes`, and clients request the role scope plus the aim scope. See `aim_tool_oauth`'s DEVELOPING.md "Role scopes for non-admin users". |
-| `aim_tool` / `aim_chatbot` | not audited | Next: Tool API permission declarations (TODO.md "aim_tool: declare permissions") |
+| `aim_tool` / `aim_chatbot` | not audited | Next: Tool API permission declarations (TODO.md/BACKLOG.md "aim_tool: declare permissions") |
 
 Result so far: the Decision-API rows turned out to be keep, so the real
 candidates are `aim_tool_oauth` (against `agent_access`), the settings form,

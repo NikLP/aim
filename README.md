@@ -218,8 +218,8 @@ ones it wants. Each submodule has its own requirements and setup:
    extraction detail. Both default off. Recall query text is logged only if you
    also tick `log_query_text` (personal data, for short investigations).
    Separately, the prompts and replies of aim's model calls are recorded by
-   `ai_logging` (admin listing `ai_logs`, pruned at 10000 entries or 90
-   days), so extraction and consolidation decisions can be reviewed. They
+   `ai_logging` (admin listing `ai_logs`; the module's own site-wide
+   retention applies, and it records nothing until a site enables it), so extraction and consolidation decisions can be reviewed. They
    can contain what visitors and documents said; a stealth option to store
    nothing is planned, not built (ADR-0060).
 

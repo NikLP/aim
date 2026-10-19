@@ -81,6 +81,6 @@ verbose tier. Proposed: one audit-tier line per recall with uid, scope and the
 returned fact IDs (no text, per the logging rule). The trace then needs no
 second copy of it. Caveat: facts edited in place keep no earlier text, so IDs
 plus timestamp reconstruct what was visible only once the edit-history item
-in TODO.md (Governance) is built. Source: Oracle's "enterprise brain" article
-asks the same question; TODO.md has the build item.
+in TODO.md/BACKLOG.md (Governance) is built. Source: Oracle's "enterprise brain" article
+asks the same question; TODO.md/BACKLOG.md has the build item.
 

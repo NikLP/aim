@@ -36,7 +36,7 @@ versus synthetic datasets, disclosure.
 Also decided 2026-10-15 (Nik): real visitor questions may enter a dataset
 only after a human has redacted them (for now); text logging is opt-in for
 new sites (this site keeps it on); disclosure wording goes to a later policy
-discussion (TODO.md, "Policy discussion: disclosure of logged chats").
+discussion (BACKLOG.md, "Policy discussion: disclosure of logged chats").
 
 Original questions (1 to 3 answered above; 4 and 5 answered here):
 1. **Retention**: `ai_log` is already 90 days / 10000 entries (ADR-0060).
@@ -81,7 +81,7 @@ Safety-critical (a failure is a leak):
 8. A: no fact text or query text appears in `logger.channel.aim` output
    with `log_query_text` off. Reworded after ADR-0060: model-call text is
    now deliberately in `ai_log`, so the assertion is only about the aim
-   channel. Added as `tests/src/Unit/AimCallTagsTest.php` (code tags versus the installer list; passes): every aim model call carries a tag in
+   channel. Added as `tests/src/Unit/AimCallTagsTest.php` (code tags versus `ActivityBackendInterface::LOGGED_TAGS`; passes): every aim model call carries a tag in
    `ai_logging.settings:prompt_logging_tags` (a missing tag silently drops
    the call from the log, so this is a real regression risk).
 
@@ -126,13 +126,10 @@ Moved to [NOTES-data-flow-and-failure-loop.md](NOTES-data-flow-and-failure-loop.
 
 ## 5. Findings from the 2026-10-14 checks
 
-- Chat turns are not in `ai_log`. `ai_logging.settings:prompt_logging_tags`
-  lists only the five `aim_*` tags and ai_logging matches tags exactly; the
-  assistant's calls are tagged by `ai_agents` / `ai_assistant_api` (its
-  thread prefixes are `ai_agents_thread_` and `ai_assistant_thread_`), so
-  they are not captured. Not confirmed at runtime which tags a live turn
-  carries. Capturing them needs either their exact tags added to the list
-  or an aim-owned tag set on the assistant's call.
+- Chat turns were not in `ai_log` on 2026-10-14: the tag list had only the
+  five `aim_*` tags and ai_logging matches tags exactly. Since fixed by
+  adding `ai_agents_aim_chatbot` (the tag `ai_agents` puts on the agent's
+  calls) to the list and to `ActivityBackendInterface::LOGGED_TAGS`.
 - Past-due facts were recalled until the hourly expiry sweep ran. Fixed
   2026-10-14: `recall()` now withholds them
   (`AimRecallFilterTest::testExpiredNotRecalledBeforeSweep`).

@@ -76,7 +76,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * shipped scope type declares today (AimRememberService::remember() itself
  * still takes them as two fixed parameters, not a generic bag) - a future
  * scope type adding a third field would need remember()'s own signature
- * widened too, not just this file; not built, see TODO.md.
+ * widened too, not just this file; not built, see BACKLOG.md.
  */
 #[Tool(
   id: 'aim_remember',

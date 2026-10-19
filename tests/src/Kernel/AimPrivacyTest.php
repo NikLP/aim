@@ -20,7 +20,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  * accounts that are not uid 1. Some of these pin behavior that is by design
  * today but is not privacy in the strong sense (an administrator role sees
  * every user's facts); they exist so a change there is a decision, not an
- * accident. See TODO.md's "Privacy review".
+ * accident. See BACKLOG.md's "Privacy review".
  */
 #[Group('aim')]
 #[RunTestsInSeparateProcesses]

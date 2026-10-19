@@ -28,7 +28,7 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 /**
  * End-to-end comparison of two ways to answer a one-shot value lookup.
  *
- * Answers TODO.md's "Measure the gate end to end" (ADR-0052 decision 3).
+ * Answers the gate eval (ADR-0052 decision 3).
  * Runs a gold set through the real assistant twice: "tool" (the assistant calls
  * aim_literal itself, the shipped design) and "prompt" (no tool, the
  * viewer's readable literals listed in the system prompt, so the large model
