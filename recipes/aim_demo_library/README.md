@@ -30,8 +30,11 @@ provider.
 
 ## Requirements
 
-- A working AIM install with a chat provider and embeddings
-  ([DEVELOPING.md](../../DEVELOPING.md), "Setting up vector search").
+- Drupal 11 and MariaDB 11.7 or newer (for `VECTOR`).
+- `drupal/ai` plus a chat provider and an embeddings provider: Ollama with
+  `nomic-embed-text` (the shipped index uses it), or a hosted one, in which
+  case also remove the `index_directly` action.
+- Olivero as the front-end theme, if you want the chat block.
 - `aim_chatbot`'s chat block only exists if Olivero was the front-end
   theme when the module was enabled. Without it the persona still applies
   and the block wording is skipped.
@@ -43,11 +46,12 @@ provider.
 From the site root:
 
 ```bash
-ddev drush recipe:apply /var/www/html/web/modules/custom/aim/recipes/aim_demo_library
+ddev drush recipe /var/www/html/web/modules/contrib/aim/recipes/aim_demo_library
 ddev drush search-api:index aim_vector_index
 ```
 
-The path is the one inside the container. To reset the facts to the
+Use the container path, and adjust `contrib` to `custom` (as on this dev
+site) to wherever the module lives. To reset the facts to the
 recipe's 31 (removing any added since), delete them first:
 `ddev drush entity:delete aim_fact -y` and `ddev drush queue:delete
 aim_consolidate`, then the two commands above.
@@ -56,11 +60,35 @@ Apply it to a fresh site, not one with data you care about: it overwrites
 the settings above, and the facts are added on top of whatever is there
 (a fact whose UUID already exists is skipped).
 
+## Fresh install
+
+1. Add the repositories (until the modules are on drupal.org):
+   `composer config repositories.literals vcs https://github.com/NikLP/literals`
+   and the same for `aim` (`https://github.com/NikLP/aim`), both with
+   `composer config repositories.<name>.no-api true`.
+2. `composer require drupal/aim:dev-main drupal/ai_provider_ollama` plus a
+   chat provider.
+3. Run Ollama with `nomic-embed-text`. At `/admin/config/ai/settings` set
+   Embeddings (`ollama` / `nomic_embed_text_latest`) and a Chat default.
+4. Apply the recipe (above).
+5. `drush search-api:index aim_vector_index` (already 100% with
+   `index_directly` on).
+6. `drush uli` and ask the widget; it is hidden from anonymous visitors.
+
+Expected: "Applied AIM demo: community library", 31 facts, and
+`drush search-api:status` shows 31/31. Smoke test:
+`drush aim:recall "When are you open on Sundays?" --scope=site`.
+
+Known noise: `[warning] Schema errors...` lines on enable are harmless. A
+failed recipe prints a long stack trace after the real error; the first
+`In ...php line N: message` is the useful one.
+
 ## Before you rely on it
 
-- **Applied to this demo site only** (2026-10-10, after deleting its
-  facts; the demo pre-flight passed), not yet to a fresh install. Apply
-  it to an isolated scratch site first.
+- **Applies to a fresh install in one go** (verified 2026-10-19 on Drupal
+  11.4): the recipe installs AIM's modules and imports their config itself,
+  so there is no `drush en` step. It still overwrites the settings above,
+  so use a scratch site.
 - **`index_directly` suits local embeddings.** With hosted embeddings each
   save ties up a worker for seconds ([ADR-0015](../../adr/resolved/0015-immediate-consolidation-considered-deferred.md)
   addendum); remove that action.
@@ -104,7 +132,7 @@ starting state by deleting every fact and re-applying the recipe:
 ```bash
 ddev drush entity:delete aim_fact -y
 ddev drush queue:delete aim_consolidate
-ddev drush recipe:apply /var/www/html/web/modules/custom/aim/recipes/aim_demo_library
+ddev drush recipe /var/www/html/web/modules/contrib/aim/recipes/aim_demo_library
 ddev drush search-api:index aim_vector_index
 ```
 

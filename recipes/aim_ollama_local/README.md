@@ -48,8 +48,9 @@ accuracy" to set a recall cutoff and HNSW tuning for your own data.
 
 ## Before you rely on it
 
-- **Never applied.** The recipe passes core's schema validation, nothing
-  more. Apply it to an isolated scratch site first.
+- **Not applied end to end.** It passes core's schema validation; a
+  `setProperties` on `ai.settings` failed on a test site and is now
+  `simpleConfigUpdate`, still unverified. Apply it to a scratch site first.
 - **`host.docker.internal` assumes DDEV.** It is this module's own
   development default, not a generic default - override it for any other
   environment.

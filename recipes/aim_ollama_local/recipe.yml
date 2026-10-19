@@ -15,7 +15,7 @@ config:
         host_name: 'http://host.docker.internal'
         port: 11434
     ai.settings:
-      setProperties:
+      simpleConfigUpdate:
         default_providers.embeddings.provider_id: ollama
         default_providers.embeddings.model_id: nomic_embed_text_latest
     # Safe unconditionally for local embeddings - a save is searchable on

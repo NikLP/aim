@@ -1120,7 +1120,7 @@ via the container, so only a hand-constructed instance is affected).
 point. Apply one from the site root (recipes are applied by path):
 
 ```bash
-ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>
+ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>  # dev-site path; use modules/contrib/aim/... elsewhere
 ```
 
 - **`aim_demo_library`**: a fictional community library (site identity,
@@ -1150,8 +1150,11 @@ ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>
   ddev drush php:eval '\Drupal\Core\Recipe\Recipe::createFromDirectory("/var/www/html/web/modules/custom/aim/recipes/<name>");'
   ```
 
+  (`modules/custom/aim` is this dev site's path; use `modules/contrib/aim`
+  where the module is installed by Composer.)
+
   No output means valid. `aim_demo_library` has been applied to this
-  site (2026-10-10); none has been applied to a fresh install yet.
+  site (2026-10-10) and to a fresh install (2026-10-19).
 - Config actions on config entities use `setProperties` (dotted keys reach
   nested values without replacing the rest); `simpleConfigUpdate` is for
   simple config like `system.site` and `aim.settings`.
@@ -1161,7 +1164,7 @@ ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>
 ## Default content export
 
 ```bash
-ddev drush content:export aim_fact --dir=/var/www/html/web/modules/custom/aim/recipes/<name>/content
+ddev drush content:export aim_fact --dir=/var/www/html/web/modules/custom/aim/recipes/<name>/content  # dev-site path
 ```
 
 Drush's command wraps core's exporter; core's own `dr` script and

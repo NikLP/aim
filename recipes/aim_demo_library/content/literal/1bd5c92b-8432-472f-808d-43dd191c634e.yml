@@ -2,7 +2,7 @@ _meta:
   version: '1.0'
   entity_type: literal
   uuid: 1bd5c92b-8432-472f-808d-43dd191c634e
-  bundle: phone
+  bundle: text
   default_langcode: en
 default:
   id:
