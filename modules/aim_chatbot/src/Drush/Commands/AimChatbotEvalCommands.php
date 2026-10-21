@@ -107,20 +107,21 @@ final class AimChatbotEvalCommands extends DrushCommands {
   /**
    * Compares the tool path with the prompt-stuffed path on a gold set.
    *
-   * Gold sets are the finder's (literals_finder/eval/*.yml). A question
+   * Gold sets use the literals:eval format (literals_finder ships
+   * eval/gold.example.yml, for the literals_demo_library recipe). A question
    * whose expected literal no longer exists is skipped. Verdicts are
    * mechanical (is the resolved value in the reply); read the --dump file
    * for the wording.
    */
   #[CLI\Command(name: 'aim:chatbot-eval')]
-  #[CLI\Argument(name: 'file', description: 'Gold set YAML (default: literals_finder eval/gold.agentblind.yml).')]
+  #[CLI\Argument(name: 'file', description: 'Gold set YAML, in the literals:eval format.')]
   #[CLI\Option(name: 'assistant', description: 'Assistant ID (default aim_demo_assistant).')]
   #[CLI\Option(name: 'modes', description: 'Comma-separated: tool, prompt, gate (default all three).')]
   #[CLI\Option(name: 'inhouse', description: 'Provider IDs counted as in-house (default typesafeai,ollama).')]
   #[CLI\Option(name: 'limit', description: 'Run only the first N usable questions.')]
   #[CLI\Option(name: 'dump', description: 'Write every reply and call count to this JSON file.')]
   public function evaluate(
-    ?string $file = NULL,
+    string $file,
     array $options = [
       'assistant' => 'aim_demo_assistant',
       'modes' => 'tool,prompt,gate',
@@ -129,7 +130,9 @@ final class AimChatbotEvalCommands extends DrushCommands {
       'dump' => '',
     ],
   ): void {
-    $file ??= DRUPAL_ROOT . '/modules/custom/literals/modules/literals_finder/eval/gold.agentblind.yml';
+    if (!is_file($file)) {
+      throw new \InvalidArgumentException("No gold set at $file");
+    }
     $gold = Yaml::decode(file_get_contents($file))['queries'] ?? [];
     // Let any signed-in visitor through the assistant's role check, for this
     // process only, so a gold item can ask as a non-admin account.

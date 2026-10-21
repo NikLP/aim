@@ -96,17 +96,16 @@ ddev drush cr
 
 Literals marked restricted are visible to nobody by default. Grant `view restricted literals` to a staff role to see them.
 
-## 7. Optional: test with a bigger pool
+## 7. Optional: score the example question set
 
-The module ships a 90-literal fictional pool and a scored question set.
+The module ships a scored question set for the demo literals.
 
 ```bash
-ddev drush literals:pool load pool100
-ddev drush literals:eval /var/www/html/web/modules/contrib/literals/modules/literals_finder/eval/gold.pool100.yml
-ddev drush literals:pool clean pool100
+ddev drush literals:eval --check
+ddev drush literals:eval
 ```
 
-Expected with `subq-snap-preview`: 51/51 answerable questions found, none wrong-confident, and 3 of 8 unanswerable questions answered anyway because the match is plausible. About 0.35 seconds a query.
+`--check` confirms every expected literal exists, with no model calls. Expected with `subq-snap-preview` (2026-10-21): 22/22 answerable questions found, none wrong-confident, 15/15 unanswerable questions answered "none". About 0.3 seconds a query. Bigger pools and more question sets are site data, not shipped: see the module's `eval/TUNING.md` for how to write and sweep your own.
 
 Don't run plain `drush literals:eval` against the demo data. Its default question set expects literals (like opening hours) that the demo recipe doesn't create, so it reports misses.
 
