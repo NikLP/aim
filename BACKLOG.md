@@ -5,6 +5,13 @@ Parked, upstream-dependent and wait-for-a-trigger items, moved out of
 entries. Pull an item back into TODO.md when work starts. Design reasoning
 belongs in the [ADRs](adr/0000-index.md).
 
+## Literals
+
+- [ ] Wait for a request (Nik 2026-10-21: `[literal:key]` tokens are not
+      for general use). Showing the literal key: hidden on the edit form
+      (shown on add only); a collection list column or the token read-only
+      in the sidebar.
+
 ## Case picker widget (raised 2026-10-14, pinned)
 
 - [ ] Pinned: a widget to pick from existing in-scope cases when writing a

@@ -1,9 +1,6 @@
 ai_chat_processor.configuration.aim_chatbot_gate:
   type: ai_chat_processor.configuration.ai_assistant_api_processor
   mapping:
-    gate:
-      type: boolean
-      label: 'Ask the literals finder before the assistant'
     gate_match_threshold:
       type: float
       label: 'Chooser confidence needed for the gate to answer'

@@ -7,6 +7,7 @@ namespace Drupal\aim\Plugin\search_api\processor;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Entity\AimFact;
 use Drupal\search_api\Attribute\SearchApiProcessor;
+use Drupal\search_api\IndexInterface;
 use Drupal\search_api\Processor\ProcessorPluginBase;
 
 /**
@@ -16,7 +17,8 @@ use Drupal\search_api\Processor\ProcessorPluginBase;
  * (ADR-0005) but never needs to be searched. Search API deletes an item a
  * processor rejects from the server, so retiring a fact (a plain save,
  * which re-tracks it) removes its vector row on the next index run, and
- * clearing `retired` puts it back. See ADR-0022.
+ * clearing `retired` puts it back. Locked, so it runs on every index with
+ * an aim_fact datasource without being enabled. See ADR-0022.
  */
 #[SearchApiProcessor(
   id: 'aim_exclude_retired',
@@ -25,8 +27,21 @@ use Drupal\search_api\Processor\ProcessorPluginBase;
   stages: [
     'alter_items' => 0,
   ],
+  locked: TRUE,
 )]
 class ExcludeRetired extends ProcessorPluginBase {
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function supportsIndex(IndexInterface $index) {
+    foreach ($index->getDatasources() as $datasource) {
+      if ($datasource->getEntityTypeId() === 'aim_fact') {
+        return TRUE;
+      }
+    }
+    return FALSE;
+  }
 
   /**
    * {@inheritdoc}

@@ -28,9 +28,9 @@ the `site` bundle this hardcode relies on is guaranteed installed.
   74-item gold sets: 30 hits, 1 arguable wrong match, against 5 at the finder
   defaults); a clear match is answered from a fixed template (label, value,
   the gist so a wrong match shows), no chat model; anything else, or any
-  finder error, goes to the assistant as before. Per-block settings switch
-  it (`gate`), and changing `chat_processor_plugin` back to
-  `ai_assistant_api_processor` restores the old path. Audit lines carry IDs
+  finder error, goes to the assistant as before. The block's Chat Executor
+  is the switch: changing `chat_processor_plugin` back to
+  `ai_assistant_api_processor` turns the gate off. Audit lines carry IDs
   only. Needs `literals_finder` to do anything; without it, a pass-through.
 - The agent forces memory: `aim_chatbot:recall` has `require_usage` on, so
   the assistant cannot answer without having checked memory (the reminder

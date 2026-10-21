@@ -74,7 +74,6 @@ class AimGateProcessor extends AiAssistantApiProcessor {
    */
   public function defaultConfiguration(): array {
     return parent::defaultConfiguration() + [
-      'gate' => TRUE,
       'gate_match_threshold' => 0.8,
       'gate_choice_margin' => 0.4,
     ];
@@ -85,12 +84,6 @@ class AimGateProcessor extends AiAssistantApiProcessor {
    */
   public function buildConfigurationForm(array $form, FormStateInterface $form_state): array {
     $form = parent::buildConfigurationForm($form, $form_state);
-    $form['gate'] = [
-      '#type' => 'checkbox',
-      '#title' => $this->t('Answer clear exact-value questions from the literals finder'),
-      '#description' => $this->t('Off sends every question to the assistant, as the plain processor does.'),
-      '#default_value' => ($this->configuration + $this->defaultConfiguration())['gate'],
-    ];
     $form['gate_match_threshold'] = [
       '#type' => 'number',
       '#title' => $this->t('Gate match threshold'),
@@ -132,7 +125,7 @@ class AimGateProcessor extends AiAssistantApiProcessor {
   protected function gate(): ?ChatOutput {
     // A processor built without saved settings has no defaults merged in.
     $settings = $this->configuration + $this->defaultConfiguration();
-    if (empty($settings['gate']) || $this->finder === NULL) {
+    if ($this->finder === NULL) {
       return NULL;
     }
     $input = $this->getInput();

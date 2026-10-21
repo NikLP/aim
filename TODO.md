@@ -97,15 +97,6 @@ finder-first gate are built. What remains is aim's side.
       stored history; a Jev-written sentence around the value instead of the
       bare template; local Jev latency unmeasured; a gate-hit line in the
       review queue (design in `modules/aim_chatbot/CLAUDE.md`).
-- [ ] **Chooser confidence on the `Find:` watchdog line** (not built).
-      Add top pick, runner-up and none probabilities plus the model id
-      (`top pl_loan_period 0.92, next pl_loan_limit 0.04, none 0.007`),
-      values-free, behind the debug/stealth switch. The probabilities are
-      already in the Decision output. Also add `literals_choose` to
-      `ai_logging`'s tag list: chooser calls are not in `ai_log` today.
-- [ ] **Reassess showing the literal key (2026-10-16).** Hidden on the edit
-      form (shown on add only); decide whether a collection list column or
-      the `[literal:key]` token read-only in the sidebar is worth the space.
 - Parked in ADR-0040 "Deferred and pinned": staged choice, groups, keyword
   fallback, per-medium context registry, local-model re-measure,
   `search_api`. The `literals_chat` module is likely to be scrapped.
