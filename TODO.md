@@ -34,6 +34,12 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       the model the facts for that turn only (not the stored history), or
       drop the assistant's own lookup tool now the gate runs the finder.
       Test against the 74-item gold set before dropping anything.
+      **Must be a config-only switch, not a new default:** follow
+      `AimGateProcessor`'s existing pattern (block's `chat_processor_plugin`
+      selects gate vs. plain `ai_assistant_api_processor`; `gate()` no-ops
+      through to plain when its dependency is absent/disabled, see
+      `modules/aim_chatbot/CLAUDE.md`). A site whose use case barely needs
+      recall must be able to opt out the same way, with zero code change.
 - [ ] **Processor test.** `AimGateProcessor` has no PHPUnit test; the finder
       overrides and the "unavailable" outcome do. Also no test for the
       chat remember permission check or the untrusted default.

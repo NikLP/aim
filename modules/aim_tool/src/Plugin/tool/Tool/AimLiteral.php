@@ -34,6 +34,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   label: new TranslatableMarkup('Look up an exact value'),
   description: new TranslatableMarkup('Returns an exact value (a phone number, a URL, a name) that memory refers to as [literal:key]. Give a key when it is known, search words to list candidate literals (key, name, description) to choose from, or a plain-language question (when the site has the finder) to have the closest literal picked; an unclear question returns candidates or nothing, never a guess.'),
   operation: ToolOperation::Read,
+  permission: 'view literals+view restricted literals',
   input_definitions: [
     'key' => new InputDefinition(
       data_type: 'string',

@@ -52,6 +52,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   label: new TranslatableMarkup('Recall facts'),
   description: new TranslatableMarkup('Searches previously remembered facts for anything semantically relevant to a query.'),
   operation: ToolOperation::Read,
+  permission: 'recall aim facts',
   input_definitions: [
     'text' => new InputDefinition(
       data_type: 'string',

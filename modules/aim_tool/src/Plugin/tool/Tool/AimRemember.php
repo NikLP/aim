@@ -83,6 +83,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   label: new TranslatableMarkup('Remember a fact'),
   description: new TranslatableMarkup('Saves a short, atomic fact directly, exactly as given - no LLM call to decide what is worth remembering. Pass facts instead of text/scope to save several facts in one call.'),
   operation: ToolOperation::Write,
+  destructive: FALSE,
+  permission: 'remember aim facts',
   input_definitions: [
     'text' => new InputDefinition(
       data_type: 'string',

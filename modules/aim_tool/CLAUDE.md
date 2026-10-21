@@ -15,6 +15,15 @@ real per-scope `create {scope} aim facts` permission via
 `AimMemoryManager::checkCreateAccess()` - the flat permission only gates
 use of the tool at all, not which scopes it can write.
 
+Each `#[Tool]` declares its flat permission (`permission:`) as well as
+overriding `checkAccess()`: Tool API checks the declared one before any
+input is processed, and the MCP bridge hides a tool from `tools/list` for
+a caller without it. Keep the two in step; a typo'd name denies every
+ordinary account but not admins, so test as a non-admin. `AimRemember`
+declares `destructive: FALSE` (it only adds facts): since tool 1.0.0-beta12
+an undeclared Write tool counts as destructive, which MCP clients read as
+"confirm before every call".
+
 ## What lives here
 
 - `src/Plugin/tool/Tool/AimRemember.php` / `AimRecall.php` - the two Tool

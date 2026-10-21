@@ -507,19 +507,16 @@ questions" section)
       moving demo deadline - revisit once a working reroll exists upstream,
       or write one properly with time to test it.
 
-## aim_tool: declare permissions on the tools (raised 2026-10-01, tool 1.0.0-beta11)
+## aim_tool: MCP input errors lost the input name (raised 2026-10-21, tool 1.0.0-beta12)
 
-- [ ] Add `permission: 'recall aim facts'` to `AimRecall`'s `#[Tool]` and
-      `permission: 'remember aim facts'` to `AimRemember`'s. Label-only
-      change: Tool API reads it without instantiating the plugin (Tool
-      Explorer, catalogs, `tool:info`, which shows `None` today) and
-      checks it before input is processed. **Keep both `checkAccess()`
-      overrides** - ToolBase's default only says "yes if a permission was
-      declared", and `AimRemember` may need its own extra rules. A typo'd
-      permission name denies every ordinary account but not admins, so
-      test as a non-admin. Denial now precedes input validation (different
-      error message when both apply): re-run the recipe's `preflight/preflight.js` (`node demo/preflight.js` on this site)
-      afterward. Optional - safe to leave undone.
+- [ ] Wait for an `mcp_server_tool_bridge` release that runs calls through
+      Tool API's `tool.runner` (or `ToolMessages`). Bridge 1.0.0-beta4 still
+      builds its invalid-input reply from `$violation->getMessage()` alone,
+      and tool beta12 moved the input name out of that text onto the
+      property path, so an MCP client now reads "This value should be of
+      the correct primitive type." without being told which input. The
+      chat path (`tool_ai_connector`, which uses the runner) is not
+      affected. Nothing to change in aim: upgrade the bridge when it ships.
 
 ## aim_tool: schema discoverability and typed output (raised 2026-10-05, from Matt Glaman's "Define the capability once, call it anywhere")
 
