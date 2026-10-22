@@ -1,5 +1,5 @@
 name: 'AIM demo: community library'
-description: 'A fictional community library as an AIM demo site: site identity, chat persona, recall cutoff, and 31 demo facts and three literals as default content.'
+description: 'A fictional community library as an AIM demo site: site identity, chat persona, recall cutoff, and 31 demo facts and eight literals as default content.'
 type: 'Demo'
 install:
   - aim
@@ -89,7 +89,7 @@ config:
         settings.label: "Harbourside Library assistant"
         settings.bot_name: "Library Assistant"
         settings.placement: bottom-right
-        style_file: 'module:ai_chatbot:bard.yml'
+        settings.style_file: 'module:ai_chatbot:bard.yml'
         settings.first_message: "Hi! I'm the Harbourside Library assistant. Ask me about opening hours, borrowing, membership, computers and Wi-Fi, meeting rooms, accessibility or regular children's events. If you tell me something new, I'll note it for staff to review."
         visibility:
           user_role:

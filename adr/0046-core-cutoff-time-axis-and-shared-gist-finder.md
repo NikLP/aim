@@ -81,8 +81,7 @@ Literals shipped standalone: no `scope=literal`, no mirror of gists into
 `aim_fact`. `aim` consumes them through `[literal:key]` tokens at recall and
 the `aim_literal` tool, not the finder
 ([ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
-section 9, [ADR-0052](../../literals/adr/0052-what-literals-is-for.md)). The
-finder as a recall source is not built.
+sections 6 and 7). The finder as a recall source is not built.
 
 ### 5. One shared gist finder (became `literals_finder` and ADR-0049)
 

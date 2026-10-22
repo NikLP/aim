@@ -1,0 +1,28 @@
+_meta:
+  version: '1.0'
+  entity_type: literal
+  uuid: 35c2bbe1-3d56-4548-9851-f3180aff0ede
+  bundle: text
+  default_langcode: en
+default:
+  id:
+    -
+      value: accounts_phone
+  status:
+    -
+      value: true
+  name:
+    -
+      value: 'Accounts phone'
+  restricted:
+    -
+      value: false
+  value:
+    -
+      value: '+1 555 0103'
+  gist:
+    -
+      value: 'The phone number to call about fines and billing, ALSO card charges and the finance department'
+  uid:
+    -
+      target_id: 1

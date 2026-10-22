@@ -1,0 +1,28 @@
+_meta:
+  version: '1.0'
+  entity_type: literal
+  uuid: 1da7240f-d7db-4613-915b-9e3611d0f0b4
+  bundle: text
+  default_langcode: en
+default:
+  id:
+    -
+      value: reservations_phone
+  status:
+    -
+      value: true
+  name:
+    -
+      value: 'Reservations phone'
+  restricted:
+    -
+      value: false
+  value:
+    -
+      value: '+1 555 0102'
+  gist:
+    -
+      value: 'The phone number for booking a meeting room or a study space, ALSO room reservations'
+  uid:
+    -
+      target_id: 1

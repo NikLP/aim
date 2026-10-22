@@ -71,35 +71,23 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       only), so "where do I log in" correctly finds nothing; the assistant
       does not yet say "you are already signed in".
 
-## Literals (design in [ADR-0052](../literals/adr/0052-what-literals-is-for.md) and [ADR-0040](../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md), module notes in [literals/CLAUDE.md](../literals/CLAUDE.md))
+## Literals, aim's side (design in [ADR-0040](../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md))
 
-The literals side and aim's token replacement, `aim_literal` tool and
-finder-first gate are built. What remains is aim's side.
+Token replacement at recall, the `aim_literal` tool and the finder-first
+gate are built. Work on the literals modules themselves is in
+[literals/BACKLOG.md](../literals/BACKLOG.md).
 
-- [ ] **Unbuilt design from ADR-0052 ("How aim uses literals").**
-      Convert-a-fact (retires the fact, never one click); the two answer
-      modes and "think harder" escalation (a skill, wired up later); the
-      finder as a live recall source; copy controls (front-end only). Pull
-      one out when a site needs it. Optional pre-gate ("is this a lookup?"
-      ahead of the finder) only if measured to pay.
-- [ ] **Example phrasings per literal** (ADR-0040 "Deferred and pinned"):
-      re-test against the in-gist `ALSO` convention after the gist overlap
-      check below.
-- [ ] **Gist overlap check.** The `login`, `password_reset` and `my_account`
-      gists overlap ("where do I log in", "what I've borrowed"; blind set
-      2026-10-12: 16 of 22 hits, 2 wrong-confident). Do NOT reword gists to
-      pass the set (feedback rule). Build a general check (warn when two
-      gists share a phrase), designed without looking at those failures and
-      measured on a fresh set; re-check `chooser_context` and thresholds.
-      The set is Claude-drafted, so not fully independent. Also: the finder
-      genuinely local, for latency.
+- [ ] **Unbuilt design from ADR-0040 section 7 ("How aim could use
+      literals further").** Convert-a-fact (retires the fact, never one
+      click); the two answer modes and "think harder" escalation (a skill,
+      wired up later); the finder as a live recall source; copy controls
+      (front-end only). Pull one out when a site needs it. Optional
+      pre-gate ("is this a lookup?" ahead of the finder) only if measured
+      to pay.
 - [ ] **Finder-first gate: open points.** Whether gate replies go into the
       stored history; a Jev-written sentence around the value instead of the
       bare template; local Jev latency unmeasured; a gate-hit line in the
       review queue (design in `modules/aim_chatbot/CLAUDE.md`).
-- Parked in ADR-0040 "Deferred and pinned": staged choice, groups, keyword
-  fallback, per-medium context registry, local-model re-measure,
-  `search_api`. The `literals_chat` module is likely to be scrapped.
 
 ## Plugin, skills and the verbal webform demo (raised 2026-10-09, important)
 

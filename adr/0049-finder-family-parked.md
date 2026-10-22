@@ -8,8 +8,9 @@ ADR-0053 (the gist vocabulary, section D) into one record; the old numbers
 (WebMCP) may supersede much of the widget half; revisit before building
 any of it. Builds on
 [ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
-(the finder, literals as first provider), [ADR-0048](../../literals/adr/0048-token-literal-access-and-entity-targets.md)
-(per-account access on resolve) and the gist vocabulary in section D.
+(the finder, literals as first provider, and per-account access on resolve
+in "The parts, settled", formerly ADR-0048) and the gist vocabulary in
+section D.
 **Date:** 2026-10-05 (widget, navigator), 2026-10-06 (tool picker)
 
 ## The shared idea

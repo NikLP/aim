@@ -1,0 +1,28 @@
+_meta:
+  version: '1.0'
+  entity_type: literal
+  uuid: c3ed11b6-eecf-420e-9f9c-bd7c410711bf
+  bundle: token
+  default_langcode: en
+default:
+  id:
+    -
+      value: site_name
+  status:
+    -
+      value: true
+  name:
+    -
+      value: 'Site name'
+  restricted:
+    -
+      value: true
+  value:
+    -
+      value: '[site:name]'
+  gist:
+    -
+      value: 'The name of the website'
+  uid:
+    -
+      target_id: 1

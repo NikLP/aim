@@ -18,8 +18,10 @@ consolidation without any real data.
   `index_directly` on so a fact told to the chat is searchable on the next
   question.
 - `content/`: default content, imported when the recipe is applied: 31
-  fictional facts (19 site, 4 role, 4 user, 4 case) and three literals
-  (`main_phone`; `staff_line` and `my_account`, restricted), exported
+  fictional facts (19 site, 4 role, 4 user, 4 case) and eight literals
+  (`main_phone`, `accounts_phone`, `reservations_phone`, `login`,
+  `password_reset`; `staff_line`, `my_account` and `site_name`,
+  restricted), exported
   from the demo site with `drush content:export`. Core's importer
   validates each entity, so aim's Guardrails constraint runs. With
   `index_directly` on (this recipe sets it) the facts are embedded and
@@ -185,9 +187,10 @@ stage keeps its edit; put it back by hand.
 
 ### Exact values (literals), about 3 minutes
 
-The recipe imports three literals (`main_phone`, public; `staff_line` and
-`my_account`, restricted: signed-in visitors only, through `view restricted
-literals`). It also gives the assistant aim's lookup tool
+The recipe imports eight literals: five public (`main_phone`,
+`accounts_phone`, `reservations_phone`, `login`, `password_reset`) and
+three restricted to signed-in visitors through `view restricted literals`
+(`staff_line`, `my_account`, `site_name`). It also gives the assistant aim's lookup tool
 (`tool:aim_literal`), and its persona says to use it for phone numbers and
 web addresses.
 

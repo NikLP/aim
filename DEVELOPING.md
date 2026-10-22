@@ -1132,7 +1132,7 @@ ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>  # de
 
 - **`aim_demo_library`**: a fictional community library (site identity,
   chat persona, recall cutoff, `index_directly`) plus its 31 facts and
-  three literals as default content in `content/`. This site's demo kit
+  eight literals as default content in `content/`. This site's demo kit
   (its pre-flight and reset steps are in the recipe README) is reset with it. The first archetype
   starter kit ([ADR-0014](adr/resolved/0014-usecase-archetype-starter-kits.md)).
   Details and caveats in its [README](recipes/aim_demo_library/README.md).

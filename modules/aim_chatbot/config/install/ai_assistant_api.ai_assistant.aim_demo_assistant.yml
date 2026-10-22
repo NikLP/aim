@@ -26,10 +26,6 @@ llm_configuration:
   temperature: 0.0
   top_k: 0.0
 actions_enabled: {  }
-roles:
-  anonymous: anonymous
-  authenticated: 0
-  content_editor: 0
-  administrator: 0
+roles: {  }
 use_function_calling: false
 ai_agent: aim_chatbot

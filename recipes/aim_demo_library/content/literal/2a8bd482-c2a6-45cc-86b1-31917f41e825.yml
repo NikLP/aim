@@ -1,0 +1,28 @@
+_meta:
+  version: '1.0'
+  entity_type: literal
+  uuid: 2a8bd482-c2a6-45cc-86b1-31917f41e825
+  bundle: url
+  default_langcode: en
+default:
+  id:
+    -
+      value: login
+  status:
+    -
+      value: true
+  name:
+    -
+      value: 'Login page'
+  restricted:
+    -
+      value: false
+  value:
+    -
+      value: /user/login
+  gist:
+    -
+      value: 'The page where members sign in to their account, ALSO log in to check loans, fines or reservations'
+  uid:
+    -
+      target_id: 1

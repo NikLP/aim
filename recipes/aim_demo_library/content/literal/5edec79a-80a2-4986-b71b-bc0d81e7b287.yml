@@ -1,0 +1,28 @@
+_meta:
+  version: '1.0'
+  entity_type: literal
+  uuid: 5edec79a-80a2-4986-b71b-bc0d81e7b287
+  bundle: url
+  default_langcode: en
+default:
+  id:
+    -
+      value: password_reset
+  status:
+    -
+      value: true
+  name:
+    -
+      value: 'Password reset'
+  restricted:
+    -
+      value: false
+  value:
+    -
+      value: /user/password
+  gist:
+    -
+      value: 'The page to reset a forgotten password, ALSO recover access to an account'
+  uid:
+    -
+      target_id: 1
