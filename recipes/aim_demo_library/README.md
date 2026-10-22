@@ -12,7 +12,8 @@ consolidation without any real data.
   (`aim_chatbot` agent and `aim_demo_assistant`) and its tools (the two
   memory tools plus `aim_literal` for exact values), the chat block's
   wording and its signed-in-only visibility (only if the block exists),
-  `access deepchat api` for signed-in users, and
+  `access deepchat api` and `view restricted literals` for signed-in users,
+  `view literals` for everyone, and
   `index_directly` on so a fact told to the chat is searchable on the next
   question.
 - `content/`: default content, imported when the recipe is applied: 31

@@ -60,10 +60,17 @@ config:
     # block visibility below (the CSRF token the widget needs only comes from
     # the block's markup, so both layers matter). The assistant recalls as
     # the visitor, so a member needs to view site facts or recall is empty.
+    # The lookup tool reads literals as the visitor too: everyone sees the
+    # public ones, only signed-in visitors the restricted ones.
+    user.role.anonymous:
+      grantPermissions:
+        - 'view literals'
     user.role.authenticated:
       grantPermissions:
         - 'access deepchat api'
         - 'view site aim facts'
+        - 'view literals'
+        - 'view restricted literals'
     # The persona waits for the visitor to confirm before saving, which needs
     # the previous turn: keep session history (aim_chatbot ships none). The
     # grounded check also reads that turn (ADR-0037).
