@@ -31,11 +31,6 @@ config:
       simpleConfigUpdate:
         name: "Harbourside Community Library"
         slogan: "A fictional library, used to demonstrate AIM: agent memory built in Drupal"
-    aim.settings:
-      simpleConfigUpdate:
-        # Calibrated on this dataset with the default nomic-embed-text
-        # embeddings (ADR-0019); recalibrate if either changes.
-        recall_max_distance: 0.48
     # So a fact told to the chat is searchable on the next question. Suits
     # local embeddings (ADR-0015 addendum); with hosted embeddings each save
     # ties up a worker for seconds, so drop this action.

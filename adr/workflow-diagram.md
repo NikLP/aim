@@ -217,8 +217,8 @@ Notes on diagram 3:
 
 - Recall makes no chat-model call. The only model involved is the
   embeddings model, and only on a cache miss.
-- Score is a distance: 0 is identical. The default cutoff is 0.45 in
-  code, 0.48 on this site (ADR-0019 addendum).
+- Score is a distance: 0 is identical. The default cutoff is 0.48 in
+  code, 0.52 on this site (ADR-0019 addendum).
 - `recall()` itself has no explicit access call: per-result access is
   enforced inside Search API's ai_search backend, and is bypassed for an
   anonymous (drush/cron) caller by design.

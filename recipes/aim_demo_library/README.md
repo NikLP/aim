@@ -12,7 +12,7 @@ consolidation without any real data.
   (`aim_chatbot` agent and `aim_demo_assistant`) and its tools (the two
   memory tools plus `aim_literal` for exact values), the chat block's
   wording and its signed-in-only visibility (only if the block exists),
-  `access deepchat api` for signed-in users, `recall_max_distance` 0.48, and
+  `access deepchat api` for signed-in users, and
   `index_directly` on so a fact told to the chat is searchable on the next
   question.
 - `content/`: default content, imported when the recipe is applied: 31
@@ -224,6 +224,5 @@ not topics like opening hours, which vary by day.
 
 Site name and slogan, the chat agent's and assistant's instructions and
 tools, the widget label, welcome message and signed-in-only visibility,
-`access deepchat api` for authenticated users, `index_directly`, and
-`aim.settings:recall_max_distance` (0.48; the module default is 0.45, see
-ADR-0019's second calibration). It no longer sets a front page.
+`access deepchat api` for authenticated users, and `index_directly`. It no
+longer sets a front page.

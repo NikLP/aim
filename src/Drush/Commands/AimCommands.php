@@ -280,7 +280,7 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'include-untrusted', description: 'Also return untrusted facts, for reviewing what aim.settings:default_trusted left out of ordinary recall() results (ADR-0002).')]
   #[CLI\Option(name: 'format', description: 'Output format: table or json.')]
   #[CLI\Usage(name: 'drush aim:recall "email preference"', description: 'Search all facts for anything related to email preference.')]
-  #[CLI\Usage(name: 'drush aim:recall "email preference" --max-distance=0.45', description: 'Only facts within 0.45 cosine distance, as the chatbot and MCP tool do by default.')]
+  #[CLI\Usage(name: 'drush aim:recall "email preference" --max-distance=0.48', description: 'Only facts within 0.48 cosine distance, as the chatbot and MCP tool do by default.')]
   public function recall(
     string $text,
     array $options = [

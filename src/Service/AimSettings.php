@@ -77,15 +77,17 @@ class AimSettings {
    * text against fact text (not fact against fact, so the consolidation
    * thresholds above don't apply): answerable questions' best match
    * 0.12-0.29 (full questions and terse keyword queries alike),
-   * near-topic-but-unanswerable 0.25-0.33, off-topic 0.51-0.64. 0.45 sits
-   * in the empty band between the last two, with room either way.
+   * near-topic-but-unanswerable 0.25-0.33, off-topic 0.51-0.64. A second
+   * corpus (the aim_demo_library facts, 2026-09-27) had its highest
+   * answerable match at 0.457 and lowest off-topic at 0.497, so the default
+   * is 0.48: the one value inside the empty band of both (ADR-0019).
    * It cannot separate an answerable question from a near-topic
    * unanswerable one (their ranges overlap) - that stays the model's call.
    * The off-topic floor drifts down as the corpus grows and diversifies
    * (more candidates, more coincidental near matches), so recheck it then,
    * not only when the embeddings model changes.
    */
-  public const DEFAULT_RECALL_MAX_DISTANCE = 0.45;
+  public const DEFAULT_RECALL_MAX_DISTANCE = 0.48;
 
   /**
    * The grounding cutoff when activities.grounding.threshold is unset.

@@ -9,7 +9,7 @@ activities:
   grounding: { backend: decision, provider: '', model: '' }
 grounding_mode: 'off'
 merge_max_distance: 0
-recall_max_distance: 0.45
+recall_max_distance: 0.48
 recall_gap: 0
 default_trusted: false
 trust_policy:

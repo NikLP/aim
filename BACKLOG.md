@@ -105,7 +105,7 @@ are recommendations.
       consolidation model, and downgrades to ADD with no default. Not
       documented.
 - [ ] Shipped vs this site: `default_trusted` false/true,
-      `index_directly` off/on, `recall_max_distance` 0.45/0.48. Only
+      `index_directly` off/on, `recall_max_distance` 0.48/0.52. Only
       partly stated in the docs.
 
 ## Memory algorithm follow-ups (raised 2026-10-02, ADR-0036)

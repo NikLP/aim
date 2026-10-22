@@ -37,7 +37,7 @@ mechanism and alternatives considered.
   outside a real HTTP request. Use `curl` against the live endpoint.
 - **`aim_chatbot:recall` abstains past a distance cutoff** - rows whose
   cosine distance exceeds `aim.settings:recall_max_distance` (default
-  0.45, editable at `/admin/config/aim/settings`, read via
+  0.48, editable at `/admin/config/aim/settings`, read via
   `AimMemoryManager::getRecallMaxDistance()`) are dropped, and an empty
   remainder returns "No relevant facts found." instead of a "Relevant
   facts:" list. `AimMemoryManager::recall()` itself does not filter, so

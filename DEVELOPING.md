@@ -59,7 +59,7 @@ parsing caller. **`score` is a cosine *distance*, not a similarity** -
 better match. The table column is labeled `Distance`; the JSON key stays
 `score` to match search_api's own naming. Raw by default (the nearest
 facts however far, which is what calibrating the cutoff needs);
-`--max-distance=0.45` drops matches past that distance, as the chatbot and
+`--max-distance=0.48` drops matches past that distance, as the chatbot and
 the MCP tool do by default with `aim.settings:recall_max_distance`.
 
 Untrusted facts (ADR-0002's addendum) are excluded unless
