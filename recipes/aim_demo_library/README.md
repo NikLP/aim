@@ -12,6 +12,9 @@ consolidation without any real data.
   (`aim_chatbot` agent and `aim_demo_assistant`) and its tools (the two
   memory tools plus `aim_literal` for exact values), the chat block's
   wording and its signed-in-only visibility (only if the block exists),
+  the block's finder-first gate (`aim_chatbot_gate`, with
+  `literals_finder` installed: a clear exact-value question is answered
+  from the literal with no chat model),
   `access deepchat api`, `create site aim facts` and `view restricted
   literals` for signed-in users,
   `view literals` for everyone, and
@@ -35,6 +38,9 @@ provider.
 ## Requirements
 
 - Drupal 11 and MariaDB 11.7 or newer (for `VECTOR`).
+- A default decision model (Decision on `/admin/config/ai/settings`) for
+  the finder; without one the gate passes every question to the
+  assistant.
 - `drupal/ai` plus a chat provider and an embeddings provider: Ollama with
   `nomic-embed-text` (the shipped index uses it), or a hosted one, in which
   case also remove the `index_directly` action.
@@ -55,10 +61,9 @@ ddev drush search-api:index aim_vector_index
 ```
 
 Use the container path, and adjust `contrib` to `custom` (as on this dev
-site) to wherever the module lives. To reset the facts to the
-recipe's 31 (removing any added since), delete them first:
-`ddev drush entity:delete aim_fact -y` and `ddev drush queue:delete
-aim_consolidate`, then the two commands above.
+site) to wherever the module lives. The recipe is strict: it refuses to
+apply over config that differs from what it ships, so once the models are
+set up (below) it cannot be re-applied; reset by reinstalling instead.
 
 Apply it to a fresh site, not one with data you care about: it overwrites
 the settings above, and the facts are added on top of whatever is there
@@ -135,17 +140,9 @@ questions and expected answers are in
 Facts added during a run stay until you reset. The chat widget is for
 logged-in users only (anonymous visitors don't see it and `/api/deepchat`
 returns 403), so the audience can't add facts through it. Return to the
-starting state by deleting every fact and re-applying the recipe:
-
-```bash
-ddev drush entity:delete aim_fact -y
-ddev drush queue:delete aim_consolidate
-ddev drush recipe /var/www/html/web/modules/contrib/aim/recipes/aim_demo_library
-ddev drush search-api:index aim_vector_index
-```
-
-Re-applying skips literals that already exist, so a literal edited on
-stage keeps its edit; put it back by hand.
+starting state by reinstalling the site and following "Fresh install"
+below (the recipe is strict, so it will not re-apply over the manual model
+setup). A literal edited on stage is restored by the reinstall too.
 
 ### Suggested flow (about 8 minutes)
 

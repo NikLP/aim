@@ -5,8 +5,9 @@ How a fact moves through the module, as the code stands on 2026-10-02
 `AimGuardrailsConstraint`, `aim_tool`, `aim_chatbot`). Not a decision
 record: for the reasoning see [0000-index.md](0000-index.md).
 
-Five diagrams: write path (1), consolidation (2), recall (3), and
-call counts for a sample round (4), and exact values (5). The
+Six diagrams: write path (1), consolidation (2), recall (3), call
+counts for a sample round (4), exact values (5), and one chat turn end
+to end (6, as of 2026-10-22). The
 write path ends by enqueuing a fact for consolidation, which is the
 hand-off into diagram 2. Diagram 3 reads what diagrams 1 and 2 left in
 the vector table.
@@ -316,7 +317,7 @@ flowchart TD
   classDef bad fill:#fdd,stroke:#c53030,color:#4a0000
 
   Q["Visitor question"]:::code
-  A["Chat model (the gate)<br/>decides what it needs"]:::llm
+  A["Chat model<br/>decides what it needs"]:::llm
 
   subgraph MEM["Memory: aim_recall"]
     R1["Embed the question,<br/>nearest facts by vector distance"]:::vec
@@ -327,7 +328,7 @@ flowchart TD
     R6["Fact withheld whole<br/>(debug: [redacted])"]:::bad
   end
 
-  subgraph LIT["Exact value: literals:lookup tool"]
+  subgraph LIT["Exact value: aim_literal tool"]
     L1["By key, search words,<br/>or question (finder, optional)"]:::code
     L2["Resolve the value<br/>access checked for the viewer"]:::code
     L3["Label and exact value<br/>(no value if not allowed)"]:::code
@@ -343,10 +344,84 @@ flowchart TD
 
 Read it this way:
 
-- **The model is the gate.** It decides whether a question is a one-shot
-  value lookup, so nothing calls a decision model on every recall.
+- **The chat model chooses.** It decides whether a question needs a
+  value lookup, so nothing calls a decision model on every recall. (The
+  separate finder-first gate, which can answer before the chat model runs,
+  is in diagram 6.)
 - **Nothing is copied.** The value lives in the literal; a fact holds at most
   a token, so editing the literal changes every answer with no reindex.
 - **Who sees what is decided at read time**, by the person asking.
 - **The finder is optional.** It only maps a loose question to a literal for
   the tool's `question` mode; key and search-word lookups need no model.
+
+## 6. One chat turn, end to end
+
+What happens between a visitor typing in the chat widget and the reply,
+with the demo recipe's settings. Each box says which module does it.
+
+```mermaid
+flowchart TD
+  classDef llm fill:#cfe3ff,stroke:#2b6cb0,color:#102a43
+  classDef vec fill:#ffe2c2,stroke:#c05621,color:#3d1f00
+  classDef code fill:#eceff1,stroke:#607d8b,color:#1f2a30
+  classDef bad fill:#fdd,stroke:#c53030,color:#4a0000
+
+  V["Visitor types a message<br/>in the chat block"]:::code
+  ACC{"Allowed?<br/>block shown + access deepchat api<br/>+ assistant roles"}:::code
+  NO["No widget / refused"]:::bad
+
+  subgraph GATE["1. Gate (aim_chatbot_gate processor, optional)"]
+    G1{"literals_finder<br/>installed?"}:::code
+    G2["Finder: decision model picks<br/>one literal from the gist menu<br/>(question + gists, no values)"]:::llm
+    G3{"Clear match?<br/>score 0.8+, lead 0.4+"}:::code
+    G4["Reply from a fixed template:<br/>label + exact value + gist<br/>no chat model"]:::code
+  end
+
+  subgraph AGENT["2. Assistant (ai_agents agent aim_chatbot, up to 7 loops)"]
+    P["Optional: recall in code<br/>(recall_context setting)<br/>facts added to this turn's prompt"]:::vec
+    M["Chat model reads persona,<br/>conversation so far, the message"]:::llm
+    T{"Calls a tool?"}:::code
+    R["aim_chatbot:recall<br/>embed, nearest trusted site facts,<br/>cutoff, [literal:key] filled in"]:::vec
+    L["aim_literal<br/>value by key or search words<br/>(question mode needs the finder)"]:::code
+    W["aim_chatbot:remember<br/>Guardrails, grounded check (if on),<br/>saved untrusted for review"]:::code
+  end
+
+  OUT["Reply shown; visitor message and<br/>reply kept in session history<br/>(not the recalled facts)"]:::code
+
+  V --> ACC
+  ACC -->|no| NO
+  ACC -->|yes| G1
+  G1 -->|no| P
+  G1 -->|yes| G2 --> G3
+  G3 -->|yes| G4 --> OUT
+  G3 -->|"no, or finder error"| P
+  P --> M --> T
+  T -->|recall| R --> M
+  T -->|exact value| L --> M
+  T -->|save a fact| W --> M
+  T -->|"no, answer"| OUT
+```
+
+Read it this way:
+
+- **Two stages, and the first is optional.** The gate only exists when the
+  block's chat processor is `aim_chatbot_gate` and `literals_finder` is
+  installed. It answers "what's your phone number?" questions on its own,
+  with one small decision call and no chat model, and hands anything it is
+  unsure of to the assistant. Without the finder it passes everything on.
+- **The assistant is a loop.** The chat model either answers or asks for a
+  tool; each tool result goes back to it, up to 7 rounds. Recall is not
+  forced (`require_usage` off): the persona asks it to recall first, and
+  forcing it made correct answers get thrown away.
+- **Three tools, three jobs.** Recall finds remembered facts (memory).
+  `aim_literal` fetches an exact value (the `literals` store). Remember
+  saves something the visitor said, as an untrusted fact a reviewer
+  approves.
+- **Exact values never come from the model's memory.** They come from a
+  literal: through the gate's template, a `[literal:key]` token in a
+  recalled fact, or `aim_literal`. All three read as the visitor, so a
+  restricted value stays hidden from someone not allowed to see it.
+- **Models involved:** the chat model (amazee here) for the assistant;
+  Ollama embeddings for recall and for indexing a saved fact; the decision
+  model (Jev) for the finder and the grounded check. A remembered fact is
+  later queued for consolidation (diagram 2), off the request path.

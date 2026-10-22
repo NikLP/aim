@@ -283,6 +283,225 @@ final class AimChatbotEvalCommands extends DrushCommands {
   }
 
   /**
+   * Runs multi-turn conversations through the assistant, per recall mode.
+   *
+   * Each scenario is one thread: its turns share the assistant's history, as
+   * in the widget. Modes, for this process only: "forced" turns
+   * require_usage on for recall (shipped until 2026-10-22), "free" turns it
+   * off (shipped since), "context" turns it off, recalls in code for each
+   * message (AimChatbotRecallContextSubscriber) and drops the persona's "recall
+   * first" sentence. A turn passes when its checks pass and the agent did not
+   * run out of loops. Scenario format: see the site's demo/chat-eval/.
+   */
+  #[CLI\Command(name: 'aim:chatbot-converse')]
+  #[CLI\Argument(name: 'file', description: 'Scenario YAML: as, scenarios[name, turns[q, any, all, not, literal]].')]
+  #[CLI\Option(name: 'assistant', description: 'Assistant ID (default aim_demo_assistant).')]
+  #[CLI\Option(name: 'modes', description: 'Comma-separated: forced, free, context (default all three).')]
+  #[CLI\Option(name: 'repeat', description: 'Run each scenario this many times per mode (default 1).')]
+  #[CLI\Option(name: 'only', description: 'Comma-separated scenario names to run.')]
+  #[CLI\Option(name: 'dump', description: 'Write every reply and call count to this JSON file.')]
+  public function converse(
+    string $file,
+    array $options = [
+      'assistant' => 'aim_demo_assistant',
+      'modes' => 'forced,free,context',
+      'repeat' => 1,
+      'only' => '',
+      'dump' => '',
+    ],
+  ): void {
+    if (!is_file($file)) {
+      throw new \InvalidArgumentException("No scenario file at $file");
+    }
+    $data = Yaml::decode(file_get_contents($file));
+    $scenarios = $data['scenarios'] ?? [];
+    if ($options['only']) {
+      $only = array_map('trim', explode(',', $options['only']));
+      $scenarios = array_values(array_filter($scenarios, fn (array $s): bool => in_array($s['name'], $only, TRUE)));
+    }
+    $GLOBALS['config']['ai_assistant_api.ai_assistant.' . $options['assistant']]['roles']['authenticated'] = 'authenticated';
+    $assistant = $this->entityTypeManager->getStorage('ai_assistant')->load($options['assistant']);
+    if (!$assistant) {
+      throw new \InvalidArgumentException('No such assistant: ' . $options['assistant']);
+    }
+    $agentId = (string) $assistant->get('ai_agent');
+    $account = $this->visitor($data['as'] ?? 1);
+    $repeat = max(1, (int) $options['repeat']);
+
+    $this->dispatcher->addListener(PreGenerateResponseEvent::EVENT_NAME, $pre = $this->onPre(...));
+    $this->dispatcher->addListener(PostGenerateResponseEvent::EVENT_NAME, $post = $this->onPost(...));
+    $this->dispatcher->addListener(AgentToolPreExecuteEvent::EVENT_NAME, $tool = $this->onTool(...));
+    $summary = [];
+    $dump = [];
+    try {
+      foreach (array_map('trim', explode(',', $options['modes'])) as $mode) {
+        $this->applyRecallMode($mode, $agentId);
+        $rows = [];
+        $tot = [
+          'turns' => 0,
+          'ok' => 0,
+          'convs' => 0,
+          'convok' => 0,
+          'loops' => 0,
+          'err' => 0,
+          'calls' => 0,
+          's' => 0.0,
+        ];
+        foreach ($scenarios as $scenario) {
+          for ($r = 1; $r <= $repeat; $r++) {
+            $thread = "converse-$mode-{$scenario['name']}-$r-" . bin2hex(random_bytes(4));
+            $allOk = TRUE;
+            $this->accountSwitcher->switchTo($account);
+            try {
+              $this->runner->setAssistant($assistant);
+              $this->runner->setThrowException(TRUE);
+              $this->runner->setThreadsKey($thread);
+              $this->runner->resetMessageHistory();
+              foreach ($scenario['turns'] as $t => $turn) {
+                $this->run = ['calls' => 0, 'in' => 0, 'out' => 0, 'tools' => [], 'prov' => [], 'gate' => '-'];
+                $start = microtime(TRUE);
+                $error = FALSE;
+                try {
+                  $this->runner->setUserMessage(new UserMessage($turn['q']));
+                  $reply = trim($this->runner->process()->getNormalized()->getText());
+                  $this->runner->setAssistantMessage($reply);
+                }
+                catch (\Throwable $e) {
+                  $error = TRUE;
+                  $reply = 'ERROR ' . $e->getMessage();
+                }
+                $took = microtime(TRUE) - $start;
+                $looped = !$error && stripos($reply, 'processing steps') !== FALSE;
+                $verdict = $error ? 'error' : ($looped ? 'loops' : $this->checkTurn($turn, $reply, $account));
+                $allOk = $allOk && $verdict === 'ok';
+                $tot['turns']++;
+                $tot['s'] += $took;
+                $tot['calls'] += $this->run['calls'];
+                match ($verdict) {
+                  'ok' => $tot['ok']++,
+                  'loops' => $tot['loops']++,
+                  'error' => $tot['err']++,
+                  default => NULL,
+                };
+                $rows[] = [
+                  $verdict,
+                  $scenario['name'] . ($repeat > 1 ? " #$r" : '') . ' ' . ($t + 1),
+                  mb_strimwidth($turn['q'], 0, 40, '...'),
+                  $this->run['calls'],
+                  implode(',', $this->run['tools']) ?: '-',
+                  sprintf('%.1fs', $took),
+                ];
+                $dump[$mode][] = [
+                  'scenario' => $scenario['name'],
+                  'run' => $r,
+                  'turn' => $t + 1,
+                  'q' => $turn['q'],
+                  'verdict' => $verdict,
+                  'reply' => $reply,
+                  'seconds' => round($took, 1),
+                ] + $this->run;
+              }
+            }
+            finally {
+              $this->accountSwitcher->switchBack();
+            }
+            $tot['convs']++;
+            $tot['convok'] += $allOk ? 1 : 0;
+          }
+        }
+        $this->io()->section("Mode: $mode");
+        $this->io()->table(['', 'Scenario turn', 'Question', 'Calls', 'Tools', 'Time'], $rows);
+        $n = max(1, $tot['turns']);
+        $summary[] = [
+          $mode,
+          sprintf('%d/%d', $tot['ok'], $tot['turns']),
+          sprintf('%d/%d', $tot['convok'], $tot['convs']),
+          $tot['loops'],
+          $tot['err'],
+          sprintf('%.1f', $tot['calls'] / $n),
+          sprintf('%.1fs', $tot['s'] / $n),
+        ];
+      }
+    }
+    finally {
+      $this->dispatcher->removeListener(PreGenerateResponseEvent::EVENT_NAME, $pre);
+      $this->dispatcher->removeListener(PostGenerateResponseEvent::EVENT_NAME, $post);
+      $this->dispatcher->removeListener(AgentToolPreExecuteEvent::EVENT_NAME, $tool);
+      unset($GLOBALS['config']['ai_agents.ai_agent.' . $agentId]);
+      $this->configFactory->reset('ai_agents.ai_agent.' . $agentId);
+      Cache::invalidateTags(['config:ai_agents.ai_agent.' . $agentId]);
+    }
+
+    $this->io()->section('Summary (per-turn means)');
+    $this->io()->table(['Mode', 'Turns ok', 'Conversations ok', 'Out of loops', 'Errors', 'Calls', 'Time'], $summary);
+    if ($options['dump']) {
+      file_put_contents($options['dump'], json_encode($dump, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    }
+  }
+
+  /**
+   * Overrides the agent config for a recall mode, for this process only.
+   *
+   * @param string $mode
+   *   The mode: forced, free or context; see converse().
+   * @param string $agentId
+   *   The ai_agent ID.
+   */
+  protected function applyRecallMode(string $mode, string $agentId): void {
+    $name = 'ai_agents.ai_agent.' . $agentId;
+    unset($GLOBALS['config'][$name]);
+    $this->configFactory->reset($name);
+    if (!in_array($mode, ['forced', 'free', 'context'], TRUE)) {
+      throw new \InvalidArgumentException("Unknown mode: $mode");
+    }
+    $config = $this->configFactory->get($name)->getRawData();
+    $settings = $config['tool_settings'];
+    $settings['aim_chatbot:recall']['require_usage'] = $mode === 'forced' ? 1 : 0;
+    $override = ['tool_settings' => $settings];
+    if ($mode === 'context') {
+      $override['third_party_settings']['aim_chatbot']['recall_context'] = TRUE;
+      $override['system_prompt'] = preg_replace('/\s*Check memory with the recall tool first[^.]*\./', '', (string) $config['system_prompt']);
+    }
+    $GLOBALS['config'][$name] = $override;
+    $this->configFactory->reset($name);
+    $this->entityTypeManager->getStorage('ai_agent')->resetCache([$agentId]);
+    Cache::invalidateTags(['config:' . $name]);
+  }
+
+  /**
+   * Checks one turn's reply against its expectations.
+   *
+   * @param array $turn
+   *   The turn: any (one of these substrings), all, not (none of these), and
+   *   literal (a key whose value must appear).
+   * @param string $reply
+   *   The reply.
+   * @param \Drupal\Core\Session\AccountInterface $account
+   *   The visitor.
+   *
+   * @return string
+   *   ok or wrong.
+   */
+  protected function checkTurn(array $turn, string $reply, AccountInterface $account): string {
+    $has = fn (string $needle): bool => stripos($reply, $needle) !== FALSE;
+    if (!empty($turn['any']) && !array_filter((array) $turn['any'], $has)) {
+      return 'wrong';
+    }
+    foreach ((array) ($turn['all'] ?? []) as $needle) {
+      if (!$has($needle)) {
+        return 'wrong';
+      }
+    }
+    if (array_filter((array) ($turn['not'] ?? []), $has)) {
+      return 'wrong';
+    }
+    if (!empty($turn['literal']) && !$this->contains($reply, $turn['literal'], $account)) {
+      return 'wrong';
+    }
+    return 'ok';
+  }
+
+  /**
    * Builds the visitor for a gold item's "as".
    *
    * @param int|string $as

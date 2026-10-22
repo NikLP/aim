@@ -200,3 +200,14 @@ faults: `jev-latest` AUC 1.00, but at the default 0.5 cutoff one bad merge
 neither of the 2 misses was fixed and "same" does not separate NOOP (median
 0.49). The `merges-split` mode (three small noul questions, minimum score)
 exists in the eval script.
+
+## Addendum (2026-10-22): thresholds on `subq-snap-preview`
+
+Re-measured with `decision-eval.php` after a site reset. Verifier, hard
+merge set (20): AUC 0.99, good min 0.83, bad max 0.84; at 0.8 two of 12 bad
+merges passed, so `activities.verifier.threshold` is 0.85 (a held good merge
+only leaves two facts separate; a passed bad one loses detail). Grounding
+(52): AUC 0.99, supported min 0.92, unsupported max 0.61 except one miss at
+0.98 that no threshold catches; `activities.grounding.threshold` 0.8.
+`subq-snap-1.1` was refused for this site's key in the eval ("not permitted
+for this API key") though a single call worked, so it is unmeasured.

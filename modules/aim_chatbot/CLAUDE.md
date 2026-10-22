@@ -32,13 +32,22 @@ the `site` bundle this hardcode relies on is guaranteed installed.
   is the switch: changing `chat_processor_plugin` back to
   `ai_assistant_api_processor` turns the gate off. Audit lines carry IDs
   only. Needs `literals_finder` to do anything; without it, a pass-through.
-- The agent forces memory: `aim_chatbot:recall` has `require_usage` on, so
-  the assistant cannot answer without having checked memory (the reminder
-  re-enters its loop), and `max_loops` is 7 to fit lookup, recall and the
-  answer. Without it the model picked one of lookup or recall per question
-  and stopped (wifi password 0 of 5, now 5 of 5). Costs about 4-12 s on
-  questions the gate passes (it was 3-5 s). The `aim_demo_library` recipe
-  sets both; re-applying an older recipe would reset them.
+- Recall is not forced: `require_usage` is off on `aim_chatbot:recall`
+  (shipped and in the `aim_demo_library` recipe, which also sets
+  `max_loops` 7). Forcing it made `ai_agents` discard a correct answer
+  whenever a turn ended without a recall call (a second question in a
+  conversation, an off-topic refusal) and loop to `max_loops`. Measured
+  2026-10-22 with `drush aim:chatbot-converse` (site's
+  `demo/chat-eval/`): forced 32/36 turns, 3 out of loops, 6.3 s a turn;
+  off 36/36, 3.6 s. The older "wifi 0 of 5 without it" did not reproduce
+  on that model.
+- `src/EventSubscriber/AimChatbotRecallContextSubscriber.php` - optional
+  recall in code: with the agent's third-party setting
+  `aim_chatbot.recall_context: true`, each visitor message (and it with the
+  previous one, for follow-ups) is recalled before the model runs and the
+  facts are added to that turn's system prompt only, never to stored
+  history. The recall tool stays available. Off by default; measured
+  35/36 at 2.3 s a turn, the one miss a literal choice.
 - `src/EventSubscriber/AimChatbotSourceTextSubscriber.php` - before the
   remember tool runs, passes it the visitor's last message plus the
   assistant turn before it, for the grounded check

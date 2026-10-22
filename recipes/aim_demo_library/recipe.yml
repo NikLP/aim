@@ -10,15 +10,18 @@ install:
   - aim_chatbot
   - aim_tool
   - literals
+  - literals_finder
   - tool_ai_connector
   - ai_agents
   - ai_assistant_api
   - search_api
 config:
+  strict: true
   # Core installs a recipe's modules in config-syncing mode, which skips each
   # module's config/install (dependencies included), so import it here.
   import:
     literals: '*'
+    literals_finder: '*'
     aim: '*'
     aim_scope_site: '*'
     aim_scope_user: '*'
@@ -49,7 +52,7 @@ config:
           'tool:aim_literal': true
         tool_settings:
           'aim_chatbot:remember': { return_directly: 0, require_usage: 0, description_override: '', progress_message: '', use_artifacts: 0 }
-          'aim_chatbot:recall': { return_directly: 0, require_usage: 1, description_override: '', progress_message: '', use_artifacts: 0 }
+          'aim_chatbot:recall': { return_directly: 0, require_usage: 0, description_override: '', progress_message: '', use_artifacts: 0 }
           'tool:aim_literal': { return_directly: 0, require_usage: 0, description_override: '', progress_message: '', use_artifacts: 0 }
         tool_usage_limits:
           'aim_chatbot:remember': {  }
@@ -89,6 +92,17 @@ config:
         settings.label: "Harbourside Library assistant"
         settings.bot_name: "Library Assistant"
         settings.placement: bottom-right
+        # The finder-first gate: a clear exact-value question ("what's your
+        # phone number?") is answered from the literal with no chat model;
+        # anything else goes to the assistant. The finder uses the site's
+        # default decision model; without one the gate passes everything on.
+        settings.chat_processor_plugin: aim_chatbot_gate
+        settings.plugin_configuration:
+          assistant_id: aim_demo_assistant
+          stream_output: false
+          verbose_mode: false
+          gate_match_threshold: 0.8
+          gate_choice_margin: 0.4
         settings.style_file: 'module:ai_chatbot:bard.yml'
         settings.first_message: "Hi! I'm the Harbourside Library assistant. Ask me about opening hours, borrowing, membership, computers and Wi-Fi, meeting rooms, accessibility or regular children's events. If you tell me something new, I'll note it for staff to review."
         visibility:

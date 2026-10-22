@@ -3,3 +3,8 @@ services:
     class: Drupal\aim_chatbot\EventSubscriber\AimChatbotSourceTextSubscriber
     tags:
       - { name: event_subscriber }
+  aim_chatbot.recall_context_subscriber:
+    class: Drupal\aim_chatbot\EventSubscriber\AimChatbotRecallContextSubscriber
+    arguments: ['@entity_type.manager', '@aim.recall', '@aim.settings_reader', '@aim.memory_manager', '@current_user']
+    tags:
+      - { name: event_subscriber }

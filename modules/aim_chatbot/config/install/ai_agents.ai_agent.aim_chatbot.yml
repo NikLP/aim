@@ -20,7 +20,7 @@ tool_settings:
     use_artifacts: 0
   'aim_chatbot:recall':
     return_directly: 0
-    require_usage: 1
+    require_usage: 0
     description_override: ''
     progress_message: ''
     use_artifacts: 0

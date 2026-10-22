@@ -7,3 +7,11 @@ ai_chat_processor.configuration.aim_chatbot_gate:
     gate_choice_margin:
       type: float
       label: 'Lead over the runner-up needed for the gate to answer'
+
+ai_agents.ai_agent.*.third_party.aim_chatbot:
+  type: mapping
+  label: 'AIM chatbot settings'
+  mapping:
+    recall_context:
+      type: boolean
+      label: 'Recall site facts for each visitor message and add them to the system prompt'

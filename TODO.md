@@ -9,8 +9,9 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
 
 ## Chat quality and evals: open after the 2026-10-15/16 session
 
-State: finder-first gate live, recall forced (`require_usage`, `max_loops` 7),
-persona says "recall first", chat writes untrusted and permission-checked,
+State: recall not forced (`require_usage` off since 2026-10-22, see
+`modules/aim_chatbot/CLAUDE.md`), persona says "recall first", the demo
+recipe installs `literals_finder` and puts its block on the gate, chat writes untrusted and permission-checked,
 turns about 4.7 s with 2 hosted calls (details in the Literals entry below
 and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
 
@@ -29,17 +30,34 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       alongside the vectors (below), a broader second recall when the first
       is thin, or a relevance step over a wider candidate set. Then the
       accept/pass widget as the safety net (parked, Literals entry).
-- [ ] **Latency and cost of the fall-through path.** 2 hosted calls per turn
-      (recall, answer). Options if it must drop: run recall in code and hand
-      the model the facts for that turn only (not the stored history), or
-      drop the assistant's own lookup tool now the gate runs the finder.
-      Test against the 74-item gold set before dropping anything.
-      **Must be a config-only switch, not a new default:** follow
-      `AimGateProcessor`'s existing pattern (block's `chat_processor_plugin`
-      selects gate vs. plain `ai_assistant_api_processor`; `gate()` no-ops
-      through to plain when its dependency is absent/disabled, see
-      `modules/aim_chatbot/CLAUDE.md`). A site whose use case barely needs
-      recall must be able to opt out the same way, with zero code change.
+- [ ] **Recall in code: keep, default or delete.**
+      `AimChatbotRecallContextSubscriber` is off by default (results in
+      `modules/aim_chatbot/CLAUDE.md`). Keep as an option, make it the
+      default after more runs and scenarios (short category queries, unknown
+      topics), or delete it (the subscriber, its test, the schema entry and
+      the eval's `context` mode).
+- [ ] **Move the chat eval commands out of `aim_chatbot`.**
+      `aim:chatbot-eval` and `aim:chatbot-converse` are dev tooling; move
+      them to `aim_benchmark` (which exists so production sites don't ship
+      dev-only tools), offered only when the chat modules are present. Facts could
+      carry `[literal:key]` tokens (resolved by `recall()` for the viewer)
+      where a fact names a value, so the widget needs no lookup call - a
+      data-model choice for the recipe, not tuning to pass the eval.
+- [ ] **`aim:chatbot-eval` hides provider failures (found 2026-10-22).** When
+      the provider cannot be reached the agent swallows the error
+      (`getLastError()`), so the eval reports 0 calls and the question
+      echoed back, not an error. Check `getLastError()` or zero calls and
+      report it; `aim:chatbot-converse` has the same gap.
+- [ ] **`aim_literal`'s `question` input without the finder (2026-10-22 test
+      report).** The tool advertises `question`, which fails when
+      `literals_finder` is off (the demo recipe installs it since
+      2026-10-22; other sites may not), so the model spends a loop step on
+      the failure before using `search`. Hide the input when the finder is
+      absent.
+- [ ] **Upstream: assistant roles check (ai_assistant_api).**
+      `AiAssistantApiRunner::userHasAccess()` tests
+      `isset($chosen_roles['anonymous'])` on a list, so ticking only
+      "anonymous" lets nobody but uid 1 in. Search the queue, then file.
 - [ ] **Processor test.** `AimGateProcessor` has no PHPUnit test; the finder
       overrides and the "unavailable" outcome do. Also no test for the
       chat remember permission check or the untrusted default.
@@ -64,9 +82,8 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       `.gitignore`) before the next commit. Check with
       `git diff config/sync/key.key.*` (values not shown here).
 - [ ] **Housekeeping.** `aim_chatbot`'s shipped block still uses the plain
-      processor (only this site's block uses the gate). Test facts 141, 148,
-      149, 150 are retired, not deleted. Recipe `literals_base` no longer
-      grants `view restricted literals` to authenticated. The `login` literal
+      processor (the demo recipe switches it to the gate). Recipe `literals_demo_library` does
+      not grant `view restricted literals` to authenticated. The `login` literal
       resolves to nothing for signed-in visitors (the widget is signed-in
       only), so "where do I log in" correctly finds nothing; the assistant
       does not yet say "you are already signed in".
@@ -85,8 +102,8 @@ gate are built. Work on the literals modules themselves is in
       pre-gate ("is this a lookup?" ahead of the finder) only if measured
       to pay.
 - [ ] **Finder-first gate: open points.** Whether gate replies go into the
-      stored history; a Jev-written sentence around the value instead of the
-      bare template; local Jev latency unmeasured; a gate-hit line in the
+      stored history; a friendlier reply than the bare template (our own
+      wording: Jev is a decision model and cannot write text); local Jev latency unmeasured; a gate-hit line in the
       review queue (design in `modules/aim_chatbot/CLAUDE.md`).
 
 ## Plugin, skills and the verbal webform demo (raised 2026-10-09, important)
@@ -110,11 +127,13 @@ gate are built. Work on the literals modules themselves is in
       it. Blockers: `annotations` has no write path and the `aim_annotations`
       bridge (ADR-0024) is unbuilt; submissions need a narrow,
       permission-gated write tool, not general entity writes.
-- [ ] **Apply `aim_demo_library` to a fresh install (raised 2026-10-10).**
-      The reset on this site (delete facts, re-apply; commands in
-      `demo/README.md`) ran 2026-10-10: 31 facts indexed on import, all 13
-      pre-flight checks passed. A fresh install is still untested. Also
-      decide whether the demo needs a front page again.
+- [ ] **Fresh install docs.** The recipe README's "Fresh install" should
+      say to apply `aim_ollama_local` (or set the Ollama host and
+      embeddings default) before this recipe, since facts are embedded on
+      import, and add a stop after it for manual model setup (chat
+      provider, decision models and thresholds on the Models tab,
+      `grounding_mode`); run `node demo/preflight.js`; decide whether the
+      demo needs a front page again.
 - [ ] **Re-check what the personas assume the assistant can see** (a
       signed-in member only gets facts through `view site aim facts`;
       `aim_literal` needs only `view literals` since 2026-10-10), and
@@ -122,11 +141,16 @@ gate are built. Work on the literals modules themselves is in
 
 ## Recipes (raised 2026-09-27)
 
-- [ ] Apply `recipes/aim_demo_library` to an isolated scratch site (its
-      own database) and fix whatever breaks: it has only passed core's
-      schema validation. Then confirm `aim:remember --file` loads all 31
-      facts and the demo questions in the recipe README's "Running the demo"
-      answer as before.
+- [ ] Run the demo questions in the recipe README's "Running the demo" on
+      the fresh install.
+- [ ] **`aim:consolidate --dry-run` prints every compared pair** (2026-10-22
+      test report: 32 rows, 31 unrelated ADDs at 0.33-0.44, the one useful
+      NOOP lost on stage). Add `--changes-only`, or make it the dry-run
+      default with a flag for all rows.
+- [ ] **MCP checks for `mcp_server_tool_bridge` beta5.** When
+      `aim_tool_oauth` is next enabled: check the three tools list without a cache rebuild and
+      that `pmu aim_tool` leaves no `mcp_tool_config.aim_*` behind; refresh
+      the "observed with beta3" notes in aim_tool's README/DEVELOPING.md.
 
 ## Ingestion
 
@@ -176,6 +200,20 @@ only work to do is listed here.
       operation of `AimFactAccessControlHandler`; build with the form), and
       later an optional `aim_trust` submodule (`TrustPolicyResolverInterface`
       out of `AimTrustPolicy`) when a second rule set or audit fields appear.
+- [ ] **Settings form: say what is optional (raised 2026-10-22).** The
+      Models tab's grounding fieldset should say the check is optional (off
+      by default; trust then comes from `trust_policy` alone) and needs a
+      provider with the `decision` operation (no chat path, ADR-0037).
+      Consolidation and the verifier keep their chat option: it is the
+      baseline any chat provider can run; a decision model is the upgrade.
+- [ ] **`subq-snap-1.1`: find why the eval was refused, then re-measure**
+      the verifier and grounding thresholds on it (ADR-0021's 2026-10-22
+      addendum). The finder's calls on it work; `decision-eval.php`'s
+      grounding run got "not permitted for this API key".
+- [ ] **Sovereignty wording is stale (Nik, 2026-10-22).** Local chat model
+      support is no longer forced, but ADR-0004 and CLAUDE.md decision 5
+      still say extraction/consolidation "must support Ollama". Add an
+      ADR-0004 addendum with the current position and fix decision 5.
 - [ ] **Grounded check: enforce.** Review shadow scores on real use, then
       set `grounding_mode: enforce`. Also: per-model question text;
       `ingest_max_chars` and a passage limit for the decision call (untested
