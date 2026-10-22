@@ -8,9 +8,9 @@ activities:
   verifier: { backend: chat, provider: '', model: '' }
   grounding: { backend: decision, provider: '', model: '' }
 grounding_mode: 'off'
-merge_max_distance: 0
+merge_max_distance: 0.0
 recall_max_distance: 0.48
-recall_gap: 0
+recall_gap: 0.0
 default_trusted: false
 trust_policy:
   default: ''
