@@ -61,7 +61,9 @@ config:
     # the block's markup, so both layers matter). The assistant recalls as
     # the visitor, so a member needs to view site facts or recall is empty.
     # The lookup tool reads literals as the visitor too: everyone sees the
-    # public ones, only signed-in visitors the restricted ones.
+    # public ones, only signed-in visitors the restricted ones. A member can
+    # tell the assistant a fact, which waits untrusted for review (chat
+    # ships as hold); a reviewer's own fact starts trusted (ADR-0037).
     user.role.anonymous:
       grantPermissions:
         - 'view literals'
@@ -69,6 +71,7 @@ config:
       grantPermissions:
         - 'access deepchat api'
         - 'view site aim facts'
+        - 'create site aim facts'
         - 'view literals'
         - 'view restricted literals'
     # The persona waits for the visitor to confirm before saving, which needs

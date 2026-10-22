@@ -360,3 +360,46 @@ column" is not built: the facts list's Trusted and Grounding filters do the
 job for now, and `aim:status` shows the untrusted count. No audit fields
 (`trusted_by`, `trusted_at`, `trust_basis`): add them before real data
 (ADR-0056).
+
+### Writer's permissions (2026-10-22)
+
+Found on the test site (aim b70a28b): `resolve()` looked only at channel
+and scope, so the presenter's own chat fact was held like a visitor's,
+while a Drush or ingest write of the same text followed `default_trusted`.
+Who writes matters more than the route.
+
+1. **A reviewer's write starts trusted.** `resolve()` takes the writing
+   account (the current user). If it holds `administer aim`, `review aim
+   facts` or `trust {scope} aim facts` (`AimTrustPolicy::canApprove()`, the
+   permissions the Trust/Untrust actions already check) the policy is
+   `trusted`, whatever the channel. Otherwise the channel/scope rules apply
+   as before; chat still ships as `hold`. No new permission or setting.
+2. **The explicit override uses the same check.** `remember()`'s
+   `trusted: TRUE` was already ignored for an unprivileged caller
+   (2026-10-19, above); it now also accepts `review aim facts`, so the
+   override and the access handler agree.
+3. **Enforce mode may still demote a reviewer's fact.** The writer's
+   permission changes the start, not the check. The grounded check only
+   runs where there is source text, and on every such path the fact's
+   wording is the model's, not the writer's: the chat assistant phrases
+   what the visitor said, extraction phrases a document, an MCP agent
+   phrases its own conversation. A reviewer's say-so covers what they meant,
+   not that the model wrote it down faithfully, which is what the check
+   tests. A demotion is visible (Grounding filter, audit line) and the
+   reviewer trusts it by hand in one action. The reviewer's say-so for an
+   exact text is the explicit `trusted: TRUE`, which still wins over the
+   check. (Considered and rejected: a fourth policy value, "approved",
+   never demoted.)
+4. **Who the writer is per channel.** Drush runs as anonymous (Drush 13
+   has no `--uid`/`--user` option), so Drush writes keep following the
+   `drush` rule. The ingest form and chat are the signed-in user. An MCP
+   caller is its OAuth token's user, with permissions narrowed to what the
+   token's scopes grant (simple_oauth's `Oauth2AccessPolicy`); the
+   `aim:remember`/`aim:recall` scopes grant no trust permission, so a
+   non-admin MCP writer follows the `mcp` rule unless a role-granularity
+   scope carries a reviewer role. An admin-role token keeps the admin
+   bypass and writes trusted.
+
+Consequence: on a site in enforce mode an admin's chat or ingest write is
+live at once if it grounds; on this site (shadow mode) it is live at once.
+Kernel test: `AimGroundingTest::testWriterCanApprove`.

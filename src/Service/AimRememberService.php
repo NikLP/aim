@@ -72,9 +72,9 @@ class AimRememberService {
   /**
    * Reduces a caller's explicit trusted value to what it may set.
    *
-   * FALSE is always honored (it only withholds). TRUE needs the admin
-   * permission or the scope's trust permission; from anyone else it is
-   * ignored and the policy decides.
+   * FALSE is always honored (it only withholds). TRUE needs a permission
+   * that could trust the fact by hand (AimTrustPolicy::canApprove()); from
+   * anyone else it is ignored and the policy decides.
    *
    * @param bool|null $trusted
    *   The caller's explicit value.
@@ -88,7 +88,7 @@ class AimRememberService {
     if ($trusted !== TRUE) {
       return $trusted;
     }
-    if ($this->currentUser->hasPermission('administer aim') || $this->currentUser->hasPermission('trust ' . $scope . ' aim facts')) {
+    if ($this->trustPolicy->canApprove($this->currentUser, $scope)) {
       return TRUE;
     }
     $this->logger->warning('Explicit trusted=TRUE ignored for scope @scope (uid @uid): no trust permission.', [
@@ -113,11 +113,12 @@ class AimRememberService {
    *   The check's score.
    *
    * @return array
-   *   trusted, plus grounding_score when checked. An explicit value wins
-   *   over the policy and the check; the score is still recorded.
+   *   trusted, plus grounding_score when checked. The policy is resolved
+   *   for the current user, the writer. An explicit value wins over the
+   *   policy and the check; the score is still recorded.
    */
   protected function trustValues(?bool $explicit, ?string $channel, string $scope, bool $checked, ?float $score): array {
-    $values = $this->trustPolicy->values($this->trustPolicy->resolve($channel, $scope), $checked, $score);
+    $values = $this->trustPolicy->values($this->trustPolicy->resolve($channel, $scope, $this->currentUser), $checked, $score);
     if ($explicit !== NULL) {
       $values['trusted'] = $explicit;
     }
@@ -170,9 +171,9 @@ class AimRememberService {
    *   NULL (the default) lets the policy decide (AimTrustPolicy) - the
    *   right fallback for every LLM/human-mixed caller the draft-to-trusted
    *   gate exists for. FALSE is always honored. TRUE is honored only for a
-   *   caller holding "administer aim" or the scope's trust permission, and
-   *   is otherwise ignored; use it for curated data that was never subject
-   *   to the gate, e.g. demo seed data.
+   *   caller who could trust the fact by hand (administer aim, review aim
+   *   facts or the scope's trust permission), and is otherwise ignored;
+   *   unlike the policy's start, it is never demoted by the grounded check.
    * @param string|null $targetType
    *   The referenced entity's type ID, for scope=entity (e.g. node).
    *   Ignored for every other scope.

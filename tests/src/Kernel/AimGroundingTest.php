@@ -201,6 +201,35 @@ class AimGroundingTest extends KernelTestBase {
   }
 
   /**
+   * A writer who could trust the fact by hand starts it trusted.
+   *
+   * The channel's hold does not apply to them, but the grounded check
+   * still demotes; only an explicit trusted=TRUE is never demoted.
+   */
+  public function testWriterCanApprove(): void {
+    $this->setMode('enforce');
+    $this->config('aim.settings')
+      ->set('default_trusted', FALSE)
+      ->set('trust_policy', ['default' => '', 'channels' => ['chat' => 'hold', 'drush' => 'untrusted'], 'scopes' => []])
+      ->save();
+    $memory = $this->container->get('aim.remember');
+
+    // Anonymous (as Drush runs): the channel policy.
+    $this->assertFalse((bool) $memory->remember('Anonymous.', 'site', NULL, 'test', channel: 'drush')->get('trusted')->value);
+
+    foreach (['review aim facts', 'trust site aim facts', 'administer aim'] as $permission) {
+      $this->setUpCurrentUser([], [$permission]);
+      $kept = $memory->remember(self::GOOD, 'site', NULL, 'test', sourceText: self::PASSAGE, channel: 'chat');
+      $this->assertTrue((bool) $kept->get('trusted')->value, $permission);
+      $this->assertTrue((bool) $memory->remember('Unchecked.', 'site', NULL, 'test', channel: 'drush')->get('trusted')->value, $permission);
+      $demoted = $memory->remember(self::BAD, 'site', NULL, 'test', sourceText: self::PASSAGE, channel: 'chat');
+      $this->assertFalse((bool) $demoted->get('trusted')->value, $permission);
+      $explicit = $memory->remember('Approved.', 'site', NULL, 'test', trusted: TRUE, sourceText: self::BAD, channel: 'chat');
+      $this->assertTrue((bool) $explicit->get('trusted')->value, $permission);
+    }
+  }
+
+  /**
    * Candidates go to the model in groups of max_questions.
    */
   public function testChunking(): void {

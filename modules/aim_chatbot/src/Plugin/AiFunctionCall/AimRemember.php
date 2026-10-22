@@ -117,7 +117,7 @@ final class AimRemember extends FunctionCallBase implements ExecutableFunctionCa
       // Whether a visitor's say-so is approved site knowledge is the trust
       // policy's call for the chat channel (shipped: hold, so the fact waits
       // untrusted for a reviewer and one chat cannot change what others are
-      // told).
+      // told). A visitor who could trust it by hand starts it trusted.
       $fact = $this->rememberService->remember($text, self::FACT_SCOPE, NULL, 'chatbot:aim_chatbot', sourceText: $this->sourceText, expires: $this->rememberService->parseExpires(['expires' => $this->getContextValue('expires')]), channel: AimTrustPolicy::CHANNEL_CHAT);
       $this->setOutput('Saved fact ' . $fact->id() . ($fact->get('trusted')->value ? ' (shared with other visitors)' : ' (waiting for staff review; it is not shared with other visitors until approved)') . ': ' . $text);
     }

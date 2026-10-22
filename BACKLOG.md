@@ -270,7 +270,8 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       `administer aim` or a new permission for writing about
       others; later option, accept it but force `trusted=FALSE` so the
       per-scope trust permission reviews it. Same class of gap as the
-      `trusted` override on `remember()` above. Not built.
+      `trusted` override on `remember()` (closed 2026-10-19, ADR-0037
+      addendum). Not built.
       [ADR-0007](adr/resolved/0007-user-scope-requires-real-account.md)
 
 ## ADR-0035 - Standing constraints (design only, nothing built)

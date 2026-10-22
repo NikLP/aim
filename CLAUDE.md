@@ -67,10 +67,13 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
    retrieval. ([ADR-0001](adr/resolved/0001-storage-and-scope-model.md))
 3. **Governance** - permissions/roles + a draft-to-trusted gate, built as
    the `trusted` flag rather than Content Moderation; `recall()` skips
-   untrusted facts. A new fact's starting trust comes from
+   untrusted facts. A new fact starts trusted when its writer could trust
+   it by hand (`administer aim`, `review aim facts` or the scope's trust
+   permission); otherwise its starting trust comes from
    `aim.settings:trust_policy` (per entry channel, then per scope, then
-   `default_trusted`); the grounded check, in enforce mode, demotes or
-   promotes it per the policy, and `hold` is never promoted. The chat
+   `default_trusted`). The grounded check, in enforce mode, demotes or
+   promotes it per the policy (a reviewer's start can be demoted, only an
+   explicit `trusted` cannot), and `hold` is never promoted. The chat
    channel ships as `hold`. ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
    addendum)
 4. **Processing** - Queue API + a dedicated crontab entry, never
@@ -253,7 +256,10 @@ Per-scope, dynamically generated via `BundlePermissionHandlerTrait`:
 entity access operation used only by the Trust/Untrust bulk actions, so
 a scope's reviewer can flip the `trusted` flag without update access to
 the fact's text; retire/unretire stay on `administer aim`).
-The `trusted` override on `remember()` is not gated by it yet. Tool API/MCP:
+The same three permissions (`administer aim`, `review aim facts`, the
+scope's trust permission) start a writer's fact trusted and are the only
+ones `remember()`'s explicit `trusted: TRUE` is honored for
+(`AimTrustPolicy::canApprove()`). Tool API/MCP:
 `remember aim facts` / `recall aim facts` (`aim_tool`). A
 `user_scope_role_visibility` matrix (`/admin/config/aim/user-scope-access`)
 additionally grants `scope=user` visibility by viewer-role/subject-role

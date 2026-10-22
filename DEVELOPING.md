@@ -592,9 +592,15 @@ to the model and never stored.
 - **Trust policy** (`aim.settings:trust_policy`, `AimTrustPolicy`): each
   write names its entry channel in code (`chat`, `mcp`, `ingest`, `drush`;
   never the caller's `source`). Rule order: an explicit `trusted` (FALSE
-  always; TRUE only with `administer aim` or the scope's trust
-  permission), the channel's rule, the scope's rule, `default` (empty
-  follows `default_trusted`). Values: `trusted` (starts trusted, enforce
+  always; TRUE only for a writer who `canApprove()`: `administer aim`,
+  `review aim facts` or the scope's trust permission), then `trusted` for
+  a writer who `canApprove()`, the channel's rule, the scope's rule,
+  `default` (empty follows `default_trusted`). The writer is the current
+  user: Drush runs as anonymous (Drush 13 has no `--uid`/`--user` option),
+  so Drush writes follow the `drush` channel's rule; an MCP caller is its
+  OAuth token's user with permissions narrowed to the token's scopes, so
+  `aim_tool_oauth`'s two scopes never make a non-admin a reviewer (an
+  admin-role token keeps its bypass). Values: `trusted` (starts trusted, enforce
   demotes below the threshold), `untrusted` (starts untrusted, enforce
   promotes at or above it), `hold` (untrusted, never promoted). Shipped:
   `channels: {chat: hold}`. A fact with no source text keeps its starting
@@ -603,7 +609,8 @@ to the model and never stored.
   Grounded check): `off`; `shadow` records the score and leaves `trusted`
   alone; `enforce` also moves `trusted` per the policy above (threshold
   `activities.grounding.threshold`, default 0.7), untrusted when the check
-  fails or has no model (fail closed). A permitted explicit `trusted` wins. Decision backend only (`activities.grounding`).
+  fails or has no model (fail closed), including a reviewer's start. A
+  permitted explicit `trusted` wins. Decision backend only (`activities.grounding`).
 - **Checking reliability:** the Grounding column (sortable) and the
   "Grounding score below" filter on the facts list; an audit line per
   verdict (fact ID, score, cutoff, mode, no text); call time, tokens and the

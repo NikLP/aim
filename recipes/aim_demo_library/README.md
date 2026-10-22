@@ -12,7 +12,8 @@ consolidation without any real data.
   (`aim_chatbot` agent and `aim_demo_assistant`) and its tools (the two
   memory tools plus `aim_literal` for exact values), the chat block's
   wording and its signed-in-only visibility (only if the block exists),
-  `access deepchat api` and `view restricted literals` for signed-in users,
+  `access deepchat api`, `create site aim facts` and `view restricted
+  literals` for signed-in users,
   `view literals` for everyone, and
   `index_directly` on so a fact told to the chat is searchable on the next
   question.
@@ -96,10 +97,14 @@ failed recipe prints a long stack trace after the real error; the first
 - **0.48 is calibrated to this dataset** with `nomic-embed-text`
   ([ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md)).
   Recalibrate if the model changes.
-- **No review gate.** Every fact is live the moment it is saved, and any
-  signed-in visitor can add facts through the chat widget (the recipe
-  grants `access deepchat api` to authenticated users only)
-  ([ADR-0002](../../adr/0002-governance-deferred-guardrails-mandatory.md)).
+- **Review gate by writer.** Any signed-in visitor can tell the chat a
+  fact (the recipe grants `access deepchat api` and `create site aim
+  facts` to authenticated users only). A member's fact waits untrusted for
+  review (the chat channel ships as `hold`); a writer who could trust it
+  by hand (`administer aim`, `review aim facts`, `trust site aim facts`)
+  starts it trusted, so the presenter's own fact is live at once
+  ([ADR-0037](../../adr/resolved/0037-transient-source-passages-for-grounding.md)'s
+  2026-10-22 addendum).
 
 ## Running the demo
 
@@ -150,7 +155,14 @@ stage keeps its edit; put it back by hand.
    - "Can I bring my dog?"
    - "Do you have a cafe?" (it says it doesn't have that recorded)
    - "We now have a cafe, open 10 to 3 every day." Then ask about the cafe
-     again. It saved the fact and recalls it immediately.
+     again. You are signed in as the admin, a reviewer, so the fact is
+     trusted the moment it is saved and recalled immediately.
+   - Optional, the review gate: in a private window sign in as a member
+     (any account without a trust permission; `ddev drush user:create
+     member --password=...`) and tell the chat a new fact. It says the
+     fact waits for staff review, and asking about it (as either account)
+     finds nothing. Trust it at `/admin/content/aim-facts` (Trusted filter,
+     Trust action) and ask again.
    - "What is the capital of Australia?" (it stays on topic)
 2. **Under the hood.** Log in (`ddev drush uli --uri=<public URL>`)
    and open `/admin/content/aim-facts`: facts are content entities, with
@@ -209,11 +221,12 @@ not topics like opening hours, which vary by day.
 
 ### Be upfront about
 
-- It is a proof of concept. There is no draft-to-trusted review step yet:
-  every fact is live the moment it is saved (ADR-0002 designs it).
+- It is a proof of concept. A member's chat fact waits for review, but a
+  reviewer's own fact is live at once. The grounded check ships off; in
+  shadow mode it only records a score.
 - The chat widget needs the `access deepchat api` permission, which only
   authenticated users have (registration is admin-only). Anyone you give an
-  account can add facts, so reset after a session.
+  account can add held facts, so reset after a session.
 - Chat replies take about 6 seconds (a hosted model plus a memory lookup);
   MCP recall and the search itself take milliseconds.
 - The recall cutoff is a heuristic, calibrated per dataset. A question near
@@ -225,5 +238,6 @@ not topics like opening hours, which vary by day.
 
 Site name and slogan, the chat agent's and assistant's instructions and
 tools, the widget label, welcome message and signed-in-only visibility,
-`access deepchat api` for authenticated users, and `index_directly`. It no
+`access deepchat api` and `create site aim facts` for authenticated users,
+and `index_directly`. It no
 longer sets a front page.

@@ -92,6 +92,10 @@ because they hold every permission. A non-admin MCP user gets:
 - **`aim_recall` returns nothing for `scope=user`**: the role-visibility
   matrix (`AimScopeUser`) reads `$account->getRoles()`, and the token's
   roles are only what its scopes carry.
+- **A reviewer's writes still follow the `mcp` trust rule**: a writer
+  with a trust permission starts facts trusted (ADR-0037's 2026-10-22
+  addendum), but the token lacks it. A role-granularity scope (below)
+  carrying a reviewer role fixes that too.
 
 Fix: add a **role-granularity** scope per role that should use aim over
 MCP, at `/admin/config/people/simple_oauth/oauth2_scope`:

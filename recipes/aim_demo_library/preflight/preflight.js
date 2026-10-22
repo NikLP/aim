@@ -256,11 +256,13 @@ async function askWidget(page, question) {
         await sleep(1200);
         const a = await askWidget(page, cfg.chatQuestion);
         if (!new RegExp(cfg.chatExpect, 'i').test(a.text)) throw new Error('expected /' + cfg.chatExpect + '/ in: ' + a.text.slice(0, 160));
-        // No junk token here: the assistant drops one as filler, and the
-        // grounded check (ADR-0037) then rightly marks the saved fact as
-        // not what the visitor said, so it is untrusted under enforce and
-        // recall skips it. The made-up name is unique on its own, and its
-        // "zz" still trips the leftover-facts check if cleanup fails.
+        // Signed in as uid 1, a reviewer, so the fact starts trusted and
+        // skips chat's hold. No junk token here: the assistant drops one as
+        // filler, and the grounded check (ADR-0037) then rightly marks the
+        // saved fact as not what the visitor said, so it is demoted under
+        // enforce and recall skips it. The made-up name is unique on its
+        // own, and its "zz" still trips the leftover-facts check if cleanup
+        // fails.
         const b = await askWidget(page, 'Please remember that the library\'s story-time mascot is a fox named Fizzwick.');
         const c = await askWidget(page, 'What is the library\'s story-time mascot called?');
         if (!/Fizzwick/i.test(c.text)) throw new Error(`write then read failed; second answer: ${c.text.slice(0, 140)}`);
