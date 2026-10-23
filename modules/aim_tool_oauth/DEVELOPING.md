@@ -142,6 +142,14 @@ could not connect (403); a user with no role permissions got a token but
 
 ## Gotchas
 
+- `simple_oauth_server_metadata`'s install hook stores
+  `registration_endpoint` as an absolute URL built from the host it ran
+  on, so enabling it from Drush stores `https://<ddev host>/oauth/register`
+  and discovery hands remote clients an unreachable registration URL. Set
+  it back to `''` (`drush cset simple_oauth_server_metadata.settings
+  registration_endpoint ''`); empty means the route is auto-discovered
+  from each request's host (hit 2026-10-23 on a fresh install).
+
 - The OAuth admin form's "Required scopes" selector only offers scopes an
   already-enabled `mcp_tool_config` carries - empty with no free-text
   fallback on a fresh site. `aim_tool_oauth_install()` seeds this in code.

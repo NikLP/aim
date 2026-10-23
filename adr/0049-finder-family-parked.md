@@ -7,7 +7,7 @@ ADR-0053 (the gist vocabulary, section D) into one record; the old numbers
 0050, 0051 and 0053 are retired. The browser-side idea
 (WebMCP) may supersede much of the widget half; revisit before building
 any of it. Builds on
-[ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
+[ADR-0040](../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
 (the finder, literals as first provider, and per-account access on resolve
 in "The parts, settled", formerly ADR-0048) and the gist vocabulary in
 section D.
@@ -173,7 +173,7 @@ already a gist, so this does not wait on Annotations.
 (provenance in fuzzy-trace theory and ReadAgent, the annotations-side changes,
 editor explanation, alternatives) is annopm ADR-028, not duplicated here; the
 annotations changes are dotdev-repo work, not aim work. For literal mechanics
-[ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
+[ADR-0040](../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
 and its addenda govern.
 
 Annotations and literals both need a word for a short natural-language

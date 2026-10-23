@@ -28,7 +28,7 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 /**
  * End-to-end comparison of two ways to answer a one-shot value lookup.
  *
- * Answers the gate eval (ADR-0040 section 6).
+ * Answers the gate eval (ADR-0061 section 2).
  * Runs a gold set through the real assistant twice: "tool" (the assistant calls
  * aim_literal itself, the shipped design) and "prompt" (no tool, the
  * viewer's readable literals listed in the system prompt, so the large model

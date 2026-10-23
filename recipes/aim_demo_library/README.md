@@ -44,6 +44,11 @@ provider.
 - `drupal/ai` plus a chat provider and an embeddings provider: Ollama with
   `nomic-embed-text` (the shipped index uses it), or a hosted one, in which
   case also remove the `index_directly` action.
+- `ai_vdb_provider_mariadb`, `ai_search` and `search_api` **not** enabled
+  yet: let the recipe install them. With the provider already enabled the
+  apply fails (`The "mariadb" plugin does not exist`, or `Table
+  'aim_fact_vectors' already exists`) and rolls back; `drush pmu` the
+  three and apply again (2026-10-23).
 - Olivero as the front-end theme, if you want the chat block.
 - `aim_chatbot`'s chat block only exists if Olivero was the front-end
   theme when the module was enabled. Without it the persona still applies
@@ -71,18 +76,25 @@ the settings above, and the facts are added on top of whatever is there
 
 ## Fresh install
 
-1. Add the repositories (until the modules are on drupal.org):
-   `composer config repositories.literals vcs https://github.com/NikLP/literals`
-   and the same for `aim` (`https://github.com/NikLP/aim`), both with
-   `composer config repositories.<name>.no-api true`.
-2. `composer require drupal/aim:dev-main drupal/ai_provider_ollama` plus a
-   chat provider.
+1. Add the repository for `aim` (until it is on drupal.org; `literals` is,
+   as `drupal/literals`):
+   `composer config repositories.aim vcs https://github.com/NikLP/aim` and
+   `composer config repositories.aim.no-api true`.
+2. `composer require drupal/aim:dev-main drupal/literals:^1.0@alpha
+   drupal/ai_provider_ollama` plus a chat provider (`literals` has only an
+   alpha so far, which aim's `*` constraint does not pull on its own).
 3. Run Ollama with `nomic-embed-text`. At `/admin/config/ai/settings` set
-   Embeddings (`ollama` / `nomic_embed_text_latest`) and a Chat default.
+   Embeddings (`ollama` / `nomic_embed_text_latest`), a Chat default and a
+   Decision default (for the finder).
 4. Apply the recipe (above).
 5. `drush search-api:index aim_vector_index` (already 100% with
    `index_directly` on).
 6. `drush uli` and ask the widget; it is hidden from anonymous visitors.
+7. For the MCP part of the demo and the pre-flight: enable `aim_tool_oauth`
+   and the OAuth/MCP stack, set the key paths and expose the site over
+   HTTPS, per `aim_tool_oauth`'s
+   [DEVELOPING.md](../../modules/aim_tool_oauth/DEVELOPING.md) "Setup". A
+   recipe cannot do this part (site-specific key paths, the tunnel).
 
 Expected: "Applied AIM demo: community library", 31 facts, and
 `drush search-api:status` shows 31/31. Smoke test:

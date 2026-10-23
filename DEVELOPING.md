@@ -288,8 +288,19 @@ its own (rule and per-override table in
 [ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)). If a symptom
 returns, check the alter hook still applies
 (`ddev drush php:eval 'echo get_class(\Drupal::service("ai.vdb_provider")->createInstance("mariadb"));'`
-should print the aim class). Bug details in
+should print the aim class; `drush aim:status`'s "Provider shim" line checks
+the same). Bug details in
 [ADR-0022](adr/resolved/0022-exclude-retired-facts-from-vector-index.md).
+
+**The swap needs the definitions rebuilt at aim's install.** `drupal/ai`
+names the VDB manager `ai.vdb_provider` without the
+`plugin_manager_cache_clear` tag, and core's `PluginManagerPass` only tags
+`plugin.manager.*` services, so a module install never clears its cached
+definitions. A provider enabled before aim then kept definitions cached
+without the alter, and aim's own `config/install` index save ran the stock
+provider (`Table 'aim_fact_vectors' already exists` on the second save,
+and silently without the shim's fixes otherwise). `AimServiceProvider`
+adds the tag; delete it once `drupal/ai` does.
 
 **A fourth override (string attributes written Markdown-escaped) was
 removed 2026-09-27**, after the site moved from `ai_search` as bundled

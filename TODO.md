@@ -88,13 +88,13 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       only), so "where do I log in" correctly finds nothing; the assistant
       does not yet say "you are already signed in".
 
-## Literals, aim's side (design in [ADR-0040](../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md))
+## Literals, aim's side (design in [ADR-0061](adr/0061-how-aim-uses-literals.md))
 
 Token replacement at recall, the `aim_literal` tool and the finder-first
 gate are built. Work on the literals modules themselves is in
-[literals/BACKLOG.md](../literals/BACKLOG.md).
+[literals/BACKLOG.md](../../contrib/literals/BACKLOG.md).
 
-- [ ] **Unbuilt design from ADR-0040 section 7 ("How aim could use
+- [ ] **Unbuilt design from ADR-0061 section 3 ("How aim could use
       literals further").** Convert-a-fact (retires the fact, never one
       click); the two answer modes and "think harder" escalation (a skill,
       wired up later); the finder as a live recall source; copy controls

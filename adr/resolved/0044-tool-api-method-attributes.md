@@ -3,7 +3,7 @@
 **Status:** Retired 2026-10-12 - a watching brief, not a decision; the
 revisit trigger is in TODO.md. Was: Proposed 2026-10-04, nothing built and no
 change to `aim_tool`. Touches [ADR-0013](0013-mcp-tool-exposure.md)
-(Tool API/MCP exposure) and [ADR-0040](../../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
+(Tool API/MCP exposure) and [ADR-0040](../../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
 "The parts, settled" (the literal agent tools).
 **Date:** 2026-10-04
 

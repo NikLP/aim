@@ -6,9 +6,10 @@ Architecture Decision Records for the `aim` module.
 
 The Active table is one list; these are the threads running through it.
 
-- **Literals and the finder** - [0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
-  (one record since 2026-10-22: what literals is for, how aim uses it,
-  answer modes; absorbs the former 0048 and 0052),
+- **Literals and the finder** - [0040](../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
+  (in the `literals` repo: what literals is for; absorbs the former 0048
+  and 0052), [0061](0061-how-aim-uses-literals.md) (how aim uses it, answer
+  modes),
   [0046](0046-core-cutoff-time-axis-and-shared-gist-finder.md); parked
   extensions and the gist vocabulary in [0049](0049-finder-family-parked.md).
 - **Annotations bridge** (prerequisites cleared 2026-10-11, bridge module
@@ -44,7 +45,7 @@ Still carrying work, proposed, or deferred.
 | [0032](0032-dated-category-listing-for-quick-notes.md) | No `event` scope for diary-style notes: category + `asserted` date, a non-vector list method, and tid-based capture in the Tool API | Proposed 2026-10-01 - design only, not built |
 | [0035](0035-standing-constraints-action-gate.md) | Standing constraints: structured "don't build X until Y" facts enforced by a deterministic action-layer gate, semantic recall advisory only | Proposed 2026-10-01 - design only, not built |
 | [0036](0036-memory-algorithm-appraisal.md) | Memory algorithm appraisal: what to borrow from the literature (recency/importance re-rank, RRF, decay), and what aim does badly | Proposed 2026-10-02 - research only, nothing built |
-| [0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md) | Literals: a standalone `literal` entity (name, key, value, gist, type, restricted flag) found by a decision-model chooser over the whole menu; values never reach the model; a find-and-gate layer for things, not a chat-cost trick; `aim` resolves tokens at recall, has `aim_literal`, and runs the finder as a gate ahead of the chat model, no scope or mirror; absorbs the former 0048 (token literals resolve for the asking account) and 0052 (what literals is for, answer modes) | Accepted, current state, merged 2026-10-22 (history in git); built through finder/tool/search/gate; convert-a-fact, finder as recall source and answer modes unbuilt (section 7); supersedes 0039 |
+| [0040](../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md) | Literals (in the `literals` repo, drupal.org): a standalone `literal` entity (name, key, value, gist, type, restricted flag) found by a decision-model chooser over the whole menu; values never reach the model; a find-and-gate layer for things, not a chat-cost trick; consumers use tokens, `literals.lookup` and the finder as a gate; absorbs the former 0048 (token literals resolve for the asking account) and 0052 (what literals is for) | Accepted, current state, merged 2026-10-22 (history in git); aim's side split into 0061 on 2026-10-23; supersedes 0039 |
 | [0043](0043-content-truth-drift-audit.md) | Content-versus-truth drift audit: live facts as an independent reference, a typed decision flags published content that contradicts them, human resolves | Proposed 2026-10-04 - design only, not built; needs a content index and a measured false-positive rate |
 | [0046](0046-core-cutoff-time-axis-and-shared-gist-finder.md) | Where core stops: time as a retrieval axis instead of a `kind`, sibling modules for other semantics, literals standalone; absorbs the former 0045 (memory kinds: `aim_fact` is semantic by design, defer a `kind` field) | Proposed 2026-10-04, updated 2026-10-08 - pieces 1-3 design only; 4 done, 5 became `literals_finder` + 0049 |
 | [0049](0049-finder-family-parked.md) | The finder family (merged 2026-10-08 from 0049/0050/0051): an inline `@` picker over pluggable providers, a Jev-driven meaning navigator choosing by gist, and a tool picker; model only picks from an enumerated, access-filtered list ; absorbs the former 0053 (the gist vocabulary) | Parked 2026-10-08 - design only, nothing built; WebMCP may supersede the widget half |
@@ -52,6 +53,7 @@ Still carrying work, proposed, or deferred.
 | [0056](0056-personal-data-write-gate.md) | No personal data stored unless authorised: refuse names and contact details at write time (patterns plus a decision-model check), authorised by `user` scope or a permission, never by a model; grounded check inline, no stored passages | Parked 2026-10-11 (proposed 2026-10-10) - design only; revisit later |
 | [0058](0058-htmx-4-for-admin-forms.md) | htmx 4 for self-saving admin controls: per-row trusted toggle and the role-visibility matrix as candidates | Proposed 2026-10-13 - feasibility study only, nothing built |
 | [0060](0060-adopt-ai-logging-for-model-calls.md) | Model-call logging through `ai_logging`, prompts and replies included; aim adds run ID and duration; stealth mode a later option | Built 2026-10-14; stealth not built |
+| [0061](0061-how-aim-uses-literals.md) | How aim uses literals: tokens replaced at recall as the viewer, `aim_literal` over `literals.lookup`, the finder as a gate ahead of the chat model (measured), no scope or mirror; convert-a-fact, finder as a recall source and answer modes designed | Built 2026-10-08 to 10-15 (sections 1-2); section 3 unbuilt, tracked in TODO.md; split out of 0040 2026-10-23 |
 | [0059](0059-single-valued-category-and-ingress-labelling.md) | Single-valued, indexed `category` that recall can filter on, set on every write route (labelled on ingress); free tagging becomes a scope-module concern | Proposed 2026-10-14 - design only, nothing built |
 
 ## Resolved

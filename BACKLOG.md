@@ -7,7 +7,7 @@ belongs in the [ADRs](adr/0000-index.md).
 
 ## Literals
 
-Moved to [literals/BACKLOG.md](../literals/BACKLOG.md) 2026-10-22.
+Moved to [literals/BACKLOG.md](../../contrib/literals/BACKLOG.md) 2026-10-22.
 
 ## Case picker widget (raised 2026-10-14, pinned)
 
@@ -377,10 +377,15 @@ questions" section)
       is still wanted. The boolean `state` field this was originally
       motivated by was removed 2026-10-12 (nothing read it).
 - [ ] Upstream work for `AimMariaDBProvider`'s overrides (status checked
-      against drupal.org and the git history 2026-09-27; the provider project
-      has only 6 issues):
+      against drupal.org and the git history 2026-09-27, re-checked
+      2026-10-23: no provider commit since #3605665 on 2026-06-23, no
+      release since 1.0.1; the maintainer knows the fixes are available
+      (Nik, direct conversation) and will cut a point release once
+      convinced - so don't add issues to the queue for now, raise new
+      items with him directly):
       (1) index save throws "table exists" - already
-      [#3609961](https://www.drupal.org/i/3609961) (RTBC), but its MR 8
+      [#3609961](https://www.drupal.org/i/3609961) (now Needs work; our
+      patch offered there, approach still under debate), but its MR 8
       makes `createCollection()` drop the collection first, and the
       index-update hook calls it on every save, so it would wipe the vectors
       on every index save. **Commented** on 2026-09-27 that `CREATE TABLE IF
@@ -389,19 +394,72 @@ questions" section)
       written;
       (2) `getVdbIds()` uses `querySearch()`'s default `limit = 10`, so
       deletes remove at most 10 rows - filed as
-      [#3626257](https://www.drupal.org/i/3626257) 2026-09-27; (3) an empty
-      integer/decimal/date/boolean attribute is inserted as `''`, which
-      strict mode rejects (`ERROR 1366`) - filed as
-      [#3626262](https://www.drupal.org/i/3626262) 2026-09-27; (4)
+      [#3626257](https://www.drupal.org/i/3626257) 2026-09-27, MR up; (3) an
+      empty integer/decimal/date/boolean attribute is inserted as `''`,
+      which strict mode rejects (`ERROR 1366`) - filed as
+      [#3626262](https://www.drupal.org/i/3626262) 2026-09-27, MR up; (4)
       optionally a BTREE index for filterable attribute columns, a feature
-      request; (5) string attributes stored Markdown-escaped (`_` as `\_`,
+      request, held until the bugs land; (5) string attributes stored Markdown-escaped (`_` as `\_`,
       so `subject` filters miss) - **DONE 2026-09-27**: fixed upstream by
       [#3572801](https://www.drupal.org/i/3572801) in ai_search 1.3.0-alpha5
       / 2.0.0-alpha2 and `drupal/ai`'s 1.x head, not in the code bundled
       with `drupal/ai` 1.4.9 or 1.5.0 - the site moved from that bundled
       copy to the standalone `drupal/ai_search:^1.3@alpha` package
       (DEVELOPING.md, "Upgrading to standalone `ai_search`") and removed
-      the shim override.
+      the shim override; (6) missing dependency: the module declares only
+      `ai:ai`, but its plugin extends `ai`'s `AiVdbProviderClientBase`,
+      which implements `ai_search`'s `AiVdbProviderSearchApiInterface`, and
+      `ai_vdb_provider_mariadb_requirements()` loads `search_api_server`
+      storage unconditionally. Enabled without `ai_search`, the status
+      report fatals (`PluginNotFoundException: The "search_api_server"
+      entity type does not exist`), and applying `aim_demo_library` failed
+      with `The "mariadb" plugin does not exist` (empty valid-ID list),
+      rolled back (2026-10-23). Mechanism: without `ai_search`'s namespace,
+      `AiVdbProviderClientBase` cannot load, so attribute discovery skips
+      every VDB plugin on it (`mariadb` and `amazeeio_vector_db`) and the
+      manager caches the empty list; installing `ai_search` later does not
+      clear it (the cache bug in (7)). Still on the 1.0.x head (checked
+      2026-10-23, queue has no such issue). Fix: add
+      `ai_search:ai_search` to the dependencies (raise with the maintainer
+      directly, not yet filed). The same requirements hook also loads only
+      the server with ID `mariadb`, so its debug-logging warning never
+      checks another server (e.g. `aim_vector`) - minor, same
+      conversation. Partly `drupal/ai`'s too:
+      [#3535939](https://www.drupal.org/i/3535939) ("AiVdbProviderClientBase
+      depends on classes in the ai_search submodule") is fixed only on
+      `drupal/ai`'s own 2.0.x/2.x branches (the base class there implements
+      no `ai_search` interface); the 1.x head, which this site's 1.6.x-dev
+      tracks, still implements
+      `Drupal\ai_search\AiVdbProviderSearchApiInterface`;
+      (7) `drupal/ai`'s `ai.vdb_provider` manager is not tagged
+      `plugin_manager_cache_clear` (core's `PluginManagerPass` only tags
+      `plugin.manager.*` ids), so no module install clears
+      `ai_vdb_provider_info_plugins` (the `ai_modules_installed()` hook
+      clears `ai_provider_plugins` only, and runs after config install
+      anyway). Measured live 2026-10-23: the entry survived
+      `plugin.cache_clearer->clearCachedDefinitions()`, the call
+      `ModuleInstaller::install()` makes before installing config. So a
+      provider enabled before aim kept definitions cached without
+      `AimHooks::vdbProviderInfoAlter()`, and aim's `config/install` index
+      save plus the recipe's `setProperties` re-save ran the stock
+      provider: `Table 'aim_fact_vectors' already exists`, bug (1), and on
+      a site without that second save, a silent run without the shim. Not
+      a provider override: fixed in aim by `AimServiceProvider`, which adds
+      the tag (verified the manager is now registered and the entry is
+      cleared; not yet re-run on a fresh install with the provider
+      pre-enabled, so the recipe README's "don't pre-enable" note stays
+      until it is). Upstream: [#3547139](https://www.drupal.org/i/3547139)
+      ("Cache flush on VDB installation does not work") was closed
+      2025-09 with MR !900, which only added test dependencies; the 1.x
+      head still has no tag or flush (nor do 2.x/2.0.x). It was closed as
+      fixed by #3535939, which only removes the discovery skip, not the
+      stale cache. **Commented** on #3547139 (tag as the fix) and
+      #3535939 (1.x backport) 2026-10-23; delete `AimServiceProvider`
+      when the tag lands. Both
+      failures needed the provider enabled before the recipe; with
+      `ai_vdb_provider_mariadb`, `ai_search` and `search_api` uninstalled
+      the recipe applied cleanly (31/31), since then the definitions are
+      first built after aim is installed.
       The two tuning overrides (M, ef_search) go as soon as a provider
       release includes [#3605665](https://www.drupal.org/i/3605665) (merged
       on the 1.0.x head, one commit past 1.0.1, not yet released);

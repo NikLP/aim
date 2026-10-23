@@ -3,7 +3,7 @@
 **Status:** Proposed 2026-10-04, updated 2026-10-08 - pieces 1-3 (category
 stays, time as a retrieval axis, the core cutoff rule) are design only,
 nothing built; piece 4 is done (literals are standalone,
-[ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md));
+[ADR-0040](../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md));
 piece 5 became `literals_finder` plus the parked
 [ADR-0049](0049-finder-family-parked.md). Absorbs the former ADR-0045
 (memory kinds), kept below as the Background.
@@ -24,7 +24,7 @@ four further points:
 3. The aim is a generic module, and it is drifting toward over-complication.
    A PoC may be broad, but "extensible" needs a stated cutoff for what
    belongs in core.
-4. Literals ([ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md))
+4. Literals ([ADR-0040](../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md))
    have value on their own, but are reachable today only through aim. The
    "gist" idea (a short description embedded so a thing can be shortlisted)
    may apply beyond literals, e.g. to choosing among tools.
@@ -80,7 +80,7 @@ ADR-0035 (authored rules), so it is not a core concern.
 Literals shipped standalone: no `scope=literal`, no mirror of gists into
 `aim_fact`. `aim` consumes them through `[literal:key]` tokens at recall and
 the `aim_literal` tool, not the finder
-([ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
+([ADR-0040](../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
 sections 6 and 7). The finder as a recall source is not built.
 
 ### 5. One shared gist finder (became `literals_finder` and ADR-0049)

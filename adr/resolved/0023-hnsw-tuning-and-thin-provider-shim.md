@@ -90,8 +90,8 @@ provider it extends. The rule:
 | In `AimMariaDBProvider` | Generic or aim-specific | Upstream |
 | --- | --- | --- |
 | `createCollection()` swallows "table exists" | Generic bug fix | Reported as #3609961 (RTBC), but its MR 8 makes `createCollection()` drop the collection first, and the index-update hook calls it on every save, so it would wipe the vectors on every index save. Comment there: `CREATE TABLE IF NOT EXISTS`, or tolerate error 1050, is the safe fix. Do not upgrade to a release with MR 8 as written |
-| `getVdbIds()` pages instead of `LIMIT 10` | Generic bug fix | Unfixed in 1.0.x head; no issue found (the project's 6 issues checked 2026-09-27), to file |
-| Empty numeric value inserted as `NULL` | Generic bug fix | Unfixed; no issue found, to file |
+| `getVdbIds()` pages instead of `LIMIT 10` | Generic bug fix | #3626257, MR up; unfixed in 1.0.x head (2026-10-23) |
+| Empty numeric value inserted as `NULL` | Generic bug fix | #3626262, MR up; unfixed in 1.0.x head (2026-10-23) |
 | M applied to new collections | Generic feature | In 1.0.x head, unreleased |
 | `ef_search` applied per query | Generic feature | In 1.0.x head, unreleased |
 | `ensureColumnIndex()` BTREE on a column | Generic feature, aim picks the column | Feature request to file |

@@ -81,7 +81,7 @@ fills a form per element: read the element's annotation (what the field
 wants); recall as the **viewing account** from the field label plus that
 text; take the best match under `recall_max_distance` (split it to the
 field's shape if needed; exact values such as phone numbers come from
-literals, [ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md));
+literals, [ADR-0040](../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md));
 leave the field blank if nothing matches or the match is ambiguous; the
 visitor reviews every value before submit, and nothing is saved back
 without confirmation. Site and role facts act as policy ("never collect
@@ -121,7 +121,7 @@ entity and site subjects.
   content against facts and needs no Annotations dependency.
 - **Gist.** [ADR-0049](0049-finder-family-parked.md) section D (body in annopm
   ADR-028) defines a shared "gist" field; an annotation's gist can prefill a
-  literal's gist ([ADR-0040](../../literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)).
+  literal's gist ([ADR-0040](../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)).
   Annotations attaches at bundle and field granularity, so this is limited
   to singleton hosts.
 - **Privacy:** recall must never run as a broader account than the viewer.
