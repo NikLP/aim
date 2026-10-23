@@ -151,6 +151,17 @@ gate are built. Work on the literals modules themselves is in
       `aim_tool_oauth` is next enabled: check the three tools list without a cache rebuild and
       that `pmu aim_tool` leaves no `mcp_tool_config.aim_*` behind; refresh
       the "observed with beta3" notes in aim_tool's README/DEVELOPING.md.
+- [ ] **Note: recall is tied to MariaDB and `nomic-embed-text` today**
+      (checked 2026-10-23). `aim.info.yml` hard-depends on
+      `ai_vdb_provider_mariadb` (so the recipe needn't list it), and
+      `search_api.server.aim_vector` hardcodes
+      `ollama__nomic-embed-text:latest` at 768 dimensions.
+      `recall_max_distance` (0.52) and `recall_gap` are tuned to that
+      model's distances on MariaDB's `VEC_DISTANCE_COSINE`, so a different
+      embeddings model or backend needs them re-tuned. Other MariaDB-only
+      code: `AimMariaDBProvider`, the raw SQL in `AimStatusChecker`,
+      `aim_uninstall()`'s table drop. Recall and consolidation themselves go
+      through Search API, so they're portable.
 
 ## Ingestion
 

@@ -20,8 +20,7 @@ config:
   # Core installs a recipe's modules in config-syncing mode, which skips each
   # module's config/install (dependencies included), so import it here.
   import:
-    literals: '*'
-    literals_finder: '*'
+    ai_vdb_provider_mariadb: '*'
     aim: '*'
     aim_scope_site: '*'
     aim_scope_user: '*'
@@ -29,6 +28,8 @@ config:
     aim_scope_case: '*'
     aim_chatbot: '*'
     aim_tool: '*'
+    literals: '*'
+    literals_finder: '*'
   actions:
     system.site:
       simpleConfigUpdate:
@@ -62,7 +63,7 @@ config:
     # The chat widget is for signed-in visitors: the API permission here, the
     # block visibility below (the CSRF token the widget needs only comes from
     # the block's markup, so both layers matter). The assistant recalls as
-    # the visitor, so a member needs to view site facts or recall is empty.
+    # the visitor, so a member needs  view site facts or recall is empty.
     # The lookup tool reads literals as the visitor too: everyone sees the
     # public ones, only signed-in visitors the restricted ones. A member can
     # tell the assistant a fact, which waits untrusted for review (chat

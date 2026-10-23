@@ -233,11 +233,3 @@ not topics like opening hours, which vary by day.
   a topic the facts don't cover can still get the nearest facts, and the
   model has to notice they don't answer it.
 - Do not use it for classified data: a hosted model can see what it recalls.
-
-### What the recipe changes
-
-Site name and slogan, the chat agent's and assistant's instructions and
-tools, the widget label, welcome message and signed-in-only visibility,
-`access deepchat api` and `create site aim facts` for authenticated users,
-and `index_directly`. It no
-longer sets a front page.
