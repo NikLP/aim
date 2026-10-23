@@ -46,12 +46,27 @@ not something `aim`'s own `composer.json` should carry (it just
 1. Enable the OAuth stack (`simple_oauth`, `simple_oauth_21`,
    `simple_oauth_server_metadata`, `simple_oauth_client_registration`,
    `simple_oauth_pkce`, `consumers`, `mcp_server_oauth`), then
-   `aim_tool_oauth`.
+   `aim_tool_oauth`:
+
+   ```bash
+   drush en tool mcp_server mcp_server_tool_bridge consumers simple_oauth simple_oauth_21 simple_oauth_server_metadata simple_oauth_client_registration simple_oauth_pkce mcp_server_oauth aim_tool_oauth -y
+   ```
+
 2. Generate a key pair outside the docroot:
    `vendor/bin/drush simple-oauth:generate-keys <path>` (this site uses
-   `keys/` at repo root, sibling to `web/`, already gitignored).
-   `simple_oauth.settings`'s `public_key`/`private_key` must point at it.
-3. Confirm `aim_tool_oauth`'s shipped config took: two `oauth2_scope`
+   `keys/` at repo root, sibling to `web/`, already gitignored; the keys
+   survive a site reinstall, so after one only the config needs setting).
+   `simple_oauth.settings`'s `public_key`/`private_key` must point at it:
+   `drush cset simple_oauth.settings public_key <path>/public.key -y`, and
+   the same for `private_key`.
+3. Clear `registration_endpoint`:
+   `drush cset simple_oauth_server_metadata.settings registration_endpoint '' -y`.
+   `simple_oauth_server_metadata`'s install hook stores it as an absolute
+   URL built from the host it ran on, so enabling it from Drush stores
+   `https://<ddev host>/oauth/register` and discovery hands remote clients
+   an unreachable registration URL. Empty means the route is found from
+   each request's host (hit 2026-10-23 on a fresh install).
+4. Confirm `aim_tool_oauth`'s shipped config took: two `oauth2_scope`
    entities (`aim:remember`, `aim:recall`) with `granularity_id:
    permission` set, pointed at `remember aim facts`/`recall aim facts`. A
    scope with no granularity crashes `Oauth2ScopeProvider::
@@ -60,7 +75,7 @@ not something `aim`'s own `composer.json` should carry (it just
    scope/permission error. Check `drush watchdog:show` for
    `AssertionError: assert($granularity instanceof
    ScopeGranularityInterface)` if this regresses.
-4. Expose the site over real HTTPS to the client - DDEV's local hostname
+5. Expose the site over real HTTPS to the client - DDEV's local hostname
    and self-signed cert can't be reached/trusted by a cloud-hosted
    connector. This site uses Tailscale Funnel: `tailscale funnel --bg
    https+insecure://127.0.0.1:443` (must target the router's **HTTPS**
@@ -73,7 +88,7 @@ not something `aim`'s own `composer.json` should carry (it just
    (`ddev describe`'s `web:80 -> 127.0.0.1:NNNNN`, reassigned on every
    restart), and don't set `router_http_port` expecting it to pin a
    per-project value.
-5. Register and connect a real client: confirm
+6. Register and connect a real client: confirm
    `/.well-known/oauth-protected-resource` and
    `/.well-known/oauth-authorization-server` both resolve, every endpoint
    (including `registration_endpoint`) comes back `https://`, and a real
@@ -141,14 +156,6 @@ could not connect (403); a user with no role permissions got a token but
   containing it).
 
 ## Gotchas
-
-- `simple_oauth_server_metadata`'s install hook stores
-  `registration_endpoint` as an absolute URL built from the host it ran
-  on, so enabling it from Drush stores `https://<ddev host>/oauth/register`
-  and discovery hands remote clients an unreachable registration URL. Set
-  it back to `''` (`drush cset simple_oauth_server_metadata.settings
-  registration_endpoint ''`); empty means the route is auto-discovered
-  from each request's host (hit 2026-10-23 on a fresh install).
 
 - The OAuth admin form's "Required scopes" selector only offers scopes an
   already-enabled `mcp_tool_config` carries - empty with no free-text
