@@ -9,32 +9,19 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
 
 ## Tools (raised 2026-10-25)
 
-- [ ] **`aim_recall`'s `date` doesn't say which date it is.** It is
-      `asserted` ("true since") when set, else `created` ("recorded"), and
-      the output description says so, but a result can't tell the caller
-      which one it carries. Left as is on purpose (no time fields yet, see
-      ADR-0036's dated recall); a `date_kind` or two fields when time work
-      starts.
-- [ ] **Move chat onto the shared tools (needs an ADR, changes ADR-0013).**
-      The site chatbot has to use the same `aim_recall`/`aim_remember` as
-      MCP (through `tool_ai_connector`, as `aim_literal` already is),
-      replacing `aim_chatbot`'s own `#[FunctionCall]` recall and remember.
-      **Scope is gated by permissions, decided 2026-10-25:** the tools run
-      as the visitor and members hold only `view`/`create site aim facts`,
-      the same per-fact check MCP relies on; no config lock (`ai_agents`'
-      `tool_usage_limits` only reaches top-level inputs, not
-      `facts[].scope`). A site that grants members another scope gets it
-      in chat too, by design. The work:
-      - **Trust channel.** Chat writes must stay on the `chat` channel
-        (ships `hold`); `aim_remember` hardcodes `CHANNEL_MCP` and needs
-        to know its caller.
-      - **Grounding evidence.** Chat's source text is the real chat history
-        (`AimChatbotSourceTextSubscriber`, which feeds `aim_chatbot`'s
-        plugin); the tool's `source_text` is what the model chooses to
-        quote. Keep the history as the evidence.
-      - **Smaller differences:** 5 results vs 10, and the chat reply
-        wording ("shared with other visitors"); the persona and the
-        eval/pre-flight checks that name the old tool IDs.
+- [ ] **Upstream: hand a `#[ToolMethod]` its invoker** (ADR-0062 decision
+      2). `aim_remember` picks its trust channel and source from the Tool
+      API invoker, which a method service never receives;
+      `AimRememberInvokerSubscriber` catches it from `ToolInputTransformEvent`
+      meanwhile. Ask `drupal/tool` for a runner-filled parameter (for example
+      one typed `Invoker`, never an input); delete the subscriber when it
+      lands. Issue not filed yet.
+- [ ] **Re-measure chat as a member, not uid 1.** The 2026-10-25 runs on the
+      shared tools (`chatbot-converse` free 36/36, literal eval 20/23) ran
+      as uid 1, which bypasses the per-scope checks chat now relies on. A
+      one-off member run (recall, then a confirmed save: `chat` channel,
+      held, grounding scored) passed; the full sets need a member test
+      account, as in the anonymous-questions item below.
 
 ## Chat quality and evals: open after the 2026-10-15/16 session
 
@@ -209,6 +196,14 @@ gate are built. Work on the literals modules themselves is in
 
 ## Ingestion
 
+- [ ] **`ingest aim facts` should not grant every scope (decided
+      2026-10-25).** Today it implies write access to every scope with no
+      per-scope check (ADR-0016), which cuts against ADR-0062's "permissions
+      decide scope". Make it gate only the form: each fact also needs
+      `create {scope} aim facts` (`AimMemoryManager::checkCreateAccess()`,
+      as `aim_remember` does per entry), and a refused fact is reported,
+      not written. Update the permission's description, ADR-0016 and the
+      root CLAUDE.md's Permissions section with it.
 - [ ] Chunking for `aim:extract` and the ingest form: today the whole file
       goes into one extraction prompt (`AimMemoryManager::extractFacts()`),
       so a file larger than the chat model's context fails. Split on

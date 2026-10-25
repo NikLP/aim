@@ -11,9 +11,11 @@ with `mcp_server_tool_bridge` 1.0.0-beta3). `aim_recall` drops facts past
 `aim.settings:recall_max_distance` (not settable per call, so a remote
 model can't turn the cutoff off) and returns at most 25 facts (`limit`,
 default 10), each with its text, scope, subject (a case ID, role or user)
-and date. `aim_remember` takes a list of one or more facts and reports
-each on its own line, including when a fact waits for review or has an end
-date.
+and date (with whether it is "true since" or "recorded"). `aim_remember`
+takes a list of one or more facts and reports each on its own line,
+including when a fact waits for review or has an end date. The site's chat
+assistant (`aim_chatbot`) uses the same two tools; what any caller reaches
+is set by its scope permissions.
 
 ## Which scope when
 

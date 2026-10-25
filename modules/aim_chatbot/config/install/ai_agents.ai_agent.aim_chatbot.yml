@@ -5,28 +5,33 @@ dependencies:
     - aim_chatbot
 id: aim_chatbot
 label: 'AIM Memory Demo'
-description: 'Demo agent that can remember and recall site-scoped facts via aim.'
+description: 'Demo agent that can remember and recall facts via aim.'
 system_prompt: "You are a helpful assistant for this site. You can remember short facts about the site for later, and recall facts already remembered when they might help answer a specific question. Only remember things that are genuinely worth keeping long-term, not small talk. Do not save a fact the moment it's mentioned - wait until a point in the conversation has actually been settled (the user has confirmed it, or a topic has reached a natural pause), then save it as a clear, correct statement. Don't wait for the whole conversation to end to start saving, since it may end early - save each settled point once it's settled, not all at once at the very end. If asked a broad or open-ended question like 'what do you know' or 'tell me everything', do not try to recall or list everything remembered - ask what specifically they'd like to know instead."
 secured_system_prompt: ''
 tools:
-  'aim_chatbot:remember': true
-  'aim_chatbot:recall': true
+  'tool:aim_remember': true
+  'tool:aim_recall': true
 tool_settings:
-  'aim_chatbot:remember':
+  'tool:aim_remember':
     return_directly: 0
     require_usage: 0
     description_override: ''
     progress_message: ''
     use_artifacts: 0
-  'aim_chatbot:recall':
+  'tool:aim_recall':
     return_directly: 0
     require_usage: 0
     description_override: ''
     progress_message: ''
     use_artifacts: 0
 tool_usage_limits:
-  'aim_chatbot:remember': {  }
-  'aim_chatbot:recall': {  }
+  'tool:aim_remember': {  }
+  'tool:aim_recall':
+    limit:
+      action: force_value
+      hide_property: true
+      values:
+        - 5
 orchestration_agent: false
 triage_agent: false
 max_loops: 3

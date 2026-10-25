@@ -162,9 +162,9 @@ class AimSettings {
    * Returns the live recall cutoff from aim.settings.
    *
    * See getAutoThreshold() - same fallback behavior. Applied by callers
-   * that must abstain on a poor match: aim_chatbot:recall and aim_tool's
-   * aim_recall pass it to recall() as $maxDistance; recall() itself does
-   * not apply it unless asked.
+   * that must abstain on a poor match: aim_tool's aim_recall and
+   * aim_chatbot's recall-context subscriber pass it to recall() as
+   * $maxDistance; recall() itself does not apply it unless asked.
    *
    * @return float
    *   Distance above which a recalled fact is too dissimilar to present as

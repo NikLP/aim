@@ -506,7 +506,8 @@ Central service backing every write/read path. Key public methods:
   - live `aim.settings` values, not the class constants (those are only
   the shipped defaults and in-code fallback). `recall_max_distance` is
   applied only when a caller passes it to `recall()` as `$maxDistance`:
-  `aim_chatbot:recall` and `aim_tool`'s `aim_recall` do; `drush aim:recall`
+  `aim_tool`'s `aim_recall` and `aim_chatbot`'s recall-context subscriber
+  do; `drush aim:recall`
   does with `--max-distance` and is raw otherwise.
 - `getDefaultChatProvider(): ?array` - resolves the site-wide default via
   `AiProviderPluginManager`; `NULL` if none configured. `AimCommands`'
@@ -586,10 +587,9 @@ to the model and never stored.
   ingest form's prose mode) passes the whole document;
   `remember(..., sourceText: ...)`; the MCP `aim_remember` tool's
   `source_text` input (supplied by the calling agent, so only as verbatim
-  as that agent is); the chat assistant's remember tool, through
-  `aim_chatbot`'s `AimChatbotSourceTextSubscriber` (the visitor's last
-  message plus the assistant turn before it, which needs the assistant's
-  session history on). JSON and one-fact-per-line ingest have no source
+  as that agent is), which the chat assistant uses too since ADR-0062
+  (reading the chat history instead was dropped; that ADR's decision 3
+  says when it returns). JSON and one-fact-per-line ingest have no source
   text and stay unchecked (`grounding_score` empty).
 - **One call per write, not per fact.** `checkGrounding()` puts the
   candidates in one Decision call (per group, below) (`candidate_1` ... in the state, one

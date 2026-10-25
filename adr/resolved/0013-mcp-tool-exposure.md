@@ -8,6 +8,10 @@ with no Drupal session. Nothing in this ADR's own scope remains open -
 see the two "Addendum (built ...)" sections at the end for both build
 paths, including a real drupal.org packaging bug that briefly looked like
 a dead end and three real `simple_oauth`/`mcp_server_oauth` gotchas.
+**Superseded in part, 2026-10-25:** the separate chat tools are gone; chat
+uses `aim_tool`'s tools, scope set by permissions
+([ADR-0062](../0062-chat-on-the-shared-tools.md)). The Decision's second
+bullet and the Scope discipline risk below are history.
 **Date:** 2026-09-12 (Tool API/MCP), 2026-09-13 (OAuth2)
 
 ## Context

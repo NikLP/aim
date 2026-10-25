@@ -19,7 +19,16 @@ scope_fields?}` entries, saved in one call/bootstrap (a single-fact form
 beside it was removed 2026-10-25: it duplicated every field and the two
 descriptions drifted). `expires` (`YYYY-MM-DD`) retires the fact after that
 day via `drush aim:expire` or `hook_cron` (ADR-0057). Each entry is saved
-or reported on its own line; `source` is always `tool:aim_remember`.
+or reported on its own line. `source` and the trust channel are never
+inputs: they follow the Tool API invoker (`AimRemember::CALLERS`, ADR-0062).
+`tool_ai_connector` (an agent on this site: chat) writes `chat:aim_remember`
+on the `chat` channel, `drush` writes `drush:aim_remember` on `drush`,
+anything else (MCP, direct PHP) `tool:aim_remember` on `mcp`. A
+`#[ToolMethod]` service is not given its invoker, so
+`AimRememberInvokerSubscriber` catches it from `ToolInputTransformEvent`
+when `facts` is set and hands it to the service, which uses it once and
+clears it; delete the subscriber when Tool API passes the invoker to the
+method.
 
 Requires `drupal/mcp_server_tool_bridge:^1.0.0-beta2` +
 `drupal/mcp_server:^2.0.0-beta3` together - `mcp_server_tool_bridge`'s
@@ -42,8 +51,9 @@ server enforces before the method runs. An empty result reads "No
 relevant facts found."
 
 **Recall results are structured** (decided 2026-10-25 over a prefix per
-line): `results` is a list of `{text, scope, subject, date}` (subject empty
-for site; `date` is `asserted`, else `created`), declared with
+line): `results` is a list of `{text, scope, subject, date, date_kind}`
+(subject empty for site; `date` is `asserted` with `date_kind: true_since`,
+else `created` with `date_kind: recorded`), declared with
 `#[ToolOutput(definition: ListOutputDefinition)]`, which the MCP bridge
 publishes as `outputSchema` and returns as `structuredContent`. Scope and
 subject are there for the caller to act on, such as adding to a case by its

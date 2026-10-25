@@ -1,11 +1,13 @@
 name: 'AIM Chatbot'
 type: module
-description: 'Exposes aim memory to an AI Agents chat assistant as function-call tools.'
+description: 'A chat assistant on AIM memory: an AI Agents agent using aim_tool''s recall and remember tools.'
 package: AIM
 core_version_requirement: ^11
 dependencies:
   - aim:aim
   - aim:aim_scope_site
+  - aim:aim_tool
   - ai_agents:ai_agents
+  - tool:tool_ai_connector
   - ai:ai_assistant_api
   - ai:ai_chatbot

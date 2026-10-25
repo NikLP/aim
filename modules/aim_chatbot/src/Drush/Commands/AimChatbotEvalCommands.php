@@ -456,7 +456,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
     }
     $config = $this->configFactory->get($name)->getRawData();
     $settings = $config['tool_settings'];
-    $settings['aim_chatbot:recall']['require_usage'] = $mode === 'forced' ? 1 : 0;
+    $settings['tool:aim_recall']['require_usage'] = $mode === 'forced' ? 1 : 0;
     $override = ['tool_settings' => $settings];
     if ($mode === 'context') {
       $override['third_party_settings']['aim_chatbot']['recall_context'] = TRUE;

@@ -165,13 +165,14 @@ vectors).
 | `Kernel/AimTrustActionTest`, `AimRetireActionTest` | Bulk trust/retire actions and their access checks |
 | `Unit/AimEmbeddingCacheSubscriberTest` | Embedding cache hit, bypass, key identity (ADR-0017) |
 | `Unit/AimCallTagsTest` | Every `aim_*` call tag is in `ai_logging`'s prompt-logging list |
-| `aim_chatbot/.../AimChatbotSourceTextSubscriberTest` | Chat source text handling |
+| `aim_chatbot/.../AimChatbotRecallContextSubscriberTest` | Recall in code before the chat model |
+| `aim_tool/.../Kernel/AimToolPermissionsTest` | Tool permissions, per-scope create checks, channel and source from the invoker, reply notes, schema |
 
 Run (needs a separate `phpunit` database, see DEVELOPING.md's "Running the
 tests"):
 
 ```bash
-ddev exec "cd /var/www/html && SIMPLETEST_DB='mysql://db:db@db/phpunit' SIMPLETEST_BASE_URL=http://web vendor/bin/phpunit -c web/core/phpunit.xml.dist web/modules/custom/aim/tests web/modules/custom/aim/modules/aim_chatbot/tests"
+ddev exec "cd /var/www/html && SIMPLETEST_DB='mysql://db:db@db/phpunit' SIMPLETEST_BASE_URL=http://web vendor/bin/phpunit -c web/core/phpunit.xml.dist web/modules/custom/aim/tests web/modules/custom/aim/modules"
 ```
 
 Still to write:
@@ -182,8 +183,8 @@ Still to write:
 2. A stale-`drush cim` guard: scope `plugin` reverted to null must fail a
    test, not fail silent (`testShippedScopeConfig` checks the shipped
    config, not the live one).
-3. Tool API / MCP: `aim_recall` and `aim_remember` permission and scope
-   checks (`aim_tool`, `aim_tool_oauth` have no tests).
+3. MCP transport: `aim_tool_oauth`'s scopes and the bridge (no tests; the
+   site's pre-flight covers them end to end).
 
 ## Literals: automated tests (C)
 

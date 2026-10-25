@@ -1,6 +1,7 @@
 # CLAUDE.md — AIM Chatbot
 
-`ai_agents` FunctionCall tools exposing AIM memory to a chat assistant.
+A chat assistant on AIM memory: an `ai_agents` agent using `aim_tool`'s
+`aim_recall`/`aim_remember` (and `aim_literal`) through `tool_ai_connector`.
 Part of the [aim](../../CLAUDE.md) project - see the root module's
 CLAUDE.md for environment, architecture decisions, and the code-style/
 git rules shared across all of `aim`'s submodules; this file only covers
@@ -8,19 +9,27 @@ what is specific to `aim_chatbot`.
 
 ## Scope
 
-**Hardcoded to `scope: site`, deliberately.** A chat visitor isn't
-resolved to a real Drupal account, so `scope: user` writes/reads aren't
-offered here - see
-[ADR-0007](../../adr/resolved/0007-user-scope-requires-real-account.md). Don't
-widen this without a real per-visitor identity to scope to.
-`aim_chatbot.info.yml` depends on `aim_scope_site` (ADR-0026 piece 5) so
-the `site` bundle this hardcode relies on is guaranteed installed.
+**Set by the visitor's permissions, not by code**
+([ADR-0062](../../adr/0062-chat-on-the-shared-tools.md)). The tools run as
+the visitor: recall returns only facts they may view, remember checks
+`create {scope} aim facts` per fact. A chat-facing role needs `recall aim
+facts`/`remember aim facts` plus the per-scope permissions; whatever scopes
+it holds, chat reaches. The demo recipe gives members `site` only. Chat
+writes go on the `chat` trust channel (shipped `hold`) because
+`aim_remember` picks the channel from its Tool API invoker
+(`tool_ai_connector`), not because of anything here. The one hardcoded
+`site` left is `AimChatbotRecallContextSubscriber`'s, hence the
+`aim_scope_site` dependency.
 
 ## What lives here
 
-- `src/Plugin/AiFunctionCall/AimRemember.php` / `AimRecall.php` - the two
-  tools, both backed by `aim.memory_manager` directly (no extraction LLM
-  call - same write path as `drush aim:remember`/`aim:recall`).
+- No tools of its own: the agent lists `tool:aim_recall`,
+  `tool:aim_remember` and (in the demo recipe) `tool:aim_literal`. Recall
+  is limited to 5 results by the agent's `tool_usage_limits` (forced,
+  hidden from the model). The grounded check's evidence is the
+  `source_text` the model passes, as over MCP; reading the chat history
+  instead was dropped with the old tools (ADR-0062 decision 3 says when
+  it comes back).
 - `src/Plugin/ChatProcessor/AimGateProcessor.php` (`aim_chatbot_gate`,
   extends the AI Assistant API processor) - the finder-first gate. Asks the
   literals finder about the last message with its own stricter thresholds
@@ -32,7 +41,7 @@ the `site` bundle this hardcode relies on is guaranteed installed.
   is the switch: changing `chat_processor_plugin` back to
   `ai_assistant_api_processor` turns the gate off. Audit lines carry IDs
   only. Needs `literals_finder` to do anything; without it, a pass-through.
-- Recall is not forced: `require_usage` is off on `aim_chatbot:recall`
+- Recall is not forced: `require_usage` is off on `tool:aim_recall`
   (shipped and in the `aim_demo_library` recipe, which also sets
   `max_loops` 7). Forcing it made `ai_agents` discard a correct answer
   whenever a turn ended without a recall call (a second question in a
@@ -47,14 +56,8 @@ the `site` bundle this hardcode relies on is guaranteed installed.
   previous one, for follow-ups) is recalled before the model runs and the
   facts are added to that turn's system prompt only, never to stored
   history. The recall tool stays available. Off by default; measured
-  35/36 at 2.3 s a turn, the one miss a literal choice.
-- `src/EventSubscriber/AimChatbotSourceTextSubscriber.php` - before the
-  remember tool runs, passes it the visitor's last message plus the
-  assistant turn before it, for the grounded check
-  ([ADR-0037](../../adr/resolved/0037-transient-source-passages-for-grounding.md)).
-  The previous turn is only there when the assistant keeps history
-  (`allow_history`); this module ships `none`, the demo recipe sets
-  `private_tempstore_pool`.
+  35/36 at 2.3 s a turn, the one miss a literal choice. On the shared
+  tools (2026-10-25, uid 1, `free`): 36/36 at 2.8 s a turn.
 - `config/install/ai_agents.ai_agent.aim_chatbot.yml` - the agent config,
   `guardrail_set: aim_write_guardrails`.
 - `config/install/ai_assistant_api.ai_assistant.aim_demo_assistant.yml` +
@@ -64,14 +67,13 @@ the `site` bundle this hardcode relies on is guaranteed installed.
 
 ## Abstention
 
-`aim_chatbot:recall` drops matches past `aim.settings:recall_max_distance`
+`aim_recall` drops matches past `aim.settings:recall_max_distance`
 and answers "No relevant facts found." when none survive - see
 [DEVELOPING.md](DEVELOPING.md)'s "Gotchas" and
 [ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md). The
 cutoff is embeddings-model specific: retune it if the model changes, and
-recheck as the site-scope corpus grows or diversifies. The same cutoff is
-passed to `AimMemoryManager::recall()` as `$maxDistance`, and `aim_tool`'s
-MCP `aim_recall` applies it by default too.
+recheck as the site-scope corpus grows or diversifies. The recall-context
+subscriber passes the same cutoff.
 
 ## CCC (`ai_context`)
 

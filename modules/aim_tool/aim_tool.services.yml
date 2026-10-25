@@ -17,3 +17,10 @@ services:
   aim_tool.remember:
     class: Drupal\aim_tool\Tool\AimRemember
     autowire: true
+  # Hands aim_remember its Tool API invoker, which picks the trust channel
+  # (ADR-0062).
+  aim_tool.remember_invoker_subscriber:
+    class: Drupal\aim_tool\EventSubscriber\AimRememberInvokerSubscriber
+    arguments: ['@aim_tool.remember']
+    tags:
+      - { name: event_subscriber }

@@ -12,12 +12,15 @@ Uses `ai_agents` - see
 [ADR-0008](../../adr/0008-chatbot-integration-mechanism.md) for the
 mechanism and alternatives considered.
 
-- Two `#[FunctionCall]` tools (`aim_chatbot:remember`/`aim_chatbot:recall`)
-  and the `ai_agents.ai_agent.aim_chatbot` config entity
-  (`guardrail_set: aim_write_guardrails`). Both tools are hardcoded
-  `scope: site` - a chat visitor isn't resolved to a real account, and
-  unlocking `recall` too would let a broad question surface a real
-  `scope: user` fact.
+- The `ai_agents.ai_agent.aim_chatbot` config entity
+  (`guardrail_set: aim_write_guardrails`) with `tool:aim_recall` and
+  `tool:aim_remember` (`aim_tool`, through `tool_ai_connector`; function
+  names `tool__aim_recall`/`tool__aim_remember`). No scope lock: the tools
+  run as the visitor, so a role's scope permissions are what chat reaches
+  ([ADR-0062](../../adr/0062-chat-on-the-shared-tools.md)). Recall's 5-result
+  limit is a `tool_usage_limits` `force_value` with `hide_property`.
+  `aim_remember` writes on the `chat` channel with source
+  `chat:aim_remember` because its invoker is `tool_ai_connector`.
 - `ai_assistant_api.ai_assistant.aim_demo_assistant` and
   `block.block.olivero_aimdemochat` ship in this module's
   `config/install`/`config/optional`. The assistant's `ai_agent` field
@@ -35,13 +38,13 @@ mechanism and alternatives considered.
 - `drush php:eval` can't exercise the chat endpoint -
   `AssistantMessageBuilder` resolves the current route, which is null
   outside a real HTTP request. Use `curl` against the live endpoint.
-- **`aim_chatbot:recall` abstains past a distance cutoff** - rows whose
+- **`aim_recall` abstains past a distance cutoff** - rows whose
   cosine distance exceeds `aim.settings:recall_max_distance` (default
   0.48, editable at `/admin/config/aim/settings`, read via
   `AimMemoryManager::getRecallMaxDistance()`) are dropped, and an empty
-  remainder returns "No relevant facts found." instead of a "Relevant
-  facts:" list. `AimMemoryManager::recall()` itself does not filter, so
-  `drush aim:recall` and `aim_tool`'s MCP recall still return raw results.
+  remainder returns "No relevant facts found." instead of a result list.
+  `AimMemoryManager::recall()` itself does not filter, so `drush
+  aim:recall` without `--max-distance` still returns raw results.
   Calibrated against `nomic-embed-text` (question vs. fact): answerable
   questions' best match 0.12-0.29 (full questions and terse keyword
   queries alike), near-topic-but-unanswerable 0.25-0.33, off-topic

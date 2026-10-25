@@ -9,14 +9,16 @@ consolidation without any real data.
 ## What it applies
 
 - `recipe.yml`: site name and slogan, the chat assistant's persona
-  (`aim_chatbot` agent and `aim_demo_assistant`) and its tools (the two
-  memory tools plus `aim_literal` for exact values), the chat block's
+  (`aim_chatbot` agent and `aim_demo_assistant`) and its tools
+  (`aim_tool`'s `aim_recall`, limited to 5 results, and `aim_remember`,
+  plus `aim_literal` for exact values), the chat block's
   wording and its signed-in-only visibility (only if the block exists),
   the block's finder-first gate (`aim_chatbot_gate`, with
   `literals_finder` installed: a clear exact-value question is answered
   from the literal with no chat model),
-  `access deepchat api`, `create site aim facts` and `view restricted
-  literals` for signed-in users,
+  `access deepchat api`, `recall aim facts`, `remember aim facts`,
+  `view`/`create site aim facts` and `view restricted literals` for
+  signed-in users,
   `view literals` for everyone, and
   `index_directly` on so a fact told to the chat is searchable on the next
   question.

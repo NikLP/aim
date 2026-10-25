@@ -1,8 +1,6 @@
 remember aim facts:
   title: 'Remember AIM facts'
-  description: 'Use the aim_remember Tool API/MCP tool. Each fact also needs the create permission for its scope.'
-  restrict access: true
+  description: 'Use the aim_remember tool (chat, Tool API, MCP). Each fact also needs the create permission for its scope.'
 recall aim facts:
   title: 'Recall AIM facts'
-  description: 'Use the aim_recall Tool API/MCP tool. Results are limited to facts the caller may view.'
-  restrict access: true
+  description: 'Use the aim_recall tool (chat, Tool API, MCP). Results are limited to facts the caller may view.'

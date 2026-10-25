@@ -13,7 +13,9 @@ use Drupal\aim\Service\AimTrustPolicy;
 use Drupal\tool\Attribute\ToolInput;
 use Drupal\tool\Attribute\ToolMethod;
 use Drupal\tool\Attribute\ToolOutput;
+use Drupal\tool\Drush\DrushInvoker;
 use Drupal\tool\ExecutableResult;
+use Drupal\tool\Tool\Invoker;
 use Drupal\tool\Tool\ToolOperation;
 use Drupal\tool\TypedData\InputDefinition;
 use Drupal\tool\TypedData\ListInputDefinition;
@@ -23,16 +25,13 @@ use Drupal\tool\TypedData\OutputDefinition;
 /**
  * The aim_remember tool: saves aim_facts, the same path as aim:remember.
  *
- * Unlike aim_chatbot's aim_chatbot:remember, this is not locked to
- * scope=site: a Tool API caller here is a real, authenticated Drupal
- * account (gated on the "remember aim facts" permission below - separate
- * from AimRecall's "recall aim facts", not the single blanket
- * administer aim the admin UI uses, since write and read are
- * different trust levels for a non-admin caller), not an anonymous chat
- * visitor, so scope/subject are caller-supplied - the same
- * shape ADR-0006 established for the drush CLI adapter, over Tool API/MCP
- * transport instead of a shell. See ADR-0013 for why this is a separate
- * tool from the chatbot's rather than a shared one.
+ * The one remember tool for chat (through tool_ai_connector), MCP, Drush
+ * and Tool API (ADR-0062). Not locked to any scope: the caller is a real
+ * Drupal account (gated on the "remember aim facts" permission below -
+ * separate from AimRecall's "recall aim facts", since write and read are
+ * different trust levels for a non-admin caller), so scope/subject are
+ * caller-supplied - the same shape ADR-0006 established for the drush CLI
+ * adapter.
  *
  * "remember aim facts" only gates use of this tool at all - rememberOne()
  * additionally checks the real per-scope "create {scope} aim facts"
@@ -50,9 +49,12 @@ use Drupal\tool\TypedData\OutputDefinition;
  * mirroring aim:remember's own --file option. Bad entries are reported and
  * skipped; the rest are saved.
  *
- * source is not an input: provenance is the channel's to record, not the
- * caller's to claim, so every fact gets tool:aim_remember (the account that
- * wrote it is in uid).
+ * Neither source nor the trust channel is an input: provenance is the
+ * channel's to record, not the caller's to claim. Both follow the Tool API
+ * invoker (CALLERS): an agent on this site writes as chat, Drush as drush,
+ * anything else (MCP, direct PHP) as mcp. The account that wrote it is in
+ * uid. AimRememberInvokerSubscriber hands the invoker over, since a
+ * #[ToolMethod] service is not given it.
  *
  * An entry's scope_fields (ADR-0028 piece 4) carries the extra fields a
  * scope type declares via getBaseFieldDefinitions() (piece 1), today only
@@ -70,9 +72,24 @@ use Drupal\tool\TypedData\OutputDefinition;
 final class AimRemember {
 
   /**
-   * The source recorded on every fact this tool saves.
+   * The source recorded for a caller not in CALLERS.
    */
   const SOURCE = 'tool:aim_remember';
+
+  /**
+   * Trust channel and source per Tool API invoker ID.
+   */
+  const CALLERS = [
+    // tool_ai_connector's invoker: an ai_agents agent on this site, the
+    // chat assistant.
+    'tool_ai_connector' => [AimTrustPolicy::CHANNEL_CHAT, 'chat:aim_remember'],
+    DrushInvoker::ID => [AimTrustPolicy::CHANNEL_DRUSH, 'drush:aim_remember'],
+  ];
+
+  /**
+   * The invoker of the call about to run, or NULL for none.
+   */
+  private ?Invoker $invoker = NULL;
 
   /**
    * Constructs an AimRemember tool service.
@@ -92,6 +109,19 @@ final class AimRemember {
     private readonly AimGroundingChecker $groundingChecker,
     private readonly AccountInterface $currentUser,
   ) {}
+
+  /**
+   * Sets the invoker of the next call.
+   *
+   * Called by AimRememberInvokerSubscriber when the facts input is set;
+   * remember() uses it once and clears it.
+   *
+   * @param \Drupal\tool\Tool\Invoker|null $invoker
+   *   The invoker, or NULL for a call with none.
+   */
+  public function setInvoker(?Invoker $invoker): void {
+    $this->invoker = $invoker;
+  }
 
   /**
    * Saves facts.
@@ -180,6 +210,8 @@ final class AimRemember {
       );
     }
     $sourceText = ($source_text ?? '') !== '' ? $source_text : NULL;
+    [$channel, $source] = self::CALLERS[$this->invoker?->id] ?? [AimTrustPolicy::CHANNEL_MCP, self::SOURCE];
+    $this->invoker = NULL;
 
     $lines = [];
     $created = 0;
@@ -194,7 +226,7 @@ final class AimRemember {
         continue;
       }
 
-      $fact = $this->rememberOne($entry, $sourceText);
+      $fact = $this->rememberOne($entry, $sourceText, $channel, $source);
       if (isset($fact['error'])) {
         $lines[] = "Entry $i: " . $fact['error'];
         continue;
@@ -221,8 +253,7 @@ final class AimRemember {
    * What happens to a saved fact next, when that is not "recall finds it".
    *
    * A held fact waits for review and recall skips it until then, so a
-   * caller told only "Created" would report it as known. Mirrors
-   * aim_chatbot's AimRemember reply.
+   * caller told only "Created" would report it as known.
    *
    * @param array $fact
    *   A successful rememberOne() result.
@@ -248,13 +279,17 @@ final class AimRemember {
    *   One facts entry: text/scope/subject/expires/scope_fields.
    * @param string|null $sourceText
    *   The text the fact came from, for the grounded check, or NULL.
+   * @param string $channel
+   *   The trust channel, an AimTrustPolicy::CHANNEL_* constant.
+   * @param string $source
+   *   The source recorded on the fact.
    *
    * @return array
    *   ['id' => int, 'bundle' => string, 'subject' => string, 'trusted' =>
    *   bool, 'expires' => int|null] on success, or ['error' => string] on
    *   failure.
    */
-  private function rememberOne(array $fields, ?string $sourceText = NULL): array {
+  private function rememberOne(array $fields, ?string $sourceText, string $channel, string $source): array {
     $scope = $fields['scope'] ?? NULL;
     $scopeFields = $fields['scope_fields'] ?? [];
     if (empty($scope)) {
@@ -282,7 +317,7 @@ final class AimRemember {
         $fields['text'],
         $scope,
         $subject,
-        self::SOURCE,
+        $source,
         [],
         NULL,
         NULL,
@@ -290,7 +325,7 @@ final class AimRemember {
         $scopeFields['target_id'] ?? NULL,
         $sourceText,
         $this->rememberService->parseExpires($fields),
-        AimTrustPolicy::CHANNEL_MCP,
+        $channel,
       );
     }
     catch (\InvalidArgumentException $e) {

@@ -31,8 +31,8 @@ flowchart TD
 
   subgraph IN["Write paths in"]
     A1["drush aim:remember<br/>(single, or --file batch)<br/>used by agents such as Claude Code<br/>via the aim-memory skill"]
-    A2["MCP / Tool API aim_remember<br/>needs 'remember aim facts' plus<br/>per-scope 'create {scope} aim facts'<br/>source default tool:aim_remember"]
-    A3["Chatbot FunctionCall AimRemember<br/>scope forced to site<br/>source chatbot:aim_chatbot"]
+    A2["MCP / Tool API aim_remember<br/>needs 'remember aim facts' plus<br/>per-scope 'create {scope} aim facts'<br/>source tool:aim_remember, channel mcp"]
+    A3["Chat: the same aim_remember via tool_ai_connector<br/>scope by the visitor's permissions<br/>source chat:aim_remember, channel chat"]
     A4["drush aim:extract file<br/>aim-discovery skill runs this<br/>(not aim:remember)"]
     A5["Ingest form, mode 1: extract (planned)<br/>upload prose (.txt), needs<br/>'ingest aim facts'<br/>same path as aim:extract"]
     A6["Ingest form, mode 2: one fact per line (planned)<br/>no model call, scope and subject<br/>chosen once on the form<br/>each line goes to remember()"]
@@ -381,9 +381,9 @@ flowchart TD
     P["Optional: recall in code<br/>(recall_context setting)<br/>facts added to this turn's prompt"]:::vec
     M["Chat model reads persona,<br/>conversation so far, the message"]:::llm
     T{"Calls a tool?"}:::code
-    R["aim_chatbot:recall<br/>embed, nearest trusted site facts,<br/>cutoff, [literal:key] filled in"]:::vec
+    R["aim_recall (aim_tool), 5 results<br/>embed, nearest trusted facts the visitor may view,<br/>cutoff, [literal:key] filled in"]:::vec
     L["aim_literal<br/>one query: key first, then the finder<br/>(or search without it)"]:::code
-    W["aim_chatbot:remember<br/>Guardrails, grounded check (if on),<br/>saved untrusted for review"]:::code
+    W["aim_remember (aim_tool), chat channel<br/>Guardrails, grounded check (if on),<br/>saved held for review"]:::code
   end
 
   OUT["Reply shown; visitor message and<br/>reply kept in session history<br/>(not the recalled facts)"]:::code

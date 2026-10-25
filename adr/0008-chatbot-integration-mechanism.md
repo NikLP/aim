@@ -94,8 +94,9 @@ in, not a settled product surface (the literals chat module is likely to be
 scrapped). This is the one design note kept from the split-assistants
 proposal.
 
-`aim_chatbot` exposes `aim_chatbot:recall` and `aim_chatbot:remember`
-(hardcoded `scope: site`) to one assistant that answers public visitors and
+`aim_chatbot` exposed `aim_chatbot:recall` and `aim_chatbot:remember`
+(hardcoded `scope: site`; since 2026-10-25 `aim_tool`'s tools, scope set by
+permissions, ADR-0062) to one assistant that answers public visitors and
 also writes site-wide facts. With no draft-to-trusted gate, a visitor's
 claim is live when saved and recalled to the next visitor as fact: a
 poisoning vector. Proposal: two assistants over the same memory.

@@ -23,10 +23,9 @@ use Drupal\tool\TypedData\OutputDefinition;
  * Same read path as drush aim:recall. Gated on "recall aim facts" -
  * separate from AimRemember's "remember aim facts" permission, since a
  * caller able to search facts should not automatically be able to write
- * them, or vice versa. Unlike aim_chatbot's aim_chatbot:recall, this is
- * not locked to scope=site - see AimRemember's docblock for why a Tool
- * API caller (a real, authenticated Drupal account) is a different trust
- * level from an anonymous chat visitor. scope=user omitting user
+ * them, or vice versa. The one recall tool for chat and MCP (ADR-0062), not
+ * locked to any scope: what a caller gets is what it may view. scope=user
+ * omitting user
  * defaults to the calling account rather than every user's facts,
  * matching AimRemember's same default and keeping "recall my facts" the
  * ergonomic no-argument case for scope=user.
@@ -43,19 +42,20 @@ use Drupal\tool\TypedData\OutputDefinition;
  *
  * Drops matches past aim.settings:recall_max_distance, so an off-topic
  * query returns "No relevant facts found." rather than the nearest
- * unrelated facts (ADR-0019). The chatbot's recall does the same. There is
- * no max_distance input: a remote caller could pass 2 and turn the cutoff
- * off (drush aim:recall --max-distance stays for tuning).
+ * unrelated facts (ADR-0019). There is no max_distance input: a remote
+ * caller could pass 2 and turn the cutoff off (drush aim:recall
+ * --max-distance stays for tuning).
  *
  * A #[ToolMethod] service (ADR-0044), not a #[Tool] plugin class: Tool API
  * builds the inputs from recall()'s parameters and @param text, and
  * AimToolHooks::toolInfoAlter() replaces scope's with the installed scopes.
  *
- * Results are structured, one {text, scope, subject, date} object per fact,
- * which the MCP bridge publishes as outputSchema/structuredContent: the
- * scope and subject are there for the caller to act on (add to a case by
- * its ID, aim a role fact), and typed fields can't be misread the way a
- * formatted line can. aim_chatbot's recall keeps formatFactLine()'s lines.
+ * Results are structured, one {text, scope, subject, date, date_kind}
+ * object per fact, which the MCP bridge publishes as
+ * outputSchema/structuredContent: the scope and subject are there for the
+ * caller to act on (add to a case by its ID, aim a role fact), and typed
+ * fields can't be misread the way a formatted line can. date_kind says
+ * which date it is, as formatFactLine()'s "true since"/"recorded" does.
  */
 final class AimRecall {
 
@@ -120,7 +120,8 @@ final class AimRecall {
           'text' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Text'), description: new TranslatableMarkup('The fact.')),
           'scope' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Scope'), description: new TranslatableMarkup('Who the fact is true for: one of the scopes listed on the scope input.')),
           'subject' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Subject'), description: new TranslatableMarkup('Who or what it is about, as the scope says: the role machine name, the user uid, the case ID (pass it as subject to aim_remember to add to the same case). Empty for site.'), required: FALSE),
-          'date' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Date'), description: new TranslatableMarkup('YYYY-MM-DD: when the fact became true if that is known, otherwise when it was recorded.')),
+          'date' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Date'), description: new TranslatableMarkup('YYYY-MM-DD, the date date_kind names.')),
+          'date_kind' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Date kind'), description: new TranslatableMarkup('true_since: the fact has been true since date. recorded: when it became true is not known; date is when it was recorded.')),
         ],
       ),
     ),
@@ -169,7 +170,8 @@ final class AimRecall {
       'text' => $row['text'],
       'scope' => $row['scope'],
       'subject' => $row['subject'] !== NULL ? (string) $row['subject'] : '',
-      'date' => gmdate('Y-m-d', (int) ($row['asserted'] ?? $row['created'])),
+      'date' => gmdate('Y-m-d', (int) (!empty($row['asserted']) ? $row['asserted'] : $row['created'])),
+      'date_kind' => !empty($row['asserted']) ? 'true_since' : 'recorded',
     ], $rows);
     return ExecutableResult::success(
       new TranslatableMarkup('Found @count relevant fact(s).', ['@count' => count($rows)]),

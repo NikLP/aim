@@ -25,7 +25,8 @@ The Active table is one list; these are the threads running through it.
   [0036](0036-memory-algorithm-appraisal.md) (research).
 - **Chat, tools and front ends** - [0008](0008-chatbot-integration-mechanism.md)
   (with the split-assistants addendum), [0044](resolved/0044-tool-api-method-attributes.md),
-  [0016](0016-document-ingestion-ui.md), [0029](0029-context-carrying-turns.md).
+  [0016](0016-document-ingestion-ui.md), [0029](0029-context-carrying-turns.md),
+  [0062](0062-chat-on-the-shared-tools.md) (chat on `aim_tool`'s tools).
 
 ## Active
 
@@ -55,6 +56,7 @@ Still carrying work, proposed, or deferred.
 | [0060](0060-adopt-ai-logging-for-model-calls.md) | Model-call logging through `ai_logging`, prompts and replies included; aim adds run ID and duration; stealth mode a later option | Built 2026-10-14; stealth not built |
 | [0061](0061-how-aim-uses-literals.md) | How aim uses literals: tokens replaced at recall as the viewer, `aim_literal` over `literals.lookup`, the finder as a gate ahead of the chat model (measured), no scope or mirror; convert-a-fact, finder as a recall source and answer modes designed | Built 2026-10-08 to 10-15 (sections 1-2); section 3 unbuilt, tracked in TODO.md; split out of 0040 2026-10-23 |
 | [0059](0059-single-valued-category-and-ingress-labelling.md) | Single-valued, indexed `category` that recall can filter on, set on every write route (labelled on ingress); free tagging becomes a scope-module concern | Proposed 2026-10-14 - design only, nothing built |
+| [0062](0062-chat-on-the-shared-tools.md) | Chat on the shared tools: one `aim_recall`/`aim_remember` for chat and MCP; scope gated by permissions; the tool picks its trust channel from its Tool API invoker and says which date recall returns; chat's evidence is the model's quote; changes ADR-0013 | Built 2026-10-25; upstream invoker request not filed (stopgap subscriber live) |
 
 ## Resolved
 

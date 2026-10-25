@@ -8,8 +8,9 @@ submodules; this file only covers what is specific to `aim_tool`.
 
 ## Permissions
 
-`remember aim facts` / `recall aim facts` (`aim_tool.permissions.yml`, both
-`restrict access: true`), separate from the flat `administer aim`
+`remember aim facts` / `recall aim facts` (`aim_tool.permissions.yml`, not
+`restrict access`: chat members hold them, and neither grants anything the
+per-scope permissions don't), separate from the flat `administer aim`
 the admin UI uses. `AimRemember` additionally checks, per entry, the
 real per-scope `create {scope} aim facts` permission via
 `AimMemoryManager::checkCreateAccess()` - the flat permission only gates
@@ -29,17 +30,20 @@ an undeclared Write tool counts as destructive, which MCP clients read as
 - `src/Tool/AimRemember.php` / `AimRecall.php` (`#[ToolMethod]` services
   `aim_tool.remember`/`aim_tool.recall`; see
   [DEVELOPING.md](DEVELOPING.md)), backed by `aim.memory_manager`
-  directly. Not locked to
-  `scope: site` like `aim_chatbot`'s equivalents - a Tool API caller is a
-  real, authenticated account, so scope/subject are caller-supplied
-  (same shape as `drush aim:remember`, per
+  directly. The one recall and remember for chat, MCP, Drush and Tool API
+  ([ADR-0062](../../adr/0062-chat-on-the-shared-tools.md)); not locked to
+  any scope - the caller is a real account, so scope/subject are
+  caller-supplied (same shape as `drush aim:remember`, per
   [ADR-0006](../../adr/resolved/0006-agent-native-write-path.md)).
   `AimRemember` takes one shape: `facts`, a list of one or more entries
   (`text`, `scope` required; `subject`, `expires`, `scope_fields`
   optional), plus an optional `source_text` (the words the facts came
   from) for the grounded check, one call for the whole list
   ([ADR-0037](../../adr/resolved/0037-transient-source-passages-for-grounding.md)).
-  `source` is not an input: every fact gets `tool:aim_remember`. An
+  Neither `source` nor the trust channel is an input: both follow the Tool
+  API invoker (`AimRemember::CALLERS`; chat gets `chat`/`chat:aim_remember`),
+  handed over by `src/EventSubscriber/AimRememberInvokerSubscriber.php`
+  until Tool API passes it to the method. An
   entry's `scope_fields` (ADR-0028 piece 4) gets its properties from the
   installed scopes' types (`getBaseFieldDefinitions()`) in
   `AimToolHooks::toolInfoAlter()`, and is dropped from the schema when none
@@ -79,5 +83,8 @@ cutoff off. `limit` is capped at 25. `AimRemember`'s reply says when a
 fact waits for review or has an expiry, so a caller doesn't report a held
 fact as known.
 
-See [ADR-0013](../../adr/resolved/0013-mcp-tool-exposure.md) for why this is a
-separate plugin pair from `aim_chatbot`'s rather than a shared one.
+`AimRecall` results carry `date_kind` (`true_since`/`recorded`) beside
+`date`. An MCP client caches the output schema on connect: after an output
+change, reconnect it. History: [ADR-0013](../../adr/resolved/0013-mcp-tool-exposure.md)
+kept chat's tools separate; [ADR-0062](../../adr/0062-chat-on-the-shared-tools.md)
+merged them.

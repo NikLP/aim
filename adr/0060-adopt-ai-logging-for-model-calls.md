@@ -107,9 +107,9 @@ Checked against the installed `ai` 1.6.x suite while deciding this:
   `ai_observability` nor `ai_logging` reads it, so it would carry data to no
   consumer. Input debug data (`setDebugDataValue()`) is what reaches
   `ai_log`, and is what decision 2 uses.
-- **`ChatMemory` plugins**: `AimChatbotSourceTextSubscriber` reads the
-  agent's own chat history, and the demo recipe already uses
-  `private_tempstore_pool`. No change.
+- **`ChatMemory` plugins**: the demo recipe already uses
+  `private_tempstore_pool` (the chat history reader this note named,
+  `AimChatbotSourceTextSubscriber`, went with ADR-0062). No change.
 - **Moderation guardrail and AI Reranker**: available, not needed yet;
   check them before building a custom equivalent for ADR-0002 or ADR-0036.
 - **`ai_observability`** would be the route to token and latency metrics in

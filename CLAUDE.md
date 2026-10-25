@@ -113,7 +113,7 @@ aim/                    ← root module (always required), ships zero scopes
 │   ├── aim_scope_site/  ← ships the site aim_scope, zero PHP
 │   ├── aim_scope_case/  ← ships the case aim_scope + its subject-minting plugin
 │   ├── aim_scope_entity/← ships the entity aim_scope + its view-access plugin
-│   ├── aim_chatbot/     ← ai_agents FunctionCall tools, locked scope=site
+│   ├── aim_chatbot/     ← ai_agents chat agent on aim_tool's tools
 │   ├── aim_tool/        ← Tool API + MCP exposure, any scope
 │   ├── aim_tool_oauth/  ← OAuth2 scopes for remote MCP callers
 │   └── aim_benchmark/   ← synthetic fact generation, aim:benchmark commands
@@ -131,11 +131,11 @@ than relying on the site shell's manifest.
 | `aim` | Core - `aim_fact`/`aim_scope` entities, `AimMemoryManager`, Guardrails wiring, vector search, admin UI, `aim:remember`/`aim:recall`/`aim:extract`/`aim:consolidate`/`aim:expire` Drush commands. Ships zero scope instances itself (ADR-0026). | this file |
 | `aim_scope_user` | Ships the `user` `aim_scope`, its `AimScopeUser` access plugin (role-visibility, ADR-0025), and the `requires_account` ThirdPartySetting (ADR-0007) | [CLAUDE.md](modules/aim_scope_user/CLAUDE.md) |
 | `aim_scope_role` | Ships the `role` `aim_scope`. Zero PHP. | [README.md](modules/aim_scope_role/README.md) |
-| `aim_scope_site` | Ships the `site` `aim_scope` - `aim_chatbot`'s hardcoded scope. Zero PHP. | [README.md](modules/aim_scope_site/README.md) |
+| `aim_scope_site` | Ships the `site` `aim_scope`. Zero PHP. | [README.md](modules/aim_scope_site/README.md) |
 | `aim_scope_case` | Ships the `case` `aim_scope` and its `AimScopeCase` plugin (`defaultSubject()` mints case IDs, ADR-0025); access control (`checkViewAccess()`) still unbuilt, stays neutral | [CLAUDE.md](modules/aim_scope_case/CLAUDE.md) |
 | `aim_scope_entity` | Ships the `entity` `aim_scope` and its `AimScopeEntity` plugin (`checkViewAccess()` mirrors the referenced entity's own view access, ADR-0025/ADR-0027; also declares/installs the `target_type`/`target_id` base fields, ADR-0028) | [CLAUDE.md](modules/aim_scope_entity/CLAUDE.md) |
-| `aim_chatbot` | `#[FunctionCall]` tools for an `ai_agents` chat assistant, hardcoded `scope: site` | [CLAUDE.md](modules/aim_chatbot/CLAUDE.md) |
-| `aim_tool` | `#[Tool]` plugins (any scope, permission-gated) exposed over Tool API and, via `mcp_server_tool_bridge`, MCP | [CLAUDE.md](modules/aim_tool/CLAUDE.md) |
+| `aim_chatbot` | An `ai_agents` chat agent, assistant and block on `aim_tool`'s `aim_recall`/`aim_remember`; scope set by the visitor's permissions (ADR-0062) | [CLAUDE.md](modules/aim_chatbot/CLAUDE.md) |
+| `aim_tool` | `#[ToolMethod]` tools (any scope, permission-gated) for chat (through `tool_ai_connector`), Tool API and, via `mcp_server_tool_bridge`, MCP | [CLAUDE.md](modules/aim_tool/CLAUDE.md) |
 | `aim_tool_oauth` | OAuth2 scopes + third-party settings so a remote MCP client with no Drupal session can authenticate | [CLAUDE.md](modules/aim_tool_oauth/CLAUDE.md) |
 | `aim_benchmark` | Synthetic fact generation (`AimBenchmarkGenerator`) and the `aim:benchmark`/`aim:benchmark-cleanup` Drush commands, split out so production sites don't ship dev-only load generation | [CLAUDE.md](modules/aim_benchmark/CLAUDE.md) |
 
@@ -259,8 +259,10 @@ the fact's text; retire/unretire stay on `administer aim`).
 The same three permissions (`administer aim`, `review aim facts`, the
 scope's trust permission) start a writer's fact trusted and are the only
 ones `remember()`'s explicit `trusted: TRUE` is honored for
-(`AimTrustPolicy::canApprove()`). Tool API/MCP:
-`remember aim facts` / `recall aim facts` (`aim_tool`). A
+(`AimTrustPolicy::canApprove()`). Chat, Tool API and MCP:
+`remember aim facts` / `recall aim facts` (`aim_tool`; not `restrict
+access`, since each only opens a tool whose results and writes are
+checked per scope). A
 `user_scope_role_visibility` matrix (`/admin/config/aim/user-scope-access`)
 additionally grants `scope=user` visibility by viewer-role/subject-role
 pairing, ORed against `view user aim facts` - see

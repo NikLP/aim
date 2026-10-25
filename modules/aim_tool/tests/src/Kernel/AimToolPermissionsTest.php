@@ -11,6 +11,7 @@ use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
 use Drupal\literals\Entity\Literal;
 use Drupal\literals\Entity\LiteralType;
+use Drupal\tool\Tool\Invoker;
 use Drupal\tool\TypedData\ListOutputDefinition;
 use Drupal\user\UserInterface;
 use PHPUnit\Framework\Attributes\Group;
@@ -232,6 +233,34 @@ class AimToolPermissionsTest extends KernelTestBase {
   }
 
   /**
+   * The caller picks the trust channel and source, never an input.
+   */
+  public function testChannelFollowsInvoker(): void {
+    // MCP writes start trusted here, so the channel shows in the result.
+    $this->config('aim.settings')->set('trust_policy.channels.mcp', 'trusted')->save();
+    $this->actAs($this->createUser(['remember aim facts', 'create site aim facts']));
+
+    $written = [];
+    foreach (['tool_ai_connector', 'mcp_server', 'drush'] as $invoker) {
+      $this->tool('aim_remember', new Invoker($invoker))
+        ->setInputValue('facts', [['text' => "Written by $invoker.", 'scope' => 'site']])
+        ->execute();
+      $facts = AimFact::loadMultiple();
+      $fact = end($facts);
+      $written[$invoker] = [$fact->get('source')->value, (bool) $fact->get('trusted')->value];
+    }
+    // Chat ships as hold, drush follows default_trusted (off).
+    $this->assertSame(['chat:aim_remember', FALSE], $written['tool_ai_connector']);
+    $this->assertSame(['tool:aim_remember', TRUE], $written['mcp_server']);
+    $this->assertSame(['drush:aim_remember', FALSE], $written['drush']);
+
+    // A call with no invoker after one with: the invoker does not carry over.
+    $this->remember(['text' => 'No invoker.', 'scope' => 'site']);
+    $facts = AimFact::loadMultiple();
+    $this->assertSame('tool:aim_remember', end($facts)->get('source')->value);
+  }
+
+  /**
    * A held fact's reply says it waits for review; an expiry is stated.
    */
   public function testReplySaysWhatHappensNext(): void {
@@ -267,7 +296,7 @@ class AimToolPermissionsTest extends KernelTestBase {
     // Results are structured, so a caller can act on scope and subject.
     $results = $recall->getOutputDefinitions()['results'];
     $this->assertInstanceOf(ListOutputDefinition::class, $results);
-    $this->assertSame(['text', 'scope', 'subject', 'date'], array_keys($results->getItemDefinition()->getPropertyDefinitions()));
+    $this->assertSame(['text', 'scope', 'subject', 'date', 'date_kind'], array_keys($results->getItemDefinition()->getPropertyDefinitions()));
 
     // A scope added later (the scope admin form) shows up without a rebuild.
     AimScope::create(['id' => 'case', 'label' => 'Case'])->save();
@@ -287,8 +316,8 @@ class AimToolPermissionsTest extends KernelTestBase {
    * @return \Drupal\tool\Tool\ToolInterface
    *   The tool.
    */
-  protected function tool(string $id) {
-    return $this->container->get('plugin.manager.tool')->createInstance($id);
+  protected function tool(string $id, ?Invoker $invoker = NULL) {
+    return $this->container->get('plugin.manager.tool')->createInstance($id, [], $invoker);
   }
 
   /**
