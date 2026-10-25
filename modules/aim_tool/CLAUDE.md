@@ -53,12 +53,22 @@ an undeclared Write tool counts as destructive, which MCP clients read as
   the permission live here.
 - MCP exposure (`mcp_server_tool_bridge.mcp_tool_config.*.yml`) ships in
   `aim_tool_oauth/config/install`, not here: `aim_tool` alone is Tool API
-  only, with no MCP packages needed.
+  only, with no MCP packages needed. Those configs carry no
+  `description`: one set there overrides the plugin's in MCP.
+- `src/AimScopeGuide.php` (`aim_tool.scope_guide`) - the one source of the
+  "which scope when" wording, limited to installed scopes. Read by
+  `src/Hook/AimToolHooks.php` (`hook_tool_info_alter`, rewriting both
+  tools' `scope` descriptions; plugin caches cleared on `aim_scope`
+  changes) and by `aim_tool_oauth`'s MCP server instructions. Keep
+  README.md's "Which scope when" table in step with it.
 
-`AimRecall` drops matches past `aim.settings:recall_max_distance` by
-default (an off-topic query returns "No relevant facts found." instead of
-the nearest unrelated facts), and takes an optional `max_distance` input
-to override it ([ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md)).
+`AimRecall` always drops matches past `aim.settings:recall_max_distance`
+(an off-topic query returns "No relevant facts found." instead of the
+nearest unrelated facts, [ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md));
+there is no per-call `max_distance`, so a remote caller can't switch the
+cutoff off. `limit` is capped at 25. `AimRemember`'s reply says when a
+fact waits for review or has an expiry, so a caller doesn't report a held
+fact as known.
 
 See [ADR-0013](../../adr/resolved/0013-mcp-tool-exposure.md) for why this is a
 separate plugin pair from `aim_chatbot`'s rather than a shared one.

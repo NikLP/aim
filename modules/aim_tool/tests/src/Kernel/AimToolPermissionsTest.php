@@ -215,6 +215,46 @@ class AimToolPermissionsTest extends KernelTestBase {
   }
 
   /**
+   * A held fact's reply says it waits for review; an expiry is stated.
+   */
+  public function testReplySaysWhatHappensNext(): void {
+    // Untrusted by default (default_trusted off), and no trust permission.
+    $this->actAs($this->createUser(['remember aim facts', 'create site aim facts']));
+    $held = (string) $this->remember(['text' => 'Open at nine.', 'scope' => 'site', 'expires' => '2030-01-31'])->getResultMessage();
+    $this->assertStringContainsString('Waiting for staff review', $held);
+    $this->assertStringContainsString('It retires after 2030-01-31.', $held);
+
+    $batch = $this->remember(['facts' => [['text' => 'Closed on Mondays.', 'scope' => 'site']]]);
+    $this->assertStringContainsString('Waiting for staff review', $batch->getResult()->getContextValues()['results']);
+
+    // A writer who could trust it by hand starts it trusted: no note.
+    $this->actAs($this->createUser(['remember aim facts', 'administer aim']));
+    $trusted = (string) $this->remember(['text' => 'Open at ten.', 'scope' => 'site'])->getResultMessage();
+    $this->assertStringNotContainsString('Waiting for staff review', $trusted);
+    $this->assertStringNotContainsString('retires', $trusted);
+  }
+
+  /**
+   * The scope inputs list the installed scopes; recall has no cutoff input.
+   */
+  public function testSchemaReflectsInstalledScopes(): void {
+    $manager = $this->container->get('plugin.manager.tool');
+    $remember = (string) $manager->getDefinition('aim_remember')->getInputDefinition('scope')->getDescription();
+    $this->assertStringContainsString('- site: ', $remember);
+    $this->assertStringContainsString('- user: ', $remember);
+    $this->assertStringNotContainsString('- case: ', $remember, 'case is not installed here');
+
+    $recall = $manager->getDefinition('aim_recall');
+    $this->assertStringContainsString('site (about the organization)', (string) $recall->getInputDefinition('scope')->getDescription());
+    $this->assertArrayNotHasKey('max_distance', $recall->getInputDefinitions());
+
+    // A scope added later (the scope admin form) shows up without a rebuild.
+    AimScope::create(['id' => 'case', 'label' => 'Case'])->save();
+    $remember = (string) $manager->getDefinition('aim_remember')->getInputDefinition('scope')->getDescription();
+    $this->assertStringContainsString('- case: ', $remember);
+  }
+
+  /**
    * Makes the account the current user, which the tools read.
    */
   protected function actAs(UserInterface $account): void {

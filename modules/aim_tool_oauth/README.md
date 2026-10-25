@@ -19,7 +19,9 @@ appended to `mcp_server.handle`'s `_auth`, not swapped in.
   OAuth packages below) **before** `drush en aim_tool_oauth`. This module
   ships the `mcp_tool_config` entities that expose `aim_recall`,
   `aim_remember` and `aim_literal` over MCP, so MCP is on exactly when it
-  is enabled. See [aim_tool's DEVELOPING.md](../aim_tool/DEVELOPING.md) for
+  is enabled. It also adds aim's usage notes and scope guide to the MCP
+  server instructions a client receives on connecting (after any text the
+  site sets in `mcp_server.settings`). See [aim_tool's DEVELOPING.md](../aim_tool/DEVELOPING.md) for
   the version-constraint reasoning.
 - `drupal/simple_oauth` + `e0ipso/simple_oauth_21` (OAuth 2.1: PKCE, RFC
   9728 discovery metadata, dynamic client registration - **Packagist-only

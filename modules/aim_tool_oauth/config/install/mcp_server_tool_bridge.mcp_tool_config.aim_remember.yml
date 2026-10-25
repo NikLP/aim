@@ -6,4 +6,3 @@ dependencies:
       - aim_tool_oauth
 id: aim_remember
 tool_id: aim_remember
-description: 'Saves a short, atomic fact directly into aim memory.'

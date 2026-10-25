@@ -200,8 +200,8 @@ supersede keeps an audit trail), so they take up result slots.
   limit (so it interacts correctly with the over-fetch), `drush
   aim:recall` staying raw unless given `--max-distance`. `aim_tool`'s MCP
   `aim_recall` applies `recall_max_distance` by default, since the MCP
-  connector reaches every scope, and takes an optional `max_distance` of
-  its own (2 disables it). A spot check on user scope (uid 1, nomic) put
+  connector reaches every scope. Its optional `max_distance` input was
+  removed 2026-10-25: a remote model could pass 2 and disable the cutoff. A spot check on user scope (uid 1, nomic) put
   related queries at 0.14-0.36 and off-topic at 0.53-0.63, so 0.45 holds
   there too; role and case scope were not measured.
 - **The over-fetch fix** in `recall()` and `findNearestNeighbor()`.

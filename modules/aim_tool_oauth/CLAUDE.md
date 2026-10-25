@@ -32,6 +32,13 @@ to `aim_tool_oauth`.
   Both `oauth2_scope` entities ship `dependencies.enforced.module:
   [aim_tool_oauth]`, so `ConfigManager::uninstall()` deletes them on its
   own; no explicit deletion needed in `hook_uninstall()`.
+- `src/Hook/AimToolOauthHooks.php` - `hook_mcp_server_instructions_alter`
+  appends aim's usage notes and `aim_tool`'s `AimScopeGuide` to the MCP
+  server instructions, after any site-set
+  `mcp_server.settings:server_instructions`. A hook, not shipped config:
+  that setting is `mcp_server`'s and per site, so shipping it would
+  collide, and a rebuild lost it when it lived only in the database. The
+  demo pre-flight checks it arrives at the handshake.
 
 ## Root `composer.json` workaround
 

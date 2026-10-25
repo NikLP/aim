@@ -42,10 +42,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * they hold no "view user aim facts" permission - no separate filtering
  * needed in this plugin.
  *
- * Drops matches past aim.settings:recall_max_distance by default (the
- * caller may pass its own max_distance), so an off-topic query returns
- * "No relevant facts found." rather than the nearest unrelated facts
- * (ADR-0019). The chatbot's recall does the same.
+ * Drops matches past aim.settings:recall_max_distance, so an off-topic
+ * query returns "No relevant facts found." rather than the nearest
+ * unrelated facts (ADR-0019). The chatbot's recall does the same. There is
+ * no max_distance input: a remote caller could pass 2 and turn the cutoff
+ * off (drush aim:recall --max-distance stays for tuning).
  */
 #[Tool(
   id: 'aim_recall',
@@ -62,7 +63,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     'scope' => new InputDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Scope'),
-      description: new TranslatableMarkup('Restrict results to one scope: user, role, site, case.'),
+      // Replaced with the installed scopes by AimToolHooks::toolInfoAlter().
+      description: new TranslatableMarkup('Optional. Restrict results to one scope; leave empty to search every scope you can see.'),
       required: FALSE,
     ),
     'subject' => new InputDefinition(
@@ -80,15 +82,10 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     'limit' => new InputDefinition(
       data_type: 'integer',
       label: new TranslatableMarkup('Limit'),
-      description: new TranslatableMarkup('Maximum number of results.'),
+      description: new TranslatableMarkup('How many facts at most (1 to 25, default 10). Each is one short line: use fewer for a quick check, more for a broad question.'),
       required: FALSE,
       default_value: 10,
-    ),
-    'max_distance' => new InputDefinition(
-      data_type: 'float',
-      label: new TranslatableMarkup('Maximum distance'),
-      description: new TranslatableMarkup('Drop facts less similar than this (cosine distance: 0 is identical, lower is stricter, 2 disables the cutoff). Omit to use the site default, which filters out unrelated facts.'),
-      required: FALSE,
+      constraints: ['Range' => ['min' => 1, 'max' => self::MAX_LIMIT]],
     ),
   ],
   output_definitions: [
@@ -100,6 +97,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   ],
 )]
 final class AimRecall extends ToolBase {
+
+  /**
+   * The most results one call returns, so a caller can't pull the store.
+   */
+  const MAX_LIMIT = 25;
 
   /**
    * The settings reader.
@@ -138,8 +140,8 @@ final class AimRecall extends ToolBase {
         $values['scope'] ?? NULL,
         $values['subject'] ?? NULL,
         $userFilter,
-        (int) ($values['limit'] ?? 10),
-        isset($values['max_distance']) ? (float) $values['max_distance'] : $this->settings->getRecallMaxDistance(),
+        max(1, min(self::MAX_LIMIT, (int) ($values['limit'] ?? 10))),
+        $this->settings->getRecallMaxDistance(),
         FALSE,
         $this->settings->getRecallGap(),
       );

@@ -1162,8 +1162,9 @@ ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>  # de
 - **No `aim_mcp` recipe, deliberately.** The remote-MCP stack is already
   shipped: `aim_tool` carries the tool configs, `aim_tool_oauth` the
   scopes and the tool-gating settings, and the `simple_oauth`/`mcp_server`
-  defaults match what this site runs, apart from the key paths and the
-  `server_instructions` text. What is left is manual (key generation,
+  defaults match what this site runs, apart from the key paths (aim's MCP
+  server instructions come from `aim_tool_oauth`'s alter hook, not
+  config). What is left is manual (key generation,
   HTTPS exposure, the `provide` composer workaround), which a recipe
   cannot do. See `aim_tool_oauth`'s [DEVELOPING.md](modules/aim_tool_oauth/DEVELOPING.md).
 - **Validate without applying** (read-only, catches schema errors and

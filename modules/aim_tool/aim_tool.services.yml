@@ -1,0 +1,7 @@
+services:
+  aim_tool.scope_guide:
+    class: Drupal\aim_tool\AimScopeGuide
+    arguments: ['@entity_type.bundle.info']
+  # So autowired hook classes (AimToolHooks, aim_tool_oauth's) can
+  # type-hint it.
+  Drupal\aim_tool\AimScopeGuide: '@aim_tool.scope_guide'

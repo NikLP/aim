@@ -142,7 +142,8 @@ node demo/preflight.js   # site wrapper; see below
 
 It checks the site (local and through the public funnel URL), Ollama, the
 vector index, the full OAuth handshake as Claude.ai does it (client
-registration, consent, PKCE), all four scopes over MCP, MCP abstention on an
+registration, consent, PKCE), that the MCP server instructions carry aim's
+scope guide, all four scopes over MCP, MCP abstention on an
 off-topic question, save-then-search, and the chat widget in a real browser
 (answer, then write-then-read), plus that anonymous visitors can't see or
 call the widget. It needs DDEV up, a public URL that reaches the site (a

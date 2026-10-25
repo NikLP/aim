@@ -176,14 +176,21 @@ async function askWidget(page, question) {
     });
 
     let rpc = null;
+    let init = null;
     await check('OAuth: register, consent, PKCE token', async () => {
       const token = await oauthToken(browser);
       rpc = mcpClient(token);
-      const init = await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'preflight', version: '1' } });
+      init = await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'preflight', version: '1' } });
       if (!init.result) throw new Error('initialize failed: ' + JSON.stringify(init).slice(0, 160));
       await rpc('notifications/initialized', {}, true);
     });
     if (rpc) {
+      await check('MCP: server instructions sent, with the scope guide', async () => {
+        const text = init.result.instructions || '';
+        if (!/This server is AIM/.test(text)) throw new Error('no aim instructions in initialize (aim_tool_oauth hook_mcp_server_instructions_alter)');
+        if (!/- site: /.test(text)) throw new Error('instructions lack the scope guide');
+        return text.length + ' chars';
+      });
       await check('MCP: both tools listed', async () => {
         const names = ((await rpc('tools/list', {})).result.tools || []).map((t) => t.name);
         for (const n of ['tool_api__aim_recall', 'tool_api__aim_remember']) if (!names.includes(n)) throw new Error(n + ' missing; have ' + names.join(', '));

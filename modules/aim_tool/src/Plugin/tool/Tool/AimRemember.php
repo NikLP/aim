@@ -95,7 +95,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     'scope' => new InputDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Scope'),
-      description: new TranslatableMarkup('Required when passing text (not needed inside facts, where each entry has its own). One of the scopes actually installed on this site - typically user, role, site, or case, but ask if unsure which are enabled here.'),
+      // Replaced with the installed scopes and what each is for by
+      // AimToolHooks::toolInfoAlter().
+      description: new TranslatableMarkup('Required when passing text (inside facts, each entry has its own). One of the scopes installed on this site.'),
       required: FALSE,
     ),
     'subject' => new InputDefinition(
@@ -144,7 +146,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
           'scope' => new InputDefinition(
             data_type: 'string',
             label: new TranslatableMarkup('Scope'),
-            description: new TranslatableMarkup('One of user, role, site, case. Defaults to site if omitted.'),
+            description: new TranslatableMarkup('Required, as for a single fact: see the top-level scope input for the scopes and when to use each.'),
             required: FALSE,
           ),
           'subject' => new InputDefinition(
@@ -314,18 +316,46 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
 
     if ($fact['bundle'] === 'case') {
       return ExecutableResult::success(
-        new TranslatableMarkup('Created aim_fact @id. Case ID: @case_id - pass this as subject on later calls to add to the same case.', [
+        new TranslatableMarkup('Created aim_fact @id. Case ID: @case_id - pass this as subject on later calls to add to the same case.@status', [
           '@id' => $fact['id'],
           '@case_id' => $fact['subject'],
+          '@status' => $this->statusNote($fact),
         ]),
         ['fact_id' => $fact['id'], 'case_id' => $fact['subject']],
       );
     }
 
     return ExecutableResult::success(
-      new TranslatableMarkup('Created aim_fact @id.', ['@id' => $fact['id']]),
+      new TranslatableMarkup('Created aim_fact @id.@status', [
+        '@id' => $fact['id'],
+        '@status' => $this->statusNote($fact),
+      ]),
       ['fact_id' => $fact['id']],
     );
+  }
+
+  /**
+   * What happens to a saved fact next, when that is not "recall finds it".
+   *
+   * A held fact waits for review and recall skips it until then, so a
+   * caller told only "Created" would report it as known. Mirrors
+   * aim_chatbot's AimRemember reply.
+   *
+   * @param array $fact
+   *   A successful rememberOne() result.
+   *
+   * @return string
+   *   Sentences starting with a space, or an empty string.
+   */
+  private function statusNote(array $fact): string {
+    $note = '';
+    if (!$fact['trusted']) {
+      $note .= ' Waiting for staff review: recall will not return it until it is approved.';
+    }
+    if ($fact['expires']) {
+      $note .= ' It retires after ' . gmdate('Y-m-d', $fact['expires']) . '.';
+    }
+    return $note;
   }
 
   /**
@@ -367,7 +397,7 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
       if ($fact['bundle'] === 'case') {
         $line .= " Case ID: {$fact['subject']}.";
       }
-      $lines[] = $line;
+      $lines[] = $line . $this->statusNote($fact);
       $created++;
     }
 
@@ -390,8 +420,9 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
    *   The text the fact came from, for the grounded check, or NULL.
    *
    * @return array
-   *   ['id' => int, 'bundle' => string, 'subject' => string] on success, or
-   *   ['error' => string] on failure.
+   *   ['id' => int, 'bundle' => string, 'subject' => string, 'trusted' =>
+   *   bool, 'expires' => int|null] on success, or ['error' => string] on
+   *   failure.
    */
   private function rememberOne(array $fields, ?string $sourceText = NULL): array {
     $scope = $fields['scope'] ?? NULL;
@@ -442,6 +473,8 @@ final class AimRemember extends ToolBase implements InputDefinitionRefinerInterf
       'id' => (int) $fact->id(),
       'bundle' => $fact->bundle(),
       'subject' => $fact->get('subject')->value,
+      'trusted' => (bool) $fact->get('trusted')->value,
+      'expires' => $fact->get('expires')->value ? (int) $fact->get('expires')->value : NULL,
     ];
   }
 
