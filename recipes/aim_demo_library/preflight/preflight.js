@@ -214,7 +214,7 @@ async function askWidget(page, question) {
         if (!/No relevant facts/i.test(t)) throw new Error('returned facts for an off-topic query: ' + t.replace(/\s+/g, ' ').slice(0, 160));
       });
       await check('MCP: remember, then searchable', async () => {
-        toolText(await rpc('tools/call', { name: 'tool_api__aim_remember', arguments: { text: `${CANARY} the pre-flight canary heron is called Mabel.`, scope: 'site' } }));
+        toolText(await rpc('tools/call', { name: 'tool_api__aim_remember', arguments: { facts: [{ text: `${CANARY} the pre-flight canary heron is called Mabel.`, scope: 'site' }] } }));
         const t0 = Date.now();
         for (let i = 0; i < 40; i++) {
           const t = toolText(await rpc('tools/call', { name: 'tool_api__aim_recall', arguments: { text: `${CANARY} what is the pre-flight canary heron called?`, scope: 'site', limit: 3 } }));

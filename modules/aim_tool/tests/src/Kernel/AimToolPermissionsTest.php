@@ -80,11 +80,12 @@ class AimToolPermissionsTest extends KernelTestBase {
     $reader = $this->createUser(['recall aim facts']);
     $nobody = $this->createUser([]);
 
-    $this->assertTrue($this->tool('aim_remember')->access($writer));
-    $this->assertFalse($this->tool('aim_remember')->access($reader));
-    $this->assertFalse($this->tool('aim_remember')->access($nobody));
+    // Both tools have a required input, and access() fails closed without it.
+    $remember = fn () => $this->tool('aim_remember')->setInputValue('facts', [['text' => 'anything', 'scope' => 'site']]);
+    $this->assertTrue($remember()->access($writer));
+    $this->assertFalse($remember()->access($reader));
+    $this->assertFalse($remember()->access($nobody));
 
-    // aim_recall has a required input, and access() fails closed without it.
     $recall = fn () => $this->tool('aim_recall')->setInputValue('text', 'anything');
     $this->assertTrue($recall()->access($reader));
     $this->assertFalse($recall()->access($writer));
@@ -144,18 +145,18 @@ class AimToolPermissionsTest extends KernelTestBase {
   }
 
   /**
-   * The flat permission is not enough: the fact's scope needs create access.
+   * The flat permission is not enough: each fact's scope needs create access.
    */
   public function testRememberChecksScopeCreateAccess(): void {
     $this->actAs($this->createUser(['remember aim facts', 'create site aim facts']));
 
     $ok = $this->remember(['text' => 'Open at nine.', 'scope' => 'site']);
-    $this->assertTrue($ok->getResultStatus());
+    $this->assertStringContainsString('Created 1 of 1', (string) $ok->getResultMessage());
     $this->assertCount(1, AimFact::loadMultiple());
 
     $denied = $this->remember(['text' => 'A role fact.', 'scope' => 'role']);
-    $this->assertFalse($denied->getResultStatus());
-    $this->assertStringContainsString('No permission to create role-scope facts', (string) $denied->getResultMessage());
+    $this->assertStringContainsString('Created 0 of 1', (string) $denied->getResultMessage());
+    $this->assertStringContainsString('Entry 0: No permission to create role-scope facts.', $denied->getResult()->getContextValues()['results']);
     $this->assertCount(1, AimFact::loadMultiple(), 'the denied write saved nothing');
   }
 
@@ -164,22 +165,21 @@ class AimToolPermissionsTest extends KernelTestBase {
    */
   public function testAdminBypassesScopeCheck(): void {
     $this->actAs($this->createUser(['remember aim facts', 'administer aim']));
-    $this->assertTrue($this->remember(['text' => 'A role fact.', 'scope' => 'role'])->getResultStatus());
+    $ok = $this->remember(['text' => 'A role fact.', 'scope' => 'role']);
+    $this->assertStringContainsString('Created 1 of 1', (string) $ok->getResultMessage());
   }
 
   /**
-   * A batch applies the scope check per entry and keeps going.
+   * Several facts: the scope check runs per entry and the rest are saved.
    */
   public function testBatchChecksEachEntry(): void {
     $this->actAs($this->createUser(['remember aim facts', 'create site aim facts']));
 
-    $tool = $this->remember([
-      'facts' => [
+    $tool = $this->remember(
       ['text' => 'Allowed.', 'scope' => 'site'],
       ['text' => 'Denied.', 'scope' => 'role'],
-      ['scope' => 'site'],
-      ],
-    ]);
+      ['text' => '', 'scope' => 'site'],
+    );
     $this->assertTrue($tool->getResultStatus());
     $this->assertStringContainsString('Created 1 of 3', (string) $tool->getResultMessage());
     $lines = $tool->getResult()->getContextValues()['results'];
@@ -195,23 +195,33 @@ class AimToolPermissionsTest extends KernelTestBase {
     $caller = $this->createUser(['remember aim facts', 'create user aim facts']);
     $this->actAs($caller);
 
-    $this->assertTrue($this->remember(['text' => 'I like tea.', 'scope' => 'user'])->getResultStatus());
+    $ok = $this->remember(['text' => 'I like tea.', 'scope' => 'user']);
+    $this->assertStringContainsString('Created 1 of 1', (string) $ok->getResultMessage());
     $facts = AimFact::loadMultiple();
     $fact = reset($facts);
     $this->assertSame((int) $caller->id(), (int) $fact->get('user')->target_id);
   }
 
   /**
-   * A call with neither text nor a scope fails with a message, not a write.
+   * No facts fails; an entry without a scope is reported, not written.
    */
   public function testMissingInputFails(): void {
     $this->actAs($this->createUser(['remember aim facts', 'create site aim facts']));
 
-    $this->assertFalse($this->remember([])->getResultStatus());
-    $noScope = $this->remember(['text' => 'No scope given.']);
-    $this->assertFalse($noScope->getResultStatus());
-    $this->assertStringContainsString('Scope is required', (string) $noScope->getResultMessage());
+    $this->assertFalse($this->remember()->getResultStatus());
+    $noScope = $this->remember(['text' => 'No scope given.', 'scope' => '']);
+    $this->assertStringContainsString('Scope is required', $noScope->getResult()->getContextValues()['results']);
     $this->assertCount(0, AimFact::loadMultiple());
+  }
+
+  /**
+   * Every fact gets the tool's own source, whatever the caller sends.
+   */
+  public function testSourceIsTheTools(): void {
+    $this->actAs($this->createUser(['remember aim facts', 'create site aim facts']));
+    $this->remember(['text' => 'Open at nine.', 'scope' => 'site', 'source' => 'trust-me']);
+    $facts = AimFact::loadMultiple();
+    $this->assertSame('tool:aim_remember', reset($facts)->get('source')->value);
   }
 
   /**
@@ -220,29 +230,29 @@ class AimToolPermissionsTest extends KernelTestBase {
   public function testReplySaysWhatHappensNext(): void {
     // Untrusted by default (default_trusted off), and no trust permission.
     $this->actAs($this->createUser(['remember aim facts', 'create site aim facts']));
-    $held = (string) $this->remember(['text' => 'Open at nine.', 'scope' => 'site', 'expires' => '2030-01-31'])->getResultMessage();
+    $held = $this->remember(['text' => 'Open at nine.', 'scope' => 'site', 'expires' => '2030-01-31'])->getResult()->getContextValues()['results'];
     $this->assertStringContainsString('Waiting for staff review', $held);
     $this->assertStringContainsString('It retires after 2030-01-31.', $held);
 
-    $batch = $this->remember(['facts' => [['text' => 'Closed on Mondays.', 'scope' => 'site']]]);
-    $this->assertStringContainsString('Waiting for staff review', $batch->getResult()->getContextValues()['results']);
-
     // A writer who could trust it by hand starts it trusted: no note.
     $this->actAs($this->createUser(['remember aim facts', 'administer aim']));
-    $trusted = (string) $this->remember(['text' => 'Open at ten.', 'scope' => 'site'])->getResultMessage();
+    $trusted = $this->remember(['text' => 'Open at ten.', 'scope' => 'site'])->getResult()->getContextValues()['results'];
     $this->assertStringNotContainsString('Waiting for staff review', $trusted);
     $this->assertStringNotContainsString('retires', $trusted);
   }
 
   /**
-   * The scope inputs list the installed scopes; recall has no cutoff input.
+   * The schema lists the installed scopes and only their extra fields.
    */
   public function testSchemaReflectsInstalledScopes(): void {
     $manager = $this->container->get('plugin.manager.tool');
-    $remember = (string) $manager->getDefinition('aim_remember')->getInputDefinition('scope')->getDescription();
+    $entry = fn () => $manager->getDefinition('aim_remember')->getInputDefinition('facts')->getItemDefinition()->getPropertyDefinitions();
+    $remember = (string) $entry()['scope']->getDescription();
     $this->assertStringContainsString('- site: ', $remember);
     $this->assertStringContainsString('- user: ', $remember);
     $this->assertStringNotContainsString('- case: ', $remember, 'case is not installed here');
+    $this->assertArrayNotHasKey('scope_fields', $entry(), 'no installed scope declares extra fields');
+    $this->assertArrayNotHasKey('source', $entry());
 
     $recall = $manager->getDefinition('aim_recall');
     $this->assertStringContainsString('site (about the organization)', (string) $recall->getInputDefinition('scope')->getDescription());
@@ -250,8 +260,7 @@ class AimToolPermissionsTest extends KernelTestBase {
 
     // A scope added later (the scope admin form) shows up without a rebuild.
     AimScope::create(['id' => 'case', 'label' => 'Case'])->save();
-    $remember = (string) $manager->getDefinition('aim_remember')->getInputDefinition('scope')->getDescription();
-    $this->assertStringContainsString('- case: ', $remember);
+    $this->assertStringContainsString('- case: ', (string) $entry()['scope']->getDescription());
   }
 
   /**
@@ -286,15 +295,15 @@ class AimToolPermissionsTest extends KernelTestBase {
   }
 
   /**
-   * Runs aim_remember with the given inputs.
+   * Runs aim_remember with the given facts entries.
    *
    * @return \Drupal\tool\Tool\ToolInterface
    *   The executed tool.
    */
-  protected function remember(array $inputs) {
+  protected function remember(array ...$facts) {
     $tool = $this->tool('aim_remember');
-    foreach ($inputs as $name => $value) {
-      $tool->setInputValue($name, $value);
+    if ($facts) {
+      $tool->setInputValue('facts', $facts);
     }
     return $tool->execute();
   }

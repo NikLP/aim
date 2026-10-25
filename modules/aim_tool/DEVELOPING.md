@@ -8,15 +8,18 @@ module reference in [../../DEVELOPING.md](../../DEVELOPING.md).
 
 ## Tool API + MCP exposure
 
-`aim_tool` ships `#[Tool]` plugins `aim_remember`/`aim_recall` wrapping
-`AimMemoryManager` directly (any scope, gated on `remember aim facts`/
+`aim_tool` ships the tools `aim_remember`/`aim_recall`/`aim_literal`
+wrapping `AimMemoryManager` directly (any scope, gated on `remember aim facts`/
 `recall aim facts`, not the admin UI's single `administer aim`).
 `mcp_server_tool_bridge` exposes both over MCP via config-only
 `mcp_tool_config` entities, shipped by `aim_tool_oauth` (`config/install`),
-so MCP is opt-in: enable that module to turn it on. `aim_remember` also takes an
-optional `facts` list for saving several facts in one call/bootstrap, and an
-optional `expires` (`YYYY-MM-DD`, also per `facts` entry): the fact is
-retired after that day by `drush aim:expire` or `hook_cron` (ADR-0057).
+so MCP is opt-in: enable that module to turn it on. `aim_remember` takes
+only `facts`, a list of one or more `{text, scope, subject?, expires?,
+scope_fields?}` entries, saved in one call/bootstrap (a single-fact form
+beside it was removed 2026-10-25: it duplicated every field and the two
+descriptions drifted). `expires` (`YYYY-MM-DD`) retires the fact after that
+day via `drush aim:expire` or `hook_cron` (ADR-0057). Each entry is saved
+or reported on its own line; `source` is always `tool:aim_remember`.
 
 Requires `drupal/mcp_server_tool_bridge:^1.0.0-beta2` +
 `drupal/mcp_server:^2.0.0-beta3` together - `mcp_server_tool_bridge`'s
@@ -35,8 +38,21 @@ tool list. `aim_recall` always applies the site's `recall_max_distance`
 turned the cutoff off; `drush aim:recall --max-distance` stays for
 tuning). `limit` is capped at `AimRecall::MAX_LIMIT` (25) by a `Range`
 constraint, which the MCP schema advertises as `minimum`/`maximum` and the
-server enforces, and clamped in code too. An empty result reads "No
+server enforces before the method runs. An empty result reads "No
 relevant facts found."
+
+**`aim_recall` and `aim_literal` are `#[ToolMethod]` services**, not
+`#[Tool]` plugin classes (tool 1.0.0-beta12, ADR-0044): `src/Tool/`,
+registered in `aim_tool.services.yml`. Tool API builds each tool's inputs
+from the method's parameters and `@param` text, so a description lives in
+the docblock; `#[ToolInput]` only sets a label or a constraint the
+inference can't, and `#[ToolOutput]` declares the outputs (the methods
+return an `ExecutableResult` to keep their own reply messages, so nothing is
+inferred from the return type). The tool ID is on the attribute, so the
+plugin IDs, MCP names and the recipe's `tool:aim_literal` are unchanged, and
+`hook_tool_info_alter()` reaches method tools like plugin ones. A
+`#[ToolMethod]` tool and a `#[Tool]` class with the same ID cannot coexist:
+discovery skips the method one. `aim_remember` is still a plugin.
 
 **Descriptions have one source each.** The scope inputs' descriptions are
 rewritten at discovery by `AimToolHooks::toolInfoAlter()` from

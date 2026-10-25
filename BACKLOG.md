@@ -596,12 +596,6 @@ the released tags and issue queue - check before building on them.
 Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
 2.0.0-beta5.
 
-- [ ] Stale/hardcoded scope lists: `AimRecall`'s `scope` description and
-      `AimRemember`'s batch-entry `scope` description say "user, role,
-      site, case" (no `entity`, ignores which scope submodules are
-      installed, ADR-0028). Build the description from the installed
-      `aim_scope` entities, as the refiner already does for
-      `scope_fields`.
 - [ ] Constrain `scope` to an enum if Tool API supports one on
       `InputDefinition` (check first; #3582943 suggests `tool:info` may
       drop it even when declared). Otherwise the description is the only
@@ -663,8 +657,17 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
   consumer needs more than the supersede edge in `related`.
 - ADR-0014 (use-case archetype starter kits): revisit when a third Recipe
   beyond `aim_demo_library` and `aim_ollama_local` is wanted.
-- ADR-0044 (Tool API method attributes, drupal/tool MR 162): revisit when the
-  MR merges, or when a new `aim_tool` tool is about to be written.
+- ADR-0044 (Tool API method attributes, drupal/tool MR 162): fired
+  2026-10-25, `#[ToolMethod]` shipped in tool 1.0.0-beta12. Decided: adopt.
+  `aim_recall` and `aim_literal` are now `#[ToolMethod]` services
+  (`aim_tool/src/Tool/`), same IDs, same schema byte for byte, same MCP
+  names. Gains: constructor injection, descriptions from the docblock,
+  the `limit` cap as a `#[ToolInput]` constraint. `aim_literal` stays a
+  wrapper: `literals.lookup::lookup()` takes an input array, not typed
+  parameters, and the ID is aim's. `aim_remember` is next, once its
+  facts-only rewrite is committed; open there: moving the per-scope create
+  check into `$access` makes a batch all-or-nothing (today a bad-scope entry
+  is reported and skipped).
 - ADR-0055 (decision rationale as entity-scope facts): revisit when a
   decision-provenance need is real. The test is to hand-model 5 to 10 ADRs
   as `scope=entity` facts and check recall beats grepping the ADR files.

@@ -15,10 +15,11 @@ real per-scope `create {scope} aim facts` permission via
 `AimMemoryManager::checkCreateAccess()` - the flat permission only gates
 use of the tool at all, not which scopes it can write.
 
-Each `#[Tool]` declares its flat permission (`permission:`) as well as
-overriding `checkAccess()`: Tool API checks the declared one before any
-input is processed, and the MCP bridge hides a tool from `tools/list` for
-a caller without it. Keep the two in step; a typo'd name denies every
+Each tool declares its flat permission (`permission:` on `#[Tool]` or
+`#[ToolMethod]`): Tool API checks it before any input is processed, and
+the MCP bridge hides a tool from `tools/list` for a caller without it.
+`AimRemember` also overrides `checkAccess()` with the same permission;
+keep the two in step. A typo'd name denies every
 ordinary account but not admins, so test as a non-admin. `AimRemember`
 declares `destructive: FALSE` (it only adds facts): since tool 1.0.0-beta12
 an undeclared Write tool counts as destructive, which MCP clients read as
@@ -26,24 +27,27 @@ an undeclared Write tool counts as destructive, which MCP clients read as
 
 ## What lives here
 
-- `src/Plugin/tool/Tool/AimRemember.php` / `AimRecall.php` - the two Tool
-  API plugins, backed by `aim.memory_manager` directly. Not locked to
+- `src/Plugin/tool/Tool/AimRemember.php` (a `#[Tool]` plugin) /
+  `src/Tool/AimRecall.php` (a `#[ToolMethod]` service, `aim_tool.recall`;
+  see [DEVELOPING.md](DEVELOPING.md)), backed by `aim.memory_manager`
+  directly. Not locked to
   `scope: site` like `aim_chatbot`'s equivalents - a Tool API caller is a
   real, authenticated account, so scope/subject are caller-supplied
   (same shape as `drush aim:remember`, per
-  [ADR-0006](../../adr/resolved/0006-agent-native-write-path.md)). `AimRemember`'s
-  `scope_fields` input (ADR-0028 piece 4) is a generic free map, refined
-  per call via `InputDefinitionRefinerInterface` once `scope` is known -
-  it gains whichever properties the chosen scope's `AimScopeTypeInterface`
-  plugin declares via `getBaseFieldDefinitions()` (translated to Tool
-  `InputDefinition`s by `AimRemember::toolInputFromBaseField()`), so the
-  MCP schema reflects whatever scope submodules are actually installed
-  instead of a hardcoded `scope=entity` shape. A `facts` batch entry's
-  own `scope_fields` stays unrefined - Tool API's refiner mechanism has
-  no per-list-item equivalent. An optional `source_text` (the words the
-  fact or batch came from) feeds the grounded check, one call for the
-  whole batch ([ADR-0037](../../adr/resolved/0037-transient-source-passages-for-grounding.md)).
-- `src/Plugin/tool/Tool/AimLiteral.php` - `aim_literal`, a thin wrapper over
+  [ADR-0006](../../adr/resolved/0006-agent-native-write-path.md)).
+  `AimRemember` takes one shape: `facts`, a list of one or more entries
+  (`text`, `scope` required; `subject`, `expires`, `scope_fields`
+  optional), plus an optional `source_text` (the words the facts came
+  from) for the grounded check, one call for the whole list
+  ([ADR-0037](../../adr/resolved/0037-transient-source-passages-for-grounding.md)).
+  `source` is not an input: every fact gets `tool:aim_remember`. An
+  entry's `scope_fields` (ADR-0028 piece 4) gets its properties from the
+  installed scopes' types (`getBaseFieldDefinitions()`) in
+  `AimToolHooks::toolInfoAlter()`, and is dropped from the schema when none
+  declares any; Tool API's input refiners can't reach a list entry, so the
+  per-call refiner that used to type it went with the single-fact form.
+- `src/Tool/AimLiteral.php` (`#[ToolMethod]` service `aim_tool.literal`) -
+  `aim_literal`, a thin wrapper over
   the `literals.lookup` service (key, search words, or a question when
   `literals_finder` is enabled), gated on `view literals` (or `view
   restricted literals`), not `recall aim facts`: literals check access per

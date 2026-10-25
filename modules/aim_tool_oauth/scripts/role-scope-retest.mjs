@@ -45,7 +45,7 @@ async function run(label,user,client,scope,calls){
   const txt=c.j?.result?.content?.map(x=>x.text).join(' || ')??JSON.stringify(c.j?.error??c.j);console.log('   ',name,JSON.stringify(args).slice(0,60),'->',c.status,String(txt).replace(/\s+/g,' ').slice(0,700));}}
 const cl=(await register());console.log('client',cl.client_id,'scope:',cl.scope);
 const C=cl.client_id; const R=u=>['tool_api__aim_recall',{text:'favourite zzq',scope:'user',user:String(u)}]; const rec=[R(6),R(7),R(9)];
-const rem=u=>[['tool_api__aim_remember',{text:'T-test fact from '+u+' zzq',scope:'user',subject:String({t_alice:6,t_bob:7,t_mgr:8}[u])}]];
+const rem=u=>[['tool_api__aim_remember',{facts:[{text:'T-test fact from '+u+' zzq',scope:'user',subject:String({t_alice:6,t_bob:7,t_mgr:8}[u])}]}]];
 const only=process.argv[2];
 const M={
  a:()=>run('A alice role+recall+remember','t_alice',C,'t:t_staff aim:recall aim:remember',[...rec,...rem('t_alice')]),

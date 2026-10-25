@@ -230,6 +230,13 @@ that same entry's `scope_fields`. Not a functional loss - an
 unconstrained map already accepts whatever a batch entry needs to send,
 just without the single-call path's stricter per-scope typing.
 
+**Update 2026-10-25:** the single-call path and its refiner are gone;
+`aim_remember` takes only `facts`. A `facts` entry's `scope_fields` now
+gets its properties at discovery from every installed scope's type
+(`AimToolHooks::toolInfoAlter()`) and is left out of the schema when no
+installed type declares any, so the schema still follows the installed
+scopes, per site rather than per call.
+
 **Not solved by this piece, deliberately deferred, not a regression**:
 `AimMemoryManager::remember()` itself still takes `$targetType`/
 `$targetId` as two fixed positional parameters, not a generic bag, so

@@ -5,3 +5,12 @@ services:
   # So autowired hook classes (AimToolHooks, aim_tool_oauth's) can
   # type-hint it.
   Drupal\aim_tool\AimScopeGuide: '@aim_tool.scope_guide'
+  # #[ToolMethod] services (ADR-0044): Tool API discovers each tool from its
+  # attributed method; the tool ID is on the attribute, not the service ID.
+  aim_tool.recall:
+    class: Drupal\aim_tool\Tool\AimRecall
+    autowire: true
+  aim_tool.literal:
+    class: Drupal\aim_tool\Tool\AimLiteral
+    # literals.lookup has no class alias to autowire from.
+    arguments: ['@literals.lookup', '@current_user']
