@@ -9,30 +9,32 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
 
 ## Tools (raised 2026-10-25)
 
-- [ ] **Chat on the same tools as MCP (needs an ADR, changes ADR-0013).**
-      The chat agent uses `aim_chatbot`'s own `#[FunctionCall]` recall and
-      remember, sharing services with `aim_tool` but not the tools; only
-      `aim_literal` is shared, through `tool_ai_connector`. Moving chat to
-      `tool:aim_recall`/`tool:aim_remember` means one tool surface and one
-      set of descriptions, but:
-      - **Scope lock.** Today it's in code (site only). `ai_agents`'
-        `tool_usage_limits` can force a value per agent in config
-        (`force_value`, `hide_property`), which fits recall's top-level
-        `scope` but probably not remember's `facts[].scope`: the limits
-        act on top-level properties, so the `facts`-only shape makes
-        remember harder to lock. Check before deciding.
-      - **Permissions already enforce it:** recall and remember run as the
-        visitor, and members hold only `view`/`create site aim facts`. The
-        code lock is belt-and-braces; on the shared tools, a site granting
-        members another scope would let chat use it.
-      - **Trust channel.** Chat writes use the `chat` channel (ships
-        `hold`); `aim_remember` hardcodes `CHANNEL_MCP` and would need to
-        know its caller.
+- [ ] **`aim_recall`'s `date` doesn't say which date it is.** It is
+      `asserted` ("true since") when set, else `created` ("recorded"), and
+      the output description says so, but a result can't tell the caller
+      which one it carries. Left as is on purpose (no time fields yet, see
+      ADR-0036's dated recall); a `date_kind` or two fields when time work
+      starts.
+- [ ] **Move chat onto the shared tools (needs an ADR, changes ADR-0013).**
+      The site chatbot has to use the same `aim_recall`/`aim_remember` as
+      MCP (through `tool_ai_connector`, as `aim_literal` already is),
+      replacing `aim_chatbot`'s own `#[FunctionCall]` recall and remember.
+      **Scope is gated by permissions, decided 2026-10-25:** the tools run
+      as the visitor and members hold only `view`/`create site aim facts`,
+      the same per-fact check MCP relies on; no config lock (`ai_agents`'
+      `tool_usage_limits` only reaches top-level inputs, not
+      `facts[].scope`). A site that grants members another scope gets it
+      in chat too, by design. The work:
+      - **Trust channel.** Chat writes must stay on the `chat` channel
+        (ships `hold`); `aim_remember` hardcodes `CHANNEL_MCP` and needs
+        to know its caller.
       - **Grounding evidence.** Chat's source text is the real chat history
-        (`AimChatbotSourceTextSubscriber`); the tool's `source_text` is
-        what the model chooses to quote, weaker for the grounded check.
+        (`AimChatbotSourceTextSubscriber`, which feeds `aim_chatbot`'s
+        plugin); the tool's `source_text` is what the model chooses to
+        quote. Keep the history as the evidence.
       - **Smaller differences:** 5 results vs 10, and the chat reply
-        wording ("shared with other visitors").
+        wording ("shared with other visitors"); the persona and the
+        eval/pre-flight checks that name the old tool IDs.
 
 ## Chat quality and evals: open after the 2026-10-15/16 session
 
