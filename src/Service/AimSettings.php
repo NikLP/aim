@@ -117,7 +117,7 @@ class AimSettings {
   ) {}
 
   /**
-   * Returns the live auto-merge threshold from aim.settings.
+   * Returns the live auto-merge distance from aim.settings.
    *
    * Falls back to DEFAULT_AUTO_THRESHOLD only if the config value is
    * missing (e.g. aim.settings was deleted outside of a normal uninstall) -
@@ -132,7 +132,7 @@ class AimSettings {
   }
 
   /**
-   * Returns the live ambiguous threshold from aim.settings.
+   * Returns the live ambiguous distance from aim.settings.
    *
    * See getAutoThreshold() - same fallback behavior.
    *

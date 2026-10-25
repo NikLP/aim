@@ -196,7 +196,7 @@ final class AimSettingsForm extends ConfigFormBase {
       if ($activity === 'verifier') {
         $form['models'][$activity]['threshold'] = [
           '#type' => 'number',
-          '#title' => $this->t('Decision confirmation threshold'),
+          '#title' => $this->t('Verifier threshold'),
           '#description' => $this->t('A decision model confirms a merge only when its probability is above this value. Empty or 0 uses 0.5. Model-specific: a model that scores faulty merges high needs a higher value, calibrate it with the aim_benchmark eval scripts (hosted Jev separated cleanly at about 0.8 on a small 20-merge set, not a proven value).'),
           '#default_value' => $choice['threshold'] ?? NULL,
           '#min' => 0,
@@ -222,7 +222,7 @@ final class AimSettingsForm extends ConfigFormBase {
     ];
     $form['consolidation']['auto_threshold'] = [
       '#type' => 'number',
-      '#title' => $this->t('Auto-merge threshold'),
+      '#title' => $this->t('Auto-merge distance'),
       '#description' => $this->t('Distance at or below which a candidate fact is retired as a duplicate automatically, no LLM call.'),
       '#config_target' => 'aim.settings:auto_threshold',
       '#min' => 0,
@@ -232,8 +232,8 @@ final class AimSettingsForm extends ConfigFormBase {
     ];
     $form['consolidation']['ambiguous_threshold'] = [
       '#type' => 'number',
-      '#title' => $this->t('Ambiguous threshold'),
-      '#description' => $this->t('Distance at or below which a candidate fact gets a single LLM classification call (ADD/UPDATE/RETIRE/NOOP). Above this, facts are left alone at zero cost. Must be greater than the auto-merge threshold.'),
+      '#title' => $this->t('Ambiguous distance'),
+      '#description' => $this->t('Distance at or below which a candidate fact gets a single LLM classification call (ADD/UPDATE/RETIRE/NOOP). Above this, facts are left alone at zero cost. Must be greater than the auto-merge distance.'),
       '#config_target' => 'aim.settings:ambiguous_threshold',
       '#min' => 0,
       '#max' => 1,
@@ -425,7 +425,7 @@ final class AimSettingsForm extends ConfigFormBase {
     $auto = (float) $form_state->getValue('auto_threshold');
     $ambiguous = (float) $form_state->getValue('ambiguous_threshold');
     if ($auto >= $ambiguous) {
-      $form_state->setErrorByName('ambiguous_threshold', $this->t('The ambiguous threshold must be greater than the auto-merge threshold, or every ambiguous-band pair would be auto-merged instead of reviewed.'));
+      $form_state->setErrorByName('ambiguous_threshold', $this->t('The ambiguous distance must be greater than the auto-merge distance, or every ambiguous-band pair would be auto-merged instead of reviewed.'));
     }
 
     if (!str_contains((string) $form_state->getValue('extraction_prompt'), '{text}')) {

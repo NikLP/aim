@@ -4,14 +4,14 @@ aim.settings:
   mapping:
     auto_threshold:
       type: float
-      label: 'Auto-merge threshold'
+      label: 'Auto-merge distance'
       constraints:
         Range:
           min: 0
           max: 1
     ambiguous_threshold:
       type: float
-      label: 'Ambiguous threshold'
+      label: 'Ambiguous distance'
       constraints:
         Range:
           min: 0

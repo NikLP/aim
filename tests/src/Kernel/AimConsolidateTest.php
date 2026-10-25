@@ -106,7 +106,7 @@ class AimConsolidateTest extends KernelTestBase {
   }
 
   /**
-   * Facts farther apart than the ambiguous threshold are left alone.
+   * Facts farther apart than the ambiguous distance are left alone.
    */
   public function testDistantFactsUntouched(): void {
     $a = $this->fact('Open at nine.');

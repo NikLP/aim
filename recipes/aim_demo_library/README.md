@@ -113,9 +113,16 @@ failed recipe prints a long stack trace after the real error; the first
 - **`index_directly` suits local embeddings.** With hosted embeddings each
   save ties up a worker for seconds ([ADR-0015](../../adr/resolved/0015-immediate-consolidation-considered-deferred.md)
   addendum); remove that action.
-- **0.48 is calibrated to this dataset** with `nomic-embed-text`
+- **Thresholds are tuned to particular models.** The distance settings
+  (Chatbot recall maximum distance `recall_max_distance`, Recall gap
+  `recall_gap`, Auto-merge distance `auto_threshold`, Ambiguous distance
+  `ambiguous_threshold`) were measured on this dataset with
+  `nomic-embed-text` on MariaDB
   ([ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md)).
-  Recalibrate if the model changes.
+  This recipe's Gate match threshold (`gate_match_threshold`, 0.8) and
+  Gate choice margin (`gate_choice_margin`, 0.4) were measured with hosted
+  Jev (`typesafeai`) as the Decision default. Re-check them if you change
+  either model.
 - **Review gate by writer.** Any signed-in visitor can tell the chat a
   fact (the recipe grants `access deepchat api` and `create site aim
   facts` to authenticated users only). A member's fact waits untrusted for
