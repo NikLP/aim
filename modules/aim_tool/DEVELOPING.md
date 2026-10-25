@@ -41,18 +41,22 @@ constraint, which the MCP schema advertises as `minimum`/`maximum` and the
 server enforces before the method runs. An empty result reads "No
 relevant facts found."
 
-**`aim_recall` and `aim_literal` are `#[ToolMethod]` services**, not
+**All three tools are `#[ToolMethod]` services**, not
 `#[Tool]` plugin classes (tool 1.0.0-beta12, ADR-0044): `src/Tool/`,
 registered in `aim_tool.services.yml`. Tool API builds each tool's inputs
 from the method's parameters and `@param` text, so a description lives in
 the docblock; `#[ToolInput]` only sets a label or a constraint the
-inference can't, and `#[ToolOutput]` declares the outputs (the methods
+inference can't (or, for `aim_remember`'s `facts`, a whole list-of-maps
+definition, which no PHP type describes), and `#[ToolOutput]` declares the outputs (the methods
 return an `ExecutableResult` to keep their own reply messages, so nothing is
 inferred from the return type). The tool ID is on the attribute, so the
 plugin IDs, MCP names and the recipe's `tool:aim_literal` are unchanged, and
 `hook_tool_info_alter()` reaches method tools like plugin ones. A
 `#[ToolMethod]` tool and a `#[Tool]` class with the same ID cannot coexist:
-discovery skips the method one. `aim_remember` is still a plugin.
+discovery skips the method one. `aim_remember`'s per-scope create check
+stays inside the method, not in `#[ToolMethod]`'s `$access`: that runs
+before the tool, so one entry in a scope the caller can't write would deny
+the whole list instead of being reported and skipped.
 
 **Descriptions have one source each.** The scope inputs' descriptions are
 rewritten at discovery by `AimToolHooks::toolInfoAlter()` from

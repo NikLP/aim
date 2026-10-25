@@ -2,28 +2,26 @@
 
 declare(strict_types=1);
 
-namespace Drupal\aim_tool\Plugin\tool\Tool;
+namespace Drupal\aim_tool\Tool;
 
-use Drupal\Core\Access\AccessResult;
-use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Service\AimGroundingChecker;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRememberService;
 use Drupal\aim\Service\AimTrustPolicy;
-use Drupal\tool\Attribute\Tool;
+use Drupal\tool\Attribute\ToolInput;
+use Drupal\tool\Attribute\ToolMethod;
+use Drupal\tool\Attribute\ToolOutput;
 use Drupal\tool\ExecutableResult;
-use Drupal\tool\Tool\ToolBase;
 use Drupal\tool\Tool\ToolOperation;
 use Drupal\tool\TypedData\InputDefinition;
 use Drupal\tool\TypedData\ListInputDefinition;
 use Drupal\tool\TypedData\MapInputDefinition;
 use Drupal\tool\TypedData\OutputDefinition;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * Saves aim_facts directly, the same write path as drush aim:remember.
+ * The aim_remember tool: saves aim_facts, the same path as aim:remember.
  *
  * Unlike aim_chatbot's aim_chatbot:remember, this is not locked to
  * scope=site: a Tool API caller here is a real, authenticated Drupal
@@ -34,14 +32,17 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * visitor, so scope/subject are caller-supplied - the same
  * shape ADR-0006 established for the drush CLI adapter, over Tool API/MCP
  * transport instead of a shell. See ADR-0013 for why this is a separate
- * plugin from the chatbot's rather than a shared one.
+ * tool from the chatbot's rather than a shared one.
  *
  * "remember aim facts" only gates use of this tool at all - rememberOne()
  * additionally checks the real per-scope "create {scope} aim facts"
  * permission for each entry's actual scope (AimMemoryManager::
  * checkCreateAccess()), so the same permission the admin UI's entity add
  * form enforces per bundle also binds this write path, not just the flat
- * permission below.
+ * permission below. It stays per entry rather than in a #[ToolMethod]
+ * access method: that runs before the tool, so one entry in a scope the
+ * caller cannot write would deny the whole list instead of being reported
+ * and skipped.
  *
  * One shape: facts, a list of one or more entries. A single-fact form
  * beside it duplicated every field and the two drifted (2026-10-25). One
@@ -63,21 +64,68 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * two fixed parameters - a scope type adding a third field would need that
  * signature widened too; not built, see BACKLOG.md.
  *
- * ToolBase's constructor is final (no constructor DI for extra services),
- * but its create() is not - so services are injected by overriding
- * create() and setting properties after parent::create(), the same pattern
- * aim_chatbot's FunctionCall plugins use, rather than a \Drupal::service()
- * call at execution time.
+ * A #[ToolMethod] service (ADR-0044). facts carries a full definition in
+ * #[ToolInput]: a list of maps has no PHP type to infer it from.
  */
-#[Tool(
-  id: 'aim_remember',
-  label: new TranslatableMarkup('Remember facts'),
-  description: new TranslatableMarkup('Saves one or more short, atomic facts exactly as given - no LLM call decides what is worth remembering. Put every fact in facts, one entry each, even a single one.'),
-  operation: ToolOperation::Write,
-  destructive: FALSE,
-  permission: 'remember aim facts',
-  input_definitions: [
-    'facts' => new ListInputDefinition(
+final class AimRemember {
+
+  /**
+   * The source recorded on every fact this tool saves.
+   */
+  const SOURCE = 'tool:aim_remember';
+
+  /**
+   * Constructs an AimRemember tool service.
+   *
+   * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
+   *   The aim memory manager.
+   * @param \Drupal\aim\Service\AimRememberService $rememberService
+   *   The remember service.
+   * @param \Drupal\aim\Service\AimGroundingChecker $groundingChecker
+   *   The grounded check.
+   * @param \Drupal\Core\Session\AccountInterface $currentUser
+   *   The calling account.
+   */
+  public function __construct(
+    private readonly AimMemoryManager $memoryManager,
+    private readonly AimRememberService $rememberService,
+    private readonly AimGroundingChecker $groundingChecker,
+    private readonly AccountInterface $currentUser,
+  ) {}
+
+  /**
+   * Saves facts.
+   *
+   * @param array $facts
+   *   The facts to save, described by the #[ToolInput] definition.
+   * @param string|null $source_text
+   *   The exact words every fact in facts came from: what the person said
+   *   or the passage you read, quoted verbatim, not a summary. Used to
+   *   check each fact is actually stated there; never stored. Omit when
+   *   there is no such text.
+   *
+   * @return \Drupal\tool\ExecutableResult
+   *   One line per entry, or a failure when facts is empty.
+   */
+  #[ToolMethod(
+    id: 'aim_remember',
+    label: new TranslatableMarkup('Remember facts'),
+    description: new TranslatableMarkup('Saves one or more short, atomic facts exactly as given - no LLM call decides what is worth remembering. Put every fact in facts, one entry each, even a single one.'),
+    operation: ToolOperation::Write,
+    destructive: FALSE,
+    permission: 'remember aim facts',
+  )]
+  #[ToolOutput(
+    name: 'results',
+    definition: new OutputDefinition(
+      data_type: 'string',
+      label: new TranslatableMarkup('Results'),
+      description: new TranslatableMarkup('Per-fact outcome, one line each: the new fact ID, the case ID for scope=case (pass it as subject to add to the same case), and whether the fact waits for review or has an end date.'),
+      required: FALSE,
+    ),
+  )]
+  public function remember(
+    #[ToolInput(definition: new ListInputDefinition(
       label: new TranslatableMarkup('Facts'),
       description: new TranslatableMarkup('The facts to save, one entry each. Save everything worth keeping from one exchange in one call.'),
       required: TRUE,
@@ -121,68 +169,17 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
           ),
         ],
       ),
-    ),
-    'source_text' => new InputDefinition(
-      data_type: 'string',
-      label: new TranslatableMarkup('Source text'),
-      description: new TranslatableMarkup('The exact words every fact in facts came from: what the person said or the passage you read, quoted verbatim, not a summary. Used to check each fact is actually stated there; never stored. Omit when there is no such text.'),
-      required: FALSE,
-    ),
-  ],
-  output_definitions: [
-    'results' => new OutputDefinition(
-      data_type: 'string',
-      label: new TranslatableMarkup('Results'),
-      description: new TranslatableMarkup('Per-fact outcome, one line each: the new fact ID, the case ID for scope=case (pass it as subject to add to the same case), and whether the fact waits for review or has an end date.'),
-      required: FALSE,
-    ),
-  ],
-)]
-final class AimRemember extends ToolBase {
-
-  /**
-   * The source recorded on every fact this tool saves.
-   */
-  const SOURCE = 'tool:aim_remember';
-
-  /**
-   * The aim memory manager.
-   */
-  protected AimMemoryManager $memoryManager;
-
-  /**
-   * The remember service.
-   */
-  protected AimRememberService $rememberService;
-
-  /**
-   * The grounded check.
-   */
-  protected AimGroundingChecker $groundingChecker;
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
-    $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
-    $instance->memoryManager = $container->get('aim.memory_manager');
-    $instance->rememberService = $container->get('aim.remember');
-    $instance->groundingChecker = $container->get('aim.grounding_checker');
-    return $instance;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function doExecute(array $values): ExecutableResult {
-    $facts = $values['facts'] ?? [];
+    ))]
+    array $facts,
+    ?string $source_text = NULL,
+  ): ExecutableResult {
     if (empty($facts)) {
       return ExecutableResult::failure(
         new TranslatableMarkup('Provide facts: a list of one or more {text, scope} entries.'),
         NULL,
       );
     }
-    $sourceText = ($values['source_text'] ?? '') !== '' ? (string) $values['source_text'] : NULL;
+    $sourceText = ($source_text ?? '') !== '' ? $source_text : NULL;
 
     $lines = [];
     $created = 0;
@@ -271,12 +268,11 @@ final class AimRemember extends ToolBase {
       $subject = (string) $this->currentUser->id();
     }
 
-    // checkAccess() below only checks the flat "remember aim facts"
-    // permission, gating use of this tool at all - it does not know each
-    // entry's scope. Check the real per-scope "create {scope} aim facts"
-    // permission here too (AimFactAccessControlHandler, "administer aim
-    // memory" as bypass), the same one the admin UI's entity add form
-    // already enforces per bundle.
+    // The tool's declared permission only gates use of this tool at all -
+    // it does not know each entry's scope. Check the real per-scope "create
+    // {scope} aim facts" permission here too (AimFactAccessControlHandler,
+    // "administer aim" as bypass), the same one the admin UI's entity add
+    // form already enforces per bundle.
     if (!$this->memoryManager->checkCreateAccess($scope, $this->currentUser)->isAllowed()) {
       return ['error' => 'No permission to create ' . $scope . '-scope facts.'];
     }
@@ -308,14 +304,6 @@ final class AimRemember extends ToolBase {
       'trusted' => (bool) $fact->get('trusted')->value,
       'expires' => $fact->get('expires')->value ? (int) $fact->get('expires')->value : NULL,
     ];
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function checkAccess(array $values, AccountInterface $account, bool $return_as_object = FALSE): bool|AccessResultInterface {
-    $access = AccessResult::allowedIfHasPermission($account, 'remember aim facts');
-    return $return_as_object ? $access : $access->isAllowed();
   }
 
 }

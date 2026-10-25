@@ -1,6 +1,6 @@
 # CLAUDE.md — AIM Tool
 
-Tool API plugins exposing AIM memory (any scope, permission-gated), and
+Tool API tools (`#[ToolMethod]` services) exposing AIM memory (any scope, permission-gated), and
 via `mcp_server_tool_bridge`, MCP. Part of the [aim](../../CLAUDE.md)
 project - see the root module's CLAUDE.md for environment, architecture
 decisions, and the code-style/git rules shared across all of `aim`'s
@@ -10,16 +10,15 @@ submodules; this file only covers what is specific to `aim_tool`.
 
 `remember aim facts` / `recall aim facts` (`aim_tool.permissions.yml`, both
 `restrict access: true`), separate from the flat `administer aim`
-the admin UI uses. `AimRemember`'s tool plugin additionally checks the
+the admin UI uses. `AimRemember` additionally checks, per entry, the
 real per-scope `create {scope} aim facts` permission via
 `AimMemoryManager::checkCreateAccess()` - the flat permission only gates
 use of the tool at all, not which scopes it can write.
 
-Each tool declares its flat permission (`permission:` on `#[Tool]` or
-`#[ToolMethod]`): Tool API checks it before any input is processed, and
-the MCP bridge hides a tool from `tools/list` for a caller without it.
-`AimRemember` also overrides `checkAccess()` with the same permission;
-keep the two in step. A typo'd name denies every
+Each tool declares its flat permission (`permission:` on `#[ToolMethod]`):
+Tool API checks it before any input is processed, and the MCP bridge
+hides a tool from `tools/list` for a caller without it. A typo'd name
+denies every
 ordinary account but not admins, so test as a non-admin. `AimRemember`
 declares `destructive: FALSE` (it only adds facts): since tool 1.0.0-beta12
 an undeclared Write tool counts as destructive, which MCP clients read as
@@ -27,9 +26,9 @@ an undeclared Write tool counts as destructive, which MCP clients read as
 
 ## What lives here
 
-- `src/Plugin/tool/Tool/AimRemember.php` (a `#[Tool]` plugin) /
-  `src/Tool/AimRecall.php` (a `#[ToolMethod]` service, `aim_tool.recall`;
-  see [DEVELOPING.md](DEVELOPING.md)), backed by `aim.memory_manager`
+- `src/Tool/AimRemember.php` / `AimRecall.php` (`#[ToolMethod]` services
+  `aim_tool.remember`/`aim_tool.recall`; see
+  [DEVELOPING.md](DEVELOPING.md)), backed by `aim.memory_manager`
   directly. Not locked to
   `scope: site` like `aim_chatbot`'s equivalents - a Tool API caller is a
   real, authenticated account, so scope/subject are caller-supplied

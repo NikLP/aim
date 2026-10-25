@@ -1,6 +1,6 @@
 # AIM Tool
 
-Exposes AIM memory as Tool API plugins (`aim_remember`/`aim_recall`), and
+Exposes AIM memory as Tool API tools (`aim_remember`/`aim_recall`), and
 through them, over MCP via `mcp_server_tool_bridge`. Any scope, gated by
 permission rather than hardcoded like `aim_chatbot`. Part of
 [AIM](../../README.md).

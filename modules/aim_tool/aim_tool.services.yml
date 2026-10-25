@@ -14,3 +14,6 @@ services:
     class: Drupal\aim_tool\Tool\AimLiteral
     # literals.lookup has no class alias to autowire from.
     arguments: ['@literals.lookup', '@current_user']
+  aim_tool.remember:
+    class: Drupal\aim_tool\Tool\AimRemember
+    autowire: true
