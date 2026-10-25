@@ -104,7 +104,7 @@ assuming one needs to be written from scratch.
   pass).
 
 **Addendum, 2026-09-27:** a first kit exists as
-`recipes/aim_demo_library/` (a fictional library, from the DrupalCon demo).
+`recipes/aim_demo_library/` (a fictional library, from the demo).
 It answers the Recipe question above for the narrow case only: the
 recipe carries config actions (persona, site identity, recall cutoff) and
 the facts load through `aim:remember --file`, not recipe default content,

@@ -106,7 +106,7 @@ gate are built. Work on the literals modules themselves is in
       wording: Jev is a decision model and cannot write text); local Jev latency unmeasured; a gate-hit line in the
       review queue (design in `modules/aim_chatbot/CLAUDE.md`).
 
-## Plugin, skills and the verbal webform demo (raised 2026-10-09, important)
+## Plugin, skills and the verbal webform (raised 2026-10-09, important)
 
 - [ ] **A Claude Code plugin for aim.** Bundle the skills (`aim-discovery`,
       `aim-memory`, the ones below), the MCP server config with its OAuth
@@ -114,16 +114,27 @@ gate are built. Work on the literals modules themselves is in
       MCP tools alone do not tell a model *when* to use them; the skills do.
       Build once the grill-to-recipe skill exists, so version one has
       something to show. Needs an ADR.
+- [ ] **Move `skills/` to `.agents/skills/` (raised 2026-10-25).** The
+      convention `ai`, `tool` and `mcp_server` already use (Marcus
+      Johansson's talk: drupal.org's knowledge base detects
+      `.agents/skills/<name>/SKILL.md` and lists them per module). Repoint
+      the site's `.claude/skills/` symlinks and the doc links to `skills/`.
+- [ ] **A `create-aim-scope-type` skill (raised 2026-10-25).** A
+      maintainer "extend it" skill, like `ai`'s `create-guardrail-plugin`:
+      scaffold an `AimScopeTypeInterface` plugin plus the submodule that
+      ships its `aim_scope`, with the traps (`setProvider()` on each base
+      field, the `plugin` property and its `PluginExists` constraint,
+      `settings` typed `ignore`). Model it on `aim_scope_entity`.
 - [ ] **Skill chain: grill, then recipe.** The grill writes site memory; a
       recipe-building skill reads it and proposes a Recipe. ADR-0035's gate
       applies (dry-run and human review before any apply). Own ADR.
-- [ ] **Verbal webform demo.** Chain: a webform builder tool (the `webform`
+- [ ] **Verbal webform.** Chain: a webform builder tool (the `webform`
       module is not installed; search drupal.org for an existing Webform
       Tool API / MCP builder before building one) so a form is designed by
       talking; annotations on each element (purpose, plain-language help, what
       a good answer looks like); a walkthrough skill that asks each question,
-      writes the answer back, and uses aim for anything already known. Demo:
-      an everyman describes the form they want, then is interviewed through
+      writes the answer back, and uses aim for anything already known. In
+      use: an everyman describes the form they want, then is interviewed through
       it. Blockers: `annotations` has no write path and the `aim_annotations`
       bridge (ADR-0024) is unbuilt; submissions need a narrow,
       permission-gated write tool, not general entity writes.
@@ -132,8 +143,7 @@ gate are built. Work on the literals modules themselves is in
       embeddings default) before this recipe, since facts are embedded on
       import, and add a stop after it for manual model setup (chat
       provider, decision models and thresholds on the Models tab,
-      `grounding_mode`); run `node demo/preflight.js`; decide whether the
-      demo needs a front page again.
+      `grounding_mode`), then `node demo/preflight.js`.
 - [ ] **Re-check what the personas assume the assistant can see** (a
       signed-in member only gets facts through `view site aim facts`;
       `aim_literal` needs only `view literals` since 2026-10-10), and
@@ -141,8 +151,11 @@ gate are built. Work on the literals modules themselves is in
 
 ## Recipes (raised 2026-09-27)
 
-- [ ] Run the demo questions in the recipe README's "Running the demo" on
-      the fresh install.
+- [ ] **Showcase (no date).** aim doing a handful of different things
+      (chat recall and save, scopes, the review gate, MCP from a remote
+      client), backed by literals, plus what literals does on its own
+      (finder, token replacement). The recipe README's "Running the demo"
+      questions and whether the site needs a front page fold into this.
 - [ ] **`aim:consolidate --dry-run` prints every compared pair** (2026-10-22
       test report: 32 rows, 31 unrelated ADDs at 0.33-0.44, the one useful
       NOOP lost on stage). Add `--changes-only`, or make it the dry-run

@@ -125,7 +125,11 @@ are recommendations.
       (hybrid keyword + vector recall; second keyword-only index fused in
       PHP, feasibility checked in [ADR-0036](adr/0036-memory-algorithm-appraisal.md)
       "Checked 2026-10-02"; open question there: whether a keyword-only
-      hit may bypass the ADR-0019 distance cutoff).
+      hit may bypass the ADR-0019 distance cutoff). Brushed past again
+      2026-10-25 (Marcus Johansson's talk slide: FTS5 BM25 + sqlite-vec
+      fused by the same RRF formula, for a Drupal docs search). Still
+      parked, but TODO.md's "short category queries" miss lists keyword
+      matching as one candidate fix; check it would help there first.
 
 ## Outside advice (raised 2026-10-15, George Kastanis, OpenBrain author)
 
@@ -566,9 +570,9 @@ questions" section)
       `\Drupal::hasService('key.repository')` call inside
       `getPrivateKey()`/`getPublicKey()`, gated on a `keys_storage`
       config value, instead of constructor injection) and an offer to test
-      a reroll. Not worth hand-patching a live OAuth path against a
-      moving demo deadline - revisit once a working reroll exists upstream,
-      or write one properly with time to test it.
+      a reroll. Not worth hand-patching a live OAuth path - revisit once
+      a working reroll exists upstream, or write one properly with time
+      to test it.
 
 ## aim_tool: MCP input errors lost the input name (raised 2026-10-21, tool 1.0.0-beta12)
 

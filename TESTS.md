@@ -35,8 +35,8 @@ yet, so a pass there says nothing about the module.
 - B. Demo pre-flight (`recipes/aim_demo_library/preflight/preflight.js`, run
   from the site wrapper `demo/preflight.js`): site, Ollama, vector index,
   the OAuth handshake, all scopes over MCP, MCP abstention, save-then-search
-  and the chat widget in a browser. Run before each demo, not a regression
-  suite.
+  and the chat widget in a browser. A whole-site health check, not a
+  regression suite.
 
 ## Next: model evals (A)
 
