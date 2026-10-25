@@ -11,6 +11,7 @@ use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
 use Drupal\literals\Entity\Literal;
 use Drupal\literals\Entity\LiteralType;
+use Drupal\tool\TypedData\ListOutputDefinition;
 use Drupal\user\UserInterface;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -263,6 +264,10 @@ class AimToolPermissionsTest extends KernelTestBase {
     $recall = $manager->getDefinition('aim_recall');
     $this->assertStringContainsString('site (about the organization)', (string) $recall->getInputDefinition('scope')->getDescription());
     $this->assertArrayNotHasKey('max_distance', $recall->getInputDefinitions());
+    // Results are structured, so a caller can act on scope and subject.
+    $results = $recall->getOutputDefinitions()['results'];
+    $this->assertInstanceOf(ListOutputDefinition::class, $results);
+    $this->assertSame(['text', 'scope', 'subject', 'date'], array_keys($results->getItemDefinition()->getPropertyDefinitions()));
 
     // A scope added later (the scope admin form) shows up without a rebuild.
     AimScope::create(['id' => 'case', 'label' => 'Case'])->save();

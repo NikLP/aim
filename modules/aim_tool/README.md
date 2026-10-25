@@ -10,7 +10,8 @@ Over MCP the tools are listed as `tool_api__aim_remember` and
 with `mcp_server_tool_bridge` 1.0.0-beta3). `aim_recall` drops facts past
 `aim.settings:recall_max_distance` (not settable per call, so a remote
 model can't turn the cutoff off) and returns at most 25 facts (`limit`,
-default 10). `aim_remember` takes a list of one or more facts and reports
+default 10), each with its text, scope, subject (a case ID, role or user)
+and date. `aim_remember` takes a list of one or more facts and reports
 each on its own line, including when a fact waits for review or has an end
 date.
 

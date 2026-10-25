@@ -600,10 +600,6 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
       `InputDefinition` (check first; #3582943 suggests `tool:info` may
       drop it even when declared). Otherwise the description is the only
       discovery channel.
-- [ ] Typed output for `aim_recall`: today one formatted `results` string.
-      A structured list (id, text, scope, distance, asserted) lets agents
-      chain on it. Trade-off: MCP clients may render the string better;
-      could return both.
 - [ ] Optional: use `drush tool:run aim_recall` / `aim_remember` as a
       smoke test of the tool layer without an MCP client.
 

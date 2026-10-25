@@ -13,6 +13,9 @@ use Drupal\tool\Attribute\ToolMethod;
 use Drupal\tool\Attribute\ToolOutput;
 use Drupal\tool\ExecutableResult;
 use Drupal\tool\Tool\ToolOperation;
+use Drupal\tool\TypedData\ListOutputDefinition;
+use Drupal\tool\TypedData\MapOutputDefinition;
+use Drupal\tool\TypedData\OutputDefinition;
 
 /**
  * The aim_recall tool: a semantic query against aim_vector_index.
@@ -47,6 +50,12 @@ use Drupal\tool\Tool\ToolOperation;
  * A #[ToolMethod] service (ADR-0044), not a #[Tool] plugin class: Tool API
  * builds the inputs from recall()'s parameters and @param text, and
  * AimToolHooks::toolInfoAlter() replaces scope's with the installed scopes.
+ *
+ * Results are structured, one {text, scope, subject, date} object per fact,
+ * which the MCP bridge publishes as outputSchema/structuredContent: the
+ * scope and subject are there for the caller to act on (add to a case by
+ * its ID, aim a role fact), and typed fields can't be misread the way a
+ * formatted line can. aim_chatbot's recall keeps formatFactLine()'s lines.
  */
 final class AimRecall {
 
@@ -85,8 +94,8 @@ final class AimRecall {
    *   Restrict results to one user, by uid or username. Only meaningful
    *   with scope=user; omit to default to the calling account.
    * @param int $limit
-   *   How many facts at most (1 to 25, default 10). Each is one short line:
-   *   use fewer for a quick check, more for a broad question.
+   *   How many facts at most (1 to 25, default 10). Each is one short
+   *   object: use fewer for a quick check, more for a broad question.
    *
    * @return \Drupal\tool\ExecutableResult
    *   The matching facts, or a failure when the search could not run.
@@ -100,8 +109,21 @@ final class AimRecall {
   )]
   #[ToolOutput(
     name: 'results',
-    data_type: 'string',
-    description: new TranslatableMarkup('The matching facts, formatted as a list.'),
+    definition: new ListOutputDefinition(
+      label: new TranslatableMarkup('Results'),
+      description: new TranslatableMarkup('The matching facts, nearest first. Empty when nothing relevant is recorded.'),
+      required: FALSE,
+      item_definition: new MapOutputDefinition(
+        label: new TranslatableMarkup('Fact'),
+        description: new TranslatableMarkup('One fact.'),
+        property_definitions: [
+          'text' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Text'), description: new TranslatableMarkup('The fact.')),
+          'scope' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Scope'), description: new TranslatableMarkup('Who the fact is true for: one of the scopes listed on the scope input.')),
+          'subject' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Subject'), description: new TranslatableMarkup('Who or what it is about, as the scope says: the role machine name, the user uid, the case ID (pass it as subject to aim_remember to add to the same case). Empty for site.'), required: FALSE),
+          'date' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Date'), description: new TranslatableMarkup('YYYY-MM-DD: when the fact became true if that is known, otherwise when it was recorded.')),
+        ],
+      ),
+    ),
   )]
   public function recall(
     #[ToolInput(label: new TranslatableMarkup('Search text'))]
@@ -139,14 +161,19 @@ final class AimRecall {
     if (empty($rows)) {
       return ExecutableResult::success(
         new TranslatableMarkup('No relevant facts found.'),
-        ['results' => ''],
+        ['results' => []],
       );
     }
 
-    $lines = array_map(fn (array $row): string => $this->recallService->formatFactLine($row), $rows);
+    $results = array_map(fn (array $row): array => [
+      'text' => $row['text'],
+      'scope' => $row['scope'],
+      'subject' => $row['subject'] !== NULL ? (string) $row['subject'] : '',
+      'date' => gmdate('Y-m-d', (int) ($row['asserted'] ?? $row['created'])),
+    ], $rows);
     return ExecutableResult::success(
       new TranslatableMarkup('Found @count relevant fact(s).', ['@count' => count($rows)]),
-      ['results' => implode("\n", $lines)],
+      ['results' => $results],
     );
   }
 

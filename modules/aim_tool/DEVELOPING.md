@@ -41,6 +41,18 @@ constraint, which the MCP schema advertises as `minimum`/`maximum` and the
 server enforces before the method runs. An empty result reads "No
 relevant facts found."
 
+**Recall results are structured** (decided 2026-10-25 over a prefix per
+line): `results` is a list of `{text, scope, subject, date}` (subject empty
+for site; `date` is `asserted`, else `created`), declared with
+`#[ToolOutput(definition: ListOutputDefinition)]`, which the MCP bridge
+publishes as `outputSchema` and returns as `structuredContent`. Scope and
+subject are there for the caller to act on, such as adding to a case by its
+ID. A few more tokens per result than a formatted line (field names repeat),
+bounded by the 25 cap. `aim_chatbot`'s recall keeps `formatFactLine()`'s
+lines. An MCP client validates results against the schema it cached when it
+connected, so a connector opened before an output change reports "Structured
+content does not match the tool's output schema" until it reconnects.
+
 **All three tools are `#[ToolMethod]` services**, not
 `#[Tool]` plugin classes (tool 1.0.0-beta12, ADR-0044): `src/Tool/`,
 registered in `aim_tool.services.yml`. Tool API builds each tool's inputs
