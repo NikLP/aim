@@ -232,7 +232,7 @@ async function askWidget(page, question) {
         $admin = \\Drupal\\user\\Entity\\User::load(1);
         \\Drupal::currentUser()->setAccount($admin);
         $tool = \\Drupal::service("plugin.manager.tool")->createInstance("aim_literal");
-        $tool->setInputValue("question", "What is the library main phone number?");
+        $tool->setInputValue("query", "What is the library main phone number?");
         $v = $tool->execute()->getResult()->getContextValues();
         echo json_encode(["phone" => $reader->read("main_phone", $anon), "staffAnon" => $reader->read("staff_line", $anon), "staffAdmin" => $reader->read("staff_line", $admin), "tool" => $v["value"] ?? ""]);`);
       const r = JSON.parse(out.split('\n').pop());

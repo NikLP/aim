@@ -47,8 +47,14 @@ an undeclared Write tool counts as destructive, which MCP clients read as
   per-call refiner that used to type it went with the single-fact form.
 - `src/Tool/AimLiteral.php` (`#[ToolMethod]` service `aim_tool.literal`) -
   `aim_literal`, a thin wrapper over
-  the `literals.lookup` service (key, search words, or a question when
-  `literals_finder` is enabled), gated on `view literals` (or `view
+  the `literals.lookup` service with one `query` input, described as "the
+  person's question as they asked it" (what the chat gate gives the
+  finder). With `literals_finder` enabled every query goes to the finder,
+  keys included (it resolved every bare key exactly, 2026-10-25, and keeps
+  its ambiguity and gist checks: results over Jev tokens); without it a
+  key-shaped query is tried as a key, then a search lists candidates. The
+  caller never picks a mode, so a site without the finder advertises no
+  input that would fail. Gated on `view literals` (or `view
   restricted literals`), not `recall aim facts`: literals check access per
   value, so a signed-in member can use it in chat. The lookup tool
   an aim site uses; `literals_tool`'s `literals:lookup` wraps the same

@@ -382,7 +382,7 @@ flowchart TD
     M["Chat model reads persona,<br/>conversation so far, the message"]:::llm
     T{"Calls a tool?"}:::code
     R["aim_chatbot:recall<br/>embed, nearest trusted site facts,<br/>cutoff, [literal:key] filled in"]:::vec
-    L["aim_literal<br/>value by key or search words<br/>(question mode needs the finder)"]:::code
+    L["aim_literal<br/>one query: key first, then the finder<br/>(or search without it)"]:::code
     W["aim_chatbot:remember<br/>Guardrails, grounded check (if on),<br/>saved untrusted for review"]:::code
   end
 

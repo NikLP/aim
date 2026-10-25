@@ -96,10 +96,12 @@ class AimToolPermissionsTest extends KernelTestBase {
    * The literal lookup tool opens to either literals read permission.
    */
   public function testLiteralToolAccess(): void {
-    $this->assertTrue($this->tool('aim_literal')->access($this->createUser(['view literals'])));
-    $this->assertTrue($this->tool('aim_literal')->access($this->createUser(['view restricted literals'])));
-    $this->assertFalse($this->tool('aim_literal')->access($this->createUser(['recall aim facts'])));
-    $this->assertFalse($this->tool('aim_literal')->access($this->createUser([])));
+    // The query input is required, and access() fails closed without it.
+    $literal = fn () => $this->tool('aim_literal')->setInputValue('query', 'main_phone');
+    $this->assertTrue($literal()->access($this->createUser(['view literals'])));
+    $this->assertTrue($literal()->access($this->createUser(['view restricted literals'])));
+    $this->assertFalse($literal()->access($this->createUser(['recall aim facts'])));
+    $this->assertFalse($literal()->access($this->createUser([])));
   }
 
   /**
@@ -119,29 +121,33 @@ class AimToolPermissionsTest extends KernelTestBase {
       ])->save();
     }
 
+    // A query shaped like a key is tried as one first.
     $this->actAs($this->createUser(['view literals']));
-    $match = $this->literal(['key' => 'main_phone']);
+    $match = $this->literal('main_phone');
     $this->assertTrue($match->getResultStatus());
     $values = $match->getResult()->getContextValues();
     $this->assertSame('match', $values['outcome']);
     $this->assertSame('value-of-main_phone', $values['value']);
 
-    // A restricted literal the caller may not see reads as "none".
-    $hidden = $this->literal(['key' => 'staff_line']);
-    $this->assertSame('none', $hidden->getResult()->getContextValues()['outcome']);
-    $this->assertSame('', $hidden->getResult()->getContextValues()['value']);
+    // A restricted literal the caller may not see gives no value, and is
+    // not offered as a candidate either.
+    $hidden = $this->literal('staff_line')->getResult()->getContextValues();
+    $this->assertSame('', $hidden['value']);
+    $this->assertStringNotContainsString('staff_line', $hidden['candidates']);
 
-    // Search lists candidates and never a value.
-    $search = $this->literal(['search' => 'phone'])->getResult()->getContextValues();
+    // Plain words, with no finder enabled, list candidates and never a value.
+    $search = $this->literal('phone')->getResult()->getContextValues();
     $this->assertSame('candidates', $search['outcome']);
     $this->assertStringContainsString('main_phone', $search['candidates']);
     $this->assertSame('', $search['value']);
+    $this->assertNotSame('match', $this->literal('the phone number')->getResult()->getContextValues()['outcome']);
 
     $this->actAs($this->createUser(['view literals', 'view restricted literals']));
-    $this->assertSame('value-of-staff_line', $this->literal(['key' => 'staff_line'])->getResult()->getContextValues()['value']);
+    $this->assertSame('value-of-staff_line', $this->literal('staff_line')->getResult()->getContextValues()['value']);
 
-    // A question needs the finder, which is not enabled: failure, not a guess.
-    $this->assertFalse($this->literal(['question' => 'the phone number'])->getResultStatus());
+    // The tool has one input: the caller never picks a lookup mode.
+    $inputs = $this->container->get('plugin.manager.tool')->getDefinition('aim_literal')->getInputDefinitions();
+    $this->assertSame(['query'], array_keys($inputs));
   }
 
   /**
@@ -281,17 +287,13 @@ class AimToolPermissionsTest extends KernelTestBase {
   }
 
   /**
-   * Runs aim_literal with the given inputs.
+   * Runs aim_literal with the given query.
    *
    * @return \Drupal\tool\Tool\ToolInterface
    *   The executed tool.
    */
-  protected function literal(array $inputs) {
-    $tool = $this->tool('aim_literal');
-    foreach ($inputs as $name => $value) {
-      $tool->setInputValue($name, $value);
-    }
-    return $tool->execute();
+  protected function literal(string $query) {
+    return $this->tool('aim_literal')->setInputValue('query', $query)->execute();
   }
 
   /**

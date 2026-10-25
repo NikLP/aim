@@ -48,12 +48,14 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       (`getLastError()`), so the eval reports 0 calls and the question
       echoed back, not an error. Check `getLastError()` or zero calls and
       report it; `aim:chatbot-converse` has the same gap.
-- [ ] **`aim_literal`'s `question` input without the finder (2026-10-22 test
-      report).** The tool advertises `question`, which fails when
-      `literals_finder` is off (the demo recipe installs it since
-      2026-10-22; other sites may not), so the model spends a loop step on
-      the failure before using `search`. Hide the input when the finder is
-      absent.
+- [ ] **`aim:chatbot-eval` can't run anonymous questions.** With the demo
+      assistant closed to anonymous, every gold question without `as:`
+      errors "User does not have the required role to run the assistant"
+      (40 of 43 on `gold.agentblind.yml`, 2026-10-25). Running the set as
+      uid 1 works but skews it: restricted values count as leaks, and the
+      `login` literal (`/user/login`, access-checked) is correctly empty
+      for a signed-in viewer, so its three questions read as wrong. Run
+      anonymous questions as a plain authenticated test account instead.
 - [ ] **Upstream: assistant roles check (ai_assistant_api).**
       `AiAssistantApiRunner::userHasAccess()` tests
       `isset($chosen_roles['anonymous'])` on a list, so ticking only
