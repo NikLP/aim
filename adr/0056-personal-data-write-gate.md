@@ -1,4 +1,4 @@
-# ADR-0056: No personal data stored unless authorised - a personal-data write gate
+# ADR-0056: No personal data stored unless authorized - a personal-data write gate
 
 **Status:** Parked (2026-10-11, Nik: revisit personal data later) - proposed
 2026-10-10, design only. Decision 7 (no stored passages) was built on its
@@ -15,9 +15,9 @@ only write checks are a length limit and a no-markup rule. The README says
 Guardrails filter PII; they do not.
 
 **After:** a fact that names or identifies a private person is refused at
-write time, unless the write is authorised: a `user`-scope fact about its own
+write time, unless the write is authorized: a `user`-scope fact about its own
 subject, or a human holding a new permission who stores it on purpose. A
-model is never the one who authorises.
+model is never the one who authorizes.
 
 **Gains:** personal data in aim's database is there by decision, not by
 accident; GDPR exposure shrinks to facts someone chose to keep; erasure can
@@ -32,7 +32,7 @@ while the checking model is down.
 ## Context
 
 Nik's rule (2026-10-10, prompted by a GDPR reminder): aim should not save
-names or other personal data unless authorised, and that needs to be a gate.
+names or other personal data unless authorized, and that needs to be a gate.
 
 Today:
 
@@ -66,26 +66,26 @@ address), account or ID numbers, and anything else that identifies a
 private individual. Not personal data: organizations, and roles without a
 name ("the branch manager", "a staff member").
 
-**2. What authorises it.**
+**2. What authorizes it.**
 - A `user`-scope fact about its own subject. Other people named in it (a
-  family member, a colleague) are not authorised.
+  family member, a colleague) are not authorized.
 - A human writer holding `store personal data in aim memory` (new,
   `restrict access`), on a human-authored route only: the admin fact form
   and Drush with `--uid`. The chat tools, MCP tools and extraction cannot
   use it; the model wrote that text, not the person.
-- An authorised fact is marked (`personal_data` boolean on `aim_fact`) with
+- An authorized fact is marked (`personal_data` boolean on `aim_fact`) with
   an audit line, so a retention or erasure job can find it.
 
 **3. Where it runs.** A second guardrail set, `aim_personal_data`, run by
 `runGuardrails()` after `aim_write_guardrails` unless the write is
-authorised. It checks `text`, `subject` (except a `user`-scope subject,
+authorized. It checks `text`, `subject` (except a `user`-scope subject,
 which is an account) and `source`. For `user` scope the model check gets
 the subject's display name as context and asks about anyone else.
 
 **4. Two tiers.**
 - **Patterns** (core `RegexpGuardrail`, local, no call): email addresses,
   phone numbers, card and IBAN numbers. Skipped for `user` scope, where the
-  subject's own contact details are authorised. A side effect worth having:
+  subject's own contact details are authorized. A side effect worth having:
   an organization's raw phone or email in a fact is refused, which pushes
   it into a literal (`[literal:key]` tokens pass the pattern).
 - **Names** (an aim guardrail plugin calling the decision backend, one Noul
@@ -154,5 +154,5 @@ permission. Lost: re-checking a fact later against its passage.
   instead, which breaks the rule.
 - Public names (a staff name already published on the website): covered by
   the permission today; a per-site allowlist may be kinder.
-- Retention for authorised `personal_data` facts, with the retired-facts
+- Retention for authorized `personal_data` facts, with the retired-facts
   retention item (TODO.md, ADR-0022).

@@ -94,7 +94,7 @@ unless noted; synthetic data only for hosted Jev.
     traffic.
 3. **Embedding gate in PHP.** Cosine compare time at 200, 2,000 and 10,000
     stored vectors, to find where a real vector index is needed. Tune the
-    "nothing close" floor and the top-hit margin on near-neighbour pairs
+    "nothing close" floor and the top-hit margin on near-neighbor pairs
     ("reservations phone" versus "main phone"). Also the non-literal
     question rate: how often the gate returns `none` without a chooser call.
 4. **Second-language gold set.** A query in one language against gists in

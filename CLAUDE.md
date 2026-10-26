@@ -298,17 +298,24 @@ ddev exec "cd /var/www/html && vendor/bin/phpcs --standard=Drupal,DrupalPractice
 # the module directory, so the module's own phpstan.neon (its
 # ignoreErrors rules) is silently skipped without it
 ddev exec "cd /var/www/html && vendor/bin/phpstan analyse web/modules/custom/aim --memory-limit=512M -c web/modules/custom/aim/phpstan.neon"
+
+# cspell - run from the module dir so its .cspell.json (core's config +
+# .cspell-project-words.txt) is picked up
+ddev exec -d /var/www/html/web/modules/custom/aim "../../../core/node_modules/.bin/cspell --no-progress '**/*.{php,module,inc,install,yml,js,css,twig,md}'"
 ```
 
 Run JS/CSS/spelling tools via core's pinned toolchain
 (`web/core/node_modules/.bin/<tool>`), not `npx` - `npx` can drift from
-whatever version CI pins. `corepack enable && cd web/core && yarn install
---immutable` installs the exact pinned versions first.
+whatever version CI pins. `ddev exec "cd web/core && yarn install
+--immutable"` installs the exact pinned versions first (DDEV's
+`corepack_enable` already provides the pinned yarn). A genuine new
+project word goes in `.cspell-project-words.txt` (the file name
+drupal.org's CI template expects), one lowercase word per line, sorted.
 
 `vendor/bin/phpcs` only works through `ddev exec` (or inside the
 container) - the host has no `php` on `PATH`. Fix small findings (typos,
 style violations, a genuine new dictionary word) inline rather than
-queuing them.
+queueing them.
 
 ## Git
 

@@ -1,0 +1,23 @@
+{
+  "version": "0.2",
+  "import": ["../../../core/.cspell.json"],
+  "dictionaryDefinitions": [
+    {
+      "name": "project-words",
+      "path": "./.cspell-project-words.txt"
+    }
+  ],
+  "dictionaries": ["project-words"],
+  "ignorePaths": ["node_modules/**"],
+  "overrides": [
+    {
+      "filename": [
+        "**/ai_assistant_api.ai_assistant.aim_assistant.yml",
+        "**/preflight/preflight.js",
+        "eval/REVIEW-QUEUE.md",
+        "adr/resolved/0037-transient-source-passages-for-grounding.md"
+      ],
+      "ignoreWords": ["please", "sorry"]
+    }
+  ]
+}

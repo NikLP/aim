@@ -90,7 +90,7 @@ class AimBenchmarkGenerator {
    *
    * Bypasses remember()'s guardrail check and consolidation enqueue on
    * purpose: generated text has nothing for a guardrail to catch, and
-   * queuing thousands of facts for LLM-mediated consolidation would turn a
+   * queueing thousands of facts for LLM-mediated consolidation would turn a
    * latency benchmark into an uncontrolled reasoning-call bill the moment
    * aim_consolidate's crontab entry next runs (aim's CLAUDE.md's
    * "Consolidation" section). Both checks run universally via

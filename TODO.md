@@ -89,7 +89,7 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       then recall on the server.
 - [ ] **Do not commit `config/sync/key.key.amazeeio_ai*.yml` (found
       2026-10-16).** The live keys now use the `config` provider (the key
-      value sits in the config itself, after the amazee re-authorisation),
+      value sits in the config itself, after the amazee re-authorization),
       and a `config:export` wrote the plaintext values into the tracked
       sync directory. Either put the keys back on the `file`/env provider
       and re-export, or keep these three files out of git (config_ignore or

@@ -30,7 +30,7 @@ model.
 `verifier` and `grounding` use `typesafeai`/`jev-latest`
 (`backend: decision`), API key via the Key module's file provider outside
 the web root. Measured 2026-10-02 on hand-written, human-verified sets (24
-pairs, 14 merges, 20 gate items) plus 25 real near-neighbour pairs from
+pairs, 14 merges, 20 gate items) plus 25 real near-neighbor pairs from
 this site's facts: pairs 22-23/24 (one unsafe error, NOOP read as UPDATE),
 25/25 real pairs, merges and gate AUC 1.00, 0.4 s per call; `jev-latest`
 and `jev-preview` scored the same. The sets are easy, so the scores

@@ -42,7 +42,7 @@ are recommendations.
 **Personal data (raised 2026-10-10, [ADR-0056](adr/0056-personal-data-write-gate.md), parked 2026-10-11)**
 
 - [ ] Parked by Nik 2026-10-11, revisit later. Accept or amend ADR-0056 (no personal data stored unless
-      authorised). Then: a `pii` eval set and task in `decision-eval.php`,
+      authorized). Then: a `pii` eval set and task in `decision-eval.php`,
       the `aim_personal_data` guardrail set, the extraction prompt change,
       and the demo's raw email fact moved into a literal.
       Revisit triggers (decide later, 2026-10-15): before real personal
