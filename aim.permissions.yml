@@ -5,7 +5,7 @@ administer aim:
 
 ingest aim facts:
   title: 'Ingest documents into AIM'
-  description: 'Upload a document or fact file on the AIM ingest form, which extracts facts with a model and saves them in any scope the file names.'
+  description: 'Use the AIM ingest form (upload a document or fact file; facts are extracted with a model or read as given). Each fact also needs the create permission for its scope.'
   restrict access: true
 
 review aim facts:

@@ -247,8 +247,8 @@ duplicated here.
 `review aim facts` (`restrict access`; trust/untrust bulk actions in every
 scope, no text edits - the one reviewer permission, ADR-0037's addendum);
 `ingest aim facts` (the Content > AIM > Ingest form at
-`/admin/content/aim-facts/ingest`, `restrict access: true`; implies write
-access to every scope, no per-scope check, see
+`/admin/content/aim-facts/ingest`, `restrict access: true`; opens the form
+only, each fact also needs its scope's `create {scope} aim facts`, see
 [ADR-0016](adr/0016-document-ingestion-ui.md)).
 Per-scope, dynamically generated via `BundlePermissionHandlerTrait`:
 `view {scope} aim facts` / `create {scope} aim facts` /

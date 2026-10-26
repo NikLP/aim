@@ -8,6 +8,7 @@ use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelInterface;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\Dto\StructuredOutputSchema;
@@ -352,21 +353,27 @@ class AimRememberService {
    *   the facts unchecked.
    * @param string|null $channel
    *   The entry channel for the trust policy.
+   * @param \Drupal\Core\Session\AccountInterface|null $writer
+   *   An account whose "create {scope} aim facts" permission each candidate
+   *   is checked against (the ingest form's user), or NULL for no check
+   *   (Drush, which runs as anonymous).
    *
    * @return array
    *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[]), 'skipped'
    *   (int, the number of user-scope candidates skipped because no
-   *   $subjectUid was supplied), and 'blocked' (int, the number of
-   *   candidates a guardrail rejected, per decision 7).
+   *   $subjectUid was supplied), 'blocked' (int, the number of candidates a
+   *   guardrail rejected, per decision 7) and 'denied' (int, the number in
+   *   a scope $writer may not create facts in).
    *
    * @throws \InvalidArgumentException
    *   If $subjectUid is given but does not resolve to a real account.
    */
-  public function createFactsFromCandidates(array $facts, string $source, ?string $subjectUid = NULL, ?bool $trusted = NULL, ?string $sourceText = NULL, ?string $channel = NULL): array {
+  public function createFactsFromCandidates(array $facts, string $source, ?string $subjectUid = NULL, ?bool $trusted = NULL, ?string $sourceText = NULL, ?string $channel = NULL, ?AccountInterface $writer = NULL): array {
     $storage = $this->entityTypeManager->getStorage('aim_fact');
     $created = [];
     $skipped = 0;
     $blocked = 0;
+    $denied = 0;
 
     $subjectAccount = NULL;
     if (!empty($subjectUid)) {
@@ -380,6 +387,12 @@ class AimRememberService {
     $scores = $grounded ? $this->groundingChecker->checkGrounding($sourceText, array_column($facts, 'text')) : [];
 
     foreach (array_values($facts) as $i => $fact) {
+      // The model picks each candidate's scope, so the writer's per-scope
+      // permission is checked per candidate, as aim_remember does per entry.
+      if ($writer && !$this->manager->checkCreateAccess($fact['scope'], $writer)->isAllowed()) {
+        $denied++;
+        continue;
+      }
       $values = [
         'text' => $fact['text'],
         'source' => $source,
@@ -443,7 +456,13 @@ class AimRememberService {
       $this->manager->logVerbose('Extraction skipped @skipped user-scope candidates: no subject-uid supplied.', ['@skipped' => $skipped]);
     }
 
-    return ['created' => $created, 'skipped' => $skipped, 'blocked' => $blocked];
+    if ($denied > 0) {
+      $this->manager->logAudit('Extraction dropped @denied candidates in scopes uid @uid may not create facts in.', [
+        '@denied' => $denied,
+        '@uid' => $writer?->id(),
+      ]);
+    }
+    return ['created' => $created, 'skipped' => $skipped, 'blocked' => $blocked, 'denied' => $denied];
   }
 
   /**
@@ -464,6 +483,9 @@ class AimRememberService {
    *   The chat model, or NULL for the extraction activity's configured one.
    * @param string|null $channel
    *   The entry channel for the trust policy.
+   * @param \Drupal\Core\Session\AccountInterface|null $writer
+   *   The account to check per-scope create access for, or NULL for none;
+   *   see createFactsFromCandidates().
    *
    * @return array
    *   The createFactsFromCandidates() result plus 'extracted' (int, how many
@@ -474,7 +496,7 @@ class AimRememberService {
    * @throws \RuntimeException
    *   If no provider/model is given and none is configured.
    */
-  public function ingestText(string $text, string $source, ?string $subjectUid = NULL, ?string $providerId = NULL, ?string $modelId = NULL, ?string $channel = NULL): array {
+  public function ingestText(string $text, string $source, ?string $subjectUid = NULL, ?string $providerId = NULL, ?string $modelId = NULL, ?string $channel = NULL, ?AccountInterface $writer = NULL): array {
     if (empty($providerId) || empty($modelId)) {
       $default = $this->settings->getModelFor('extraction');
       if ($default === NULL) {
@@ -486,9 +508,9 @@ class AimRememberService {
 
     $facts = $this->extractFacts(trim($text), $providerId, $modelId);
     if (empty($facts)) {
-      return ['created' => [], 'skipped' => 0, 'blocked' => 0, 'extracted' => 0];
+      return ['created' => [], 'skipped' => 0, 'blocked' => 0, 'denied' => 0, 'extracted' => 0];
     }
-    $result = $this->createFactsFromCandidates($facts, $source, $subjectUid ?: NULL, NULL, trim($text), $channel);
+    $result = $this->createFactsFromCandidates($facts, $source, $subjectUid ?: NULL, NULL, trim($text), $channel, $writer);
     $result['extracted'] = count($facts);
     return $result;
   }
@@ -508,12 +530,16 @@ class AimRememberService {
    *   The source for entries that name none.
    * @param string|null $channel
    *   The entry channel for the trust policy.
+   * @param \Drupal\Core\Session\AccountInterface|null $writer
+   *   An account whose "create {scope} aim facts" permission each entry is
+   *   checked against (the ingest form's user), or NULL for no check (Drush,
+   *   which runs as anonymous). A denied entry is an error, not a write.
    *
    * @return array
    *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[] keyed by
    *   entry index) and 'errors' (string messages keyed by entry index).
    */
-  public function rememberBatch(array $entries, ?string $defaultSource = NULL, ?string $channel = NULL): array {
+  public function rememberBatch(array $entries, ?string $defaultSource = NULL, ?string $channel = NULL, ?AccountInterface $writer = NULL): array {
     $created = [];
     $errors = [];
     foreach ($entries as $i => $entry) {
@@ -523,6 +549,10 @@ class AimRememberService {
       }
       if (empty($entry['scope'])) {
         $errors[$i] = 'missing scope';
+        continue;
+      }
+      if ($writer && !$this->manager->checkCreateAccess((string) $entry['scope'], $writer)->isAllowed()) {
+        $errors[$i] = 'No permission to create ' . $entry['scope'] . '-scope facts.';
         continue;
       }
       try {

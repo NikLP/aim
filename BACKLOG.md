@@ -605,6 +605,12 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
 
 ## Backlog - explicitly "wait for a trigger" per the docs' own framing
 
+- [ ] **Eval: the `login` literal for signed-in viewers (parked
+      2026-10-25).** `/user/login` is access-checked, so it is correctly
+      empty for a signed-in visitor, and the three `login` questions in
+      `gold.agentblind.yml` read as wrong when the set runs as uid 1 or a
+      member. Not a chat fault; revisit with the eval set itself.
+
 - [ ] Fact verification as a user-facing feature - now reinforced twice
       (OpenAI's editable memory summary, and OpenKB's review-as-UX pattern
       from this thread).

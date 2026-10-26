@@ -57,7 +57,8 @@ writes go on the `chat` trust channel (shipped `hold`) because
   facts are added to that turn's system prompt only, never to stored
   history. The recall tool stays available. Off by default; measured
   35/36 at 2.3 s a turn, the one miss a literal choice. On the shared
-  tools (2026-10-25, uid 1, `free`): 36/36 at 2.8 s a turn.
+  tools (2026-10-25, `free`): 36/36 at 2.8 s a turn as uid 1, 36/36 at
+  3.0 s as a plain member.
 - `config/install/ai_agents.ai_agent.aim_chatbot.yml` - the agent config,
   `guardrail_set: aim_write_guardrails`.
 - `config/install/ai_assistant_api.ai_assistant.aim_demo_assistant.yml` +

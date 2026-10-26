@@ -161,7 +161,7 @@ vectors).
 | `Kernel/AimScopeBehaviorTest` | Shipped scope config, case ID minting, `requires_account`, entity-scope view access, role visibility, expiry sweep |
 | `Kernel/AimConsolidateTest` | Near-duplicate retire, dry run, distant facts, scope separation, retired facts ignored |
 | `Kernel/AimGroundingTest` | Grounded check modes (shadow, enforce, off), fail-closed, one call per batch |
-| `Kernel/AimIngestTest` | Ingest form lines and JSON modes, validation |
+| `Kernel/AimIngestTest` | Ingest form lines and JSON modes, validation, per-scope create checks (form and extraction) |
 | `Kernel/AimTrustActionTest`, `AimRetireActionTest` | Bulk trust/retire actions and their access checks |
 | `Unit/AimEmbeddingCacheSubscriberTest` | Embedding cache hit, bypass, key identity (ADR-0017) |
 | `Unit/AimCallTagsTest` | Every `aim_*` call tag is in `ai_logging`'s prompt-logging list |

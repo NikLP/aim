@@ -87,9 +87,13 @@ final class AimIngestForm extends FormBase {
       '#description' => $this->t('Used when no file is chosen.'),
     ];
 
+    // Only the scopes this user may create facts in: ingest aim facts opens
+    // the form, the per-scope permissions decide where it writes.
     $scopes = [];
     foreach ($this->entityTypeManager->getStorage('aim_scope')->loadMultiple($this->memoryManager->allowedScopes()) as $id => $scope) {
-      $scopes[$id] = $scope->label();
+      if ($this->memoryManager->checkCreateAccess($id, $this->currentUser())->isAllowed()) {
+        $scopes[$id] = $scope->label();
+      }
     }
     $form['lines'] = [
       '#type' => 'details',
@@ -189,10 +193,10 @@ final class AimIngestForm extends FormBase {
     $source = trim((string) $form_state->getValue('source'))
       ?: ($file ? 'upload:' . $file->getClientOriginalName() : 'paste');
 
-    $result = ['created' => [], 'errors' => [], 'skipped' => 0, 'blocked' => 0, 'mode' => $mode];
+    $result = ['created' => [], 'errors' => [], 'skipped' => 0, 'blocked' => 0, 'denied' => 0, 'mode' => $mode];
     try {
       if ($mode === 'extract') {
-        $r = $this->rememberService->ingestText($text, $source, trim((string) $form_state->getValue('subject_uid')) ?: NULL, NULL, NULL, AimTrustPolicy::CHANNEL_INGEST);
+        $r = $this->rememberService->ingestText($text, $source, trim((string) $form_state->getValue('subject_uid')) ?: NULL, NULL, NULL, AimTrustPolicy::CHANNEL_INGEST, $this->currentUser());
         $result = $r + $result;
         if ($r['extracted'] === 0) {
           $this->messenger()->addWarning($this->t('The model returned no facts worth remembering.'));
@@ -219,7 +223,7 @@ final class AimIngestForm extends FormBase {
             }
           }
         }
-        $r = $this->rememberService->rememberBatch($entries, $source, AimTrustPolicy::CHANNEL_INGEST);
+        $r = $this->rememberService->rememberBatch($entries, $source, AimTrustPolicy::CHANNEL_INGEST, $this->currentUser());
         $result['created'] = $r['created'];
         $result['errors'] = $r['errors'];
         $result['total'] = count($entries);
@@ -236,13 +240,14 @@ final class AimIngestForm extends FormBase {
       $this->messenger()->addError($this->t('Ingest failed. See the log for details.'));
     }
 
-    $this->memoryManager->logAudit('Ingest form run by uid @uid (mode @mode): @created created, @errors errors, @skipped skipped, @blocked blocked.', [
+    $this->memoryManager->logAudit('Ingest form run by uid @uid (mode @mode): @created created, @errors errors, @skipped skipped, @blocked blocked, @denied denied.', [
       '@uid' => $this->currentUser()->id(),
       '@mode' => $mode,
       '@created' => count($result['created']),
       '@errors' => count($result['errors']),
       '@skipped' => $result['skipped'],
       '@blocked' => $result['blocked'],
+      '@denied' => $result['denied'],
     ]);
 
     $form_state->set('result', $result);
@@ -282,6 +287,9 @@ final class AimIngestForm extends FormBase {
     }
     if (!empty($result['blocked'])) {
       $summary[] = $this->t('@count fact(s) blocked by a guardrail check.', ['@count' => $result['blocked']]);
+    }
+    if (!empty($result['denied'])) {
+      $summary[] = $this->t('@count fact(s) not saved: they are in a scope you may not add facts to.', ['@count' => $result['denied']]);
     }
     $summary[] = $this->t('Consolidation of these facts runs later, via the queue.');
     $build['summary'] = ['#theme' => 'item_list', '#items' => $summary];

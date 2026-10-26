@@ -13,15 +13,10 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
       2). `aim_remember` picks its trust channel and source from the Tool
       API invoker, which a method service never receives;
       `AimRememberInvokerSubscriber` catches it from `ToolInputTransformEvent`
-      meanwhile. Ask `drupal/tool` for a runner-filled parameter (for example
-      one typed `Invoker`, never an input); delete the subscriber when it
-      lands. Issue not filed yet.
-- [ ] **Re-measure chat as a member, not uid 1.** The 2026-10-25 runs on the
-      shared tools (`chatbot-converse` free 36/36, literal eval 20/23) ran
-      as uid 1, which bypasses the per-scope checks chat now relies on. A
-      one-off member run (recall, then a confirmed save: `chat` channel,
-      held, grounding scored) passed; the full sets need a member test
-      account, as in the anonymous-questions item below.
+      meanwhile. Upstream: [tool#3583116](https://git.drupalcode.org/project/tool/-/work_items/3583116)
+      (open, 2026-10-21) passes the invoker to method-tool *access*
+      callbacks; Nik commented 2026-10-25 asking for a runner-filled
+      `?Invoker` method parameter too. Delete the subscriber when it lands.
 
 ## Chat quality and evals: open after the 2026-10-15/16 session
 
@@ -68,10 +63,11 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       assistant closed to anonymous, every gold question without `as:`
       errors "User does not have the required role to run the assistant"
       (40 of 43 on `gold.agentblind.yml`, 2026-10-25). Running the set as
-      uid 1 works but skews it: restricted values count as leaks, and the
-      `login` literal (`/user/login`, access-checked) is correctly empty
-      for a signed-in viewer, so its three questions read as wrong. Run
-      anonymous questions as a plain authenticated test account instead.
+      uid 1 works but skews it (restricted values count as leaks). Run
+      anonymous questions as a plain authenticated test account instead:
+      a temporary copy of the set with `as: <member>` on every item without
+      one works (2026-10-25: 20/23, 5 leaks, same as uid 1; the 3 misses
+      are the `login` questions, parked in BACKLOG.md).
 - [ ] **Upstream: assistant roles check (ai_assistant_api).**
       `AiAssistantApiRunner::userHasAccess()` tests
       `isset($chosen_roles['anonymous'])` on a list, so ticking only
@@ -196,14 +192,6 @@ gate are built. Work on the literals modules themselves is in
 
 ## Ingestion
 
-- [ ] **`ingest aim facts` should not grant every scope (decided
-      2026-10-25).** Today it implies write access to every scope with no
-      per-scope check (ADR-0016), which cuts against ADR-0062's "permissions
-      decide scope". Make it gate only the form: each fact also needs
-      `create {scope} aim facts` (`AimMemoryManager::checkCreateAccess()`,
-      as `aim_remember` does per entry), and a refused fact is reported,
-      not written. Update the permission's description, ADR-0016 and the
-      root CLAUDE.md's Permissions section with it.
 - [ ] Chunking for `aim:extract` and the ingest form: today the whole file
       goes into one extraction prompt (`AimMemoryManager::extractFacts()`),
       so a file larger than the chat model's context fails. Split on

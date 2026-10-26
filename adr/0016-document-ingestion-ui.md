@@ -62,8 +62,15 @@ Content and a local-action button ("Ingest") on the existing `views.view.aim_fac
 Admin UI section already documents for that View, not a tab. Permission:
 `ingest aim memory` (core `aim`, `restrict access`), not `store aim memory`
 (that lives in the optional `aim_tool`) and not `administer aim memory`.
-It implies write access to every scope: an import is a deliberate bulk load
-by a trusted operator, with no per-scope `create {scope} aim facts` check.
+~~It implies write access to every scope: an import is a deliberate bulk load
+by a trusted operator, with no per-scope `create {scope} aim facts` check.~~
+**Changed 2026-10-25:** the permission (now `ingest aim facts`) opens the
+form only. Each fact also needs its scope's `create {scope} aim facts`, as on
+every other write path (ADR-0062's "permissions decide scope"): the
+one-per-line scope list shows only the writer's scopes, a JSON entry in
+another scope is reported as an error, and an extracted candidate in one is
+dropped and counted ("not saved"). Drush passes no writer and is unchecked,
+since it runs as anonymous.
 
 Text only for this first cut, per the scope given for this ADR - no
 PDF/office-format parsing. A future format-conversion step is a separate,

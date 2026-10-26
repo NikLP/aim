@@ -95,9 +95,14 @@ match can't be model-guessed.
 ### Ingest form
 
 `/admin/content/aim-facts/ingest` (`AimIngestForm`, permission `ingest aim
-memory`) shares one code path with drush: `AimMemoryManager::ingestText()`
+facts`) shares one code path with drush: `AimRememberService::ingestText()`
 (`aim:extract`), `rememberBatch()` (`aim:remember --file`, and the form's
-one-fact-per-line and JSON modes), `parseFactFields()`. Uploads are read
+one-fact-per-line and JSON modes), `parseFactFields()`. The form passes its
+user as `$writer`, so each fact needs its scope's `create {scope} aim facts`
+(`checkCreateAccess()`): the one-per-line scope list shows only those
+scopes, a JSON entry outside them is an error, an extracted candidate
+outside them is dropped and counted as `denied`. Drush passes no writer
+(it runs as anonymous) and is unchecked. Uploads are read
 from the request and never saved as a File entity; capped at 100 KB
 (`AimIngestForm::MAX_BYTES`). Submit is synchronous; consolidation stays
 queued. Test data: `tests/ingest-test/`.
@@ -616,6 +621,13 @@ to the model and never stored.
   promotes at or above it), `hold` (untrusted, never promoted). Shipped:
   `channels: {chat: hold}`. A fact with no source text keeps its starting
   state. No UI yet: edit via `drush config:set` or config import.
+  A writer who `canApprove()` is the source of truth, so their fact starts
+  trusted on any channel, by design (decided 2026-10-25, no four-eyes
+  rule). The gap is wording, not the person: on chat, MCP and extraction a
+  model writes the fact text, so a reviewer's trusted fact can be a
+  paraphrase nobody read. That is the grounded check's job: in `enforce`
+  it demotes a trusted fact whose text the source doesn't state (this site
+  runs `shadow`, so it only scores).
 - **Modes** (`aim.settings:grounding_mode`, AIM settings > Models >
   Grounded check): `off`; `shadow` records the score and leaves `trusted`
   alone; `enforce` also moves `trusted` per the policy above (threshold

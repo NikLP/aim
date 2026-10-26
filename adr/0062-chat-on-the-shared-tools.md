@@ -1,9 +1,12 @@
 # ADR-0062: Chat on the shared tools
 
 **Status:** Built 2026-10-25, except the upstream half of decision 2 (the
-`ToolInputTransformEvent` stopgap is live; the Tool API request is not
-filed, TODO.md "Tools"). Measured as uid 1: `chatbot-converse` free 36/36
-at 2.8 s a turn (3.6 s before), literal eval 20/23 (unchanged). Changes
+`ToolInputTransformEvent` stopgap is live; upstream is tool#3583116 (the
+invoker for access callbacks), commented 2026-10-25 asking for the method
+too; TODO.md "Tools"). Measured as uid 1: `chatbot-converse` free 36/36
+at 2.8 s a turn (3.6 s before), literal eval 20/23 (unchanged); as a plain
+member (authenticated only, so the per-scope checks apply): 36/36 at 3.0 s,
+20/23. Changes
 [ADR-0013](resolved/0013-mcp-tool-exposure.md)'s "keep the two paths
 separate" (its Decision, second bullet, and the Scope discipline risk) and
 answers its open question on whether the chatbot should call the same tool

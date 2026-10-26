@@ -123,6 +123,36 @@ class AimIngestTest extends KernelTestBase {
   }
 
   /**
+   * Ingest opens the form; each fact still needs its scope's create access.
+   */
+  public function testScopePermissionsApply(): void {
+    $this->setCurrentUser($this->createUser(['ingest aim facts', 'create site aim facts']));
+
+    $json = json_encode([
+      ['text' => 'A site fact.', 'scope' => 'site'],
+      ['text' => 'A role fact.', 'scope' => 'role'],
+    ]);
+    $result = $this->submit(['mode' => 'json', 'text' => $json])->get('result');
+    $this->assertCount(1, $result['created']);
+    $this->assertSame('No permission to create role-scope facts.', $result['errors'][1]);
+
+    // Lines mode offers only the scopes the user may write.
+    $lines = $this->submit(['mode' => 'lines', 'scope' => 'role', 'text' => 'A role fact.']);
+    $this->assertArrayHasKey('scope', $lines->getErrors());
+    $this->assertCount(1, AimFact::loadMultiple());
+
+    // Extraction: the model picks the scope, so each candidate is checked.
+    $writer = $this->container->get('current_user')->getAccount();
+    $extracted = $this->container->get('aim.remember')->createFactsFromCandidates([
+      ['scope' => 'site', 'text' => 'Closed on Mondays.'],
+      ['scope' => 'role', 'text' => 'Staff start at eight.'],
+    ], 'test', writer: $writer);
+    $this->assertCount(1, $extracted['created']);
+    $this->assertSame(1, $extracted['denied']);
+    $this->assertCount(2, AimFact::loadMultiple());
+  }
+
+  /**
    * Submits the ingest form with the given values.
    *
    * @param array $values
