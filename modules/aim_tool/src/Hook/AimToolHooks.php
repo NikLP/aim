@@ -63,6 +63,11 @@ class AimToolHooks {
         'Optional. Leave empty to search every scope you can see, or restrict to one: ' . $this->scopeGuide->scopeList() . ". Search by topic; you don't need a case ID or role name to find their facts.",
       );
     }
+    if (($definitions['aim_brief'] ?? NULL) instanceof ToolDefinition) {
+      $definitions['aim_brief']->getInputDefinition('scope')->setDescription(
+        'Optional. Leave empty for every scope, or list one: ' . $this->scopeGuide->scopeList() . '.',
+      );
+    }
     if (!($definitions['aim_remember'] ?? NULL) instanceof ToolDefinition) {
       return;
     }

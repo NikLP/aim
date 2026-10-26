@@ -49,6 +49,11 @@ an undeclared Write tool counts as destructive, which MCP clients read as
   `AimToolHooks::toolInfoAlter()`, and is dropped from the schema when none
   declares any; Tool API's input refiners can't reach a list entry, so the
   per-call refiner that used to type it went with the single-fact form.
+- `src/Tool/AimBrief.php` (`aim_tool.brief`) - `aim_brief`, no search
+  text: the newest trusted facts per installed scope the caller can view
+  (own user facts, own roles' role facts), via
+  `AimRecallService::recent()`, results as `AimRecall::toResult()`. Gated
+  on `recall aim facts`. See [DEVELOPING.md](DEVELOPING.md#aim_brief).
 - `src/Tool/AimLiteral.php` (`#[ToolMethod]` service `aim_tool.literal`) -
   `aim_literal`, a thin wrapper over
   the `literals.lookup` service with one `query` input, described as "the

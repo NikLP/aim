@@ -39,6 +39,7 @@ class AimToolOauthHooks {
     $aim = <<<TEXT
     This server is AIM, the site's long-term memory: short facts that staff have approved, not conversation transcripts.
 
+    - At the start of work, call aim_brief once for the newest facts about the site, your roles and you.
     - Call aim_recall before answering anything a stored fact could change, rather than relying on what is already in the conversation. "No relevant facts found" means nothing is recorded; say so rather than guessing.
     - Use aim_literal, not recall, for exact values such as phone numbers, web addresses and names, and give the value exactly as returned.
     - Save with aim_remember only what is worth keeping long term, as short statements with calendar dates ("closed until 16 October 2026", not "until Friday"); set expires when a fact has an end date. Pass source_text with the words they came from. Put everything worth keeping from one exchange in one call's facts list.

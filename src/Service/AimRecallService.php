@@ -6,7 +6,10 @@ namespace Drupal\aim\Service;
 
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\aim\Entity\AimFact;
 use Drupal\literals\LiteralReader;
 use Drupal\search_api\SearchApiException;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -32,6 +35,8 @@ class AimRecallService {
    *   The current user: the viewer literal tokens are replaced as.
    * @param \Drupal\literals\LiteralReader $literalReader
    *   The literals reader, for [literal:key] tokens in fact text.
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   The entity type manager, for recent()'s listing.
    */
   public function __construct(
     protected AimMemoryManager $manager,
@@ -40,6 +45,7 @@ class AimRecallService {
     protected AccountProxyInterface $currentUser,
     #[Autowire(service: 'literals.reader')]
     protected LiteralReader $literalReader,
+    protected EntityTypeManagerInterface $entityTypeManager,
   ) {}
 
   /**
@@ -182,41 +188,11 @@ class AimRecallService {
         continue;
       }
 
-      $fact = $original->getValue();
-      // The aim_exclude_retired processor keeps retired facts out of the
-      // index (ADR-0022), but one retired since the last index run is
-      // still there; filter it out here for that gap.
-      if (!$fact->get('retired')->isEmpty()) {
+      $row = $this->row($original->getValue(), $result->getScore());
+      if ($row === NULL) {
         continue;
       }
-      // A past-due fact is withheld before the expiry sweep retires it
-      // (ADR-0057), so expiry holds to the date, not the next cron run.
-      $expires = $fact->get('expires')->value;
-      if ($expires !== NULL && (int) $expires <= $this->time->getRequestTime()) {
-        continue;
-      }
-
-      // Tokens resolve as the viewing account at read time, so the value is
-      // never stored in the fact. A fact naming a literal this viewer cannot
-      // read is withheld whole: a sentence with a hole in it misleads, and
-      // its presence would hint at the restricted value. The
-      // show_redacted_facts debug setting shows it with [redacted] instead.
-      $text = $this->literalReader->replaceTokens((string) $fact->get('text')->value, $this->currentUser, NULL, !$this->configFactory->get('aim.settings')->get('show_redacted_facts'));
-      if ($text === NULL) {
-        continue;
-      }
-
-      $rows[] = [
-        'id' => $fact->id(),
-        'score' => $result->getScore(),
-        'scope' => $fact->bundle(),
-        'subject' => $this->manager->scopeRequiresAccount($fact->bundle()) ? $fact->get('user')->target_id : $fact->get('subject')->value,
-        'text' => $text,
-        'source' => $fact->get('source')->value,
-        'trusted' => (bool) $fact->get('trusted')->value,
-        'created' => (int) $fact->get('created')->value,
-        'asserted' => $fact->get('asserted')->isEmpty() ? NULL : (int) $fact->get('asserted')->value,
-      ];
+      $rows[] = $row;
 
       if (count($rows) >= $limit) {
         break;
@@ -248,6 +224,130 @@ class AimRecallService {
     }
 
     return $rows;
+  }
+
+  /**
+   * Lists the newest trusted facts in one scope, with no search text.
+   *
+   * For a briefing at the start of work, which has no query to search by:
+   * recall() is semantic and finds nothing for "everything". Same rows and
+   * the same withholding as recall() (retired, past expiry, a literal the
+   * viewer cannot read), and only facts the current account may view.
+   *
+   * @param string $scope
+   *   The scope to list.
+   * @param string[]|null $subjects
+   *   Restrict to these subjects, e.g. the viewer's roles. NULL for any.
+   * @param \Drupal\Core\Session\AccountInterface|null $user
+   *   Restrict to facts about this account, for a scope that requires one.
+   * @param int $limit
+   *   Maximum number of rows.
+   *
+   * @return array
+   *   Rows as recall() returns them, newest first, with score NULL.
+   */
+  public function recent(string $scope, ?array $subjects, ?AccountInterface $user, int $limit): array {
+    if ($subjects === []) {
+      return [];
+    }
+    $storage = $this->entityTypeManager->getStorage('aim_fact');
+    $query = $storage->getQuery()
+      ->accessCheck(TRUE)
+      ->condition('scope', $scope)
+      ->condition('trusted', TRUE)
+      ->notExists('retired')
+      ->sort('created', 'DESC')
+      ->sort('id', 'DESC');
+    $query->condition($query->orConditionGroup()
+      ->notExists('expires')
+      ->condition('expires', $this->time->getRequestTime(), '>'));
+    if ($subjects !== NULL) {
+      $query->condition('subject', $subjects, 'IN');
+    }
+    if ($user) {
+      $query->condition('user', (int) $user->id());
+    }
+
+    // Entity queries don't apply aim_fact's view access, so facts are
+    // checked as they load; page on until the limit fills.
+    $rows = [];
+    $offset = 0;
+    while (count($rows) < $limit) {
+      $ids = (clone $query)->range($offset, $limit * 2)->execute();
+      if (!$ids) {
+        break;
+      }
+      $offset += count($ids);
+      foreach ($storage->loadMultiple($ids) as $fact) {
+        if (!$fact->access('view', $this->currentUser)) {
+          continue;
+        }
+        $row = $this->row($fact, NULL);
+        if ($row !== NULL) {
+          $rows[] = $row;
+        }
+        if (count($rows) >= $limit) {
+          break;
+        }
+      }
+    }
+
+    $this->manager->logVerbose('Recent returned @count rows (scope @scope, limit @limit, uid @uid).', [
+      '@count' => count($rows),
+      '@scope' => $scope,
+      '@limit' => $limit,
+      '@uid' => $this->currentUser->id(),
+    ]);
+    return $rows;
+  }
+
+  /**
+   * Builds one result row, or NULL when the fact is withheld.
+   *
+   * @param \Drupal\aim\Entity\AimFact $fact
+   *   The fact.
+   * @param float|null $score
+   *   The match distance, or NULL when the row did not come from a search.
+   *
+   * @return array|null
+   *   The row (see recall()), or NULL for a retired or past-due fact, or one
+   *   naming a literal the viewer cannot read.
+   */
+  protected function row(AimFact $fact, ?float $score): ?array {
+    // The aim_exclude_retired processor keeps retired facts out of the
+    // index (ADR-0022), but one retired since the last index run is
+    // still there; filter it out here for that gap.
+    if (!$fact->get('retired')->isEmpty()) {
+      return NULL;
+    }
+    // A past-due fact is withheld before the expiry sweep retires it
+    // (ADR-0057), so expiry holds to the date, not the next cron run.
+    $expires = $fact->get('expires')->value;
+    if ($expires !== NULL && (int) $expires <= $this->time->getRequestTime()) {
+      return NULL;
+    }
+
+    // Tokens resolve as the viewing account at read time, so the value is
+    // never stored in the fact. A fact naming a literal this viewer cannot
+    // read is withheld whole: a sentence with a hole in it misleads, and
+    // its presence would hint at the restricted value. The
+    // show_redacted_facts debug setting shows it with [redacted] instead.
+    $text = $this->literalReader->replaceTokens((string) $fact->get('text')->value, $this->currentUser, NULL, !$this->configFactory->get('aim.settings')->get('show_redacted_facts'));
+    if ($text === NULL) {
+      return NULL;
+    }
+
+    return [
+      'id' => $fact->id(),
+      'score' => $score,
+      'scope' => $fact->bundle(),
+      'subject' => $this->manager->scopeRequiresAccount($fact->bundle()) ? $fact->get('user')->target_id : $fact->get('subject')->value,
+      'text' => $text,
+      'source' => $fact->get('source')->value,
+      'trusted' => (bool) $fact->get('trusted')->value,
+      'created' => (int) $fact->get('created')->value,
+      'asserted' => $fact->get('asserted')->isEmpty() ? NULL : (int) $fact->get('asserted')->value,
+    ];
   }
 
 }

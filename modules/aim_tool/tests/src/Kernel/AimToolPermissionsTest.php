@@ -304,6 +304,56 @@ class AimToolPermissionsTest extends KernelTestBase {
   }
 
   /**
+   * The brief lists the newest facts the caller can see, per scope.
+   */
+  public function testBriefListsNewestVisibleFacts(): void {
+    $caller = $this->createUser([
+      'recall aim facts',
+      'view site aim facts',
+      'view role aim facts',
+      'view user aim facts',
+    ]);
+    $other = $this->createUser([]);
+    $roles = $caller->getRoles(TRUE);
+    $role = reset($roles);
+    $now = $this->container->get('datetime.time')->getRequestTime();
+    $fact = fn (string $text, string $scope, int $age, array $values = []) => AimFact::create($values + [
+      'text' => $text,
+      'scope' => $scope,
+      'trusted' => TRUE,
+      'created' => $now - $age,
+    ])->save();
+    $fact('Oldest.', 'site', 400);
+    $fact('Newest.', 'site', 100);
+    $fact('Middle.', 'site', 200);
+    $fact('Untrusted.', 'site', 10, ['trusted' => FALSE]);
+    $fact('Retired.', 'site', 10, ['retired' => $now - 5]);
+    $fact('Expired.', 'site', 10, ['expires' => $now - 5]);
+    $fact('My role.', 'role', 100, ['subject' => $role]);
+    $fact('Another role.', 'role', 100, ['subject' => 'not_mine']);
+    $fact('About me.', 'user', 100, ['user' => $caller->id()]);
+    $fact('About someone else.', 'user', 100, ['user' => $other->id()]);
+
+    $this->actAs($caller);
+    $results = $this->brief(['limit' => 2])->getResult()->getContextValues()['results'];
+    $this->assertSame(['Newest.', 'Middle.', 'My role.', 'About me.'], array_column($results, 'text'));
+    $this->assertSame(['site', 'site', 'role', 'user'], array_column($results, 'scope'));
+    $this->assertSame(['text', 'scope', 'subject', 'date', 'date_kind'], array_keys($results[0]));
+
+    $site = $this->brief(['scope' => 'site'])->getResult()->getContextValues()['results'];
+    $this->assertSame(['Newest.', 'Middle.', 'Oldest.'], array_column($site, 'text'));
+    $this->assertFalse($this->brief(['scope' => 'nope'])->getResultStatus());
+
+    // Per-scope view access still applies: no role or user view, none listed.
+    $this->actAs($this->createUser(['recall aim facts', 'view site aim facts']));
+    $scopes = array_unique(array_column($this->brief()->getResult()->getContextValues()['results'], 'scope'));
+    $this->assertSame(['site'], array_values($scopes));
+
+    $this->assertTrue($this->tool('aim_brief')->access($caller));
+    $this->assertFalse($this->tool('aim_brief')->access($this->createUser(['remember aim facts'])));
+  }
+
+  /**
    * Makes the account the current user, which the tools read.
    */
   protected function actAs(UserInterface $account): void {
@@ -328,6 +378,20 @@ class AimToolPermissionsTest extends KernelTestBase {
    */
   protected function literal(string $query) {
     return $this->tool('aim_literal')->setInputValue('query', $query)->execute();
+  }
+
+  /**
+   * Runs aim_brief with the given inputs.
+   *
+   * @return \Drupal\tool\Tool\ToolInterface
+   *   The executed tool.
+   */
+  protected function brief(array $inputs = []) {
+    $tool = $this->tool('aim_brief');
+    foreach ($inputs as $name => $value) {
+      $tool->setInputValue($name, $value);
+    }
+    return $tool->execute();
   }
 
   /**

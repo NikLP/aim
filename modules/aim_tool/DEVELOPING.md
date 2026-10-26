@@ -8,7 +8,7 @@ module reference in [../../DEVELOPING.md](../../DEVELOPING.md).
 
 ## Tool API + MCP exposure
 
-`aim_tool` ships the tools `aim_remember`/`aim_recall`/`aim_literal`
+`aim_tool` ships the tools `aim_remember`/`aim_recall`/`aim_brief`/`aim_literal`
 wrapping `AimMemoryManager` directly (any scope, gated on `remember aim facts`/
 `recall aim facts`, not the admin UI's single `administer aim`).
 `mcp_server_tool_bridge` exposes both over MCP via config-only
@@ -101,6 +101,26 @@ idea as `aim_chatbot`'s remember reply).
 were previously self-doubled on drupal.org (`drupal/x-x`, an empty
 metapackage stub) - fixed upstream; both now resolve under their plain
 names.
+
+
+## `aim_brief`
+
+A no-query listing for the start of work: `aim_recall` is semantic, so a
+vague "everything about this site" finds whatever is nearest, or nothing
+past the cutoff. `AimBrief` walks `AimScopeGuide::scopeIds()` (site first)
+and calls `AimRecallService::recent()` per scope: an entity query for
+trusted, unretired, unexpired facts, newest `created` first. A scope that
+requires an account lists the caller's own facts, `role` lists facts whose
+subject is one of the caller's roles, and every other scope its newest
+facts. Entity queries don't apply `aim_fact` view access, so `recent()`
+checks `access('view')` per loaded fact and pages on until the limit
+fills; rows then go through the same `row()` as `recall()` (literal tokens
+replaced or the fact withheld). Results reuse `AimRecall::toResult()`.
+Gated on `recall aim facts`; over MCP it shares the `aim:recall` OAuth
+scope (`aim_tool_oauth.install`). Not on the chat agent: chat answers a
+question, and has `aim_recall` for it.
+
+---
 
 ## MCP OAuth
 

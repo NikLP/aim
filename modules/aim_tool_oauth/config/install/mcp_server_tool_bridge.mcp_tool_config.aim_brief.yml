@@ -1,0 +1,8 @@
+langcode: en
+status: true
+dependencies:
+  enforced:
+    module:
+      - aim_tool_oauth
+id: aim_brief
+tool_id: aim_brief

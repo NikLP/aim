@@ -1,6 +1,6 @@
 # AIM Tool
 
-Exposes AIM memory as Tool API tools (`aim_remember`/`aim_recall`), and
+Exposes AIM memory as Tool API tools (`aim_remember`/`aim_recall`/`aim_brief`), and
 through them, over MCP via `mcp_server_tool_bridge`. Any scope, gated by
 permission rather than hardcoded like `aim_chatbot`. Part of
 [AIM](../../README.md).
@@ -13,7 +13,12 @@ model can't turn the cutoff off) and returns at most 25 facts (`limit`,
 default 10), each with its text, scope, subject (a case ID, role or user)
 and date (with whether it is "true since" or "recorded"). `aim_remember`
 takes a list of one or more facts and reports each on its own line,
-including when a fact waits for review or has an end date. The site's chat
+including when a fact waits for review or has an end date. `aim_brief`
+takes no search text: it lists the newest trusted facts the caller can see
+in each scope (the site, their own roles, themselves, ongoing cases;
+`limit` per scope, default 5, at most 10), in the same shape as
+`aim_recall`'s results, for getting oriented at the start of work. The
+MCP server instructions tell a client to call it once then. The site's chat
 assistant (`aim_chatbot`) uses the same two tools; what any caller reaches
 is set by its scope permissions.
 

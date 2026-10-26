@@ -166,17 +166,29 @@ final class AimRecall {
       );
     }
 
-    $results = array_map(fn (array $row): array => [
+    return ExecutableResult::success(
+      new TranslatableMarkup('Found @count relevant fact(s).', ['@count' => count($rows)]),
+      ['results' => array_map(self::toResult(...), $rows)],
+    );
+  }
+
+  /**
+   * Turns a recall row into one structured result, as aim_brief's too.
+   *
+   * @param array $row
+   *   A row from AimRecallService::recall() or recent().
+   *
+   * @return array
+   *   The text, scope, subject, date and date_kind of the fact.
+   */
+  public static function toResult(array $row): array {
+    return [
       'text' => $row['text'],
       'scope' => $row['scope'],
       'subject' => $row['subject'] !== NULL ? (string) $row['subject'] : '',
       'date' => gmdate('Y-m-d', (int) (!empty($row['asserted']) ? $row['asserted'] : $row['created'])),
       'date_kind' => !empty($row['asserted']) ? 'true_since' : 'recorded',
-    ], $rows);
-    return ExecutableResult::success(
-      new TranslatableMarkup('Found @count relevant fact(s).', ['@count' => count($rows)]),
-      ['results' => $results],
-    );
+    ];
   }
 
 }

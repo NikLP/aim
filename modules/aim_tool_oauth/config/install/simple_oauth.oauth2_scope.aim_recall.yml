@@ -6,7 +6,7 @@ dependencies:
       - aim_tool_oauth
 id: aim_recall
 name: 'aim:recall'
-description: 'Read access to aim memory (semantic search via aim_recall).'
+description: 'Read access to aim memory (search via aim_recall, the newest facts via aim_brief).'
 grant_types:
   authorization_code:
     status: true

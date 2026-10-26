@@ -25,7 +25,8 @@ to `aim_tool_oauth`.
   [DEVELOPING.md](DEVELOPING.md#role-scopes-for-non-admin-users).
 - `aim_tool_oauth.install` - `hook_install()`/`hook_uninstall()` set/unset
   `mcp_server_oauth` third-party settings (`authentication_mode:
-  required`, `scopes`) on `aim_tool`'s own `mcp_tool_config` entities.
+  required`, `scopes`) on `aim_tool`'s own `mcp_tool_config` entities
+  (`aim_brief` shares `aim:recall`; `aim_literal` gets none).
   This mutates config `aim_tool` owns because `mcp_server_oauth` gates
   through third-party settings, not a config file this module could ship
   without a filename collision - see the install file's own docblock.

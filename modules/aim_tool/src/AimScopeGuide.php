@@ -79,6 +79,16 @@ final class AimScopeGuide {
   }
 
   /**
+   * The installed scope IDs, in the order the guide lists them.
+   *
+   * @return string[]
+   *   Scope IDs, site first.
+   */
+  public function scopeIds(): array {
+    return array_keys($this->scopes());
+  }
+
+  /**
    * The installed scopes, known ones first in GUIDE order (site first).
    *
    * @return array<string, string>

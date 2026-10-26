@@ -14,16 +14,19 @@ use Drupal\Core\Config\Entity\ConfigEntityInterface;
  *
  * Applies mcp_server_oauth's gate (authentication_mode and scopes, kept as
  * third-party settings) to the mcp_tool_config entities this module ships in
- * config/install, which exist by the time this runs. Only aim_remember and
- * aim_recall are given scopes. aim_literal gets none for now: its access is
- * checked per literal value through the "view literals"/"view restricted
- * literals" permissions, not the aim scopes. No ADR decides this either way.
+ * config/install, which exist by the time this runs. Only aim_remember,
+ * aim_recall and aim_brief are given scopes; aim_brief shares aim_recall's
+ * aim:recall, being the same read permission. aim_literal gets none for now:
+ * its access is checked per literal value through the "view literals"/"view
+ * restricted literals" permissions, not the aim scopes. No ADR decides this
+ * either way.
  */
 function aim_tool_oauth_install(): void {
   $storage = \Drupal::entityTypeManager()->getStorage('mcp_tool_config');
   $scopes = [
     'aim_remember' => 'aim:remember',
     'aim_recall' => 'aim:recall',
+    'aim_brief' => 'aim:recall',
   ];
   foreach ($scopes as $tool_config_id => $scope) {
     $tool_config = $storage->load($tool_config_id);
@@ -47,7 +50,7 @@ function aim_tool_oauth_install(): void {
  */
 function aim_tool_oauth_uninstall(): void {
   $storage = \Drupal::entityTypeManager()->getStorage('mcp_tool_config');
-  foreach (['aim_remember', 'aim_recall'] as $tool_config_id) {
+  foreach (['aim_remember', 'aim_recall', 'aim_brief'] as $tool_config_id) {
     $tool_config = $storage->load($tool_config_id);
     if (!$tool_config instanceof ConfigEntityInterface) {
       continue;

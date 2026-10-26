@@ -10,6 +10,9 @@ services:
   aim_tool.recall:
     class: Drupal\aim_tool\Tool\AimRecall
     autowire: true
+  aim_tool.brief:
+    class: Drupal\aim_tool\Tool\AimBrief
+    autowire: true
   aim_tool.literal:
     class: Drupal\aim_tool\Tool\AimLiteral
     # literals.lookup has no class alias to autowire from.
