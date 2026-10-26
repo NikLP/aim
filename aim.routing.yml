@@ -14,14 +14,6 @@ aim.settings:
   requirements:
     _permission: 'administer aim'
 
-aim.user_scope_access:
-  path: '/admin/config/aim/user-scope-access'
-  defaults:
-    _form: '\Drupal\aim\Form\AimScopeUserAccessForm'
-    _title: 'AIM user-scope visibility'
-  requirements:
-    _permission: 'administer aim'
-
 aim.status:
   path: '/admin/config/aim/status'
   defaults:

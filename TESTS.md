@@ -140,9 +140,7 @@ unless noted; synthetic data only for hosted Jev.
    `aim:benchmark`.
 9. **Pinned until tested:** recency/importance re-rank (needs a gold set),
    time-limited facts not UPDATE-merged into permanent ones.
-10. **Drush `pmu aim_scope_entity` SQLSTATE oddity** (ADR-0028): not
-    reproducible on retry 2026-09-29; recheck before filing or closing.
-11. **Unverified, from ADRs:** whether ECA exposes a blockable event for
+10. **Unverified, from ADRs:** whether ECA exposes a blockable event for
     config-entity changes (ADR-0035); whether `remember()`-style direct
     entity writes run Guardrails (DEVELOPING.md); whether scope-access
     refusal holds through Annotations (ADR-0026).

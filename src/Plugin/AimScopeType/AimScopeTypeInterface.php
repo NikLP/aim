@@ -12,20 +12,15 @@ use Drupal\aim\Entity\AimFact;
 /**
  * Interface for AimScopeType plugins.
  *
- * A plugin supplies everything specific to one scope *type*: extra
- * view-access logic beyond the flat "view {scope} aim facts" permission
- * (checkViewAccess()), a default subject for a new fact of this scope
- * (defaultSubject()), the base fields this type needs on aim_fact
- * (getBaseFieldDefinitions()), and the instance-level settings a scope of
- * this type takes (defaultSettings()/buildSettingsForm()) - ADR-0028
- * widened this from an access-only seam (ADR-0025) to the full definition
- * of a scope type's shape, once ADR-0027's target_type/target_id showed
- * fields belong with the plugin that needs them, not hardcoded in core.
- * Plugins are placed in src/Plugin/AimScopeType of any enabled module and
- * declare the #[AimScopeType] attribute; discovery is automatic. Since
- * ADR-0028 piece 3, the plugin ID and the aim_scope config entity ID it
- * serves are no longer required to match - see AimScope::get('plugin')
- * and AimScopeTypePluginManager::getTypePlugin().
+ * A plugin is everything specific to one kind of scope: extra view access
+ * (checkViewAccess()), a default subject (defaultSubject()), base fields
+ * on aim_fact (getBaseFieldDefinitions()) and its settings
+ * (defaultSettings()/buildSettingsForm()). Each aim_scope config names
+ * the plugin it uses in `plugin` (or none), and the manager hands the
+ * plugin that scope's `settings` as its configuration
+ * (AimScopeTypePluginManager::getTypePlugin()). aim ships the user, case
+ * and entity plugins; another module adds one in its own
+ * src/Plugin/AimScopeType with the #[AimScopeType] attribute (ADR-0063).
  *
  * @see \Drupal\aim\Attribute\AimScopeType
  * @see \Drupal\aim\AimScopeTypePluginManager
@@ -44,7 +39,7 @@ interface AimScopeTypeInterface {
    * ever needs to narrow the flat permission rather than widen it.
    *
    * @param \Drupal\aim\Entity\AimFact $fact
-   *   The fact being checked, whose bundle matches this plugin's ID.
+   *   The fact being checked, of a scope that uses this plugin.
    * @param \Drupal\Core\Session\AccountInterface $account
    *   The account requesting view access.
    *
@@ -70,38 +65,12 @@ interface AimScopeTypeInterface {
   /**
    * Returns base field definitions this scope type needs on aim_fact.
    *
-   * Merged by aim's hook_entity_base_field_info() (AimHooks) with every
-   * other registered type's fields into aim_fact's single base table -
-   * the columns exist regardless of which plugin happens to be servicing
-   * a given request, but the code and dependency for a field lives with
-   * the plugin that declared it (ADR-0028 piece 1). Called once per
-   * plugin *type*, not once per aim_scope instance - two instances of
-   * the same type (ADR-0028 piece 3) share one set of columns. A type
-   * with no fields of its own (most of them) returns an empty array.
-   *
-   * Each returned definition MUST call ->setProvider('your_module') on
-   * itself. Since every plugin's fields are merged through one shared
-   * hook_entity_base_field_info() implementation (living in core aim,
-   * not each plugin's own module), Drupal's own merge logic
-   * (EntityFieldManager::buildBaseFieldDefinitions()) would otherwise
-   * stamp every field with aim as its provider - it only defers to an
-   * already-set provider, never infers one from which plugin built the
-   * definition. See AimScopeEntity::getBaseFieldDefinitions() for the
-   * reference implementation.
-   *
-   * The owning module's hook_install() must call
-   * \Drupal::entityDefinitionUpdateManager()->installFieldStorageDefinition()
-   * for each field this method declares - the physical column does not
-   * appear on its own just because the field is now merged into
-   * aim_fact's live definitions. No matching hook_uninstall() is needed:
-   * core's own \Drupal\Core\Extension\ModuleInstaller::uninstall()
-   * already calls uninstallFieldStorageDefinition() generically for any
-   * field whose getProvider() matches the module being uninstalled - a
-   * hand-written hook_uninstall() doing the same call races that generic
-   * pass and crashes (verified 2026-09-29: the manual call drops the
-   * column first, then core's pass finds the still-code-declared field
-   * and queries the now-missing column). See
-   * aim_scope_entity.install for the reference hook_install().
+   * Merged by AimHooks::entityBaseFieldInfo() from every plugin in code,
+   * so the columns exist whether or not a scope of this type is enabled.
+   * A plugin in another module must call ->setProvider() with its own
+   * module on each definition, or the merge stamps it with aim, and must
+   * install the field storage in its hook_install(); core's uninstall
+   * removes it. Most types return an empty array.
    *
    * @return \Drupal\Core\Field\BaseFieldDefinition[]
    *   Field definitions keyed by field name.
@@ -109,16 +78,9 @@ interface AimScopeTypeInterface {
   public function getBaseFieldDefinitions(): array;
 
   /**
-   * Returns default settings for a new aim_scope instance of this type.
+   * Returns default settings for a scope of this type.
    *
-   * Read into the instance's own `settings` property (AimScope) when a
-   * scope of this type is first created via AimScopeForm's type
-   * selector. A type with no settings of its own (most of them) returns
-   * an empty array - this does not replace an existing
-   * ThirdPartySetting-based config flag on its own (see
-   * aim_scope_user's requires_account, still ThirdPartySetting-based -
-   * ADR-0028 treats migrating it to this mechanism as a nice-to-have,
-   * not a requirement).
+   * Used for a new scope, and under any setting a saved scope lacks.
    *
    * @return array
    *   Default settings, keyed by setting name.

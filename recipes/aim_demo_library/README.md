@@ -9,19 +9,21 @@ consolidation without any real data.
 ## What it applies
 
 - `recipe.yml`: site name and slogan, the chat assistant's persona
-  (`aim_chatbot` agent and `aim_demo_assistant`) and its tools
+  (`aim_chatbot` agent and `aim_assistant`) and its tools
   (`aim_tool`'s `aim_recall`, limited to 5 results, and `aim_remember`,
-  plus `aim_literal` for exact values), the chat block's
-  wording and its signed-in-only visibility (only if the block exists),
-  the block's finder-first gate (`aim_chatbot_gate`, with
-  `literals_finder` installed: a clear exact-value question is answered
-  from the literal with no chat model),
+  plus `aim_literal` for exact values), Olivero installed for the chat
+  block,
   `access deepchat api`, `recall aim facts`, `remember aim facts`,
   `view`/`create site aim facts` and `view restricted literals` for
   signed-in users,
   `view literals` for everyone, and
   `index_directly` on so a fact told to the chat is searchable on the next
   question.
+- `config/block.block.olivero_aimdemochat.yml`: the chat block in Olivero,
+  on `aim_assistant`, with the library's wording, signed-in-only
+  visibility and the finder-first gate (`aim_chatbot_gate`, with
+  `literals_finder` installed: a clear exact-value question is answered
+  from the literal with no chat model).
 - `content/`: default content, imported when the recipe is applied: 31
   fictional facts (19 site, 4 role, 4 user, 4 case) and eight literals
   (`main_phone`, `accounts_phone`, `reservations_phone`, `login`,
@@ -189,7 +191,8 @@ setup). A literal edited on stage is restored by the reinstall too.
    and open `/admin/content/aim-facts`: facts are content entities, with
    scope (a bundle), source, provenance and the person who wrote them.
    `/admin/config/aim/settings` has the recall cutoff, and
-   `/admin/config/aim/user-scope-access` the role-visibility matrix.
+   `/admin/config/aim/scopes` the scopes (the user scope's edit form
+   holds the role-visibility grid).
 3. **The same memory from another agent, over MCP.** In Claude.ai add a
    custom connector for `<public URL>/mcp`
    (OAuth, dynamic client registration, scopes `aim:recall aim:remember`).

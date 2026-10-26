@@ -82,8 +82,9 @@ the whole list instead of being reported and skipped.
 
 **Descriptions have one source each.** The scope inputs' descriptions are
 rewritten at discovery by `AimToolHooks::toolInfoAlter()` from
-`AimScopeGuide` (`aim_tool.scope_guide`): recall gets a one-line list,
-remember the full guide, both limited to the installed scopes, site first.
+`AimScopeGuide` (`aim_tool.scope_guide`): recall and aim_brief get the
+scope IDs, remember the full guide (each scope's `description`), enabled
+scopes only, in weight order.
 `AimToolHooks::scopeChanged()` clears the plugin caches on any
 `aim_scope` insert, update or delete, so a scope added from the admin form
 appears without a rebuild. The MCP one-liner per tool is the plugin's own

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\aim_scope_entity\Plugin\AimScopeType;
+namespace Drupal\aim\Plugin\AimScopeType;
 
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
@@ -16,25 +16,17 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Attribute\AimScopeType;
 use Drupal\aim\Entity\AimFact;
-use Drupal\aim\Plugin\AimScopeType\AimScopeTypeInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * View access mirroring the referenced entity's own, for scope=entity facts.
+ * Facts about one piece of content, viewable as that content is (ADR-0027).
  *
- * The second dedicated AimScopeType plugin (ADR-0025's first was
- * AimScopeUser). Unlike AimScopeUser, this does not need to assemble its
- * own CacheableMetadata - $entity->access(..., TRUE) already folds in the
- * target entity's own cache tags and any contexts its access handler adds.
- * checkViewAccess() only ever returns allowed or neutral, never forbidden,
- * per AimScopeTypeInterface's contract - see ADR-0027 for what "replace,
- * not widen" for this scope actually means given
- * AimFactAccessControlHandler always ORs this result against the flat
- * permission.
+ * Adds target_type/target_id to aim_fact. checkViewAccess() returns the
+ * referenced entity's own view access, never forbidden.
  */
 #[AimScopeType(
   id: 'entity',
-  label: new TranslatableMarkup('Entity scope view access'),
+  label: new TranslatableMarkup('Entity: about one piece of content'),
 )]
 class AimScopeEntity extends PluginBase implements AimScopeTypeInterface, ContainerFactoryPluginInterface {
 
@@ -104,27 +96,14 @@ class AimScopeEntity extends PluginBase implements AimScopeTypeInterface, Contai
    * {@inheritdoc}
    */
   public function getBaseFieldDefinitions(): array {
-    // Moved out of AimFact::baseFieldDefinitions() (core aim) here per
-    // ADR-0028 piece 1 - this scope type is the only one that needs
-    // these two columns, so the field declarations live with the plugin
-    // that needs them. See aim_scope_entity.install for the field
-    // lifecycle (installFieldStorageDefinition()/
-    // uninstallFieldStorageDefinition()) this requires.
-    //
-    // setProvider() explicitly: these definitions are returned through
-    // core aim's single hook_entity_base_field_info() merge point
-    // (AimHooks::entityBaseFieldInfo()), so without this,
-    // EntityFieldManager::buildBaseFieldDefinitions() would stamp them
-    // with the *hook's* module (aim) as provider, not this plugin's own
-    // module - it only defers to an already-set provider
-    // ($definition->getProvider() == NULL check), never infers one from
-    // which plugin built the definition.
+    // Installed with aim, whether or not a scope of this type is enabled
+    // (ADR-0063 decision 5).
     $fields = [];
 
     $fields['target_type'] = BaseFieldDefinition::create('string')
       ->setLabel($this->t('Target entity type'))
       ->setDescription($this->t('The referenced entity type ID (e.g. node), when scope is entity. Empty for every other scope.'))
-      ->setProvider('aim_scope_entity')
+      ->setProvider('aim')
       ->setSetting('max_length', 32)
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['weight' => 15]);
@@ -132,7 +111,7 @@ class AimScopeEntity extends PluginBase implements AimScopeTypeInterface, Contai
     $fields['target_id'] = BaseFieldDefinition::create('string')
       ->setLabel($this->t('Target entity ID'))
       ->setDescription($this->t("The referenced entity's ID, when scope is entity. A string, since not every entity type keys on an integer. Empty for every other scope."))
-      ->setProvider('aim_scope_entity')
+      ->setProvider('aim')
       ->setSetting('max_length', 255)
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['weight' => 16]);

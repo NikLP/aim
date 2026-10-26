@@ -1,0 +1,9 @@
+langcode: en
+status: true
+dependencies: {  }
+id: entity
+label: Entity
+description: 'about one specific piece of content, e.g. a page or a product. Needs the content type and ID in scope_fields.'
+weight: 4
+plugin: entity
+settings: {  }

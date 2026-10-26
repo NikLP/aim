@@ -73,12 +73,13 @@ an undeclared Write tool counts as destructive, which MCP clients read as
   `aim_tool_oauth/config/install`, not here: `aim_tool` alone is Tool API
   only, with no MCP packages needed. Those configs carry no
   `description`: one set there overrides the plugin's in MCP.
-- `src/AimScopeGuide.php` (`aim_tool.scope_guide`) - the one source of the
-  "which scope when" wording, limited to installed scopes. Read by
-  `src/Hook/AimToolHooks.php` (`hook_tool_info_alter`, rewriting both
-  tools' `scope` descriptions; plugin caches cleared on `aim_scope`
-  changes) and by `aim_tool_oauth`'s MCP server instructions. Keep
-  README.md's "Which scope when" table in step with it.
+- `src/AimScopeGuide.php` (`aim_tool.scope_guide`) - the "which scope
+  when" wording: each enabled scope's own `description`, in weight order
+  (ADR-0063). Read by `src/Hook/AimToolHooks.php` (`hook_tool_info_alter`,
+  rewriting the tools' `scope` descriptions; plugin caches cleared on
+  `aim_scope` changes), `aim_brief` and `aim_tool_oauth`'s MCP server
+  instructions. README.md's "Which scope when" table is the shipped
+  defaults; keep it in step with `aim`'s `config/install` scope YAML.
 
 `AimRecall` always drops matches past `aim.settings:recall_max_distance`
 (an off-topic query returns "No relevant facts found." instead of the

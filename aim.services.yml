@@ -1,24 +1,12 @@
 services:
-  # Scope type plugins are discovered from src/Plugin/AimScopeType of
-  # every enabled module via the #[AimScopeType] attribute - no
-  # per-plugin registration needed here. AimScopeUser (aim_scope_user,
-  # ADR-0025's first dedicated plugin) gets its own dependencies through
-  # this manager's DefaultPluginManager container-aware instantiation, not
-  # a services.yml entry of its own. The explicit entity_type.manager
-  # argument is appended after default_plugin_manager's own three
-  # (namespaces/cache/module_handler) - needed since ADR-0028 piece 3 for
-  # getTypePlugin() to load the aim_scope instance and read its `plugin`
-  # property.
+  # Scope type plugins come from src/Plugin/AimScopeType of every enabled
+  # module (#[AimScopeType]). entity_type.manager follows
+  # default_plugin_manager's three arguments: getTypePlugin() loads the
+  # aim_scope to read its plugin and settings.
   plugin.manager.aim_scope_type:
     class: Drupal\aim\AimScopeTypePluginManager
     parent: default_plugin_manager
     arguments: ['@entity_type.manager']
-
-  aim.scope_uninstall_validator:
-    class: Drupal\aim\ScopeUninstallValidator
-    autowire: true
-    tags:
-      - { name: module_install.uninstall_validator }
 
   aim.settings_reader:
     class: Drupal\aim\Service\AimSettings

@@ -135,10 +135,11 @@ gate are built. Work on the literals modules themselves is in
       the site's `.claude/skills/` symlinks and the doc links to `skills/`.
 - [ ] **A `create-aim-scope-type` skill (raised 2026-10-25).** A
       maintainer "extend it" skill, like `ai`'s `create-guardrail-plugin`:
-      scaffold an `AimScopeTypeInterface` plugin plus the submodule that
-      ships its `aim_scope`, with the traps (`setProvider()` on each base
-      field, the `plugin` property and its `PluginExists` constraint,
-      `settings` typed `ignore`). Model it on `aim_scope_entity`.
+      scaffold an `AimScopeTypeInterface` plugin in a module plus an
+      `aim_scope` YAML naming it, with the traps (`setProvider()` and a
+      `hook_install()` for each base field, the `plugin` property and its
+      `PluginExists` constraint, `settings` typed `ignore`). Model it on
+      core's `AimScopeEntity` (ADR-0063).
 - [ ] **Skill chain: grill, then recipe.** The grill writes site memory; a
       recipe-building skill reads it and proposes a Recipe. ADR-0035's gate
       applies (dry-run and human review before any apply). Own ADR.

@@ -1,0 +1,9 @@
+langcode: en
+status: true
+dependencies: {  }
+id: site
+label: Site
+description: 'true about the organization for everyone who asks, e.g. opening hours or a fees policy. No subject.'
+weight: 0
+plugin: null
+settings: {  }

@@ -18,8 +18,8 @@ it holds, chat reaches. The demo recipe gives members `site` only. Chat
 writes go on the `chat` trust channel (shipped `hold`) because
 `aim_remember` picks the channel from its Tool API invoker
 (`tool_ai_connector`), not because of anything here. The one hardcoded
-`site` left is `AimChatbotRecallContextSubscriber`'s, hence the
-`aim_scope_site` dependency.
+`site` left is `AimChatbotRecallContextSubscriber`'s; `site` ships with
+`aim`.
 
 ## What lives here
 
@@ -61,10 +61,10 @@ writes go on the `chat` trust channel (shipped `hold`) because
   3.0 s as a plain member.
 - `config/install/ai_agents.ai_agent.aim_chatbot.yml` - the agent config,
   `guardrail_set: aim_write_guardrails`.
-- `config/install/ai_assistant_api.ai_assistant.aim_demo_assistant.yml` +
-  `config/optional/block.block.olivero_aimdemochat.yml` - demo assistant
-  and block, both shipped so the capability is visible without extra
-  config.
+- `config/install/ai_assistant_api.ai_assistant.aim_assistant.yml` - the
+  assistant a chat block uses. The demo block
+  (`block.block.olivero_aimdemochat`) is the `aim_demo_library` recipe's
+  config, not this module's.
 
 ## Abstention
 

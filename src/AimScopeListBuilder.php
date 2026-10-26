@@ -4,29 +4,30 @@ declare(strict_types=1);
 
 namespace Drupal\aim;
 
-use Drupal\Core\Config\Entity\ConfigEntityListBuilder;
+use Drupal\Core\Config\Entity\DraggableListBuilder;
 use Drupal\Core\Entity\EntityInterface;
 
 /**
- * List builder for aim_scope.
+ * Lists the scopes, dragged into the order models see them in.
  *
- * Core's own EntityListBuilder::buildHeader()/buildRow() only add an
- * Operations column - every core bundle list builder (NodeTypeListBuilder,
- * MediaTypeListBuilder, RoleListBuilder) adds its own Label column on top.
- * aim_scope had none, so /admin/structure/aim-scopes rendered as a table of
- * bare Edit/Delete dropbuttons with no way to tell which row was which
- * scope. Mirrors RoleListBuilder (label only, no description field to
- * show) rather than NodeTypeListBuilder/MediaTypeListBuilder, since
- * aim_scope's payload is deliberately id/label only (see AimScope's
- * docblock).
+ * Same shape as core's VocabularyListBuilder: the weight sets the order of
+ * the scope guide, the tools' scope lists and aim_brief's groups.
  */
-class AimScopeListBuilder extends ConfigEntityListBuilder {
+class AimScopeListBuilder extends DraggableListBuilder {
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getFormId() {
+    return 'aim_scope_list';
+  }
 
   /**
    * {@inheritdoc}
    */
   public function buildHeader() {
     $header['label'] = $this->t('Name');
+    $header['status'] = $this->t('Enabled');
     return $header + parent::buildHeader();
   }
 
@@ -34,7 +35,9 @@ class AimScopeListBuilder extends ConfigEntityListBuilder {
    * {@inheritdoc}
    */
   public function buildRow(EntityInterface $entity) {
+    /** @var \Drupal\aim\Entity\AimScope $entity */
     $row['label'] = $entity->label();
+    $row['status'] = ['#markup' => $entity->status() ? $this->t('Yes') : $this->t('No')];
     return $row + parent::buildRow($entity);
   }
 

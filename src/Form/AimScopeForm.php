@@ -13,20 +13,12 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Add/edit form for the aim_scope config entity.
  *
- * Id/label, plus (ADR-0028 piece 2) a `plugin` type selector and the
- * chosen type's own inline settings sub-form - see AimScope's docblock
- * for the config entity shape this saves. Extends core's
- * BundleEntityFormBase, the base class every bundle config entity form in
- * core uses (NodeTypeForm, MediaTypeForm): it is a plain EntityForm plus
- * protectBundleIdElement(), which locks the machine name once the bundle
- * exists. It has nothing to do with Field UI - that is gated solely on
- * aim_fact's (deliberately absent) field_ui_base_route. This exists to let
- * entity.aim_fact.add_page resolve at all: core's
- * \Drupal\Core\Entity\Controller\EntityController::addPage() unconditionally
- * builds an "Add a new @entity_type" fallback link for aim_fact's
- * bundle_entity_type, even when bundles already exist, so aim_scope needs a
- * real add-form route regardless of whether this form is ever used to add a
- * fifth scope in practice.
+ * Label, machine name, the "which scope when" description, Enabled, and a
+ * `plugin` type selector with the chosen type's own settings inline
+ * (ADR-0028 piece 2), rebuilt by AJAX. Weight is set by dragging rows on
+ * the scope list. BundleEntityFormBase is core's bundle form base
+ * (NodeTypeForm): protectBundleIdElement() locks the machine name once
+ * facts can exist.
  */
 final class AimScopeForm extends BundleEntityFormBase {
 
@@ -35,6 +27,12 @@ final class AimScopeForm extends BundleEntityFormBase {
    */
   protected const SETTINGS_WRAPPER_ID = 'aim-scope-settings-wrapper';
 
+  /**
+   * Constructs the form.
+   *
+   * @param \Drupal\aim\AimScopeTypePluginManagerInterface $scopeTypeManager
+   *   The scope type plugin manager, for the type selector.
+   */
   public function __construct(
     protected AimScopeTypePluginManagerInterface $scopeTypeManager,
   ) {}
@@ -78,6 +76,21 @@ final class AimScopeForm extends BundleEntityFormBase {
       '#machine_name' => [
         'exists' => [AimScope::class, 'load'],
       ],
+    ];
+
+    $form['description'] = [
+      '#type' => 'textarea',
+      '#title' => $this->t('Which scope when'),
+      '#description' => $this->t('What this scope is for and what its subject is. Models read this to choose a scope (the tools and the MCP server instructions), so an edit changes how they save facts.'),
+      '#default_value' => $scope->getDescription(),
+      '#rows' => 3,
+    ];
+
+    $form['status'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Enabled'),
+      '#description' => $this->t('A disabled scope takes no new facts and is not offered to models. A scope with facts cannot be disabled.'),
+      '#default_value' => $scope->isNew() || $scope->status(),
     ];
 
     $options = ['' => $this->t('- None (config-only scope, no dedicated behavior) -')];
@@ -131,12 +144,36 @@ final class AimScopeForm extends BundleEntityFormBase {
   /**
    * {@inheritdoc}
    */
+  public function validateForm(array &$form, FormStateInterface $form_state): void {
+    parent::validateForm($form, $form_state);
+    /** @var \Drupal\aim\Entity\AimScope $scope */
+    $scope = $this->entity;
+    if ($scope->isNew() || $form_state->getValue('status')) {
+      return;
+    }
+    $count = (int) $this->entityTypeManager->getStorage('aim_fact')->getQuery()
+      ->accessCheck(FALSE)
+      ->condition('scope', $scope->id())
+      ->count()
+      ->execute();
+    if ($count) {
+      $form_state->setErrorByName('status', $this->t('Cannot disable %label: @count facts use it.', [
+        '%label' => $scope->label(),
+        '@count' => $count,
+      ]));
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function save(array $form, FormStateInterface $form_state): int {
     /** @var \Drupal\aim\Entity\AimScope $scope */
     $scope = $this->entity;
     $plugin_id = $form_state->getValue('plugin');
     $scope->set('plugin', $plugin_id !== '' ? $plugin_id : NULL);
     $scope->set('settings', $plugin_id !== '' ? ($form_state->getValue('settings') ?? []) : []);
+    $scope->setStatus((bool) $form_state->getValue('status'));
 
     $result = parent::save($form, $form_state);
 

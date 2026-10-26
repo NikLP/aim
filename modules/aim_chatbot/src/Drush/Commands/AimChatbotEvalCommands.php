@@ -115,7 +115,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
    */
   #[CLI\Command(name: 'aim:chatbot-eval')]
   #[CLI\Argument(name: 'file', description: 'Gold set YAML, in the literals:eval format.')]
-  #[CLI\Option(name: 'assistant', description: 'Assistant ID (default aim_demo_assistant).')]
+  #[CLI\Option(name: 'assistant', description: 'Assistant ID (default aim_assistant).')]
   #[CLI\Option(name: 'modes', description: 'Comma-separated: tool, prompt, gate (default all three).')]
   #[CLI\Option(name: 'inhouse', description: 'Provider IDs counted as in-house (default typesafeai,ollama).')]
   #[CLI\Option(name: 'limit', description: 'Run only the first N usable questions.')]
@@ -123,7 +123,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
   public function evaluate(
     string $file,
     array $options = [
-      'assistant' => 'aim_demo_assistant',
+      'assistant' => 'aim_assistant',
       'modes' => 'tool,prompt,gate',
       'inhouse' => 'typesafeai,ollama',
       'limit' => 0,
@@ -295,7 +295,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
    */
   #[CLI\Command(name: 'aim:chatbot-converse')]
   #[CLI\Argument(name: 'file', description: 'Scenario YAML: as, scenarios[name, turns[q, any, all, not, literal]].')]
-  #[CLI\Option(name: 'assistant', description: 'Assistant ID (default aim_demo_assistant).')]
+  #[CLI\Option(name: 'assistant', description: 'Assistant ID (default aim_assistant).')]
   #[CLI\Option(name: 'modes', description: 'Comma-separated: forced, free, context (default all three).')]
   #[CLI\Option(name: 'repeat', description: 'Run each scenario this many times per mode (default 1).')]
   #[CLI\Option(name: 'only', description: 'Comma-separated scenario names to run.')]
@@ -303,7 +303,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
   public function converse(
     string $file,
     array $options = [
-      'assistant' => 'aim_demo_assistant',
+      'assistant' => 'aim_assistant',
       'modes' => 'forced,free,context',
       'repeat' => 1,
       'only' => '',

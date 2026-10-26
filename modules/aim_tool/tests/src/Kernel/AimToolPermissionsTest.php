@@ -63,11 +63,12 @@ class AimToolPermissionsTest extends KernelTestBase {
     $this->config('aim.settings')
       ->setData(Yaml::decode(file_get_contents($path . '/config/install/aim.settings.yml')))
       ->save();
-    AimScope::create(['id' => 'site', 'label' => 'Site'])->save();
-    AimScope::create(['id' => 'role', 'label' => 'Role'])->save();
+    AimScope::create(['id' => 'site', 'label' => 'Site', 'weight' => 0])->save();
+    AimScope::create(['id' => 'role', 'label' => 'Role', 'weight' => 1])->save();
     AimScope::create([
       'id' => 'user',
       'label' => 'User',
+      'weight' => 2,
       'settings' => ['requires_account' => TRUE],
     ])->save();
     // Uid 1 bypasses every access check; keep it out of the way.
@@ -291,7 +292,7 @@ class AimToolPermissionsTest extends KernelTestBase {
     $this->assertArrayNotHasKey('source', $entry());
 
     $recall = $manager->getDefinition('aim_recall');
-    $this->assertStringContainsString('site (about the organization)', (string) $recall->getInputDefinition('scope')->getDescription());
+    $this->assertStringContainsString('restrict to one: site, role, user.', (string) $recall->getInputDefinition('scope')->getDescription());
     $this->assertArrayNotHasKey('max_distance', $recall->getInputDefinitions());
     // Results are structured, so a caller can act on scope and subject.
     $results = $recall->getOutputDefinitions()['results'];
@@ -299,7 +300,7 @@ class AimToolPermissionsTest extends KernelTestBase {
     $this->assertSame(['text', 'scope', 'subject', 'date', 'date_kind'], array_keys($results->getItemDefinition()->getPropertyDefinitions()));
 
     // A scope added later (the scope admin form) shows up without a rebuild.
-    AimScope::create(['id' => 'case', 'label' => 'Case'])->save();
+    AimScope::create(['id' => 'case', 'label' => 'Case', 'weight' => 3])->save();
     $this->assertStringContainsString('- case: ', (string) $entry()['scope']->getDescription());
   }
 

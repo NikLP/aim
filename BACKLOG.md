@@ -697,20 +697,6 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
       pattern `AimScopeUser` already uses: don't grant the flat permission
       broadly, let the plugin's `checkViewAccess()` be the sole grant.
       Revisit if that stops being good enough - raised 2026-09-28.
-- [ ] **Drush oddity found verifying ADR-0028, not yet diagnosed
-      further or filed upstream.** `drush pmu aim_scope_entity` throws
-      `SQLSTATE[42S22]: Column not found: 'target_type'` even after the two
-      ADR-0028 fixes; calling
-      `\Drupal::service('module_installer')->uninstall(['aim_scope_entity'])`
-      directly (confirmed via stack trace to be the exact same
-      `ModuleInstaller::uninstall()` -> `EntityDefinitionUpdateManager->
-      uninstallFieldStorageDefinition()` code path Drush's `pm:uninstall`
-      itself calls into) completes cleanly. Isolated to Drush's command
-      layer specifically for a module providing 2+ base fields merged via
-      another module's hook. Not blocking - `aim_scope_entity`'s own
-      lifecycle works correctly through the real API - but a site
-      operator using `drush pmu` on a scope-field-providing submodule
-      should expect to hit this until it's actually root-caused.
 - [ ] Widen `AimRememberService::remember()`'s `$targetType`/`$targetId`
       positional parameters into one generic scope-fields bag - found
       2026-09-29 while building ADR-0028 piece 4, not built.
@@ -734,8 +720,6 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
       ADR-0027 above). The bridge module's own write path is still
       unbuilt. Promotion logic itself is fully custom/programmatic, not
       gated on any of this.
-- [ ] Bundling recipe for the scope submodules
-      ([ADR-0026](adr/resolved/0026-pluggable-scope-submodules.md) piece 6).
 - [ ] Write-time validation that a `scope: entity` fact carries a target,
       and an entity-type-select plus autocomplete widget for
       `target_type`/`target_id` on the admin form

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\aim_scope_case\Plugin\AimScopeType;
+namespace Drupal\aim\Plugin\AimScopeType;
 
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Access\AccessResult;
@@ -14,22 +14,16 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Attribute\AimScopeType;
 use Drupal\aim\Entity\AimFact;
-use Drupal\aim\Plugin\AimScopeType\AimScopeTypeInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * Subject auto-minting for scope=case aim_fact entities.
+ * Ongoing work: each first fact mints a case ID (defaultSubject()).
  *
- * Moved out of core aim's AimRememberService::remember() (ADR-0026's
- * follow-up audit flagged this as scope-specific behavior, not a config
- * flag, so requires_account's settings-based mechanism didn't apply -
- * needed defaultSubject() added to AimScopeTypeInterface instead).
- * checkViewAccess() stays neutral: case-scope access control is a
- * separate, still-unbuilt problem, not addressed by this plugin.
+ * Its checkViewAccess() stays neutral: case-scope access control is unbuilt.
  */
 #[AimScopeType(
   id: 'case',
-  label: new TranslatableMarkup('Case scope subject minting'),
+  label: new TranslatableMarkup('Case: one piece of ongoing work'),
 )]
 class AimScopeCase extends PluginBase implements AimScopeTypeInterface, ContainerFactoryPluginInterface {
 

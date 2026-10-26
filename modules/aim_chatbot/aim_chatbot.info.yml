@@ -5,7 +5,6 @@ package: AIM
 core_version_requirement: ^11
 dependencies:
   - aim:aim
-  - aim:aim_scope_site
   - aim:aim_tool
   - ai_agents:ai_agents
   - tool:tool_ai_connector

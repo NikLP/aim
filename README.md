@@ -174,14 +174,9 @@ yet built - see [ADR-0035](adr/0035-standing-constraints-action-gate.md).
 - `drupal/ai` (provider abstraction, Guardrails submodule)
 - Local Ollama for zero-API-key development
 
-`aim` itself ships zero scopes (ADR-0026) - `user`/`role`/`site`/`case`/
-`entity` each come from their own submodule, so a site installs only the
-ones it wants. Each submodule has its own requirements and setup:
-[aim_scope_user](modules/aim_scope_user/README.md),
-[aim_scope_role](modules/aim_scope_role/README.md),
-[aim_scope_site](modules/aim_scope_site/README.md),
-[aim_scope_case](modules/aim_scope_case/README.md),
-[aim_scope_entity](modules/aim_scope_entity/README.md),
+`aim` ships five scopes (`site`, `role`, `user`, `case`, `entity`) as
+config, each switchable off on its edit form (ADR-0063). Submodules,
+each with its own requirements and setup:
 [aim_chatbot](modules/aim_chatbot/README.md),
 [aim_tool](modules/aim_tool/README.md),
 [aim_tool_oauth](modules/aim_tool_oauth/README.md),
@@ -189,11 +184,8 @@ ones it wants. Each submodule has its own requirements and setup:
 
 ## Getting started
 
-1. Enable `aim` plus whichever scopes you want (`aim_scope_user`/
-   `aim_scope_role`/`aim_scope_site`/`aim_scope_case`/`aim_scope_entity`), and
-   `aim_chatbot`/`aim_tool` as needed. `aim_chatbot`'s tools are
-   hardcoded to `scope: site`, so it needs `aim_scope_site` installed
-   too.
+1. Enable `aim`, and `aim_chatbot`/`aim_tool` as needed. Disable any
+   scope you don't want at `/admin/config/aim/scopes`.
 2. Configure a real AI provider and point vector search at it - see
    [DEVELOPING.md](DEVELOPING.md)'s "Setting up vector search" runbook.
    `config/install` ships the search server/index *structure*, not a

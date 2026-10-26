@@ -655,24 +655,34 @@ core has no single convention here (node uses `type`, media uses
 `scope` is a legitimate domain-specific choice like the others. Bundles
 are real `aim_scope` config entities (`bundle_entity_type` on `AimFact`'s
 `#[ContentEntityType]` attribute) - `getBundleInfo('aim_fact')` derives
-automatically, no `hook_entity_bundle_info()` needed. Core `aim` ships
-zero scope instances itself (ADR-0026) - the default four each come from
-their own submodule (`aim_scope_user`/`role`/`site`/`case`). A fifth,
-`aim_scope_entity` (ADR-0027), ships the same way and shows both halves
-of the pattern in one real example: zero PHP would suffice if it only
-needed `config/install/aim.aim_scope.<id>.yml` plus an `enforced`
-dependency on the shipping module (needed for `ScopeUninstallValidator`
-to find it - see [aim_scope_user's CLAUDE.md](modules/aim_scope_user/CLAUDE.md)
-for why), but it also needs its own access rule and its own base fields
-(`target_type`/`target_id`), so it adds a dedicated
-`AimScopeTypeInterface` plugin (`AimScopeEntity`) the same way
-`aim_scope_user`'s `requires_account` adds a `settings` entry instead for
-a config-shaped (not behavior-shaped) scope difference. The plugin's
-`getBaseFieldDefinitions()` (ADR-0028 piece 1) is how its own fields get
-onto `aim_fact` without core `aim` hardcoding them - see
-[aim_scope_entity's CLAUDE.md](modules/aim_scope_entity/CLAUDE.md) for
-the field-ownership gotcha (`->setProvider()`) and the uninstall-hook
-mistake that pattern surfaced.
+automatically, no `hook_entity_bundle_info()` needed.
+
+**Scopes are config on core plugins (ADR-0063)**, the way `literals`
+ships resolvers and literal types. `aim` ships the five scopes in
+`config/install` (`aim.aim_scope.{site,role,user,case,entity}.yml`) and
+the three plugins in `src/Plugin/AimScopeType/` (`user`, `case`,
+`entity`; site and role have `plugin: null`). Each scope has:
+
+- `status` - a disabled scope takes no new facts (forbidden in
+  `AimFactAccessControlHandler::checkCreateAccess()`, admins included)
+  and is left out of `AimMemoryManager::allowedScopes()`, so tools,
+  forms and the scope guide never offer it. `AimScopeForm` refuses to
+  disable a scope that has facts; `AimScopeDeleteForm` refuses to delete
+  one.
+- `description` - the "which scope when" wording models read
+  (`aim_tool`'s `AimScopeGuide`), editable on the scope form.
+- `weight` - the order everything lists scopes in (`allowedScopes()`
+  sorts with `ConfigEntityBase::sort()`; config entity queries can't
+  sort on two keys). Set by dragging rows at `/admin/config/aim/scopes`.
+- `plugin` and `settings` - the plugin gets the scope's settings as its
+  configuration (`AimScopeTypePluginManager::getTypePlugin()`), so two
+  scopes sharing a plugin behave per their own settings.
+
+Plugin fields (`getBaseFieldDefinitions()`, ADR-0028 piece 1) are merged
+for every plugin in code, so the entity plugin's `target_type`/
+`target_id` exist on every site, unused unless an entity scope is used.
+A plugin in another module must `->setProvider()` its own module on each
+field and install the storage in its `hook_install()`.
 
 `links.field_ui_base_route` is deliberately unset - `bundle_entity_type`
 and Field UI's "Manage fields" tab are independently gated, and leaving
@@ -701,7 +711,7 @@ corrected that: `isMultiple()` and `EntityViewsData` both key off
 field declared via another module's `hook_entity_base_field_info()`
 indistinguishably from one declared in the entity's own class - neither
 bug is about declaring-module, only about bundle-conditionality. A
-scope type's own base fields (e.g. `aim_scope_entity`'s
+scope type's own base fields (e.g. the entity plugin's
 `target_type`/`target_id`) now live with the plugin that declares them
 (`AimScopeTypeInterface::getBaseFieldDefinitions()`), merged generically
 by `AimHooks::entityBaseFieldInfo()`.
@@ -797,23 +807,13 @@ recall their own `scope=user` facts via `aim_recall` without
 
 ### User-scope role visibility
 
-`AimScopeUser` (`aim_scope_user/src/Plugin/AimScopeType/AimScopeUser.php`,
-renamed from `AimUserScopeVisibility` and moved out of core `aim` when it
-became the first `AimScopeTypeInterface` plugin, ADR-0025/ADR-0026)
-adds a narrower, additive grant path beyond the flat `view user aim
-facts` permission: a `user_scope_role_visibility` matrix in
-`aim.settings` (viewer role => visible subject roles), editable at
-`/admin/config/aim/user-scope-access`, plus a
-`user_scope_shared_role_fallback` boolean (default `TRUE`) granting
-access when viewer and subject share any real role (excluding the
-implicit `authenticated` role both accounts always carry). Only ever
-returns allowed or neutral, never forbidden, so
-`AimFactAccessControlHandler` ORs it against the flat permission without
-risk of it revoking a grant it knows nothing about. Discovered generically
-via `plugin.manager.aim_scope_type` (`Drupal\aim\AimScopeTypePluginManager`,
-attribute-scanned from any enabled module's `src/Plugin/AimScopeType/`)
-rather than a hardcoded `bundle() === 'user'` branch; `case`-scope access
-control is deferred (no `aim_case` entity yet, Nik's call).
+`AimScopeUser` (`src/Plugin/AimScopeType/AimScopeUser.php`) widens the
+flat `view user aim facts` permission with the user scope's own settings,
+edited on its scope form (`/admin/config/aim/scopes/user/edit`):
+`role_visibility` (viewer role => subject roles it may see, a checkbox
+grid) and `shared_role_fallback` (default on: viewer and subject share a
+real role, `authenticated` excluded). Only ever allowed or neutral, ORed
+against the flat permission. Case-scope access control is unbuilt.
 
 ---
 
@@ -829,7 +829,7 @@ Not one "AI" - three different cost profiles:
 
 Site-wide default chat provider/model live in `ai.settings`
 (`default_providers.chat`) - `AimCommands`' `--provider`/`--model`
-options, `ai_assistant_api.ai_assistant.aim_demo_assistant`'s
+options, `ai_assistant_api.ai_assistant.aim_assistant`'s
 `llm_provider: '__default__'`, and `search_api.server.aim_vector`'s
 `backend_config.chat_model` (chunk token-sizing only, no `->chat()` call
 - cost-neutral either way) all follow it. `embeddings_engine` has no
@@ -1138,9 +1138,9 @@ via the container, so only a hand-constructed instance is affected).
   (the JSON schema extraction/consolidation parse against) is not
   editable here - it's parsed by PHP downstream and isn't safe to hand to
   a text field.
-- `/admin/config/aim/user-scope-access` - the role-visibility matrix, see
-  "User-scope role visibility" above.
-- `/admin/structure/aim-scopes` - add/edit/delete `aim_scope` entities.
+- `/admin/config/aim/scopes` - the scopes: drag to order, edit each
+  one's wording, Enabled and type settings (the user scope's
+  role-visibility grid), add or delete.
 
 ---
 

@@ -13,17 +13,11 @@ aim.settings:
   weight: 100
 
 entity.aim_scope.collection:
-  title: 'AIM scopes'
-  description: 'Manage the scopes that facts can be saved under.'
-  parent: system.admin_structure
-  route_name: entity.aim_scope.collection
-
-aim.user_scope_access:
-  title: 'User-scope visibility'
-  description: 'Configure which roles may view another role''s scope=user facts.'
+  title: 'Scopes'
+  description: 'The scopes facts are saved under: their order, wording and settings.'
   parent: aim.admin_config
-  route_name: aim.user_scope_access
-  weight: 20
+  route_name: entity.aim_scope.collection
+  weight: 0
 
 aim.status:
   title: 'Status'

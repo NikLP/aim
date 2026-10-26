@@ -631,8 +631,8 @@ class AimConsolidationService {
       'uid' => $kept->getOwnerId(),
       'trusted' => (bool) $kept->get('trusted')->value && (bool) $candidate->get('trusted')->value,
     ];
-    // Copy whichever identity fields this fact has: subject/user always
-    // exist, target_* only where aim_scope_entity is installed.
+    // Copy the identity fields: subject/user, and the entity plugin's
+    // target_*.
     foreach (['subject', 'user', 'target_type', 'target_id'] as $field) {
       if ($kept->hasField($field)) {
         $values[$field] = $kept->get($field)->getValue();

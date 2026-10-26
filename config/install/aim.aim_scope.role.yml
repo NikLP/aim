@@ -1,0 +1,9 @@
+langcode: en
+status: true
+dependencies: {  }
+id: role
+label: Role
+description: 'guidance for everyone holding one site role, e.g. "editors must add alt text to every image". Subject: the role machine name, e.g. content_editor.'
+weight: 1
+plugin: null
+settings: {  }

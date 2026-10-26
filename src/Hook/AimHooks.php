@@ -53,17 +53,10 @@ class AimHooks {
   /**
    * Implements hook_entity_base_field_info().
    *
-   * Merges every registered AimScopeType plugin's own base fields
-   * (ADR-0028 piece 1) onto aim_fact - e.g. aim_scope_entity's
-   * target_type/target_id. Iterates the plugin manager's definitions
-   * (one per registered *type*), not aim_scope config entity instances -
-   * two scope instances sharing one type (ADR-0028 piece 3) share that
-   * type's columns, so its fields are only merged once regardless of how
-   * many instances use it. A type not installed at all (its module
-   * disabled) simply isn't in the definitions list, so its fields drop
-   * out along with it - see the owning module's own
-   * hook_install()/hook_uninstall() for why that is safe (e.g.
-   * aim_scope_entity.install).
+   * Merges every AimScopeType plugin's own base fields onto aim_fact
+   * (ADR-0028 piece 1), e.g. the entity type's target_type/target_id. Per
+   * plugin in code, not per scope, so the columns exist whether or not a
+   * scope of that type is enabled (ADR-0063 decision 5).
    *
    * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
    *   The entity type to return base field definitions for.

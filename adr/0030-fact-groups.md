@@ -57,9 +57,9 @@ carry the column.
   ADR-0028's plugin merge does not apply) and adds `group` to
   `aim_vector_index` as an indexed attribute with a BTREE index,
   following ADR-0018's pattern for `user`.
-- **Uninstall:** follows `ScopeUninstallValidator`'s precedent. Refuse
-  `pmu aim_group` while any fact has a non-empty `group`, so data is not
-  dropped silently.
+- **Uninstall:** refuse `pmu aim_group` while any fact has a non-empty
+  `group` (a module uninstall validator, as the scope submodules had
+  before ADR-0063), so data is not dropped silently.
 
 ### 3. A small generic filter seam in core `recall()`
 

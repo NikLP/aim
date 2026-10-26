@@ -7,7 +7,6 @@ namespace Drupal\aim\Service;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\Core\Queue\QueueFactory;
@@ -21,6 +20,7 @@ use Drupal\ai\Guardrail\Result\StopResult;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\aim\Entity\AimFact;
+use Drupal\aim\Entity\AimScope;
 use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
 use Drupal\search_api\IndexInterface;
 use Drupal\search_api\Query\QueryInterface as SearchApiQueryInterface;
@@ -71,12 +71,6 @@ class AimMemoryManager {
    * @param \Drupal\Core\Queue\QueueFactory $queueFactory
    *   The queue factory, used to enqueue newly-written facts for async
    *   consolidation.
-   * @param \Drupal\Core\Entity\EntityTypeBundleInfoInterface $bundleInfo
-   *   The entity type bundle info service, used to validate scope against
-   *   aim_fact's real aim_scope bundles (see
-   *   \Drupal\aim\Entity\AimScope) instead of a hardcoded list, so a
-   *   fifth scope added via a new aim_scope config entity passes
-   *   validation here automatically, no code change needed.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory, used to read aim.settings' admin-editable
    *   consolidation thresholds and extraction/consolidation prompts (see
@@ -99,7 +93,6 @@ class AimMemoryManager {
     protected TimeInterface $time,
     protected AiGuardrailRepository $guardrailRepository,
     protected QueueFactory $queueFactory,
-    protected EntityTypeBundleInfoInterface $bundleInfo,
     protected ConfigFactoryInterface $configFactory,
     protected AimEmbeddingCacheSubscriber $embeddingCache,
     #[Autowire(service: 'logger.channel.aim')]
@@ -141,25 +134,22 @@ class AimMemoryManager {
   }
 
   /**
-   * Returns the scope values aim_fact's declared bundles allow.
+   * Returns the enabled scopes, the ones a new fact may use.
    *
    * @return string[]
-   *   The bundle machine names currently registered for aim_fact.
+   *   Scope IDs, by weight then label, as the scope list shows them.
    */
   public function allowedScopes(): array {
-    return array_keys($this->bundleInfo->getBundleInfo('aim_fact'));
+    $scopes = $this->entityTypeManager->getStorage('aim_scope')->loadByProperties(['status' => TRUE]);
+    uasort($scopes, [AimScope::class, 'sort']);
+    return array_map('strval', array_keys($scopes));
   }
 
   /**
    * Whether $scope requires a fact to reference a real Drupal account.
    *
-   * ADR-0007's rule, formerly a hardcoded `$scope === 'user'`/
-   * `$fact->bundle() === 'user'` check in this class and AimCommands - now
-   * a `requires_account` entry in the `settings` a scope's own plugin
-   * declares (ADR-0028 piece 2, migrated off aim_scope_user's earlier
-   * ThirdPartySetting), so a future scope can opt into the same
-   * requirement without another hardcoded string comparison here. Only
-   * aim_scope_user's plugin sets this today.
+   * ADR-0007's rule, read from the scope's `requires_account` setting
+   * (ADR-0028 piece 2). Only the user plugin sets it today.
    *
    * @param string $scope
    *   A scope ID, e.g. "user".

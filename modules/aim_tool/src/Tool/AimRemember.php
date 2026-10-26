@@ -58,7 +58,7 @@ use Drupal\tool\TypedData\OutputDefinition;
  *
  * An entry's scope_fields (ADR-0028 piece 4) carries the extra fields a
  * scope type declares via getBaseFieldDefinitions() (piece 1), today only
- * aim_scope_entity's target_type/target_id. AimToolHooks::toolInfoAlter()
+ * the entity plugin's target_type/target_id. AimToolHooks::toolInfoAlter()
  * fills its properties from the installed scopes' types and drops it from
  * the schema when none declares any; Tool API's input refiners cannot reach
  * a list entry, so this is per site, not per entry. rememberOne() reads

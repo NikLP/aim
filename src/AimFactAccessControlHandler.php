@@ -9,6 +9,7 @@ use Drupal\Core\Entity\EntityAccessControlHandler;
 use Drupal\Core\Entity\EntityHandlerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\aim\Entity\AimFact;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -25,16 +26,26 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * The custom "trust" operation (trust/untrust bulk actions) is allowed by
  * "trust {scope} aim facts" or the admin permission.
  *
- * view additionally ORs in whatever AimScopeTypePluginManager returns for
- * the fact's own bundle (ADR-0025) - a scope with no registered plugin
- * (every bundle but user today) falls through to the flat permission
- * alone, unchanged from before this plugin type existed.
+ * view additionally ORs in the fact's scope plugin's checkViewAccess()
+ * (ADR-0025); a scope with no plugin has the flat permission alone. create
+ * is forbidden for a disabled scope.
  */
 class AimFactAccessControlHandler extends EntityAccessControlHandler implements EntityHandlerInterface {
 
+  /**
+   * Constructs the access control handler.
+   *
+   * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
+   *   The entity type.
+   * @param \Drupal\aim\AimScopeTypePluginManagerInterface $scopeAccessManager
+   *   The scope type plugin manager.
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   The entity type manager, for a scope's status.
+   */
   public function __construct(
     EntityTypeInterface $entity_type,
     protected AimScopeTypePluginManagerInterface $scopeAccessManager,
+    protected EntityTypeManagerInterface $entityTypeManager,
   ) {
     parent::__construct($entity_type);
   }
@@ -43,7 +54,7 @@ class AimFactAccessControlHandler extends EntityAccessControlHandler implements 
    * {@inheritdoc}
    */
   public static function createInstance(ContainerInterface $container, EntityTypeInterface $entity_type) {
-    return new static($entity_type, $container->get('plugin.manager.aim_scope_type'));
+    return new static($entity_type, $container->get('plugin.manager.aim_scope_type'), $container->get('entity_type.manager'));
   }
 
   /**
@@ -75,8 +86,14 @@ class AimFactAccessControlHandler extends EntityAccessControlHandler implements 
    * {@inheritdoc}
    */
   protected function checkCreateAccess(AccountInterface $account, array $context, $entity_bundle = NULL) {
-    return AccessResult::allowedIfHasPermission($account, 'create ' . $entity_bundle . ' aim facts')
+    // A disabled scope takes no new facts, admins included (ADR-0063).
+    $scope = $entity_bundle !== NULL ? $this->entityTypeManager->getStorage('aim_scope')->load($entity_bundle) : NULL;
+    if ($scope && !$scope->status()) {
+      return AccessResult::forbidden('The ' . $entity_bundle . ' scope is disabled.')->addCacheableDependency($scope);
+    }
+    $access = AccessResult::allowedIfHasPermission($account, 'create ' . $entity_bundle . ' aim facts')
       ->orIf(parent::checkCreateAccess($account, $context, $entity_bundle));
+    return $scope ? $access->addCacheableDependency($scope) : $access;
   }
 
 }

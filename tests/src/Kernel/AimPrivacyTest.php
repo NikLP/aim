@@ -46,8 +46,6 @@ class AimPrivacyTest extends KernelTestBase {
     'search_api_test',
     'literals',
     'aim',
-    'aim_scope_user',
-    'aim_scope_site',
   ];
 
   /**
@@ -99,7 +97,7 @@ class AimPrivacyTest extends KernelTestBase {
    */
   public function testStrangerSeesOnlySiteFacts(): void {
     $this->grant('staff', ['view site aim facts']);
-    $this->config('aim.settings')->set('user_scope_shared_role_fallback', FALSE)->save();
+    $this->setUserScopeSettings(['shared_role_fallback' => FALSE]);
 
     $this->actAs($this->account('sam', ['staff']));
     $this->assertSame(['Open at nine.'], $this->texts());
@@ -120,7 +118,7 @@ class AimPrivacyTest extends KernelTestBase {
    */
   public function testSharedRoleWithoutFallbackHidesFact(): void {
     $this->grant('member', ['view site aim facts']);
-    $this->config('aim.settings')->set('user_scope_shared_role_fallback', FALSE)->save();
+    $this->setUserScopeSettings(['shared_role_fallback' => FALSE]);
 
     $this->actAs($this->account('sam', ['member']));
     $this->assertNotContains('Alex has a private note.', $this->texts());
@@ -131,10 +129,10 @@ class AimPrivacyTest extends KernelTestBase {
    */
   public function testMatrixShowsFactToNamedViewerRole(): void {
     $this->grant('staff', ['view site aim facts']);
-    $this->config('aim.settings')
-      ->set('user_scope_shared_role_fallback', FALSE)
-      ->set('user_scope_role_visibility', ['staff' => ['member']])
-      ->save();
+    $this->setUserScopeSettings([
+      'shared_role_fallback' => FALSE,
+      'role_visibility' => ['staff' => ['member']],
+    ]);
 
     $this->actAs($this->account('sam', ['staff']));
     $this->assertContains('Alex has a private note.', $this->texts());
@@ -150,7 +148,7 @@ class AimPrivacyTest extends KernelTestBase {
   public function testAdministratorRoleSeesPrivateFact(): void {
     $admin = Role::create(['id' => 'site_admin', 'label' => 'Site admin']);
     $admin->setIsAdmin(TRUE)->save();
-    $this->config('aim.settings')->set('user_scope_shared_role_fallback', FALSE)->save();
+    $this->setUserScopeSettings(['shared_role_fallback' => FALSE]);
 
     $this->actAs($this->account('boss', ['site_admin']));
     $this->assertContains('Alex has a private note.', $this->texts());
@@ -224,6 +222,17 @@ class AimPrivacyTest extends KernelTestBase {
    */
   protected function texts(): array {
     return array_column($this->container->get('aim.recall')->recall('anything', NULL, NULL, NULL, 10), 'text');
+  }
+
+  /**
+   * Merges values into the user scope's settings.
+   *
+   * @param array $values
+   *   Setting keys to set.
+   */
+  protected function setUserScopeSettings(array $values): void {
+    $scope = AimScope::load('user');
+    $scope->set('settings', $values + $scope->get('settings'))->save();
   }
 
 }

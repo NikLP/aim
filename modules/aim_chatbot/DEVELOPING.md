@@ -21,9 +21,9 @@ mechanism and alternatives considered.
   limit is a `tool_usage_limits` `force_value` with `hide_property`.
   `aim_remember` writes on the `chat` channel with source
   `chat:aim_remember` because its invoker is `tool_ai_connector`.
-- `ai_assistant_api.ai_assistant.aim_demo_assistant` and
-  `block.block.olivero_aimdemochat` ship in this module's
-  `config/install`/`config/optional`. The assistant's `ai_agent` field
+- `ai_assistant_api.ai_assistant.aim_assistant` ships in this module's
+  `config/install`; the demo chat block is the `aim_demo_library`
+  recipe's own config. The assistant's `ai_agent` field
   points at `aim_chatbot`, so `AiAssistantApiRunner::process()`
   short-circuits to `AgentRunner::runAsAgent()` - the assistant's own
   `system_prompt` is **not** used, only the `ai_agent` entity's is. Block

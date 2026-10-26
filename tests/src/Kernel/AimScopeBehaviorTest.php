@@ -41,11 +41,6 @@ class AimScopeBehaviorTest extends KernelTestBase {
     'search_api',
     'literals',
     'aim',
-    'aim_scope_user',
-    'aim_scope_role',
-    'aim_scope_site',
-    'aim_scope_case',
-    'aim_scope_entity',
   ];
 
   /**
@@ -60,14 +55,8 @@ class AimScopeBehaviorTest extends KernelTestBase {
     $settings = Yaml::decode(file_get_contents($path . '/config/install/aim.settings.yml'));
     $this->config('aim.settings')->setData($settings)->save();
 
-    foreach (array_keys($this->shippedScopes()) as $id) {
-      $data = $this->shippedScopes()[$id];
-      AimScope::create([
-        'id' => $data['id'],
-        'label' => $data['label'],
-        'plugin' => $data['plugin'],
-        'settings' => $data['settings'],
-      ])->save();
+    foreach ($this->shippedScopes() as $data) {
+      AimScope::create($data)->save();
     }
 
     // Uid 1 is the superuser, which bypasses every access check.
@@ -85,6 +74,25 @@ class AimScopeBehaviorTest extends KernelTestBase {
     $this->assertSame('entity', $scopes['entity']['plugin']);
     $this->assertNull($scopes['role']['plugin']);
     $this->assertNull($scopes['site']['plugin']);
+    foreach ($scopes as $id => $scope) {
+      $this->assertTrue($scope['status'], "$id ships enabled");
+      $this->assertNotEmpty($scope['description'], "$id ships its wording");
+    }
+    // Listed in weight order, site first.
+    $this->assertSame(['site', 'role', 'user', 'case', 'entity'], $this->memory()->allowedScopes());
+  }
+
+  /**
+   * A disabled scope takes no new facts and is not offered.
+   */
+  public function testDisabledScopeRefusesWrites(): void {
+    AimScope::load('case')->setStatus(FALSE)->save();
+    $this->assertNotContains('case', $this->memory()->allowedScopes());
+
+    $this->grant('boss', ['administer aim']);
+    $admin = $this->makeUser('admin', ['boss']);
+    $this->assertFalse($this->memory()->checkCreateAccess('case', $admin)->isAllowed(), 'not even an admin');
+    $this->assertTrue($this->memory()->checkCreateAccess('site', $admin)->isAllowed());
   }
 
   /**
@@ -169,9 +177,9 @@ class AimScopeBehaviorTest extends KernelTestBase {
     $peer = $this->makeUser('peer', ['staff']);
     $stranger = $this->makeUser('stranger', ['other']);
 
-    $this->setSettings([
-      'user_scope_role_visibility' => ['manager' => ['staff']],
-      'user_scope_shared_role_fallback' => FALSE,
+    $this->setUserScopeSettings([
+      'role_visibility' => ['manager' => ['staff']],
+      'shared_role_fallback' => FALSE,
     ]);
     $this->assertTrue($fact->access('view', $manager), 'matrix pairing grants');
     $this->assertFalse($fact->access('view', $peer), 'fallback off: shared role alone is not enough');
@@ -179,7 +187,7 @@ class AimScopeBehaviorTest extends KernelTestBase {
 
     // The access handler caches results per entity and account.
     $this->container->get('entity_type.manager')->getAccessControlHandler('aim_fact')->resetCache();
-    $this->setSettings(['user_scope_shared_role_fallback' => TRUE]);
+    $this->setUserScopeSettings(['shared_role_fallback' => TRUE]);
     $this->assertTrue($fact->access('view', $peer), 'fallback on: shared real role grants');
     $this->assertFalse($fact->access('view', $stranger), 'the authenticated role alone is not shared');
   }
@@ -227,9 +235,9 @@ class AimScopeBehaviorTest extends KernelTestBase {
    */
   protected function shippedScopes(): array {
     $scopes = [];
-    $list = $this->container->get('extension.list.module');
+    $path = $this->container->get('extension.list.module')->getPath('aim');
     foreach (['user', 'role', 'site', 'case', 'entity'] as $id) {
-      $file = $list->getPath('aim_scope_' . $id) . '/config/install/aim.aim_scope.' . $id . '.yml';
+      $file = $path . '/config/install/aim.aim_scope.' . $id . '.yml';
       $scopes[$id] = Yaml::decode(file_get_contents($file));
     }
     return $scopes;
@@ -269,17 +277,14 @@ class AimScopeBehaviorTest extends KernelTestBase {
   }
 
   /**
-   * Merges values into aim.settings.
+   * Merges values into the user scope's settings.
    *
    * @param array $values
-   *   Top-level keys to set.
+   *   Setting keys to set.
    */
-  protected function setSettings(array $values): void {
-    $config = $this->config('aim.settings');
-    foreach ($values as $key => $value) {
-      $config->set($key, $value);
-    }
-    $config->save();
+  protected function setUserScopeSettings(array $values): void {
+    $scope = AimScope::load('user');
+    $scope->set('settings', $values + $scope->get('settings'))->save();
   }
 
   /**

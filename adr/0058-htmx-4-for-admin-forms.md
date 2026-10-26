@@ -30,11 +30,12 @@ that need extra clicks do not get done.
   update. Gated by the existing `trust {scope} aim facts` operation. A View
   row is not a form, so the `#executes_submit_callback` trick does not
   apply: it needs a Views field plus a small controller or form.
-- **User-scope role-visibility matrix**
-  (`/admin/config/aim/user-scope-access`). A grid of checkboxes plus a Save
-  button, the post's use case almost exactly. It drives real access, so
-  saving on change with the result echoed back beats a Save button that can
-  be forgotten. Confirm it is a `ConfigFormBase` form first.
+- **User-scope role-visibility matrix** (the user scope's settings on its
+  edit form, `/admin/config/aim/scopes/user/edit`, since ADR-0063). A
+  grid of checkboxes plus a Save button, the post's use case almost
+  exactly. It drives real access, so saving on change with the result
+  echoed back beats a Save button that can be forgotten. It is now part of
+  an entity form, not a `ConfigFormBase`.
 
 Not worth it: `AimScopeForm`'s plugin selector (a dependent sub-form swap
 that works with `#ajax` and is rarely used) and the `aim.settings` form

@@ -24,9 +24,11 @@ is set by its scope permissions.
 
 ## Which scope when
 
-Every fact has a scope, which says who it is true for. The same wording
-goes to the model, in the tools' scope inputs and in the MCP server
-instructions, listing only the scopes installed on the site.
+Every fact has a scope, which says who it is true for. Each scope's
+wording is its own description, editable on its edit form at
+`/admin/config/aim/scopes`; it goes to the model in the tools' scope
+inputs and the MCP server instructions, for enabled scopes only, in the
+scope list's order. The shipped defaults:
 
 | Scope | Use it for | Subject |
 | --- | --- | --- |
@@ -34,7 +36,7 @@ instructions, listing only the scopes installed on the site.
 | `role` | Guidance for everyone holding one site role: "editors must add alt text to every image" | The role machine name, e.g. `content_editor` |
 | `user` | Something about one person, by default the one talking: how they like answers formatted | Their account (uid). Never about someone else without confirming who |
 | `case` | One piece of ongoing work with a start and an end: a site redesign | The case ID. Leave it empty on the first save and a new one comes back; reuse it to add more |
-| `entity` (if installed) | One specific piece of content: a page, a product | None; the content's type and ID go in `scope_fields` |
+| `entity` | One specific piece of content: a page, a product | None; the content's type and ID go in `scope_fields` |
 
 When no scope clearly fits, or the role or case is unclear, the model is
 told to ask before saving. Recall searches every scope the caller can see

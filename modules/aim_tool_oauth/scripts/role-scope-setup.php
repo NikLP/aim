@@ -52,5 +52,5 @@ foreach ($users as $n => $roles) {
   $u->save();
   echo "$n uid " . $u->id() . "\n";
 }
-$c = \Drupal::configFactory()->getEditable('aim.settings');
-$c->set('user_scope_role_visibility', ['t_manager' => ['t_staff']])->save();
+$scope = \Drupal::entityTypeManager()->getStorage('aim_scope')->load('user');
+$scope->set('settings', ['role_visibility' => ['t_manager' => ['t_staff']]] + $scope->get('settings'))->save();

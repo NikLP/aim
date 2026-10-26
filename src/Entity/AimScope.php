@@ -13,27 +13,14 @@ use Drupal\aim\Form\AimScopeDeleteForm;
 use Drupal\aim\Form\AimScopeForm;
 
 /**
- * Defines the AIM scope config entity.
+ * Defines the AIM scope config entity, the bundle of aim_fact.
  *
- * Bundle of aim_fact. Named aim_scope, not aim_scope_type - aim_fact's
- * bundle field is itself called scope, not type (see CLAUDE.md's "Scope as
- * bundles" section for why type was rejected as a universal convention),
- * and each entity instance IS a scope (user/role/site/case), not a
- * category of one - the same reasoning core applies to taxonomy_vocabulary
- * over a hypothetical taxonomy_term_type.
- *
- * Still deliberately no field_ui_base_route on aim_fact - config-entity-ness
- * and Field UI exposure are independently controllable, and per-bundle
- * fields on aim_fact were tried and reverted once already (see CLAUDE.md's
- * "Scope as bundles" section). Payload is id/label only, matching what
- * hook_entity_bundle_info() already provided before this - a known,
- * accepted thinness, not an oversight.
- *
- * Add/edit/delete/collection links added 2026-09-15, not part of the
- * original conversion - required to keep entity.aim_fact.add_page from
- * crashing, see AimScopeForm's docblock. This also completes the "a scope
- * can be added through the admin UI with no code" claim CLAUDE.md already
- * made about this conversion.
+ * The aim module ships five (site, role, user, case, entity) in
+ * config/install. A site switches one off with `status`, refused while it
+ * has facts, and can add more, e.g. a second scope sharing a plugin with
+ * different settings (ADR-0063). `description` is the "which scope when"
+ * wording models get (AimScopeGuide), `weight` the order scopes are listed
+ * in. No field_ui_base_route on aim_fact, deliberately: see DEVELOPING.md.
  */
 #[ConfigEntityType(
   id: 'aim_scope',
@@ -46,6 +33,8 @@ use Drupal\aim\Form\AimScopeForm;
     'id' => 'id',
     'label' => 'label',
     'uuid' => 'uuid',
+    'status' => 'status',
+    'weight' => 'weight',
   ],
   handlers: [
     'list_builder' => AimScopeListBuilder::class,
@@ -59,10 +48,10 @@ use Drupal\aim\Form\AimScopeForm;
     ],
   ],
   links: [
-    'add-form' => '/admin/structure/aim-scopes/add',
-    'edit-form' => '/admin/structure/aim-scopes/{aim_scope}/edit',
-    'delete-form' => '/admin/structure/aim-scopes/{aim_scope}/delete',
-    'collection' => '/admin/structure/aim-scopes',
+    'add-form' => '/admin/config/aim/scopes/add',
+    'edit-form' => '/admin/config/aim/scopes/{aim_scope}/edit',
+    'delete-form' => '/admin/config/aim/scopes/{aim_scope}/delete',
+    'collection' => '/admin/config/aim/scopes',
   ],
   admin_permission: 'administer aim',
   bundle_of: 'aim_fact',
@@ -73,6 +62,9 @@ use Drupal\aim\Form\AimScopeForm;
   config_export: [
     'id',
     'label',
+    'status',
+    'description',
+    'weight',
     'plugin',
     'settings',
   ],
@@ -90,25 +82,38 @@ class AimScope extends ConfigEntityBundleBase {
   protected string $label;
 
   /**
+   * What the scope is for and what its subject is, for a model choosing one.
+   */
+  protected string $description = '';
+
+  /**
+   * Where the scope is listed, lightest first.
+   */
+  protected int $weight = 0;
+
+  /**
    * The AimScopeType plugin ID this instance uses, if any.
    *
-   * Not required to equal $id (ADR-0028 piece 3) - two scope instances
-   * can point at the same plugin, each with its own $settings. NULL for
-   * a plain, config-only scope (e.g. role/site) with no dedicated
-   * behavior, fields, or settings - resolved generically by
-   * AimScopeTypePluginManager::getTypePlugin() rather than every
-   * ThirdPartySetting-style special case aim used before this existed.
+   * Not required to equal $id (ADR-0028 piece 3): two scopes can share a
+   * plugin, each with its own $settings. NULL for a plain scope (site,
+   * role) with no behavior of its own.
    */
   protected ?string $plugin = NULL;
 
   /**
    * Instance-level settings for $plugin, if any.
    *
-   * Shape is entirely up to the plugin - see
-   * AimScopeTypeInterface::defaultSettings()/buildSettingsForm(). Empty
-   * for a scope with no plugin, or a plugin with nothing to configure.
+   * Shape is up to the plugin, which gets them as its configuration (see
+   * AimScopeTypeInterface::defaultSettings()/buildSettingsForm()).
    */
   protected array $settings = [];
+
+  /**
+   * Returns the "which scope when" wording.
+   */
+  public function getDescription(): string {
+    return $this->description;
+  }
 
   /**
    * Returns the permission machine name for viewing facts of this scope.

@@ -10,9 +10,9 @@ the overall pitch.
   (`guardrail_set: aim_write_guardrails`), using `aim_tool`'s
   `aim_recall` (5 results) and `aim_remember` through
   `tool_ai_connector` - the same tools MCP callers use.
-- A demo assistant (`ai_assistant_api.ai_assistant.aim_demo_assistant`)
-  and chat block (`block.block.olivero_aimdemochat`) in `config/optional`,
-  so the capability is visible out of the box.
+- An assistant (`ai_assistant_api.ai_assistant.aim_assistant`) for a
+  chat block to use. No block ships here: place an AI DeepChat block and
+  pick this assistant (the `aim_demo_library` recipe places one).
 
 What chat can read and write is set by the visitor's permissions: give a
 chat-facing role `recall aim facts`, `remember aim facts` and the
@@ -23,7 +23,7 @@ ships as `hold`). See
 
 ## Requirements
 
-- `aim` (this module's parent), `aim_scope_site`, `aim_tool`
+- `aim` (this module's parent, with its `site` scope enabled), `aim_tool`
 - `drupal/ai`'s `ai_agents`, `ai_assistant_api`, `ai_chatbot` submodules
 - `drupal/tool`'s `tool_ai_connector`
 

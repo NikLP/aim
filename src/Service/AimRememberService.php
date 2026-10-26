@@ -214,9 +214,8 @@ class AimRememberService {
     ];
 
     if ($this->manager->scopeRequiresAccount($scope)) {
-      // A fact in a scope that requires a real account (ADR-0007,
-      // aim_scope_user's requires_account setting for scope=user)
-      // has to be about one:
+      // A fact in a scope that requires a real account (ADR-0007, the
+      // user scope's requires_account setting) has to be about one:
       // subject is a genuine entity_reference (user), not a free-text string
       // that merely happens to hold a uid - that drift is exactly what let
       // "1" and "Nik" address the same person without ever matching.
@@ -232,8 +231,8 @@ class AimRememberService {
     }
     elseif (empty($subject)) {
       // No subject given: ask this scope's access plugin (if any) for a
-      // default instead of leaving the field empty - e.g. aim_scope_case's
-      // plugin mints a new case ID.
+      // default instead of leaving the field empty - e.g. the case plugin
+      // mints a new case ID.
       $plugin = $this->scopeAccessManager->getTypePlugin($scope);
       $values['subject'] = $plugin?->defaultSubject() ?? '';
     }

@@ -14,8 +14,9 @@ use Drupal\aim\Plugin\AimScopeType\AimScopeTypeInterface;
 /**
  * Manages discovery and instantiation of aim scope type plugins.
  *
- * Plugins live in src/Plugin/AimScopeType of any enabled module and are
- * discovered via the #[AimScopeType] attribute. Mirrors the shape of
+ * Plugins live in src/Plugin/AimScopeType of any enabled module (aim
+ * ships user, case and entity) and are discovered via the #[AimScopeType]
+ * attribute. Mirrors the shape of
  * Annotations' TargetPluginManager (plugin.manager.annotations_target);
  * unlike that manager, aim has no per-entity-type multiplicity to cover,
  * so there is no deriver and no generic fallback plugin - see
@@ -69,8 +70,10 @@ class AimScopeTypePluginManager extends DefaultPluginManager implements AimScope
       return NULL;
     }
 
+    // The scope's own settings are the plugin's configuration, so two
+    // scopes sharing a plugin behave per their settings.
     /** @var \Drupal\aim\Plugin\AimScopeType\AimScopeTypeInterface $plugin */
-    $plugin = $this->createInstance($pluginId);
+    $plugin = $this->createInstance($pluginId, $scope->get('settings') ?? []);
     return $plugin;
   }
 

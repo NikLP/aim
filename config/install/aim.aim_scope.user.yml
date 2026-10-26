@@ -1,0 +1,12 @@
+langcode: en
+status: true
+dependencies: {  }
+id: user
+label: User
+description: 'about one person, by default the one you are talking to, e.g. how they like answers formatted. Subject: their account (uid); omit it for yourself. Never save a user fact about someone else without confirming who it is about.'
+weight: 2
+plugin: user
+settings:
+  requires_account: true
+  shared_role_fallback: true
+  role_visibility: {  }

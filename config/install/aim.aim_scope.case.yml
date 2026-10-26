@@ -1,0 +1,9 @@
+langcode: en
+status: true
+dependencies: {  }
+id: case
+label: Case
+description: 'one piece of ongoing work with a start and an end, e.g. a site redesign. Subject: the case ID. Omit it on the first save and a new ID comes back; pass that ID to add more to the same case.'
+weight: 3
+plugin: case
+settings: {  }
