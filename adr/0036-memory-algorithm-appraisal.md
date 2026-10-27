@@ -208,3 +208,58 @@ list, no calibration between distance and keyword scores. Notes:
 - Trigger: build when a real recall miss on a name, code or rare term is
   observed that the vector search could not find, or when the benchmark
   gold set shows one. Not before.
+
+## Addendum 2026-10-27: failure modes checked against recent work
+
+The sources above compared algorithms; this checks aim against the field's
+named failure modes. Prompted by a live lifecycle test (four facts written
+over MCP, a real queue run): a duplicate was a NOOP, a change superseded
+the old fact with a good merge, a new fact was added and `aim:expire`
+worked, but "closed for refurbishment until 30 November" was UPDATE-merged
+into the opening-hours fact and the merged fact had no `expires`.
+
+Sources (web, 2026-10-27; claims are the authors' own, several are
+preprints or vendor blogs, not re-run by us):
+
+- LifeFuse-Mem, Zhao et al., arXiv 2609.12436 (September 2026): names
+  "temporary overwriting", short-lived information replacing durable
+  knowledge; fix is separating facts by lifecycle.
+- MemStrata, "Temporal Validity in Retrieval Memory", arXiv 2606.26511:
+  contradictions are on average more embedding-similar to the original
+  than rephrased duplicates; fix is a bi-temporal ledger that closes the
+  old fact's interval instead of rewriting it.
+- Du, "Memory for Autonomous LLM Agents", arXiv 2603.07670 (March 2026):
+  survey; summarization drift, attentional dilution, staleness; raw user
+  input is a poor query; log, replay and regression-test memory changes.
+- Hindsight, "The Consolidation Problem in Agent Memory" (vendor blog, May
+  2026), https://hindsight.vectorize.io/blog/2026/05/21/agent-memory-consolidation:
+  24 anti-patterns, among them deleting superseded facts, recency-wins on
+  stable attributes, and letting the model decide everything at write time.
+- Agent Zero Memory, arXiv 2608.29606: overwrite keeps no history, so a bad
+  extraction cannot be re-derived.
+- Memory poisoning: arXiv 2606.04329 (ICML 2026) and the security survey
+  arXiv 2604.16548: one adversarial write has long-term influence;
+  rollback needs write logs or snapshots.
+- StreamMemBench, arXiv 2606.14571: "correction consolidation failure", a
+  correction absorbed but the follow-up still wrong.
+
+| Failure mode (don't) | aim, 2026-10-27 |
+| --- | --- |
+| Delete superseded facts | OK: soft retire with `superseded_by` and a reason |
+| Let one write steer behavior long-term (poisoning) | OK: trust gate, Guardrails, chat writes held |
+| Store raw turns | OK: short single-claim facts |
+| Judge memory by retrieval scores alone | OK: site's chat eval scores answers end to end |
+| Temporary overwriting | Fixed today: facts with different `expires` are never compared; a merge carries `expires` |
+| Treat near-identical embeddings as duplicates | Fixed today: 8 of 10 short contradicting pairs fell inside the old `auto_threshold` 0.09 (site's `demo/recall-eval/auto-band.php`; contradiction mean 0.074, rewording mean 0.059) while `subq-snap-1.1` classified all 18 pairs right, so the default is now 0 and only identical text skips the model |
+| Let the model decide everything at write time | Open: the model picks UPDATE and writes the merged text; the verifier checks it, the result starts trusted with no grounding score |
+| Lose provenance in a merge | Partly open: owner from the kept fact, `source` from the candidate, grounding dropped |
+| Query with the raw user input | Open: the "any upcoming events?" ranking miss |
+| Hand the model too much retrieved memory | Watch: this site loosened recall to 0.60; keep the result limit small |
+| No regression tests for memory changes | Partly open: only consolidation's no-model paths have kernel tests |
+
+The open rows mostly trace to one choice: an UPDATE writes a new fact from
+two, with model-written text and a hand-picked field list. The field's
+alternative (Zep, MemStrata) is to supersede without rewriting: close the
+old fact's validity and keep the new one as stated. Not decided; the cost
+is losing useful merges (today's "moved to Wednesdays" merge kept "ages 9
+to 13, in the makerspace", which superseding alone would have dropped).

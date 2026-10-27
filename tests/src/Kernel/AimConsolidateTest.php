@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\aim\Kernel;
 
+use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Component\Serialization\Yaml;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\aim\Entity\AimFact;
@@ -15,7 +16,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  * The consolidation sweep: which pairs it compares and what it changes.
  *
  * Only the paths that need no model are covered (a near-identical pair is
- * retired by distance alone, a distant pair is never compared). The
+ * retired by distance alone, a distant pair or a pair with different end
+ * dates is never compared). The
  * ambiguous middle, where a decision model judges, is measured by the evals
  * in TESTS.md instead.
  */
@@ -27,6 +29,9 @@ class AimConsolidateTest extends KernelTestBase {
 
   /**
    * Distance at or below which the newer fact is retired as a duplicate.
+   *
+   * The shipped default is now 0; most tests keep the old band so the
+   * no-model path stays covered.
    */
   protected const AUTO = 0.09;
 
@@ -158,6 +163,68 @@ class AimConsolidateTest extends KernelTestBase {
   }
 
   /**
+   * A fact with an end date is never merged with one without.
+   */
+  public function testDifferentLifetimesNotCompared(): void {
+    $lasting = $this->fact('Open Monday to Friday from nine.');
+    $dated = $this->fact('Closed for refurbishment until 30 November.', expires: strtotime('2026-11-30 23:59:59'));
+    $other = $this->fact('Closed until 30 November for refurbishment.', expires: strtotime('2026-12-31 23:59:59'));
+    $this->setScores([$lasting->id() => 0.02, $dated->id() => 0.03, $other->id() => 0.04]);
+
+    $this->assertSame([], $this->sweep()['rows']);
+    foreach ([$lasting, $dated, $other] as $fact) {
+      $this->assertEmpty($this->reload($fact)->get('retired')->value);
+    }
+  }
+
+  /**
+   * Facts with the same end date are still compared.
+   */
+  public function testSameEndDateCompared(): void {
+    $end = strtotime('2026-11-30 23:59:59');
+    $kept = $this->fact('Closed until 30 November.', expires: $end);
+    $dupe = $this->fact('Shut until 30 November.', expires: $end);
+    $this->setScores([$kept->id() => 0.02, $dupe->id() => 0.03]);
+
+    $rows = $this->sweep()['rows'];
+    $this->assertCount(1, $rows);
+    $this->assertSame('NOOP', $rows[0][3]);
+    $this->assertNotEmpty($this->reload($dupe)->get('retired')->value);
+  }
+
+  /**
+   * Identical text is retired with no model call, even at threshold 0.
+   */
+  public function testIdenticalTextRetiredWithoutModel(): void {
+    $kept = $this->fact('Open at nine.');
+    $dupe = $this->fact('open at  nine');
+    $this->setScores([$kept->id() => 0.02, $dupe->id() => 0.03]);
+
+    // The 'fake' provider does not exist, so any model call would throw.
+    $rows = $this->sweep(auto: 0.0)['rows'];
+    $this->assertSame('NOOP', $rows[0][3]);
+    $this->assertNotEmpty($this->reload($dupe)->get('retired')->value);
+  }
+
+  /**
+   * At threshold 0 a close but different pair goes to the model.
+   */
+  public function testClosePairGoesToModelAtZero(): void {
+    $kept = $this->fact('Members can borrow up to 20 items.');
+    $correction = $this->fact('Members can borrow up to 10 items.');
+    $this->setScores([$kept->id() => 0.01, $correction->id() => 0.016]);
+
+    try {
+      $this->sweep(auto: 0.0);
+      $this->fail('the pair was decided without a model call');
+    }
+    catch (PluginNotFoundException) {
+      // The sweep reached for the (missing) model, as it should.
+    }
+    $this->assertEmpty($this->reload($correction)->get('retired')->value);
+  }
+
+  /**
    * With no live facts the sweep says so.
    */
   public function testNoFacts(): void {
@@ -165,13 +232,20 @@ class AimConsolidateTest extends KernelTestBase {
   }
 
   /**
-   * Runs the sweep with the shipped thresholds.
+   * Runs the sweep, by default with the old 0.09 auto band.
+   *
+   * @param string|null $scope
+   *   The scope to sweep, or NULL for all.
+   * @param bool $dryRun
+   *   Whether to change nothing.
+   * @param float $auto
+   *   The auto-merge distance.
    *
    * @return array
    *   The consolidate() result.
    */
-  protected function sweep(?string $scope = NULL, bool $dryRun = FALSE): array {
-    return $this->container->get('aim.consolidation')->consolidate($scope, 'fake', 'fake-model', self::AUTO, self::AMBIGUOUS, $dryRun);
+  protected function sweep(?string $scope = NULL, bool $dryRun = FALSE, float $auto = self::AUTO): array {
+    return $this->container->get('aim.consolidation')->consolidate($scope, 'fake', 'fake-model', $auto, self::AMBIGUOUS, $dryRun);
   }
 
   /**
@@ -183,12 +257,21 @@ class AimConsolidateTest extends KernelTestBase {
    *   The scope.
    * @param int|null $retired
    *   A retired timestamp, or NULL for a live fact.
+   * @param int|null $expires
+   *   An end date timestamp, or NULL for none.
    *
    * @return \Drupal\aim\Entity\AimFact
    *   The saved fact.
    */
-  protected function fact(string $text, string $scope = 'site', ?int $retired = NULL): AimFact {
-    $fact = AimFact::create(['scope' => $scope, 'text' => $text, 'trusted' => TRUE, 'uid' => 1, 'retired' => $retired]);
+  protected function fact(string $text, string $scope = 'site', ?int $retired = NULL, ?int $expires = NULL): AimFact {
+    $fact = AimFact::create([
+      'scope' => $scope,
+      'text' => $text,
+      'trusted' => TRUE,
+      'uid' => 1,
+      'retired' => $retired,
+      'expires' => $expires,
+    ]);
     $fact->save();
     return $fact;
   }

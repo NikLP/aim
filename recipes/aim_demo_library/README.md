@@ -147,9 +147,9 @@ node demo/preflight.js   # site wrapper; see below
 It checks the site (local and through the public funnel URL), Ollama, the
 vector index, the full OAuth handshake as Claude.ai does it (client
 registration, consent, PKCE), that the MCP server instructions carry aim's
-scope guide, all four scopes over MCP, MCP abstention on an
-off-topic question, save-then-search, and the chat widget in a real browser
-(answer, then write-then-read), plus that anonymous visitors can't see or
+scope guide, all four scopes over MCP, save-then-search, and the chat
+widget in a real browser (answer, write-then-read, then "nothing recorded"
+for a question with no fact), plus that anonymous visitors can't see or
 call the widget. It needs DDEV up, a public URL that reaches the site (a
 tunnel such as Tailscale Funnel), Ollama running, and Playwright (set
 `PLAYWRIGHT_PATH`). The script is [preflight/preflight.js](preflight/preflight.js);

@@ -223,7 +223,7 @@ final class AimSettingsForm extends ConfigFormBase {
     $form['consolidation']['auto_threshold'] = [
       '#type' => 'number',
       '#title' => $this->t('Auto-merge distance'),
-      '#description' => $this->t('Distance at or below which a candidate fact is retired as a duplicate automatically, no LLM call.'),
+      '#description' => $this->t('Distance at or below which a candidate fact is retired as a duplicate automatically, no LLM call. Leave at 0: a correction ("up to 10 items" for "up to 20") sits as close as a reworded duplicate, so anything higher retires corrections unchecked. Identical text is always retired without a call.'),
       '#config_target' => 'aim.settings:auto_threshold',
       '#min' => 0,
       '#max' => 1,

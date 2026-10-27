@@ -291,7 +291,8 @@ class AimConsolidationService {
    *   verification.
    */
   protected function decideAndApply(AimFact $kept, AimFact $candidate, float $score, float $autoThreshold, string $providerId, string $modelId, bool $dryRun): array {
-    if ($score <= $autoThreshold) {
+    $auto = $this->sameText($kept, $candidate) || $score <= $autoThreshold;
+    if ($auto) {
       $decision = 'NOOP';
       $merged_text = NULL;
     }
@@ -332,7 +333,7 @@ class AimConsolidationService {
       return [$decision, $reported_text];
     }
 
-    $model = $score <= $autoThreshold ? NULL : [$providerId, $modelId];
+    $model = $auto ? NULL : [$providerId, $modelId];
     $this->logConsolidation($kept, $candidate, $score, $decision, $model);
 
     $reason = $this->buildSupersedeReason($decision, $score, $model);
@@ -643,6 +644,11 @@ class AimConsolidationService {
     if (!$candidate->get('asserted')->isEmpty()) {
       $values['asserted'] = $candidate->get('asserted')->value;
     }
+    // Only facts with the same end date are compared (findNeighbors()), so
+    // the merge keeps it.
+    if ($this->expiresOf($kept) !== NULL) {
+      $values['expires'] = $this->expiresOf($kept);
+    }
     foreach (['source'] as $field) {
       $source = !$candidate->get($field)->isEmpty() ? $candidate : $kept;
       if (!$source->get($field)->isEmpty()) {
@@ -779,6 +785,14 @@ class AimConsolidationService {
         continue;
       }
 
+      // Facts with different end dates (or one with none) have different
+      // lifetimes: merging them would drop the end date or make a lasting
+      // fact expire ("temporary overwriting"). They are never compared; the
+      // dated one stands until aim:expire retires it.
+      if ($this->expiresOf($candidate) !== $this->expiresOf($fact)) {
+        continue;
+      }
+
       $neighbors[] = [$candidate, (float) $result->getScore()];
       if (count($neighbors) >= $limit) {
         break;
@@ -786,6 +800,39 @@ class AimConsolidationService {
     }
 
     return $neighbors;
+  }
+
+  /**
+   * Whether two facts have the same text, ignoring case and spacing.
+   *
+   * A final full stop is ignored too. The one duplicate safe to retire
+   * without a model: anything less than identical may be a correction
+   * (ADR-0036's 2026-10-27 addendum).
+   *
+   * @param \Drupal\aim\Entity\AimFact $a
+   *   One fact.
+   * @param \Drupal\aim\Entity\AimFact $b
+   *   The other fact.
+   *
+   * @return bool
+   *   TRUE if the normalized texts match.
+   */
+  protected function sameText(AimFact $a, AimFact $b): bool {
+    $norm = static fn (AimFact $fact): string => rtrim(mb_strtolower((string) preg_replace('/\s+/', ' ', trim((string) $fact->get('text')->value))), '. ');
+    return $norm($a) === $norm($b);
+  }
+
+  /**
+   * Returns a fact's end date as a timestamp, or NULL when it has none.
+   *
+   * @param \Drupal\aim\Entity\AimFact $fact
+   *   The fact.
+   *
+   * @return int|null
+   *   The expires timestamp, or NULL.
+   */
+  protected function expiresOf(AimFact $fact): ?int {
+    return $fact->get('expires')->isEmpty() ? NULL : (int) $fact->get('expires')->value;
   }
 
   /**

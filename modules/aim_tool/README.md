@@ -19,7 +19,7 @@ in each scope (the site, their own roles, themselves, ongoing cases;
 `limit` per scope, default 5, at most 10), in the same shape as
 `aim_recall`'s results, for getting oriented at the start of work. The
 MCP server instructions tell a client to call it once then. The site's chat
-assistant (`aim_chatbot`) uses the same two tools; what any caller reaches
+assistant (`aim_chatbot`) uses the same `aim_recall` and `aim_remember`; what any caller reaches
 is set by its scope permissions.
 
 ## Which scope when

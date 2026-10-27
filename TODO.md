@@ -34,13 +34,17 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       flags an uncaptured tag, disabled logging or stealth mode and warns
       under 90 days; the settings form says the settings are shared;
       per-tag retention goes upstream (ADR-0060). New installs: opt-in.
-- [ ] **Short category queries ("any upcoming events?") return only the book
-      sale.** The Code Club and Baby Rhyme Time facts sit just past the
-      0.52 cutoff for that word. Fix in the system, never by rewording
-      facts or gists (feedback rule, Nik 2026-10-16): keyword matching
-      alongside the vectors (below), a broader second recall when the first
-      is thin, or a relevance step over a wider candidate set. Then the
-      accept/pass widget as the safety net (parked, Literals entry).
+- [ ] **"Any upcoming events?" misses Code Club and Baby Rhyme Time.**
+      A ranking miss, not a cutoff one (measured 2026-10-27, site's
+      `demo/recall-eval/` and `demo/chat-eval/`): Baby Rhyme Time ranks 11th
+      of 19 site facts, past the tool's limit, and no site fact contains
+      "event", so keyword matching would not help. This site now runs a loose
+      cutoff (0.60, no gap) and lets the calling model judge; abstention held.
+      Candidate fix: a decision-model relevance step over a wider set (top
+      20) than the chat model is handed (ADR-0036's pinned rerank), which is
+      also the sovereignty case: a small local chat model is worse at
+      ignoring near misses. Never fix by rewording facts or gists (feedback
+      rule, Nik 2026-10-16).
 - [ ] **Recall in code: keep, default or delete.**
       `AimChatbotRecallContextSubscriber` is off by default (results in
       `modules/aim_chatbot/CLAUDE.md`). Keep as an option, make it the
@@ -184,7 +188,7 @@ gate are built. Work on the literals modules themselves is in
       `ai_vdb_provider_mariadb` (so the recipe needn't list it), and
       `search_api.server.aim_vector` hardcodes
       `ollama__nomic-embed-text:latest` at 768 dimensions.
-      `recall_max_distance` (0.52) and `recall_gap` are tuned to that
+      `recall_max_distance` and `recall_gap` are tuned to that
       model's distances on MariaDB's `VEC_DISTANCE_COSINE`, so a different
       embeddings model or backend needs them re-tuned. Other MariaDB-only
       code: `AimMariaDBProvider`, the raw SQL in `AimStatusChecker`,

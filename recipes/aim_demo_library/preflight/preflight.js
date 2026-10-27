@@ -27,7 +27,8 @@ const cfg = Object.assign({
   chatExpect: 'Thorne',
   mcpQuestion: 'Who founded NeuralPulse Systems?',
   mcpExpect: 'Thorne',
-  offTopic: 'quantum chromodynamics lattice gauge theory',
+  noAnswer: 'Where can I park?',
+  noAnswerExpect: "(don't|do not) have|no information|not recorded|nothing recorded|(couldn't|could not|can't) find|not sure|don't know",
 }, readJson(path.join(__dirname, 'preflight.config.json')),
 readJson(path.join(root, 'demo', 'preflight.local.json')),
 process.env.PREFLIGHT_PUBLIC_URL ? { publicUrl: process.env.PREFLIGHT_PUBLIC_URL } : {},
@@ -191,9 +192,9 @@ async function askWidget(page, question) {
         if (!/- site: /.test(text)) throw new Error('instructions lack the scope guide');
         return text.length + ' chars';
       });
-      await check('MCP: both tools listed', async () => {
+      await check('MCP: all four tools listed', async () => {
         const names = ((await rpc('tools/list', {})).result.tools || []).map((t) => t.name);
-        for (const n of ['tool_api__aim_recall', 'tool_api__aim_remember']) if (!names.includes(n)) throw new Error(n + ' missing; have ' + names.join(', '));
+        for (const n of ['tool_api__aim_recall', 'tool_api__aim_remember', 'tool_api__aim_brief', 'tool_api__aim_literal']) if (!names.includes(n)) throw new Error(n + ' missing; have ' + names.join(', '));
         return names.join(', ');
       });
       await check('MCP: recall answers an on-topic question', async () => {
@@ -208,10 +209,6 @@ async function askWidget(page, question) {
         await ask({ text: 'What must editors do before publishing an image?', scope: 'role', subject: 'content_editor' }, /alt text/i);
         await ask({ text: 'How does Sam like answers to be formatted?', scope: 'user' }, /bullet/i);
         await ask({ text: 'When does the events calendar launch?', scope: 'case' }, /20 October/i);
-      });
-      await check('MCP: recall abstains on an off-topic question', async () => {
-        const t = toolText(await rpc('tools/call', { name: 'tool_api__aim_recall', arguments: { text: cfg.offTopic, scope: 'site', limit: 3 } }));
-        if (!/No relevant facts/i.test(t)) throw new Error('returned facts for an off-topic query: ' + t.replace(/\s+/g, ' ').slice(0, 160));
       });
       await check('MCP: remember, then searchable', async () => {
         toolText(await rpc('tools/call', { name: 'tool_api__aim_remember', arguments: { facts: [{ text: `${CANARY} the pre-flight canary heron is called Mabel.`, scope: 'site' }] } }));
@@ -273,7 +270,11 @@ async function askWidget(page, question) {
         const b = await askWidget(page, 'Please remember that the library\'s story-time mascot is a fox named Fizzwick.');
         const c = await askWidget(page, 'What is the library\'s story-time mascot called?');
         if (!/Fizzwick/i.test(c.text)) throw new Error(`write then read failed; second answer: ${c.text.slice(0, 140)}`);
-        return `answer ${a.secs.toFixed(1)}s, save ${b.secs.toFixed(1)}s, recall-after-save ${c.secs.toFixed(1)}s`;
+        // Recall may hand back near misses (a loose recall_max_distance);
+        // the assistant, not recall, has to say nothing is recorded.
+        const d = await askWidget(page, cfg.noAnswer);
+        if (!new RegExp(cfg.noAnswerExpect, 'i').test(d.text)) throw new Error('expected "nothing recorded" for ' + JSON.stringify(cfg.noAnswer) + ', got: ' + d.text.slice(0, 160));
+        return `answer ${a.secs.toFixed(1)}s, save ${b.secs.toFixed(1)}s, recall-after-save ${c.secs.toFixed(1)}s, no-answer ${d.secs.toFixed(1)}s`;
       }
       finally { await ctx.close(); }
     });

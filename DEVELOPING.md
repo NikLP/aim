@@ -123,14 +123,17 @@ drush aim:consolidate [--scope] [--provider] [--model] [--auto-threshold] [--amb
 
 On-demand sweep. Algorithm, schema, and thresholds in
 [ADR-0005](adr/resolved/0005-consolidation-algorithm.md). Current defaults:
-`auto_threshold: 0.09`, `ambiguous_threshold: 0.45`, calibrated against
-`ollama__nomic-embed-text:latest` - both live in `aim.settings`, editable
-at `/admin/config/aim/settings` ("Consolidation"), not just a
-code constant. **Retune if the embeddings model changes** - a threshold
-tuned for one model's distance distribution can silently auto-merge
-genuinely distinct facts under another (hit live: 0.12 auto-merged two
-related-but-distinct facts under this embedding model; pulled back to
-0.09).
+`auto_threshold: 0`, `ambiguous_threshold: 0.45` (calibrated against
+`ollama__nomic-embed-text:latest`), both in `aim.settings`, editable at
+`/admin/config/aim/settings` ("Consolidation"). `auto_threshold` is 0
+because distance cannot tell a correction from a reworded duplicate: 8
+of 10 short contradicting pairs scored under the old 0.09 ("borrow up to
+20 items" vs "up to 10" at 0.016) and would have been retired unchecked,
+while `subq-snap-1.1` classified all 18 test pairs right (site's
+`demo/recall-eval/auto-band.php`, ADR-0036's 2026-10-27 addendum). Every
+compared pair now gets a model call, except identical text (ignoring case,
+spacing and a final full stop), which is a NOOP with none. **Retune
+`ambiguous_threshold` if the embeddings model changes.**
 
 **Nothing is destroyed** (ADR-0005 addendum, 2026-10-01). Every outcome
 that removes a fact from recall is a soft retire (`retired` set), so it
@@ -144,7 +147,13 @@ is auditable and reversible with the Un-retire action (which also clears
   carried over: scope, subject/user, target and owner from the kept fact;
   `asserted` from the candidate only; `source` from the candidate
   else the kept fact; `category` the union; `trusted` only if both inputs
-  were. The merged fact is queued for consolidation like any new fact.
+  were; `expires` (equal on both, see below). The merged fact is queued
+  for consolidation like any new fact.
+
+Facts with different `expires` (one dated, one not, or two different
+dates) are never compared, so a temporary fact cannot be merged into a
+lasting one and lose its end date (`findNeighbors()`; ADR-0036's
+2026-10-27 addendum).
 - `superseded_by_reason` (on the retired candidate's row only; JSON,
   never fact text): `decision`, `by` (`auto` or `model`), `score`,
   `provider`, `model`. Installed by `aim_update_10004()`.
@@ -198,14 +207,9 @@ afterward (the apply path was live-tested this way 2026-10-01).
 
 `--dry-run` still calls the model and prints the merged text in a
 "Merged text" column (also for `BLOCKED`), for reviewing UPDATE fidelity
-by hand. **Auto-path caveat:** the auto branch keeps the *older* fact and
-retires the newer one with no model check. A synthetic "coffee machine
-moved from the second to the third floor" pair scored 0.068 (under 0.09)
-and was retired as NOOP, leaving the stale statement live; with
-`--auto-threshold=0` the model classified it UPDATE correctly. Setting the
-shipped default to 0 is not applied yet: it needs the cost measurement
-(one hosted call per pair under `ambiguous_threshold`) from the TODO
-baseline work.
+by hand. The auto path (identical text, or a distance at or under
+`auto_threshold` when a site raises it) keeps the *older* fact and
+retires the newer one with no model check.
 
 **Automated path:** `AimConsolidateQueueWorker` (plugin ID
 `aim_consolidate`) - `remember()`/`createFactsFromCandidates()` enqueue

@@ -117,8 +117,8 @@ flowchart TD
   N1 -->|no| DONE1["done, no change"]:::code
   N1 -->|yes| S{"cosine distance<br/>score"}:::vec
   S -->|"above 0.45<br/>ambiguous_threshold"| SKIP["unrelated: skip, zero cost"]:::code
-  S -->|"at or below 0.09<br/>auto_threshold"| AUTO["decision NOOP, no model call<br/>auto path keeps the older fact"]:::vec
-  S -->|"0.09 to 0.45<br/>ambiguous band"| CL["classifyPair()<br/>kept = lower ID, candidate = higher ID<br/>one structured call, or a decision-backend<br/>choice if activities.consolidation uses it"]:::llm
+  S -->|"identical text, or at or below<br/>auto_threshold (default 0)"| AUTO["decision NOOP, no model call<br/>auto path keeps the older fact"]:::vec
+  S -->|"up to 0.45<br/>ambiguous band"| CL["classifyPair()<br/>kept = lower ID, candidate = higher ID<br/>one structured call, or a decision-backend<br/>choice if activities.consolidation uses it"]:::llm
 
   CL --> D{"model decision"}:::llm
   D -->|ADD| ADD["both stand, no change"]:::code
@@ -161,8 +161,8 @@ flowchart TD
 Notes on diagram 2:
 
 - Thresholds are cosine distances, lower is closer: "at or below"
-  means more similar. Defaults 0.09 and 0.45 live in
-  `AimMemoryManager::DEFAULT_*`; the live values come from
+  means more similar. Defaults 0 and 0.45 live in
+  `AimSettings::DEFAULT_*`; the live values come from
   `aim.settings` (`auto_threshold`, `ambiguous_threshold`).
 - Retirement is always soft. Nothing is deleted from `aim_fact`, and a
   retired fact can be un-retired by the admin action.
@@ -281,7 +281,7 @@ flowchart LR
   IN100 -->|"directly: remember, JSON,<br/>or the form's one-fact-per-line mode"| NOEX["no extraction call"]:::code
   EX --> EMB1["embed: 100"]:::vec
   NOEX --> EMB1
-  EMB1 --> CONS["consolidation: up to 3 neighbors each<br/>only pairs between 0.09 and 0.45 distance"]:::code
+  EMB1 --> CONS["consolidation: up to 3 neighbors each<br/>only pairs within 0.45 distance"]:::code
   CONS --> JEV["Jev decision: about 150 to 300 calls<br/>0.4 s each, tiny inputs"]:::llm
   JEV -->|"UPDATE, rare"| MERGE["Frontier merge writer: 1 per UPDATE<br/>then Jev verify: 1, embed: 1"]:::llm
 

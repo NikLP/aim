@@ -129,8 +129,8 @@ unless noted; synthetic data only for hosted Jev.
    disclosed LongMemEval slice (50-100 questions) for recall precision,
    knowledge-update correctness and abstention; recall payload size vs
    full-history tokens; duplicate rate. Then tune `recall_max_distance`
-   (0.48), `auto_threshold` and `ambiguous_threshold` against them,
-   counting hosted calls (verifier plus `auto_threshold` 0 compounds).
+   and `ambiguous_threshold` against them, counting hosted calls
+   (`auto_threshold` is 0 since 2026-10-27, so every compared pair is one).
 7. **Retrieval at scale** (open question #5): `aim:benchmark` at thousands
    of facts. Re-verify the `getVdbIds()` limit-10 shim (#3626257) before
    relying on deletes for retention.

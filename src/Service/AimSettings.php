@@ -21,31 +21,16 @@ class AimSettings {
    * Shipped default for aim.settings' auto_threshold, and a fallback.
    *
    * The live, admin-editable value is aim.settings:auto_threshold
-   * (/admin/config/aim/settings) - see getAutoThreshold(). This constant is
-   * only the value config/install ships on a fresh install, and the
-   * fallback if that config is ever missing entirely. Public and shared
+   * (/admin/config/aim/settings) - see getAutoThreshold(). Public and shared
    * between the CLI sweep's option default and the queue worker, so the two
-   * can't drift out of sync the way AimCommands' hardcoded provider/model
-   * defaults already did twice earlier this project. Empirically set
-   * against ollama__nomic-embed-text:latest (see
-   * CLAUDE.md's "Consolidation" section) - recalibrated 2026-09-10 from an
-   * earlier 0.05/0.20 pair that was calibrated against amazeeio's
-   * mistral-embed and never re-checked after the site's embeddings_engine
-   * was switched to a local Ollama model.
-   *
-   * First pass set this to 0.12 from two known duplicate pairs (cosine
-   * distance 0.059 and 0.082). That was too loose - live testing produced
-   * a real false auto-merge at 0.1186 ("Nik likes chocolate biscuits" vs.
-   * "Nik likes chocolate digestives", genuinely distinct preferences, not
-   * a restatement) that got silently retired with zero LLM review. Pulled
-   * back to sit clearly below that observed false positive - this small
-   * embedding model apparently packs "same topic, different content" much
-   * closer to "restated duplicate" than mistral-embed did, so the safe
-   * auto-merge band is narrower here than the first calibration assumed.
-   * Still not a large sample - re-check as real data grows, and favor the
-   * ambiguous (LLM-reviewed) band over widening this one on a hunch.
+   * can't drift. 0 sends every compared pair to the model: embedding
+   * distance cannot tell a correction from a reworded duplicate ("borrow
+   * up to 20 items" vs "up to 10" scored 0.016 under nomic-embed-text), so a
+   * wider band retires corrections unchecked (ADR-0036's 2026-10-27
+   * addendum). Identical text is still a NOOP with no model call
+   * (AimConsolidationService::sameText()).
    */
-  public const DEFAULT_AUTO_THRESHOLD = 0.09;
+  public const DEFAULT_AUTO_THRESHOLD = 0.0;
 
   /**
    * Shipped default for aim.settings' ambiguous_threshold, and a fallback.

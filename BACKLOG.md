@@ -78,11 +78,6 @@ are recommendations.
       dry-run row, since the second would throw mid-sweep. Revisit only if
       a guardrail becomes LLM-backed (then validate once and reuse the
       result, without a skip flag on `saveFact()`).
-- [ ] Auto band (distance under 0.09, no model check): decide whether it
-      should go through the decision model or verifier. Revisit once a
-      decent decision model setup exists (one call per pair, see the cost
-      measurement under "Decision models").
-
 **Indexing and settings**
 
 - [ ] Open question: could Guardrails and the Decision API do the same
@@ -115,8 +110,8 @@ are recommendations.
       (resolve and confirm dates before write, `expires` plus its sweep).
       `expires` input and `aim:expire` sweep BUILT 2026-10-11 (add the
       hourly crontab line; `hook_cron` backs it up); still to do: today's date to the assistant,
-      persona wording, extraction date resolution, never merging a dated
-      fact into an undated one, dated eval items.
+      persona wording, extraction date resolution, dated eval items. Facts
+      with different end dates are never compared (BUILT 2026-10-27).
 - [ ] Pinned: `verified`/`verified_by` fields (not `trusted`), ADR-0036.
 - [ ] Parked (ADR-0057 time stance): recency/importance re-rank,
       weights default 0, needs a gold set.
@@ -128,8 +123,8 @@ are recommendations.
       hit may bypass the ADR-0019 distance cutoff). Brushed past again
       2026-10-25 (Marcus Johansson's talk slide: FTS5 BM25 + sqlite-vec
       fused by the same RRF formula, for a Drupal docs search). Still
-      parked, but TODO.md's "short category queries" miss lists keyword
-      matching as one candidate fix; check it would help there first.
+      parked: checked 2026-10-27 against the "any upcoming events?" miss
+      and it would not help (no missed fact shares a word with the question).
 
 ## Outside advice (raised 2026-10-15, George Kastanis, OpenBrain author)
 
@@ -324,7 +319,7 @@ questions" section)
       recall precision, knowledge-update correctness and abstention (parity
       targets 1, 4, 5); recall payload size vs. full-history tokens
       (target 3); duplicate rate; then tune `recall_max_distance` (0.48),
-      `auto_threshold` (evaluate 0) and `ambiguous_threshold` against
+      `ambiguous_threshold` (`auto_threshold` is 0 since 2026-10-27) against
       them; `aim:benchmark` at thousands of facts (open question #5).
       Count hosted calls while doing it: the verifier adds one call only
       per UPDATE (1 of 23 pairs on the live set, 2026-10-01), but it
