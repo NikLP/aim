@@ -118,7 +118,7 @@ command, no bespoke review UI.
 
 **Default value resolved as a config setting, not a hardcoded
 per-write-path decision.** `aim.settings:default_trusted` (boolean),
-alongside the existing tunables there (`auto_threshold`,
+alongside the existing tunables there (`compare_distance`,
 `recall_max_distance`, etc.), editable via the existing
 `AimSettingsForm` at `/admin/config/aim/settings`. Read uniformly
 wherever a new `aim_fact` gets created - one site-wide policy, not

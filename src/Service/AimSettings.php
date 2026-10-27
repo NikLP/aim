@@ -18,36 +18,27 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 class AimSettings {
 
   /**
-   * Shipped default for aim.settings' auto_threshold, and a fallback.
+   * Shipped default for aim.settings' compare_distance, and a fallback.
    *
-   * The live, admin-editable value is aim.settings:auto_threshold
-   * (/admin/config/aim/settings) - see getAutoThreshold(). Public and shared
-   * between the CLI sweep's option default and the queue worker, so the two
-   * can't drift. 0 sends every compared pair to the model: embedding
-   * distance cannot tell a correction from a reworded duplicate ("borrow
-   * up to 20 items" vs "up to 10" scored 0.016 under nomic-embed-text), so a
-   * wider band retires corrections unchecked (ADR-0036's 2026-10-27
-   * addendum). Identical text is still a NOOP with no model call
-   * (AimConsolidationService::sameText()).
+   * The live, admin-editable value is aim.settings:compare_distance
+   * (/admin/config/aim/settings), read via getCompareDistance(); this
+   * constant is the fallback if that config is missing, shared by the CLI
+   * sweep and the queue worker so the two can't drift. Pairs within it are
+   * compared: identical text is retired with no model call, any other pair
+   * gets one classification call, since embedding distance cannot tell a
+   * correction from a reworded duplicate (ADR-0036's 2026-10-27 addendum).
+   * Set to cover the observed distinct-but-topically-related band
+   * (0.29-0.41) under ollama__nomic-embed-text:latest, while excluding
+   * clearly unrelated pairs (0.67+).
    */
-  public const DEFAULT_AUTO_THRESHOLD = 0.0;
-
-  /**
-   * Shipped default for aim.settings' ambiguous_threshold, and a fallback.
-   *
-   * See DEFAULT_AUTO_THRESHOLD - same relationship to the live config value,
-   * read via getAmbiguousThreshold(). Set to cover the observed
-   * distinct-but-topically-related band (0.29-0.41) for an LLM judgment
-   * call, while still excluding clearly unrelated pairs (0.67+).
-   */
-  public const DEFAULT_AMBIGUOUS_THRESHOLD = 0.45;
+  public const DEFAULT_COMPARE_DISTANCE = 0.45;
 
   /**
    * Shipped default for aim.settings' neighbor_limit, and a fallback.
    *
    * How many nearest neighbors consolidation compares a fact against, read
-   * via getNeighborLimit(). Each neighbor inside the ambiguous band can
-   * cost one classification call, so this bounds the worst-case cost per
+   * via getNeighborLimit(). Each neighbor within the comparison distance
+   * can cost one classification call, so this bounds the worst-case cost per
    * fact. Measured 2026-10-02 on the live site: 1 found 40 decisions, 3
    * found 86, including two merges 1 never saw.
    */
@@ -56,7 +47,7 @@ class AimSettings {
   /**
    * Shipped default for aim.settings' recall_max_distance, and a fallback.
    *
-   * See DEFAULT_AUTO_THRESHOLD - same relationship to the live config value,
+   * See DEFAULT_COMPARE_DISTANCE - same relationship to the live config value,
    * read via getRecallMaxDistance(). Measured 2026-09-19 against
    * ollama__nomic-embed-text:latest on the live site-scope facts, question
    * text against fact text (not fact against fact, so the consolidation
@@ -102,38 +93,24 @@ class AimSettings {
   ) {}
 
   /**
-   * Returns the live auto-merge distance from aim.settings.
+   * Returns the live comparison distance from aim.settings.
    *
-   * Falls back to DEFAULT_AUTO_THRESHOLD only if the config value is
+   * Falls back to DEFAULT_COMPARE_DISTANCE only if the config value is
    * missing (e.g. aim.settings was deleted outside of a normal uninstall) -
    * config/install ships a real value, so this should not normally be hit.
    *
    * @return float
-   *   Score at or below which a neighbor is retired automatically.
+   *   Distance at or below which a neighbor is compared.
    */
-  public function getAutoThreshold(): float {
-    $value = $this->configFactory->get('aim.settings')->get('auto_threshold');
-    return $value !== NULL ? (float) $value : self::DEFAULT_AUTO_THRESHOLD;
-  }
-
-  /**
-   * Returns the live ambiguous distance from aim.settings.
-   *
-   * See getAutoThreshold() - same fallback behavior.
-   *
-   * @return float
-   *   Score at or below which an ambiguous neighbor gets a classification
-   *   call.
-   */
-  public function getAmbiguousThreshold(): float {
-    $value = $this->configFactory->get('aim.settings')->get('ambiguous_threshold');
-    return $value !== NULL ? (float) $value : self::DEFAULT_AMBIGUOUS_THRESHOLD;
+  public function getCompareDistance(): float {
+    $value = $this->configFactory->get('aim.settings')->get('compare_distance');
+    return $value !== NULL ? (float) $value : self::DEFAULT_COMPARE_DISTANCE;
   }
 
   /**
    * Returns how many nearest neighbors consolidation compares a fact to.
    *
-   * See getAutoThreshold() - same fallback behavior.
+   * See getCompareDistance() - same fallback behavior.
    *
    * @return int
    *   At least 1.
@@ -146,7 +123,7 @@ class AimSettings {
   /**
    * Returns the live recall cutoff from aim.settings.
    *
-   * See getAutoThreshold() - same fallback behavior. Applied by callers
+   * See getCompareDistance() - same fallback behavior. Applied by callers
    * that must abstain on a poor match: aim_tool's aim_recall and
    * aim_chatbot's recall-context subscriber pass it to recall() as
    * $maxDistance; recall() itself does not apply it unless asked.

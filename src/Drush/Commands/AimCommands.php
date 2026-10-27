@@ -337,39 +337,27 @@ final class AimCommands extends DrushCommands {
    * Reviews existing facts for near-duplicates and merges or retires them.
    *
    * Runs entirely against facts already in the store, independent of any
-   * particular write path (see CLAUDE.md's consolidation design notes).
-   * Each fact is compared to its nearest vector neighbors (up to three)
-   * within the same scope/subject: an obvious near-duplicate is retired
-   * automatically, an ambiguous case gets a classification call (ADD/UPDATE/
-   * RETIRE/NOOP, Mem0's vocabulary), and anything past the ambiguous
-   * threshold is left alone at zero cost. Retiring a fact sets its
+   * particular write path. Each fact is compared to its nearest vector
+   * neighbors (up to aim.settings neighbor_limit) within the same
+   * scope/subject and end date: identical text is retired with no model
+   * call, any other pair within the comparison distance gets a
+   * classification call (ADD/UPDATE/RETIRE/NOOP, Mem0's vocabulary), and
+   * anything farther is left alone at zero cost. Retiring a fact sets its
    * `retired` field rather than deleting it, to keep an audit trail.
    *
-   * The two thresholds default to the live aim.settings config
-   * (/admin/config/aim/settings), not a hardcoded value - --auto-threshold/
-   * --ambiguous-threshold below only override that for one invocation. The
-   * shipped defaults were picked empirically against this site's real fact
-   * data, not carried over from Mem0's or Hindsight's own models.
-   * Recalibrated 2026-09-09 against
-   * amazeeio__mistral-embed (a genuine near-duplicate pair scored ~0.02, a
-   * distinct fact about the same subject or an unrelated fact both scored
-   * ~0.17-0.27) - the original 0.35/0.65 pair was calibrated against
-   * titan-embed-text-v2:0 and was never re-checked after that model was
-   * discontinued and swapped mid-session; it sat entirely above the range
-   * mistral-embed actually produces, so every pair looked like an
-   * auto-duplicate. Re-check with `drush aim:recall`'s score column
-   * whenever the embeddings model changes, not just as real fact volume
-   * grows.
+   * The comparison distance defaults to the live aim.settings
+   * compare_distance (/admin/config/aim/settings); --compare-distance
+   * overrides it for one invocation. Re-check it with `drush aim:recall`'s
+   * distance column whenever the embeddings model changes.
    *
    * @param array $options
    *   Command options.
    */
   #[CLI\Command(name: 'aim:consolidate', aliases: ['aim-consolidate'])]
   #[CLI\Option(name: 'scope', description: 'Restrict the sweep to one scope: user, role, site, case.')]
-  #[CLI\Option(name: 'provider', description: 'The AI provider plugin ID to use for ambiguous cases.')]
-  #[CLI\Option(name: 'model', description: 'The chat model ID to use for ambiguous cases.')]
-  #[CLI\Option(name: 'auto-threshold', description: 'Score at or below which a neighbor is retired automatically, no LLM call. Defaults to the live aim.settings value.')]
-  #[CLI\Option(name: 'ambiguous-threshold', description: 'Score at or below which an ambiguous neighbor gets a classification call. Defaults to the live aim.settings value.')]
+  #[CLI\Option(name: 'provider', description: 'The AI provider plugin ID for the classification call.')]
+  #[CLI\Option(name: 'model', description: 'The chat model ID for the classification call.')]
+  #[CLI\Option(name: 'compare-distance', description: 'Distance at or below which a neighbor is compared. Defaults to the live aim.settings value.')]
   #[CLI\Option(name: 'dry-run', description: 'Print decisions without saving anything.')]
   #[CLI\Usage(name: 'drush aim:consolidate --dry-run', description: 'Preview consolidation decisions across every scope without changing anything.')]
   public function consolidate(
@@ -377,8 +365,7 @@ final class AimCommands extends DrushCommands {
       'scope' => NULL,
       'provider' => NULL,
       'model' => NULL,
-      'auto-threshold' => NULL,
-      'ambiguous-threshold' => NULL,
+      'compare-distance' => NULL,
       'dry-run' => FALSE,
     ],
   ): void {
@@ -391,16 +378,14 @@ final class AimCommands extends DrushCommands {
     // NULL (the default) follows the live aim.settings value
     // (/admin/config/aim/settings) rather than a hardcoded default, same
     // posture as resolveChatProvider() following ai.settings.
-    $auto_threshold = $options['auto-threshold'] !== NULL ? (float) $options['auto-threshold'] : $this->settings->getAutoThreshold();
-    $ambiguous_threshold = $options['ambiguous-threshold'] !== NULL ? (float) $options['ambiguous-threshold'] : $this->settings->getAmbiguousThreshold();
+    $compare_distance = $options['compare-distance'] !== NULL ? (float) $options['compare-distance'] : $this->settings->getCompareDistance();
 
     try {
       $result = $this->consolidation->consolidate(
         $options['scope'] ?: NULL,
         $provider_id,
         $model_id,
-        $auto_threshold,
-        $ambiguous_threshold,
+        $compare_distance,
         !empty($options['dry-run']),
       );
     }

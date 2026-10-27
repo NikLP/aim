@@ -2,16 +2,9 @@ aim.settings:
   type: config_object
   label: 'AIM settings'
   mapping:
-    auto_threshold:
+    compare_distance:
       type: float
-      label: 'Auto-merge distance'
-      constraints:
-        Range:
-          min: 0
-          max: 1
-    ambiguous_threshold:
-      type: float
-      label: 'Ambiguous distance'
+      label: 'Comparison distance'
       constraints:
         Range:
           min: 0
@@ -58,7 +51,7 @@ aim.settings:
       label: 'Merge verification prompt'
     recall_max_distance:
       type: float
-      label: 'Chatbot recall maximum distance'
+      label: 'Recall maximum distance'
       constraints:
         Range:
           min: 0

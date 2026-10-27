@@ -220,21 +220,11 @@ final class AimSettingsForm extends ConfigFormBase {
       '#description' => $this->t('Before an UPDATE merge is accepted, a model confirms every detail of both facts survives. A failing merge is downgraded to ADD (keep both). Checks faithfulness to the inputs, not real-world truth.'),
       '#config_target' => 'aim.settings:merge_verify',
     ];
-    $form['consolidation']['auto_threshold'] = [
+    $form['consolidation']['compare_distance'] = [
       '#type' => 'number',
-      '#title' => $this->t('Auto-merge distance'),
-      '#description' => $this->t('Distance at or below which a candidate fact is retired as a duplicate automatically, no LLM call. Leave at 0: a correction ("up to 10 items" for "up to 20") sits as close as a reworded duplicate, so anything higher retires corrections unchecked. Identical text is always retired without a call.'),
-      '#config_target' => 'aim.settings:auto_threshold',
-      '#min' => 0,
-      '#max' => 1,
-      '#step' => 0.001,
-      '#required' => TRUE,
-    ];
-    $form['consolidation']['ambiguous_threshold'] = [
-      '#type' => 'number',
-      '#title' => $this->t('Ambiguous distance'),
-      '#description' => $this->t('Distance at or below which a candidate fact gets a single LLM classification call (ADD/UPDATE/RETIRE/NOOP). Above this, facts are left alone at zero cost. Must be greater than the auto-merge distance.'),
-      '#config_target' => 'aim.settings:ambiguous_threshold',
+      '#title' => $this->t('Comparison distance'),
+      '#description' => $this->t('Facts closer than this are compared: identical text is retired as a copy with no model call, any other pair gets one classification call (ADD/UPDATE/RETIRE/NOOP). Farther pairs are left alone at zero cost. There is no automatic merge by distance: a correction ("up to 10 items" for "up to 20") sits as close as a reworded copy.'),
+      '#config_target' => 'aim.settings:compare_distance',
       '#min' => 0,
       '#max' => 1,
       '#step' => 0.001,
@@ -268,8 +258,8 @@ final class AimSettingsForm extends ConfigFormBase {
     ];
     $form['recall']['recall_max_distance'] = [
       '#type' => 'number',
-      '#title' => $this->t('Chatbot recall maximum distance'),
-      '#description' => $this->t("Cosine distance above which a match is dropped from the chatbot's recall tool, so a poor match becomes an honest \"no relevant facts\" instead of being presented as relevant. Question-to-fact distances run larger than the fact-to-fact ones above, and are specific to the current embeddings model: re-check after any change to it."),
+      '#title' => $this->t('Recall maximum distance'),
+      '#description' => $this->t('Cosine distance above which a match is dropped from the aim_recall tool (chat and MCP); with nothing left it answers "No relevant facts found". A looser value hands the calling model more near misses to judge; a tighter one drops some answers to broad questions. Question-to-fact distances run larger than the fact-to-fact ones above, and are specific to the current embeddings model: re-check after any change to it.'),
       '#config_target' => 'aim.settings:recall_max_distance',
       '#min' => 0,
       '#max' => 1,
@@ -421,12 +411,6 @@ final class AimSettingsForm extends ConfigFormBase {
     }
 
     parent::validateForm($form, $form_state);
-
-    $auto = (float) $form_state->getValue('auto_threshold');
-    $ambiguous = (float) $form_state->getValue('ambiguous_threshold');
-    if ($auto >= $ambiguous) {
-      $form_state->setErrorByName('ambiguous_threshold', $this->t('The ambiguous distance must be greater than the auto-merge distance, or every ambiguous-band pair would be auto-merged instead of reviewed.'));
-    }
 
     if (!str_contains((string) $form_state->getValue('extraction_prompt'), '{text}')) {
       $form_state->setErrorByName('extraction_prompt', $this->t('The extraction prompt must contain the placeholder %placeholder.', ['%placeholder' => '{text}']));

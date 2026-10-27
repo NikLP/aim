@@ -105,8 +105,7 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
       $fact,
       $provider['provider_id'],
       $provider['model_id'],
-      $this->settings->getAutoThreshold(),
-      $this->settings->getAmbiguousThreshold(),
+      $this->settings->getCompareDistance(),
     );
   }
 

@@ -67,12 +67,12 @@ class AimConsolidationService {
   /**
    * Reviews existing facts for near-duplicates and merges or retires them.
    *
-   * See CLAUDE.md's "Consolidation" section for the full algorithm and the
-   * empirical threshold defaults. Each fact is compared to its nearest
-   * vector neighbor within the same scope/subject: an obvious near-duplicate
-   * is retired automatically, an ambiguous case gets a single classification
-   * call (ADD/UPDATE/RETIRE/NOOP), and anything past the ambiguous
-   * threshold is left alone at zero cost. Retiring a fact sets its
+   * See DEVELOPING.md's "aim:consolidate" section for the algorithm. Each
+   * fact is compared to its nearest vector neighbors within the same
+   * scope/subject and end date: identical text is retired with no model
+   * call, anything else gets a single classification call
+   * (ADD/UPDATE/RETIRE/NOOP), and anything past the comparison distance is
+   * left alone at zero cost. Retiring a fact sets its
    * `retired` field rather than deleting it, to keep an audit trail; an
    * UPDATE creates a new merged fact and retires both inputs, and every
    * retirement records its reason in `superseded_by_reason`. An
@@ -84,15 +84,13 @@ class AimConsolidationService {
    * @param string|null $scope
    *   Restrict the sweep to one scope: user, role, site, case.
    * @param string $providerId
-   *   The AI provider plugin ID to use for ambiguous cases.
+   *   The AI provider plugin ID for the classification call.
    * @param string $modelId
-   *   The chat model ID to use for ambiguous cases.
-   * @param float $autoThreshold
-   *   Score at or below which a neighbor is retired automatically, no LLM
-   *   call.
-   * @param float $ambiguousThreshold
-   *   Score at or below which an ambiguous neighbor gets a classification
-   *   call. Above this, facts are left alone.
+   *   The chat model ID for the classification call.
+   * @param float $compareDistance
+   *   Distance at or below which a neighbor is compared (identical text is
+   *   retired with no call, anything else gets a classification call).
+   *   Above this, facts are left alone.
    * @param bool $dryRun
    *   If TRUE, decisions are computed but nothing is saved.
    *
@@ -104,7 +102,7 @@ class AimConsolidationService {
    * @throws \RuntimeException
    *   If the vector index does not exist, or a query cannot be run.
    */
-  public function consolidate(?string $scope, string $providerId, string $modelId, float $autoThreshold, float $ambiguousThreshold, bool $dryRun): array {
+  public function consolidate(?string $scope, string $providerId, string $modelId, float $compareDistance, bool $dryRun): array {
     $index = $this->manager->loadVectorIndex();
     if (!$index) {
       throw new \RuntimeException('The aim_vector_index search index does not exist.');
@@ -134,7 +132,7 @@ class AimConsolidationService {
         continue;
       }
 
-      $rows = array_merge($rows, $this->consolidateAgainstNeighbors($index, $fact, $providerId, $modelId, $autoThreshold, $ambiguousThreshold, $dryRun, $handled_pairs, $retired));
+      $rows = array_merge($rows, $this->consolidateAgainstNeighbors($index, $fact, $providerId, $modelId, $compareDistance, $dryRun, $handled_pairs, $retired));
     }
 
     return ['rows' => $rows, 'has_facts' => TRUE];
@@ -159,15 +157,12 @@ class AimConsolidationService {
    * @param \Drupal\aim\Entity\AimFact $fact
    *   The fact to consolidate.
    * @param string $providerId
-   *   The AI provider plugin ID to use for ambiguous cases.
+   *   The AI provider plugin ID for the classification call.
    * @param string $modelId
-   *   The chat model ID to use for ambiguous cases.
-   * @param float $autoThreshold
-   *   Score at or below which a neighbor is retired automatically, no LLM
-   *   call.
-   * @param float $ambiguousThreshold
-   *   Score at or below which an ambiguous neighbor gets a classification
-   *   call. Above this, the fact is left alone.
+   *   The chat model ID for the classification call.
+   * @param float $compareDistance
+   *   Distance at or below which a neighbor is compared. Above this, the
+   *   fact is left alone.
    *
    * @return array
    *   A list of [kept id, candidate id, score, decision, merged text]
@@ -177,7 +172,7 @@ class AimConsolidationService {
    * @throws \RuntimeException
    *   If the vector index does not exist.
    */
-  public function consolidateFact(AimFact $fact, string $providerId, string $modelId, float $autoThreshold, float $ambiguousThreshold): array {
+  public function consolidateFact(AimFact $fact, string $providerId, string $modelId, float $compareDistance): array {
     $index = $this->manager->loadVectorIndex();
     if (!$index) {
       throw new \RuntimeException('The aim_vector_index search index does not exist.');
@@ -185,7 +180,7 @@ class AimConsolidationService {
 
     $handled_pairs = [];
     $retired = [];
-    return $this->consolidateAgainstNeighbors($index, $fact, $providerId, $modelId, $autoThreshold, $ambiguousThreshold, FALSE, $handled_pairs, $retired);
+    return $this->consolidateAgainstNeighbors($index, $fact, $providerId, $modelId, $compareDistance, FALSE, $handled_pairs, $retired);
   }
 
   /**
@@ -202,13 +197,11 @@ class AimConsolidationService {
    * @param \Drupal\aim\Entity\AimFact $fact
    *   The fact to compare.
    * @param string $providerId
-   *   The AI provider plugin ID to use for ambiguous cases.
+   *   The AI provider plugin ID for the classification call.
    * @param string $modelId
-   *   The chat model ID to use for ambiguous cases.
-   * @param float $autoThreshold
-   *   Score at or below which a neighbor is retired automatically.
-   * @param float $ambiguousThreshold
-   *   Score above which a neighbor is not compared at all.
+   *   The chat model ID for the classification call.
+   * @param float $compareDistance
+   *   Distance above which a neighbor is not compared at all.
    * @param bool $dryRun
    *   If TRUE, decisions are computed but nothing is saved.
    * @param array $handledPairs
@@ -220,10 +213,10 @@ class AimConsolidationService {
    *   A list of [kept id, candidate id, score, decision, merged text]
    *   tuples.
    */
-  protected function consolidateAgainstNeighbors(IndexInterface $index, AimFact $fact, string $providerId, string $modelId, float $autoThreshold, float $ambiguousThreshold, bool $dryRun, array &$handledPairs, array &$retired): array {
+  protected function consolidateAgainstNeighbors(IndexInterface $index, AimFact $fact, string $providerId, string $modelId, float $compareDistance, bool $dryRun, array &$handledPairs, array &$retired): array {
     $rows = [];
 
-    $neighbors = $this->findNeighbors($index, $fact, $retired, $ambiguousThreshold, $this->settings->getNeighborLimit());
+    $neighbors = $this->findNeighbors($index, $fact, $retired, $compareDistance, $this->settings->getNeighborLimit());
     foreach ($neighbors as [$neighbor, $score]) {
       $ids = [(int) $fact->id(), (int) $neighbor->id()];
       sort($ids);
@@ -238,7 +231,7 @@ class AimConsolidationService {
       $kept = $fact->id() < $neighbor->id() ? $fact : $neighbor;
       $candidate = $fact->id() < $neighbor->id() ? $neighbor : $fact;
 
-      [$decision, $merged_text] = $this->decideAndApply($kept, $candidate, $score, $autoThreshold, $providerId, $modelId, $dryRun);
+      [$decision, $merged_text] = $this->decideAndApply($kept, $candidate, $score, $providerId, $modelId, $dryRun);
       $rows[] = [$kept->id(), $candidate->id(), round($score, 3), $decision, $merged_text];
 
       if (in_array($decision, ['NOOP', 'RETIRE'], TRUE)) {
@@ -274,13 +267,10 @@ class AimConsolidationService {
    *   The newer fact being evaluated against it.
    * @param float $score
    *   The similarity score between the two.
-   * @param float $autoThreshold
-   *   Score at or below which the candidate is retired automatically, no
-   *   LLM call.
    * @param string $providerId
-   *   The AI provider plugin ID to use for ambiguous cases.
+   *   The AI provider plugin ID for the classification call.
    * @param string $modelId
-   *   The chat model ID to use for ambiguous cases.
+   *   The chat model ID for the classification call.
    * @param bool $dryRun
    *   If TRUE, the decision is computed but nothing is saved.
    *
@@ -290,8 +280,8 @@ class AimConsolidationService {
    *   is UPDATE, BLOCKED, or an ADD downgraded from a merge that failed
    *   verification.
    */
-  protected function decideAndApply(AimFact $kept, AimFact $candidate, float $score, float $autoThreshold, string $providerId, string $modelId, bool $dryRun): array {
-    $auto = $this->sameText($kept, $candidate) || $score <= $autoThreshold;
+  protected function decideAndApply(AimFact $kept, AimFact $candidate, float $score, string $providerId, string $modelId, bool $dryRun): array {
+    $auto = $kept->hasSameText($candidate);
     if ($auto) {
       $decision = 'NOOP';
       $merged_text = NULL;
@@ -803,26 +793,6 @@ class AimConsolidationService {
   }
 
   /**
-   * Whether two facts have the same text, ignoring case and spacing.
-   *
-   * A final full stop is ignored too. The one duplicate safe to retire
-   * without a model: anything less than identical may be a correction
-   * (ADR-0036's 2026-10-27 addendum).
-   *
-   * @param \Drupal\aim\Entity\AimFact $a
-   *   One fact.
-   * @param \Drupal\aim\Entity\AimFact $b
-   *   The other fact.
-   *
-   * @return bool
-   *   TRUE if the normalized texts match.
-   */
-  protected function sameText(AimFact $a, AimFact $b): bool {
-    $norm = static fn (AimFact $fact): string => rtrim(mb_strtolower((string) preg_replace('/\s+/', ' ', trim((string) $fact->get('text')->value))), '. ');
-    return $norm($a) === $norm($b);
-  }
-
-  /**
    * Returns a fact's end date as a timestamp, or NULL when it has none.
    *
    * @param \Drupal\aim\Entity\AimFact $fact
@@ -929,8 +899,7 @@ class AimConsolidationService {
     // decision but UPDATE). The rewrite is the stronger signal: treat it as
     // an UPDATE and let the merge verifier gate it like any other.
     if ($decision === 'ADD' && is_string($merged) && trim($merged) !== '') {
-      $norm = static fn (string $text): string => mb_strtolower(preg_replace('/\s+/', ' ', trim($text)));
-      if ($norm($merged) !== $norm((string) $kept->get('text')->value)) {
+      if (AimFact::normalizeText($merged) !== AimFact::normalizeText((string) $kept->get('text')->value)) {
         $decision = 'UPDATE';
       }
     }

@@ -15,9 +15,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 /**
  * The consolidation sweep: which pairs it compares and what it changes.
  *
- * Only the paths that need no model are covered (a near-identical pair is
- * retired by distance alone, a distant pair or a pair with different end
- * dates is never compared). The
+ * Only the paths that need no model are covered (identical text is retired
+ * with no call, a distant pair or a pair with different end dates is never
+ * compared), plus that any other close pair reaches for the model. The
  * ambiguous middle, where a decision model judges, is measured by the evals
  * in TESTS.md instead.
  */
@@ -28,17 +28,9 @@ class AimConsolidateTest extends KernelTestBase {
   use FakeVectorSearchTrait;
 
   /**
-   * Distance at or below which the newer fact is retired as a duplicate.
-   *
-   * The shipped default is now 0; most tests keep the old band so the
-   * no-model path stays covered.
-   */
-  protected const AUTO = 0.09;
-
-  /**
    * Distance above which a pair is not compared at all.
    */
-  protected const AMBIGUOUS = 0.45;
+  protected const COMPARE = 0.45;
 
   /**
    * {@inheritdoc}
@@ -78,10 +70,13 @@ class AimConsolidateTest extends KernelTestBase {
   }
 
   /**
-   * A near-identical pair: the newer fact is retired, pointing at the older.
+   * Identical text: the newer fact is retired, pointing at the older.
+   *
+   * Case, spacing and a final full stop are ignored. The 'fake' provider
+   * does not exist, so any model call would throw.
    */
-  public function testNearDuplicateRetired(): void {
-    [$kept, $dupe] = [$this->fact('Open at nine.'), $this->fact('Opens at nine.')];
+  public function testIdenticalTextRetiredWithoutModel(): void {
+    [$kept, $dupe] = [$this->fact('Open at nine.'), $this->fact('open at  nine')];
     $this->setScores([$kept->id() => 0.02, $dupe->id() => 0.03]);
 
     $result = $this->sweep();
@@ -102,7 +97,7 @@ class AimConsolidateTest extends KernelTestBase {
    */
   public function testDryRunChangesNothing(): void {
     $this->fact('Open at nine.');
-    $dupe = $this->fact('Opens at nine.');
+    $dupe = $this->fact('Open at nine.');
     $this->setScores([1 => 0.02, 2 => 0.03]);
 
     $result = $this->sweep(dryRun: TRUE);
@@ -139,9 +134,9 @@ class AimConsolidateTest extends KernelTestBase {
    */
   public function testScopeArgumentLimitsSweep(): void {
     $this->fact('Open at nine.');
-    $this->fact('Opens at nine.');
+    $this->fact('Open at nine.');
     $r1 = $this->fact('Closed Sundays.', 'role');
-    $r2 = $this->fact('Shut on Sundays.', 'role');
+    $r2 = $this->fact('Closed Sundays.', 'role');
     $this->setScores([1 => 0.02, 2 => 0.03, $r1->id() => 0.02, $r2->id() => 0.03]);
 
     $rows = $this->sweep(scope: 'role')['rows'];
@@ -155,7 +150,7 @@ class AimConsolidateTest extends KernelTestBase {
    */
   public function testRetiredFactsIgnored(): void {
     $live = $this->fact('Open at nine.');
-    $this->fact('Opens at nine.', 'site', 1000);
+    $this->fact('Open at nine.', 'site', 1000);
     $this->setScores([1 => 0.02, 2 => 0.03]);
 
     $this->assertSame([], $this->sweep()['rows']);
@@ -183,7 +178,7 @@ class AimConsolidateTest extends KernelTestBase {
   public function testSameEndDateCompared(): void {
     $end = strtotime('2026-11-30 23:59:59');
     $kept = $this->fact('Closed until 30 November.', expires: $end);
-    $dupe = $this->fact('Shut until 30 November.', expires: $end);
+    $dupe = $this->fact('Closed until 30 November.', expires: $end);
     $this->setScores([$kept->id() => 0.02, $dupe->id() => 0.03]);
 
     $rows = $this->sweep()['rows'];
@@ -193,29 +188,15 @@ class AimConsolidateTest extends KernelTestBase {
   }
 
   /**
-   * Identical text is retired with no model call, even at threshold 0.
+   * A close but different pair goes to the model, however close it is.
    */
-  public function testIdenticalTextRetiredWithoutModel(): void {
-    $kept = $this->fact('Open at nine.');
-    $dupe = $this->fact('open at  nine');
-    $this->setScores([$kept->id() => 0.02, $dupe->id() => 0.03]);
-
-    // The 'fake' provider does not exist, so any model call would throw.
-    $rows = $this->sweep(auto: 0.0)['rows'];
-    $this->assertSame('NOOP', $rows[0][3]);
-    $this->assertNotEmpty($this->reload($dupe)->get('retired')->value);
-  }
-
-  /**
-   * At threshold 0 a close but different pair goes to the model.
-   */
-  public function testClosePairGoesToModelAtZero(): void {
+  public function testClosePairGoesToModel(): void {
     $kept = $this->fact('Members can borrow up to 20 items.');
     $correction = $this->fact('Members can borrow up to 10 items.');
     $this->setScores([$kept->id() => 0.01, $correction->id() => 0.016]);
 
     try {
-      $this->sweep(auto: 0.0);
+      $this->sweep();
       $this->fail('the pair was decided without a model call');
     }
     catch (PluginNotFoundException) {
@@ -232,20 +213,18 @@ class AimConsolidateTest extends KernelTestBase {
   }
 
   /**
-   * Runs the sweep, by default with the old 0.09 auto band.
+   * Runs the sweep with the shipped comparison distance.
    *
    * @param string|null $scope
    *   The scope to sweep, or NULL for all.
    * @param bool $dryRun
    *   Whether to change nothing.
-   * @param float $auto
-   *   The auto-merge distance.
    *
    * @return array
    *   The consolidate() result.
    */
-  protected function sweep(?string $scope = NULL, bool $dryRun = FALSE, float $auto = self::AUTO): array {
-    return $this->container->get('aim.consolidation')->consolidate($scope, 'fake', 'fake-model', $auto, self::AMBIGUOUS, $dryRun);
+  protected function sweep(?string $scope = NULL, bool $dryRun = FALSE): array {
+    return $this->container->get('aim.consolidation')->consolidate($scope, 'fake', 'fake-model', self::COMPARE, $dryRun);
   }
 
   /**

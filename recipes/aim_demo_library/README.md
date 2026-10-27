@@ -118,9 +118,8 @@ failed recipe prints a long stack trace after the real error; the first
   save ties up a worker for seconds ([ADR-0015](../../adr/resolved/0015-immediate-consolidation-considered-deferred.md)
   addendum); remove that action.
 - **Thresholds are tuned to particular models.** The distance settings
-  (Chatbot recall maximum distance `recall_max_distance`, Recall gap
-  `recall_gap`, Auto-merge distance `auto_threshold`, Ambiguous distance
-  `ambiguous_threshold`) were measured on this dataset with
+  (Recall maximum distance `recall_max_distance`, Recall gap
+  `recall_gap`, Comparison distance `compare_distance`) were measured on this dataset with
   `nomic-embed-text` on MariaDB
   ([ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md)).
   This recipe's Gate match threshold (`gate_match_threshold`, 0.8) and

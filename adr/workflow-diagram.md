@@ -112,13 +112,13 @@ flowchart TD
 
   MAN["drush aim:consolidate<br/>sweeps all unexpired facts by id,<br/>--dry-run prints decisions only"]:::code --> N
 
-  N["findNeighbors(), up to 3<br/>embed this fact's text as a query<br/>(query-embedding cache applies)<br/>filter scope, plus user or subject<br/>skip self, retired, expired;<br/>each neighbor decided in turn, stop if this fact retires"]:::vec
+  N["findNeighbors(), up to 3<br/>embed this fact's text as a query<br/>(query-embedding cache applies)<br/>filter scope, plus user or subject<br/>skip self, retired, expired,<br/>or a different end date;<br/>each neighbor decided in turn, stop if this fact retires"]:::vec
   N --> N1{"neighbor found?"}:::code
   N1 -->|no| DONE1["done, no change"]:::code
   N1 -->|yes| S{"cosine distance<br/>score"}:::vec
-  S -->|"above 0.45<br/>ambiguous_threshold"| SKIP["unrelated: skip, zero cost"]:::code
-  S -->|"identical text, or at or below<br/>auto_threshold (default 0)"| AUTO["decision NOOP, no model call<br/>auto path keeps the older fact"]:::vec
-  S -->|"up to 0.45<br/>ambiguous band"| CL["classifyPair()<br/>kept = lower ID, candidate = higher ID<br/>one structured call, or a decision-backend<br/>choice if activities.consolidation uses it"]:::llm
+  S -->|"above 0.45<br/>compare_distance"| SKIP["unrelated: skip, zero cost"]:::code
+  S -->|"identical text<br/>(case, spacing, final full stop ignored)"| AUTO["decision NOOP, no model call<br/>keeps the older fact"]:::vec
+  S -->|"up to 0.45, any other text"| CL["classifyPair()<br/>kept = lower ID, candidate = higher ID<br/>one structured call, or a decision-backend<br/>choice if activities.consolidation uses it"]:::llm
 
   CL --> D{"model decision"}:::llm
   D -->|ADD| ADD["both stand, no change"]:::code
@@ -160,10 +160,11 @@ flowchart TD
 
 Notes on diagram 2:
 
-- Thresholds are cosine distances, lower is closer: "at or below"
-  means more similar. Defaults 0 and 0.45 live in
-  `AimSettings::DEFAULT_*`; the live values come from
-  `aim.settings` (`auto_threshold`, `ambiguous_threshold`).
+- Distances are cosine distances, lower is closer: "at or below"
+  means more similar. The default 0.45 lives in
+  `AimSettings::DEFAULT_COMPARE_DISTANCE`; the live value comes from
+  `aim.settings` (`compare_distance`). There is no distance below which
+  pairs merge unchecked (removed 2026-10-27, ADR-0036's addendum).
 - Retirement is always soft. Nothing is deleted from `aim_fact`, and a
   retired fact can be un-retired by the admin action.
 - `ADD` and `BLOCKED` change nothing, and the same pair is simply

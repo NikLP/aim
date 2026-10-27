@@ -250,7 +250,7 @@ preprints or vendor blogs, not re-run by us):
 | Store raw turns | OK: short single-claim facts |
 | Judge memory by retrieval scores alone | OK: site's chat eval scores answers end to end |
 | Temporary overwriting | Fixed today: facts with different `expires` are never compared; a merge carries `expires` |
-| Treat near-identical embeddings as duplicates | Fixed today: 8 of 10 short contradicting pairs fell inside the old `auto_threshold` 0.09 (site's `demo/recall-eval/auto-band.php`; contradiction mean 0.074, rewording mean 0.059) while `subq-snap-1.1` classified all 18 pairs right, so the default is now 0 and only identical text skips the model |
+| Treat near-identical embeddings as duplicates | Fixed today: 8 of 10 short contradicting pairs fell inside the old `auto_threshold` 0.09 (site's `demo/recall-eval/auto-band.php`; contradiction mean 0.074, rewording mean 0.059) while `subq-snap-1.1` classified all 18 pairs right, so the `auto_threshold` setting is removed and only identical text skips the model (`compare_distance`, was `ambiguous_threshold`, bounds which pairs are compared) |
 | Let the model decide everything at write time | Open: the model picks UPDATE and writes the merged text; the verifier checks it, the result starts trusted with no grounding score |
 | Lose provenance in a merge | Partly open: owner from the kept fact, `source` from the candidate, grounding dropped |
 | Query with the raw user input | Open: the "any upcoming events?" ranking miss |

@@ -197,6 +197,40 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
   }
 
   /**
+   * Whether this fact says word for word what another fact says.
+   *
+   * Compared after normalizeText(). The one kind of duplicate safe to
+   * retire without a model: a fact that differs in any word may be a
+   * correction (ADR-0036's 2026-10-27 addendum).
+   *
+   * @param \Drupal\aim\Entity\AimFact $other
+   *   The other fact.
+   *
+   * @return bool
+   *   TRUE if the normalized texts match.
+   */
+  public function hasSameText(AimFact $other): bool {
+    return static::normalizeText((string) $this->get('text')->value) === static::normalizeText((string) $other->get('text')->value);
+  }
+
+  /**
+   * Normalizes fact text for an identical-text comparison.
+   *
+   * Ignores case, runs of whitespace and a final full stop only. Other
+   * punctuation and symbols are kept: "10.30" and "1030", or "£10" and
+   * "$10", are different facts.
+   *
+   * @param string $text
+   *   The fact text.
+   *
+   * @return string
+   *   The normalized text.
+   */
+  public static function normalizeText(string $text): string {
+    return rtrim(mb_strtolower((string) preg_replace('/\s+/', ' ', trim($text))), '. ');
+  }
+
+  /**
    * Default value callback for the trusted field.
    *
    * Reads aim.settings:default_trusted so every creation path -

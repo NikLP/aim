@@ -1,5 +1,4 @@
-auto_threshold: 0.0
-ambiguous_threshold: 0.45
+compare_distance: 0.45
 neighbor_limit: 3
 merge_verify: true
 activities:

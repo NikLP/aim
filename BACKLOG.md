@@ -287,8 +287,8 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       `ddev exec` plus a Drupal bootstrap (about a second of CPU), so
       every minute is cheap on a quiet queue. Per item: one local Ollama
       embed in `reindex()` plus the neighbor search (a second embed,
-      cached by ADR-0017); the chat call only happens for pairs between
-      `auto_threshold` and `ambiguous_threshold`, and goes to the hosted
+      cached by ADR-0017); the model call only happens for pairs within
+      `compare_distance` (not identical text), and goes to the hosted
       provider, not the laptop. The real laptop cost is memory, not heat:
       Ollama keeps the embed model resident after each call (see the
       laptop memory budget note). Recommendation: `*/5` day to day, queue_ui
@@ -319,11 +319,12 @@ questions" section)
       recall precision, knowledge-update correctness and abstention (parity
       targets 1, 4, 5); recall payload size vs. full-history tokens
       (target 3); duplicate rate; then tune `recall_max_distance` (0.48),
-      `ambiguous_threshold` (`auto_threshold` is 0 since 2026-10-27) against
+      `compare_distance` against
       them; `aim:benchmark` at thousands of facts (open question #5).
       Count hosted calls while doing it: the verifier adds one call only
       per UPDATE (1 of 23 pairs on the live set, 2026-10-01), but it
-      compounds with `auto_threshold` 0, which sends more pairs to the
+      compounds with every compared pair going to the model (since
+      2026-10-27), which sends more pairs to the
       model and so yields more UPDATEs. Measure the two together.
       Retention (the item further down) also needs the `getVdbIds()`
       limit-10 shim (#3626257) re-verified before relying on deletes, and
