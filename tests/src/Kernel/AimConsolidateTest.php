@@ -6,20 +6,23 @@ namespace Drupal\Tests\aim\Kernel;
 
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Component\Serialization\Yaml;
+use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
+use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * The consolidation sweep: which pairs it compares and what it changes.
  *
- * Only the paths that need no model are covered (identical text is retired
- * with no call, a distant pair or a pair with different end dates is never
- * compared), plus that any other close pair reaches for the model. The
- * ambiguous middle, where a decision model judges, is measured by the evals
- * in TESTS.md instead.
+ * The paths that need no model (identical text is retired with no call, a
+ * distant pair or a pair with different end dates is never compared), that
+ * any other close pair reaches for the model, and what happens to an UPDATE
+ * once scripted models (FakeDecisionBackend, ScriptedMergeConsolidationService)
+ * chose it. How well a real model judges the ambiguous middle is measured
+ * by the evals in TESTS.md instead.
  */
 #[Group('aim')]
 #[RunTestsInSeparateProcesses]
@@ -51,6 +54,25 @@ class AimConsolidateTest extends KernelTestBase {
     'literals',
     'aim',
   ];
+
+  /**
+   * The established fact in the merge tests.
+   */
+  protected const KEPT = 'Members can borrow up to 20 items.';
+
+  /**
+   * The correction in the merge tests.
+   */
+  protected const CORRECTION = 'Members can borrow up to 10 items.';
+
+  /**
+   * {@inheritdoc}
+   */
+  public function register(ContainerBuilder $container): void {
+    parent::register($container);
+    $container->register('aim.backend.decision', FakeDecisionBackend::class);
+    $container->getDefinition('aim.consolidation')->setClass(ScriptedMergeConsolidationService::class);
+  }
 
   /**
    * {@inheritdoc}
@@ -206,10 +228,93 @@ class AimConsolidateTest extends KernelTestBase {
   }
 
   /**
+   * An UPDATE's merged text gets the grounded check against both inputs.
+   *
+   * Shadow mode records the score on the merged fact; off makes no call.
+   */
+  public function testMergeIsGrounded(): void {
+    $this->scriptMerge(self::CORRECTION, 0.95);
+    $this->config('aim.settings')->set('grounding_mode', 'shadow')->save();
+    [$kept, $correction] = [$this->fact(self::KEPT), $this->fact(self::CORRECTION)];
+    $this->setScores([$kept->id() => 0.01, $correction->id() => 0.016]);
+
+    $this->assertSame('UPDATE', $this->sweep()['rows'][0][3]);
+    $grounding = array_values(array_filter($this->backend()->log, fn ($call) => $call[0] === 'grounding'));
+    $this->assertCount(1, $grounding);
+    $this->assertSame(['text' => self::KEPT . "\n" . self::CORRECTION, 'candidate_1' => self::CORRECTION], $grounding[0][1]);
+    $merged = $this->reload($kept)->get('superseded_by')->entity;
+    $this->assertEqualsWithDelta(0.95, (float) $merged->get('grounding_score')->value, 0.001);
+    $this->assertTrue((bool) $merged->get('trusted')->value);
+
+    // Off: the same merge, no grounding call, no score.
+    $this->config('aim.settings')->set('grounding_mode', 'off')->save();
+    $this->backend()->log = [];
+    [$kept, $correction] = [$this->fact(self::KEPT), $this->fact(self::CORRECTION)];
+    $this->setScores([$kept->id() => 0.01, $correction->id() => 0.016]);
+
+    $this->assertSame('UPDATE', $this->sweep()['rows'][0][3]);
+    $this->assertSame(['consolidation', 'verifier'], array_column($this->backend()->log, 0));
+    $this->assertNull($this->reload($kept)->get('superseded_by')->entity->get('grounding_score')->value);
+  }
+
+  /**
+   * Enforce mode keeps both facts when the merge is not grounded.
+   *
+   * Like a merge the verifier rejects: downgraded to ADD, nothing retired,
+   * no merged fact.
+   */
+  public function testUngroundedMergeKeepsBoth(): void {
+    $this->scriptMerge('Members can borrow up to 10 items, or 15 with a family card.', 0.1);
+    $this->config('aim.settings')->set('grounding_mode', 'enforce')->save();
+    [$kept, $correction] = [$this->fact(self::KEPT), $this->fact(self::CORRECTION)];
+    $this->setScores([$kept->id() => 0.01, $correction->id() => 0.016]);
+
+    $this->assertSame('ADD', $this->sweep()['rows'][0][3]);
+    foreach ([$kept, $correction] as $fact) {
+      $this->assertEmpty($this->reload($fact)->get('retired')->value);
+    }
+    $this->assertCount(2, AimFact::loadMultiple());
+  }
+
+  /**
    * With no live facts the sweep says so.
    */
   public function testNoFacts(): void {
     $this->assertSame(['rows' => [], 'has_facts' => FALSE], $this->sweep());
+  }
+
+  /**
+   * Scripts an UPDATE: classifier, merge writer, verifier and grounding.
+   *
+   * Also creates the facts' owner, since saving the merged fact validates
+   * its uid.
+   *
+   * @param string $mergedText
+   *   The merged text the writer returns.
+   * @param float $grounding
+   *   The merged text's grounding score.
+   */
+  protected function scriptMerge(string $mergedText, float $grounding): void {
+    $model = ['backend' => 'decision', 'provider' => 'fake', 'model' => 'fake-model'];
+    $this->config('aim.settings')
+      ->set('activities.consolidation', $model)
+      ->set('activities.verifier', $model)
+      ->set('activities.grounding', $model + ['threshold' => 0.7])
+      ->save();
+    $this->backend()->answers = ['decision' => 'UPDATE', 'faithful' => 0.9];
+    $this->backend()->scores = [$mergedText => $grounding];
+    $this->container->get('aim.consolidation')->mergedText = $mergedText;
+    User::create(['uid' => 1, 'name' => 'owner', 'status' => 1])->save();
+  }
+
+  /**
+   * Returns the fake decision backend.
+   *
+   * @return \Drupal\Tests\aim\Kernel\FakeDecisionBackend
+   *   The fake.
+   */
+  protected function backend(): FakeDecisionBackend {
+    return $this->container->get('aim.backend.decision');
   }
 
   /**

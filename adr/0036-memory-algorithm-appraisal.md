@@ -251,11 +251,11 @@ preprints or vendor blogs, not re-run by us):
 | Judge memory by retrieval scores alone | OK: site's chat eval scores answers end to end |
 | Temporary overwriting | Fixed today: facts with different `expires` are never compared; a merge carries `expires` |
 | Treat near-identical embeddings as duplicates | Fixed today: 8 of 10 short contradicting pairs fell inside the old `auto_threshold` 0.09 (site's `demo/recall-eval/auto-band.php`; contradiction mean 0.074, rewording mean 0.059) while `subq-snap-1.1` classified all 18 pairs right, so the `auto_threshold` setting is removed and only identical text skips the model (`compare_distance`, was `ambiguous_threshold`, bounds which pairs are compared) |
-| Let the model decide everything at write time | Open: the model picks UPDATE and writes the merged text; the verifier checks it, the result starts trusted with no grounding score |
-| Lose provenance in a merge | Partly open: owner from the kept fact, `source` from the candidate, grounding dropped |
+| Let the model decide everything at write time | Fixed 2026-10-27: the model picks UPDATE and writes the merged text, the verifier checks it, then the grounded check scores it against the two inputs and stores `grounding_score` on the merged fact; in `enforce` a merge below the threshold is not made (ADD, both kept). Over 16 real merges (site's `demo/recall-eval/auto-band.php ground`, `subq-snap-1.1`) correct merges scored 0.90 or more and each with an invented sentence 0.07 or less, so neither the passage nor `GROUNDING_QUESTION` needed rewording |
+| Lose provenance in a merge | Partly open: owner from the kept fact, `source` from the candidate, the merge's own grounding score; the inputs' scores are not carried |
 | Query with the raw user input | Open: the "any upcoming events?" ranking miss |
 | Hand the model too much retrieved memory | Watch: this site loosened recall to 0.60; keep the result limit small |
-| No regression tests for memory changes | Partly open: only consolidation's no-model paths have kernel tests |
+| No regression tests for memory changes | Partly open: consolidation's no-model paths and the UPDATE path's grounding (scripted models) have kernel tests |
 
 The open rows mostly trace to one choice: an UPDATE writes a new fact from
 two, with model-written text and a hand-picked field list. The field's

@@ -112,6 +112,14 @@ are recommendations.
       hourly crontab line; `hook_cron` backs it up); still to do: today's date to the assistant,
       persona wording, extraction date resolution, dated eval items. Facts
       with different end dates are never compared (BUILT 2026-10-27).
+- [ ] Idea (raised 2026-10-27): `remember()` could skip a fact whose text
+      matches a live fact in the same scope and subject
+      (`AimFact::hasSameText()`), instead of saving it for consolidation to
+      retire later. Saves a write, an embed and a queue item, and keeps
+      the admin list free of short-lived duplicates. Open: what the caller
+      is told (the existing fact's ID, as if saved?), and whether a
+      differing `expires` or trust start still counts as new. Wait for a
+      real duplicate problem.
 - [ ] Pinned: `verified`/`verified_by` fields (not `trusted`), ADR-0036.
 - [ ] Parked (ADR-0057 time stance): recency/importance re-rank,
       weights default 0, needs a gold set.

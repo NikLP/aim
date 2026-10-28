@@ -12,7 +12,7 @@ updated when one is done. Hosted Jev takes synthetic or public data only
 | --- | --- | --- | --- |
 | **A. Model evals** | The configured provider through Drupal (`decision-eval.php`, `aim.backend.decision`), fixed hand-written sets, no aim write path. Never the model's API directly. | `modules/aim_benchmark/scripts/` | Can the model make this judgment at all? |
 | **B. Module runs** | The module: `drush aim:remember` / `aim:extract` / `aim:consolidate` / `aim:recall` on a snapshot, real backends, real queue. | `tests/ingest-test/`, `aim_benchmark` commands | Does aim, wired to a model, do the right thing end to end? |
-| **C. Automated tests** | PHPUnit (kernel/unit): 54 tests, every model step faked. Command in DEVELOPING.md. | `tests/src/Kernel/`, `tests/src/Unit/`, `modules/aim_chatbot/tests/` | Does a class behave, without a live site? |
+| **C. Automated tests** | PHPUnit (kernel/unit): 79 tests, every model step faked. Command in DEVELOPING.md. | `tests/src/Kernel/`, `tests/src/Unit/`, `modules/aim_chatbot/tests/` | Does a class behave, without a live site? |
 
 The drift audit (ADR-0043) so far is type A only. Nothing in aim calls it
 yet, so a pass there says nothing about the module.
@@ -147,9 +147,10 @@ unless noted; synthetic data only for hosted Jev.
 
 ## Automated tests (C)
 
-54 tests, none calls a provider (`FakeDecisionBackend`; the vector search is
-stubbed by `FakeVectorSearchTrait`, since the real server needs MariaDB
-vectors).
+79 tests, none calls a provider (`FakeDecisionBackend`, which answers
+from scripted values; `ScriptedMergeConsolidationService` stands in for the
+merge writer's chat call; the vector search is stubbed by
+`FakeVectorSearchTrait`, since the real server needs MariaDB vectors).
 
 | Class | Covers |
 | --- | --- |
@@ -157,7 +158,7 @@ vectors).
 | `Kernel/AimRecallLiteralTokensTest` | `[literal:key]` resolved per viewer, withheld or `[redacted]`, read live (ADR-0040) |
 | `Kernel/AimPrivacyTest` | User-scope visibility: strangers, shared role, role-visibility matrix, administrator, bypass |
 | `Kernel/AimScopeBehaviorTest` | Shipped scope config, case ID minting, `requires_account`, entity-scope view access, role visibility, expiry sweep |
-| `Kernel/AimConsolidateTest` | Near-duplicate retire, dry run, distant facts, scope separation, retired facts ignored |
+| `Kernel/AimConsolidateTest` | Near-duplicate retire, dry run, distant facts, scope separation, retired facts ignored; an UPDATE's merge gets the grounded check (passage, stored score, no call when off) and enforce keeps both facts below the threshold |
 | `Kernel/AimGroundingTest` | Grounded check modes (shadow, enforce, off), fail-closed, one call per batch |
 | `Kernel/AimIngestTest` | Ingest form lines and JSON modes, validation, per-scope create checks (form and extraction) |
 | `Kernel/AimTrustActionTest`, `AimRetireActionTest` | Bulk trust/retire actions and their access checks |
@@ -175,9 +176,9 @@ ddev exec "cd /var/www/html && SIMPLETEST_DB='mysql://db:db@db/phpunit' SIMPLETE
 
 Still to write:
 
-1. Consolidation beyond the near-duplicate sweep: top-N neighbors, supersede
-   edge and verifier threshold with a stub backend (the retire path is
-   covered, the merge path is not).
+1. Consolidation beyond the near-duplicate sweep: top-N neighbors and the
+   verifier threshold (the retire path and the merge path's grounding are
+   covered).
 2. A stale-`drush cim` guard: scope `plugin` reverted to null must fail a
    test, not fail silent (`testShippedScopeConfig` checks the shipped
    config, not the live one).

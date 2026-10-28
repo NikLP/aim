@@ -49,6 +49,8 @@ class AimConsolidationService {
    *   The aim logger channel.
    * @param \Drupal\aim\Backend\ActivityBackendInterface $decisionBackend
    *   The decision backend.
+   * @param \Drupal\aim\Service\AimGroundingChecker $groundingChecker
+   *   The grounded check, run on merged text.
    */
   public function __construct(
     protected AimSettings $settings,
@@ -62,6 +64,7 @@ class AimConsolidationService {
     protected LoggerChannelInterface $logger,
     #[Autowire(service: 'aim.backend.decision')]
     protected ActivityBackendInterface $decisionBackend,
+    protected AimGroundingChecker $groundingChecker,
   ) {}
 
   /**
@@ -281,6 +284,7 @@ class AimConsolidationService {
    *   verification.
    */
   protected function decideAndApply(AimFact $kept, AimFact $candidate, float $score, string $providerId, string $modelId, bool $dryRun): array {
+    $grounding_score = NULL;
     $auto = $kept->hasSameText($candidate);
     if ($auto) {
       $decision = 'NOOP';
@@ -298,10 +302,20 @@ class AimConsolidationService {
       }
       // Guardrails check policy, not fidelity: a merge that does not
       // demonstrably keep both inputs' details is downgraded to ADD (keep
-      // both), since merging is where nuance is lost.
+      // both), since merging is where nuance is lost. The grounded check
+      // then scores the merge against its inputs like any checked write.
       $unfaithful = FALSE;
       if ($decision === 'UPDATE') {
         $failed = $this->verifyMerge($kept, $candidate, (string) $merged_text, $providerId, $modelId);
+        if ($failed === NULL && $this->settings->getGroundingMode() !== 'off') {
+          $grounding_score = $this->groundMerge($kept, $candidate, (string) $merged_text);
+          // Enforce mode keeps both facts rather than merging and marking
+          // the result untrusted, which would retire two good facts for one
+          // doubtful one. A check that failed to run fails closed.
+          if ($this->settings->getGroundingMode() === 'enforce' && ($grounding_score === NULL || $grounding_score < $this->settings->getGroundingThreshold())) {
+            $failed = 'grounding';
+          }
+        }
         if ($failed !== NULL) {
           $decision = 'ADD';
           $unfaithful = TRUE;
@@ -332,7 +346,7 @@ class AimConsolidationService {
         // Non-destructive merge: a new fact carries the merged text and
         // both inputs are retired pointing at it, so the old wording stays
         // auditable and either input can be un-retired.
-        $merged = $this->createMergedFact($kept, $candidate, (string) $merged_text);
+        $merged = $this->createMergedFact($kept, $candidate, (string) $merged_text, $grounding_score);
         foreach ([$kept, $candidate] as $input) {
           $input->set('retired', $this->time->getRequestTime());
           $input->set('superseded_by', $merged->id());
@@ -396,7 +410,7 @@ class AimConsolidationService {
    *
    * @return string|null
    *   NULL if the merge passed, else the failed check: model, distance or
-   *   error.
+   *   error. The grounded check runs after this, in decideAndApply().
    */
   protected function verifyMerge(AimFact $kept, AimFact $candidate, string $mergedText, string $providerId, string $modelId): ?string {
     $config = $this->configFactory->get('aim.settings');
@@ -435,6 +449,55 @@ class AimConsolidationService {
     }
 
     return NULL;
+  }
+
+  /**
+   * Scores whether a merged text says only what its two inputs say.
+   *
+   * The grounded check (ADR-0037) with the inputs as the passage, kept fact
+   * first, and the merged text as the only candidate. Its question also
+   * fails a dropped detail, but a merge that drops the superseded old value
+   * still passed with the plain passage: all 16 real merges measured
+   * 2026-10-27 scored 0.90 or more, and each with an invented sentence
+   * added scored 0.07 or less (the site's demo/recall-eval/auto-band.php,
+   * "ground").
+   *
+   * @param \Drupal\aim\Entity\AimFact $kept
+   *   The established fact.
+   * @param \Drupal\aim\Entity\AimFact $candidate
+   *   The newer fact.
+   * @param string $mergedText
+   *   The guardrail-checked merged text.
+   *
+   * @return float|null
+   *   The grounding probability, or NULL if the check failed to run or has
+   *   no decision model.
+   */
+  protected function groundMerge(AimFact $kept, AimFact $candidate, string $mergedText): ?float {
+    $score = $this->groundingChecker->checkGrounding($this->mergePassage($kept, $candidate), [$mergedText])[0];
+    $this->manager->logAudit('Merge grounding check (kept @kept, candidate @candidate): score @score, cutoff @cutoff, mode @mode.', [
+      '@kept' => $kept->id(),
+      '@candidate' => $candidate->id(),
+      '@score' => $score === NULL ? 'none (check failed or no model)' : round($score, 3),
+      '@cutoff' => $this->settings->getGroundingThreshold(),
+      '@mode' => $this->settings->getGroundingMode(),
+    ]);
+    return $score;
+  }
+
+  /**
+   * Builds the grounded check's passage for a merge: both inputs, one a line.
+   *
+   * @param \Drupal\aim\Entity\AimFact $kept
+   *   The established fact.
+   * @param \Drupal\aim\Entity\AimFact $candidate
+   *   The newer fact.
+   *
+   * @return string
+   *   The passage.
+   */
+  protected function mergePassage(AimFact $kept, AimFact $candidate): string {
+    return $kept->get('text')->value . "\n" . $candidate->get('text')->value;
   }
 
   /**
@@ -603,7 +666,8 @@ class AimConsolidationService {
    * prefers the candidate (the newer statement) and falls back to the
    * kept fact;
    * category is the union; trusted only if both inputs were; the owner is
-   * the kept fact's.
+   * the kept fact's; grounding_score is the merge's own check, not either
+   * input's.
    *
    * @param \Drupal\aim\Entity\AimFact $kept
    *   The established fact.
@@ -611,16 +675,19 @@ class AimConsolidationService {
    *   The newer fact.
    * @param string $mergedText
    *   The guardrail-checked merged text.
+   * @param float|null $groundingScore
+   *   The merge's grounding score, or NULL when unchecked.
    *
    * @return \Drupal\aim\Entity\AimFact
    *   The saved merged fact.
    */
-  protected function createMergedFact(AimFact $kept, AimFact $candidate, string $mergedText): AimFact {
+  protected function createMergedFact(AimFact $kept, AimFact $candidate, string $mergedText, ?float $groundingScore = NULL): AimFact {
     $values = [
       'scope' => $kept->bundle(),
       'text' => $mergedText,
       'uid' => $kept->getOwnerId(),
       'trusted' => (bool) $kept->get('trusted')->value && (bool) $candidate->get('trusted')->value,
+      'grounding_score' => $groundingScore,
     ];
     // Copy the identity fields: subject/user, and the entity plugin's
     // target_*.

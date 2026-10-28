@@ -148,8 +148,10 @@ is auditable and reversible with the Un-retire action (which also clears
   carried over: scope, subject/user, target and owner from the kept fact;
   `asserted` from the candidate only; `source` from the candidate
   else the kept fact; `category` the union; `trusted` only if both inputs
-  were; `expires` (equal on both, see below). The merged fact is queued
-  for consolidation like any new fact.
+  were; `expires` (equal on both, see below); `grounding_score` from the
+  merge's own grounded check (see "Merge verification"), empty when
+  grounding is off. The merged fact is queued for consolidation like any
+  new fact.
 
 Facts with different `expires` (one dated, one not, or two different
 dates) are never compared, so a temporary fact cannot be merged into a
@@ -166,9 +168,10 @@ answer.
 
 **Merge verification** (2026-10-01). Guardrails check policy, not
 fidelity, so an UPDATE's merged text must also pass `verifyMerge()`
-before it is accepted; failure downgrades the pair to **ADD** (keep both)
-and logs an audit line (`@check` = `model`, `distance` or `error`, never
-text). Dry-run shows such rows as `ADD` with a non-empty "Merged text".
+before it is accepted, and then the grounded check (below); failure
+downgrades the pair to **ADD** (keep both) and logs an audit line
+(`@check` = `model`, `distance`, `error` or `grounding`, never text).
+Dry-run shows such rows as `ADD` with a non-empty "Merged text".
 Settings (`aim.settings`, `/admin/config/aim/settings`):
 
 - `merge_verify` (default on): a verifier model gets both inputs and the
@@ -184,7 +187,9 @@ Settings (`aim.settings`, `/admin/config/aim/settings`):
   `DecisionBackend` calls `decision()`, `ChatBackend` is the bridge that
   renders the same `DecisionInput` as a structured-output chat prompt (one-hot
   choice answers, stated noul probability; no score questions). A decision
-  classifier returns no merged text, so its UPDATE is downgraded to ADD.
+  classifier writes no text, so on UPDATE the site default chat model
+  writes the merge (`merge_prompt`, tag `aim_consolidate_merge`); with no
+  default chat model the pair is downgraded to ADD.
   The verifier is a noul `faithful` question, true at probability >= 0.5.
   Set the verifier to a different model so one checks the other. The
   decision backend's confirmation cutoff is `activities.verifier.threshold`
@@ -195,6 +200,24 @@ Settings (`aim.settings`, `/admin/config/aim/settings`):
   barely separates a faithful merge (0.02 / 0.11) from a lossy one
   (0.08 / 0.14), so it is a weak tripwire, not a verifier; calibrate
   before enabling.
+- Grounded check (`grounding_mode` not `off`): after the verifier passes,
+  the merged text goes through `checkGrounding()` with the two inputs as
+  the passage (kept fact first, one per line), and the score is stored on
+  the merged fact as `grounding_score`, so a merge carries the same
+  provenance as any checked write and is checked by a second, separately
+  calibrated question.
+  In `enforce`, a score below `activities.grounding.threshold`, or a check
+  that failed to run, rejects the merge like the verifier does (ADD, both
+  facts stay live), rather than merging and marking the result untrusted,
+  which would retire two good facts for one doubtful one. An audit line
+  per merge (kept and candidate IDs, score, cutoff, mode). Measured
+  2026-10-27 on hosted Jev (`subq-snap-1.1`) over 16 real merges (the
+  site's `demo/recall-eval/auto-band.php ground`): every correct merge
+  scored 0.90 or more although it drops the superseded value, and each
+  with one invented sentence added scored 0.07 or less, so the plain
+  passage stays and `GROUNDING_QUESTION` is unchanged. The verifier
+  (threshold 0.8) also rejected all 16 invented sentences, and 2 of the 16
+  correct merges, both of which grounding passed.
 
 Both check faithfulness to the inputs, not real-world truth. The shipped
 consolidation prompt also now says to choose ADD when unsure
@@ -600,6 +623,8 @@ to the model and never stored.
   (reading the chat history instead was dropped; that ADR's decision 3
   says when it returns). JSON and one-fact-per-line ingest have no source
   text and stay unchecked (`grounding_score` empty).
+- **Consolidation merges** are checked too, with the two inputs as the
+  passage (see `aim:consolidate`'s "Merge verification").
 - **One call per write, not per fact.** `checkGrounding()` puts the
   candidates in one Decision call (per group, below) (`candidate_1` ... in the state, one
   strict Noul question each, `GROUNDING_QUESTION`). Extraction and an MCP
