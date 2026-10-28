@@ -1,9 +1,9 @@
 # ADR-0062: Chat on the shared tools
 
 **Status:** Built 2026-10-25, except the upstream half of decision 2 (the
-`ToolInputTransformEvent` stopgap is live; upstream is tool#3583116 (the
-invoker for access callbacks), commented 2026-10-25 asking for the method
-too; TODO.md "Tools"). Measured as uid 1: `chatbot-converse` free 36/36
+`ToolInputTransformEvent` stopgap is live; upstream is tool#3583125, a
+runner-filled `?Invoker` method parameter, split out of tool#3583116 (the
+invoker for access callbacks) 2026-10-28; TODO.md "Tools"). Measured as uid 1: `chatbot-converse` free 36/36
 at 2.8 s a turn (3.6 s before), literal eval 20/23 (unchanged); as a plain
 member (authenticated only, so the per-scope checks apply): 36/36 at 3.0 s,
 20/23. Changes

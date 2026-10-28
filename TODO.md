@@ -13,10 +13,12 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
       2). `aim_remember` picks its trust channel and source from the Tool
       API invoker, which a method service never receives;
       `AimRememberInvokerSubscriber` catches it from `ToolInputTransformEvent`
-      meanwhile. Upstream: [tool#3583116](https://git.drupalcode.org/project/tool/-/work_items/3583116)
-      (open, 2026-10-21) passes the invoker to method-tool *access*
-      callbacks; Nik commented 2026-10-25 asking for a runner-filled
-      `?Invoker` method parameter too. Delete the subscriber when it lands.
+      meanwhile. Upstream: [tool#3583125](https://git.drupalcode.org/project/tool/-/work_items/3583125)
+      (filed 2026-10-28) asks for a runner-filled `?Invoker` method
+      parameter, split out of [tool#3583116](https://git.drupalcode.org/project/tool/-/work_items/3583116)
+      (the invoker for *access* callbacks, which CCC needs) at the
+      maintainer's request. When it lands: add `?Invoker $invoker = NULL`
+      to `aim_remember` and delete the subscriber.
 
 ## Chat quality and evals: open after the 2026-10-15/16 session
 
