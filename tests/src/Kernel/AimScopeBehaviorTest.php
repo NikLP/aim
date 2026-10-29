@@ -109,6 +109,22 @@ class AimScopeBehaviorTest extends KernelTestBase {
   }
 
   /**
+   * A new case's name becomes its ID, under the scope's prefix.
+   */
+  public function testCaseNameBecomesSubject(): void {
+    $remember = $this->container->get('aim.remember');
+    $this->assertSame('case-site-redesign', $remember->remember('Named.', 'case', 'Site redesign!')->get('subject')->value);
+    $this->assertSame('case-site-redesign', $remember->remember('Prefixed.', 'case', 'case-site-redesign')->get('subject')->value);
+
+    $scope = $this->container->get('entity_type.manager')->getStorage('aim_scope')->load('case');
+    $scope->set('settings', ['prefix' => 'job-'])->save();
+    $this->assertSame('job-launch', $remember->remember('New prefix.', 'case', 'Launch')->get('subject')->value);
+    $this->assertMatchesRegularExpression('/^job-[0-9a-f]{8}$/', $remember->remember('Minted.', 'case')->get('subject')->value);
+    // An ID some fact already has keeps its old prefix.
+    $this->assertSame('case-site-redesign', $remember->remember('Old ID.', 'case', 'case-site-redesign')->get('subject')->value);
+  }
+
+  /**
    * A scope with no plugin mints nothing and requires no account.
    */
   public function testPluginlessScopesAreNeutral(): void {

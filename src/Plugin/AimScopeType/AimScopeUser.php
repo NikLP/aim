@@ -109,9 +109,9 @@ class AimScopeUser extends PluginBase implements AimScopeTypeInterface, Containe
   /**
    * {@inheritdoc}
    */
-  public function defaultSubject(): ?string {
-    // A user fact needs a real account (requires_account), never a default.
-    return NULL;
+  public function resolveSubject(string $subject, string $scopeId): string {
+    // A user fact's subject is the user field (requires_account), not this.
+    return $subject;
   }
 
   /**

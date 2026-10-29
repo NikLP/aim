@@ -14,7 +14,6 @@ use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\Dto\StructuredOutputSchema;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
-use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Entity\AimFact;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -50,8 +49,6 @@ class AimRememberService {
    *   The current user, recorded as the fact's author.
    * @param \Drupal\Core\Logger\LoggerChannelInterface $logger
    *   The aim logger channel.
-   * @param \Drupal\aim\AimScopeTypePluginManagerInterface $scopeAccessManager
-   *   The scope type plugin manager, for default subjects.
    */
   public function __construct(
     protected AimMemoryManager $manager,
@@ -66,8 +63,6 @@ class AimRememberService {
     protected AccountProxyInterface $currentUser,
     #[Autowire(service: 'logger.channel.aim')]
     protected LoggerChannelInterface $logger,
-    #[Autowire(service: 'plugin.manager.aim_scope_type')]
-    protected AimScopeTypePluginManagerInterface $scopeAccessManager,
   ) {}
 
   /**
@@ -229,15 +224,10 @@ class AimRememberService {
       $values['user'] = $account->id();
       $values['subject'] = '';
     }
-    elseif (empty($subject)) {
-      // No subject given: ask this scope's access plugin (if any) for a
-      // default instead of leaving the field empty - e.g. the case plugin
-      // mints a new case ID.
-      $plugin = $this->scopeAccessManager->getTypePlugin($scope);
-      $values['subject'] = $plugin?->defaultSubject() ?? '';
-    }
     else {
-      $values['subject'] = $subject;
+      // The scope's plugin resolves it on save (AimHooks::factPresave()),
+      // e.g. the case plugin mints or names a case ID.
+      $values['subject'] = $subject ?? '';
     }
 
     if (!empty($category)) {

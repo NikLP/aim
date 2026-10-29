@@ -36,12 +36,17 @@ drush aim:remember <text> [--scope] [--subject] [--source] [--category] [--asser
 - `--target-type`/`--target-id` name the referenced entity for
   `scope=entity` (e.g. `--target-type=node --target-id=42`); ignored for
   every other scope. See [ADR-0027](adr/resolved/0027-entity-scope.md).
-- `scope=case` with no `--subject` mints a case ID server-side
-  (`case-<8 hex chars>`, from Drupal's `uuid` service) and stamps it onto
-  the fact - the success message (and `aim_tool`'s `aim_remember`
-  `case_id` output) surfaces the resolved ID so later calls can pass it
-  back as `--subject` to append to the same case. Passing `--subject`
-  explicitly always wins over minting.
+- `scope=case` resolves `--subject` on save (`AimScopeCase::resolveSubject()`,
+  via `AimHooks::factPresave()`, so the add form gets the same): a subject
+  some fact of the scope already has is kept as is; a new one is a case
+  name, turned into an ID under the scope's `prefix` setting (default
+  `case-`, on the scope's edit form: `Site redesign` becomes
+  `case-site-redesign`, max 64 chars); none mints one
+  (`case-<8 hex chars>`, from Drupal's `uuid` service). The success
+  message (and `aim_tool`'s `aim_remember` reply) surfaces the resolved ID
+  so later calls can pass it back as `--subject` to append to the same
+  case. Two callers naming a case the same join one case, by design; a
+  mistyped ID starts a new one.
 - `scope=user` requires a real account (`--subject` resolved via
   `resolveAccountByUid()`, uid only - no username fallback on write paths,
   to avoid a typo'd username silently misattributing a fact). See

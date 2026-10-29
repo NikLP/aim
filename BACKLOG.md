@@ -12,9 +12,8 @@ Moved to [literals/BACKLOG.md](../../contrib/literals/BACKLOG.md) 2026-10-22.
 ## Case picker widget (raised 2026-10-14, pinned)
 
 - [ ] Pinned: a widget to pick from existing in-scope cases when writing a
-      `scope=case` fact, instead of typing a case ID or minting a new one
-      each time (`AimScopeCase::defaultSubject()` mints when `subject` is
-      empty). Needs a "list existing case subjects the viewer may see" query
+      `scope=case` fact, instead of typing a case ID or a new case's name
+      (`AimScopeCase::resolveSubject()` names or mints the ID). Needs a "list existing case subjects the viewer may see" query
       first, and case-scope view access is still unbuilt, so the list would
       leak case IDs across viewers until it is.
 

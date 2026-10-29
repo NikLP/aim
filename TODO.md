@@ -302,6 +302,32 @@ only work to do is listed here.
       `ai_provider_typesafeai/tests/check-decision-api.php` (offline class
       check, never run).
 
+## Case scope (raised 2026-10-29)
+
+- [ ] **Case subject constraint.** Since `AimScopeCase::resolveSubject()`
+      took case names (2026-10-29), two callers naming a case the same
+      silently join one case, and a mistyped ID silently starts a new one.
+      Add a field constraint on `subject` (not a presave exception: that
+      is a 500 on the add form, see `AimHooks`' docblock), through a new
+      scope plugin validation method the constraint calls:
+      - a subject that exactly matches an existing case ID adds to it, as
+        now;
+      - anything else asks for a new case, and fails if its resolved ID is
+        taken ("case `case-site-redesign` already exists, pass that ID to
+        add to it");
+      - a subject shaped like a minted ID (prefix + 8 hex) that matches no
+        case fails ("no case `case-7f1c595e`"), since it is almost
+        certainly a typo;
+      - the error suggests the nearest existing case ID ("did you mean
+        ...?"), only to a caller with `view case aim facts`.
+
+      A mistyped *named* ID still gets through. A case listing tool stays
+      parked (BACKLOG.md's "Case picker widget") until that happens in
+      use; note that BACKLOG's leak argument is weaker than it reads -
+      case view access is the flat permission alone today
+      (`checkViewAccess()` is neutral), so a listing gated on it shows
+      nothing that recall doesn't.
+
 ## Governance
 
 - [ ] Close [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s

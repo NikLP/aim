@@ -86,10 +86,10 @@ class AimScopeEntity extends PluginBase implements AimScopeTypeInterface, Contai
   /**
    * {@inheritdoc}
    */
-  public function defaultSubject(): ?string {
+  public function resolveSubject(string $subject, string $scopeId): string {
     // A referenced entity can't be auto-minted - the caller must supply
     // target_type/target_id explicitly.
-    return NULL;
+    return $subject;
   }
 
   /**

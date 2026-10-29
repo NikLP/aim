@@ -18,8 +18,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 /**
  * Hook implementations for the aim module.
  *
- * A factPresave() implementation used to run aim's write guardrails
- * (decision 7) here - removed 2026-09-18 in favor of a real field-level
+ * The factPresave() hook used to run aim's write guardrails (decision 7)
+ * too - removed 2026-09-18 in favor of a real field-level
  * validation Constraint (AimGuardrails, on aim_fact's text field) plus
  * AimMemoryManager::saveFact() explicitly calling validate() for a
  * programmatic writer. See AimGuardrailsConstraint's own docblock for
@@ -40,7 +40,8 @@ class AimHooks {
    *   The VDB provider plugin manager.
    * @param \Drupal\aim\AimScopeTypePluginManagerInterface $scopeTypeManager
    *   The scope type plugin manager, used by entityBaseFieldInfo() to
-   *   merge every registered scope type's own base fields onto aim_fact.
+   *   merge every registered scope type's own base fields onto aim_fact,
+   *   and by factPresave() to resolve a fact's subject.
    */
   public function __construct(
     private readonly AimMemoryManager $memoryManager,
@@ -77,6 +78,26 @@ class AimHooks {
       $fields += $plugin->getBaseFieldDefinitions();
     }
     return $fields;
+  }
+
+  /**
+   * Implements hook_ENTITY_TYPE_presave() for aim_fact.
+   *
+   * Lets the scope's plugin resolve a new fact's subject (or an edited
+   * one), so every write path - remember(), the add form, ingest - gets
+   * the same result, e.g. the case plugin's minted or named case ID.
+   * Only changes the value, never throws (see this class's docblock).
+   */
+  #[Hook('aim_fact_presave')]
+  public function factPresave(AimFact $entity): void {
+    $subject = (string) $entity->get('subject')->value;
+    if (!$entity->isNew() && $subject === (string) $entity->getOriginal()?->get('subject')->value) {
+      return;
+    }
+    $plugin = $this->scopeTypeManager->getTypePlugin($entity->bundle());
+    if ($plugin) {
+      $entity->set('subject', $plugin->resolveSubject($subject, $entity->bundle()));
+    }
   }
 
   /**

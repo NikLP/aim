@@ -55,11 +55,9 @@ flowchart TD
   R1 -->|no| ERR["InvalidArgumentException<br/>returned to caller"]:::bad
   R1 -->|yes| R2{"scope requires a<br/>real account?<br/>user scope, ADR-0007"}:::code
   R2 -->|"yes: subject must be a<br/>uid of a real user"| R3["resolve account<br/>no match: exception"]:::code
-  R2 -->|"no, subject empty"| R4["scope plugin defaultSubject()<br/>e.g. case mints a case ID"]:::code
-  R2 -->|"no, subject given"| R5["subject stored as given"]:::code
+  R2 -->|"no"| R4["subject as given (or empty);<br/>on save, scope plugin resolveSubject()<br/>e.g. case names or mints a case ID"]:::code
   R3 --> R6["build entity: text, source,<br/>category terms, asserted,<br/>target_type/target_id,<br/>expires (a past date: exception)"]:::code
   R4 --> R6
-  R5 --> R6
   R6 --> GQ{"source text given and<br/>grounding_mode not off?"}:::code
   GQ -->|no| TP
   GQ -->|yes| GC["checkGrounding(source text, [text])<br/>decision model (activities.grounding),<br/>GROUNDING_QUESTION; a batch's score<br/>comes from the request cache"]:::llm

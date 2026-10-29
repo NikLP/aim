@@ -13,7 +13,7 @@ use Drupal\aim\Entity\AimFact;
  * Interface for AimScopeType plugins.
  *
  * A plugin is everything specific to one kind of scope: extra view access
- * (checkViewAccess()), a default subject (defaultSubject()), base fields
+ * (checkViewAccess()), the stored subject (resolveSubject()), base fields
  * on aim_fact (getBaseFieldDefinitions()) and its settings
  * (defaultSettings()/buildSettingsForm()). Each aim_scope config names
  * the plugin it uses in `plugin` (or none), and the manager hands the
@@ -49,18 +49,24 @@ interface AimScopeTypeInterface {
   public function checkViewAccess(AimFact $fact, AccountInterface $account): AccessResultInterface;
 
   /**
-   * Returns a default subject for a new fact of this scope, if any.
+   * Returns the subject a new fact of this scope is stored under.
    *
-   * Called by AimMemoryManager::remember() only when the caller omitted
-   * subject and this scope doesn't require a real account (that case is
-   * handled separately, see scopeRequiresAccount()). Most scopes have
-   * nothing sensible to default to and should return NULL, leaving
-   * subject empty as before this method existed.
+   * Called by AimHooks::factPresave() for every new fact (and an edited
+   * subject), whatever the write path, after the caller's own subject
+   * (empty when omitted) is in place. A scope that requires a real account
+   * keeps subject empty (see scopeRequiresAccount()). Most scopes return
+   * the subject unchanged; the case plugin mints an ID for an empty one
+   * and turns a name into one.
    *
-   * @return string|null
-   *   A default subject value, or NULL if this scope has none.
+   * @param string $subject
+   *   The subject the caller gave, or an empty string.
+   * @param string $scopeId
+   *   The ID of the aim_scope the fact belongs to.
+   *
+   * @return string
+   *   The subject to store.
    */
-  public function defaultSubject(): ?string;
+  public function resolveSubject(string $subject, string $scopeId): string;
 
   /**
    * Returns base field definitions this scope type needs on aim_fact.

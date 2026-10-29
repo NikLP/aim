@@ -187,10 +187,12 @@ duplicated here.
   configuration; two scopes can share a plugin
   ([ADR-0028](adr/resolved/0028-scope-type-plugin.md) piece 3). The
   interface (ADR-0025/0028): `checkViewAccess()` (ORed against the flat
-  permission), `defaultSubject()` (the case plugin mints case IDs),
+  permission), `resolveSubject()` (run on save by a presave hook; the
+  case plugin mints or names case IDs under its `prefix` setting),
   `getBaseFieldDefinitions()` and `defaultSettings()`/
   `buildSettingsForm()` (rendered inline on the scope form; the user
-  plugin's are `requires_account` and the role-visibility grid). No
+  plugin's are `requires_account` and the role-visibility grid, the
+  case plugin's the case ID `prefix`). No
   `field_ui_base_route` - deliberately, see
   [DEVELOPING.md](DEVELOPING.md) for why.
 - Vector search: server `aim_vector`, index `aim_vector_index`, collection

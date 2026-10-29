@@ -3,7 +3,8 @@ status: true
 dependencies: {  }
 id: case
 label: Case
-description: 'one piece of ongoing work with a start and an end, e.g. a site redesign. Subject: the case ID. Omit it on the first save and a new ID comes back; pass that ID to add more to the same case.'
+description: 'one piece of ongoing work with a start and an end, e.g. a site redesign. Subject: the case ID. On the first save, pass a short name for the case (it becomes the ID) or omit it for a generated one; pass the ID that comes back to add more to the same case.'
 weight: 3
 plugin: case
-settings: {  }
+settings:
+  prefix: case-
