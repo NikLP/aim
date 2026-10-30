@@ -75,7 +75,7 @@ assuming one needs to be written from scratch.
   swap.
 - **Guardrail-set fragmentation.** Multiple named Guardrail sets is more
   governance surface than one - and sits ahead of
-  [ADR-0002](../0002-governance-deferred-guardrails-mandatory.md)'s still-
+  [ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s still-
   deferred Content Moderation gate, which will eventually want to reason
   about all of them uniformly. Don't let per-archetype sets drift
   independently once that gate lands; reconcile then, not before.

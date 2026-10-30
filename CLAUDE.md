@@ -65,7 +65,7 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
 2. **Scope model** - scopes are `aim_fact` bundles, composable at
    retrieval ([ADR-0001](adr/resolved/0001-storage-and-scope-model.md)):
    config on core plugins, five shipped by `aim`
-   ([ADR-0063](adr/0063-scopes-as-config-on-core-plugins.md)).
+   ([ADR-0063](adr/resolved/0063-scopes-as-config-on-core-plugins.md)).
 3. **Governance** - permissions/roles + a draft-to-trusted gate, built as
    the `trusted` flag rather than Content Moderation; `recall()` skips
    untrusted facts. A new fact starts trusted when its writer could trust
@@ -75,15 +75,19 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
    `default_trusted`). The grounded check, in enforce mode, demotes or
    promotes it per the policy (a reviewer's start can be demoted, only an
    explicit `trusted` cannot), and `hold` is never promoted. The chat
-   channel ships as `hold`. ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
+   channel ships as `hold`. ([ADR-0002](adr/resolved/0002-governance-deferred-guardrails-mandatory.md)'s
    addendum)
 4. **Processing** - Queue API + a dedicated crontab entry, never
    `hook_cron`. ([ADR-0003](adr/resolved/0003-async-processing-dedicated-crontab.md))
+   One stopgap exception: the expiry sweep (`aim:expire`, no model call)
+   also runs from `hook_cron`, because aim cannot promise a site a cron
+   job ([ADR-0057](adr/0057-dates-resolved-and-confirmed-before-write.md)).
 5. **Sovereignty** - extraction/consolidation must support Ollama; hosted
    providers are additional options, not replacements.
    ([ADR-0004](adr/resolved/0004-sovereignty-and-poc-build-order.md))
    **Temporary deviation (2026-10-02):** this site's consolidation and
-   verifier run on hosted Jev (synthetic/demo data only); the chat path and
+   verifier run on a hosted SystemOne-compatible decision endpoint
+   (synthetic/demo data only); the chat path and
    `DecisionBackend` stay so a local decision model can be switched back
    in per activity. ([ADR-0021](adr/0021-jev-typed-decision-provider.md),
    decision 2)
@@ -92,7 +96,7 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
    ([ADR-0004](adr/resolved/0004-sovereignty-and-poc-build-order.md))
 7. **Guardrails mandatory** - every candidate fact runs through
    `drupal/ai`'s Guardrails before it's written anywhere.
-   ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md))
+   ([ADR-0002](adr/resolved/0002-governance-deferred-guardrails-mandatory.md))
 8. **Generative/planning surface** (spec -> Recipe -> built site) is in
    scope; no recipe-apply tool is exposed to an LLM-driven caller without
    a dry-run and human review.
@@ -102,7 +106,7 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
 No Drupal module competes with `aim`'s actual scope (governed,
 Guardrail-checked, extracted-and-consolidated, vector-searchable memory) -
 checked directly against drupal.org. The one real overlap, CCC, is
-handled per [ADR-0008](adr/0008-chatbot-integration-mechanism.md).
+handled per [ADR-0008](adr/resolved/0008-chatbot-integration-mechanism.md).
 
 ## Repository layout
 
@@ -172,12 +176,12 @@ duplicated here.
   [DEVELOPING.md](DEVELOPING.md)'s "Grounded check"), `trusted` (boolean, the draft-to-trusted gate - starts per
   `aim.settings:trust_policy` (the add form: `default_trusted`), `recall()` excludes untrusted facts
   unless asked otherwise, see
-  [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
+  [ADR-0002](adr/resolved/0002-governance-deferred-guardrails-mandatory.md)'s
   addendum).
 - **`aim_scope`** config entity: `id`, `label`, `status`, `description`,
   `weight`, `plugin`, `settings`. `aim` ships five (site, role, user,
   case, entity) in `config/install`, like `literals` ships its literal
-  types ([ADR-0063](adr/0063-scopes-as-config-on-core-plugins.md)). A
+  types ([ADR-0063](adr/resolved/0063-scopes-as-config-on-core-plugins.md)). A
   disabled scope takes no new facts and is not offered; a scope with
   facts can't be disabled or deleted. `description` is the wording models
   read to choose a scope, `weight` the order everything lists scopes in
@@ -265,7 +269,7 @@ look at other roles when a permission check unexpectedly fails.
   and model ID only, not fact or recall query text (the one exception is
   the opt-in `log_query_text`). Model calls tagged `aim_*` are the
   exception to "no text": `ai_logging` records their prompts and replies in
-  `ai_log` ([ADR-0060](adr/0060-adopt-ai-logging-for-model-calls.md);
+  `ai_log` ([ADR-0060](adr/resolved/0060-adopt-ai-logging-for-model-calls.md);
   stealth mode, off, is the later opt-out); a new tag must be added to
   `ActivityBackendInterface::LOGGED_TAGS` and the site's
   `ai_logging.settings:prompt_logging_tags` (site-wide, aim doesn't write

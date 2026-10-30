@@ -1,7 +1,12 @@
 # ADR-0020: Verbatim facts - an explicit opt-out from consolidation
 
-**Status:** Proposed - analyzed 2026-09-26, not built. Whether to build it
-is not decided yet.
+**Status:** Retired 2026-10-30, never built. Its premise went with
+non-destructive consolidation (2026-10-01): an UPDATE now writes a new
+merged fact and retires both inputs, RETIRE replaced the hard DELETE, and
+retirement has its own `retired` field, so no fact's text is ever
+rewritten in place. The Findings below describe the code before that. A
+fact can still be retired by a merge; that is supersede, not loss, and
+`superseded_by` keeps the original.
 **Date:** 2026-09-26
 
 ## Context
@@ -9,7 +14,7 @@ is not decided yet.
 The question: can a caller add a fact verbatim, bypassing AI processing?
 The write half already works. `AimMemoryManager::remember()` stores its
 `$text` exactly as given, with no extraction call
-([ADR-0006](resolved/0006-agent-native-write-path.md)). It is reached by
+([ADR-0006](0006-agent-native-write-path.md)). It is reached by
 `drush aim:remember`, `aim_tool`'s `aim_remember` (Tool API/MCP),
 `aim_chatbot`'s `AimRemember` function call, and the admin add form at
 `/admin/content/aim-facts/add/{scope}`.
@@ -36,7 +41,7 @@ Read from the code 2026-09-26, not exercised live.
    every new fact unless the entity is flagged `setSyncing(TRUE)`.
    `consolidateFact()` pairs the fact with its nearest neighbor; the
    lower id is `kept`, the higher id is `candidate`
-   ([ADR-0005](resolved/0005-consolidation-algorithm.md)). For a verbatim fact:
+   ([ADR-0005](0005-consolidation-algorithm.md)). For a verbatim fact:
    - **As the newer fact (candidate):** NOOP retires it (`expires` set,
      so it drops out of recall); DELETE hard-deletes it; UPDATE retires
      it and overwrites the *older* neighbor's text with the model's

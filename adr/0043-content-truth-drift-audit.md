@@ -12,7 +12,7 @@ uses facts as a **reference to check published content against**.
 Staff tell the site things in passing ("the Leeds branch is closed on
 14 March", "the lift is out on Tuesday"). Those become dated, trusted facts
 ([ADR-0032](0032-dated-category-listing-for-quick-notes.md),
-[ADR-0002](0002-governance-deferred-guardrails-mandatory.md)). The pages
+[ADR-0002](resolved/0002-governance-deferred-guardrails-mandatory.md)). The pages
 people actually read were published earlier and nobody edits them. The two
 diverge silently, and a CMS has no way to notice: a page is only ever
 compared with itself.

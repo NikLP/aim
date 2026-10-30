@@ -1,7 +1,7 @@
 # ADR-0035: Standing constraints - a deterministic action gate for "don't build X until Y"
 
 **Status:** Proposed (2026-10-01) - design only, not built. Builds on
-[ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s `trusted`
+[ADR-0002](resolved/0002-governance-deferred-guardrails-mandatory.md)'s `trusted`
 flag and retired [ADR-0009](resolved/0009-recipe-apply-safety-gate.md)'s apply gate; the
 authority rules below depend on [ADR-0037](resolved/0037-transient-source-passages-for-grounding.md)
 only for untrusted-by-default writes.

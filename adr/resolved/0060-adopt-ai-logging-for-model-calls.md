@@ -1,9 +1,11 @@
 # ADR-0060: Model-call logging goes through `ai_logging`, text included; stealth is a later option
 
 **Status:** Built 2026-10-14. Reverses the "store no text" stance in
-[ADR-0037](resolved/0037-transient-source-passages-for-grounding.md) and the
+[ADR-0037](0037-transient-source-passages-for-grounding.md) and the
 CLAUDE.md logging rule for model calls. Stealth mode (decision 4) is not
-built.
+built; tracked in BACKLOG.md ("ADR-0060 follow-ups"). Position
+(2026-10-30): all-data is the mode aim runs in today; a zero-data mode
+(stealth) is the planned opposite end.
 **Date:** 2026-10-14
 
 ## In plain terms
@@ -32,7 +34,7 @@ bound how long.
   may reasonably want it.
 - `aim_activity_metrics` re-implemented what `ai_logging` already does:
   one row per call with provider, model and tokens.
-  [ADR-0021](0021-jev-typed-decision-provider.md)'s metrics need only
+  [ADR-0021](../0021-jev-typed-decision-provider.md)'s metrics need only
   duration and a run ID beyond that.
 - Upstream (Scott Euser, 2026-10-14): an option to omit the prompt is
   unwelcome, since a response can repeat the prompt anyway; redaction is
@@ -53,7 +55,7 @@ bound how long.
    Tokens, provider, model and time already have columns.
 3. **`aim_activity_metrics`, its schema and its subscriber are removed.**
    History in the table is dropped (the figures that matter are in
-   [model-call-budget.md](model-call-budget.md)). Eval queries read
+   [model-call-budget.md](../model-call-budget.md)). Eval queries read
    `ai_log`, with duration and run ID via `JSON_VALUE(extra_data, ...)`.
 4. **Stealth mode is a later, optional, off-by-default switch**, built as a
    presave hook on `ai_log` that blanks `prompt`, `output_text`,
@@ -77,7 +79,7 @@ bound how long.
 ## Consequences
 
 - Personal data can reach the database through logged prompts and
-  responses. The PII gate ([ADR-0056](0056-personal-data-write-gate.md))
+  responses. The PII gate ([ADR-0056](../0056-personal-data-write-gate.md))
   stays parked; revisit it with stealth mode before real data.
 - aim's own audit lines (`logger.channel.aim`, IDs only) are unchanged: they
   record decisions, which `ai_log` (provider calls only) does not.

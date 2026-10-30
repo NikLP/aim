@@ -1,17 +1,17 @@
 # ADR-0062: Chat on the shared tools
 
-**Status:** Built 2026-10-25, except the upstream half of decision 2 (the
+**Status:** Resolved. Built 2026-10-25, except the upstream half of decision 2 (the
 `ToolInputTransformEvent` stopgap is live; upstream is tool#3583125, a
 runner-filled `?Invoker` method parameter, split out of tool#3583116 (the
 invoker for access callbacks) 2026-10-28; TODO.md "Tools"). Measured as uid 1: `chatbot-converse` free 36/36
 at 2.8 s a turn (3.6 s before), literal eval 20/23 (unchanged); as a plain
 member (authenticated only, so the per-scope checks apply): 36/36 at 3.0 s,
 20/23. Changes
-[ADR-0013](resolved/0013-mcp-tool-exposure.md)'s "keep the two paths
+[ADR-0013](0013-mcp-tool-exposure.md)'s "keep the two paths
 separate" (its Decision, second bullet, and the Scope discipline risk) and
 answers its open question on whether the chatbot should call the same tool
 definitions. Touches [ADR-0008](0008-chatbot-integration-mechanism.md) (the
-chat mechanism) and [ADR-0037](resolved/0037-transient-source-passages-for-grounding.md)
+chat mechanism) and [ADR-0037](0037-transient-source-passages-for-grounding.md)
 (grounding evidence).
 **Date:** 2026-10-25
 

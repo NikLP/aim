@@ -140,7 +140,7 @@ behavior:
 
 The third is a real gap, not just a caveat. Proposed fix (a `verbatim`
 opt-out flag, not built) in
-[ADR-0020](../0020-verbatim-facts-consolidation-opt-out.md).
+[ADR-0020](0020-verbatim-facts-consolidation-opt-out.md).
 
 ## Addendum (2026-10-10): the trigger is an explicit `accessCheck` argument, not "anonymous"
 

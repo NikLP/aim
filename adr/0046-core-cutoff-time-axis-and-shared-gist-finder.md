@@ -48,11 +48,12 @@ Make time a retrieval axis for every fact instead of adding a `kind` field:
   option on `recall()` (event time `asserted`, falling back to `created`).
   [ADR-0032](0032-dated-category-listing-for-quick-notes.md)'s dated
   listing is the starting point.
-- **Append-only events:** the verbatim opt-out
-  ([ADR-0020](0020-verbatim-facts-consolidation-opt-out.md)) already keeps
-  consolidation from merging near-duplicate events. Document it as the
-  per-write way to record an event, and let callers set it from the write
-  tools.
+- **Append-only events:** ~~the verbatim opt-out
+  ([ADR-0020](resolved/0020-verbatim-facts-consolidation-opt-out.md))~~
+  retired 2026-10-30, never built. Consolidation already keeps dated
+  events apart where they differ (facts with different `expires` are never
+  compared, ADR-0036's 2026-10-27 addendum); a dated event fact carries its
+  date in the text (ADR-0057 point 2).
 - **Recency weighting:** a recency weight as an optional recall parameter.
 
 This covers most of the benefit of episodic memory with no schema change.

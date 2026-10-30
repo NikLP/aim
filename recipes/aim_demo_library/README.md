@@ -128,8 +128,9 @@ failed recipe prints a long stack trace after the real error; the first
   `nomic-embed-text` on MariaDB
   ([ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md)).
   This recipe's Gate match threshold (`gate_match_threshold`, 0.8) and
-  Gate choice margin (`gate_choice_margin`, 0.4) were measured with hosted
-  Jev (`typesafeai`) as the Decision default. Re-check them if you change
+  Gate choice margin (`gate_choice_margin`, 0.4) were measured with a
+  hosted SystemOne-compatible decision endpoint (`typesafeai`) as the
+  Decision default. Re-check them if you change
   either model.
 - **Review gate by writer.** Any signed-in visitor can tell the chat a
   fact (the recipe grants `access deepchat api` and `create site aim

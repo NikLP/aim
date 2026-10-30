@@ -2,9 +2,9 @@
 
 **Status:** Built 2026-10-26, live-verified (preflight 14/14, kernel
 tests 74). Supersedes
-[ADR-0026](resolved/0026-pluggable-scope-submodules.md) (scopes shipped by
-submodules). Keeps [ADR-0025](resolved/0025-scope-access-plugin-type.md)'s
-and [ADR-0028](resolved/0028-scope-type-plugin.md)'s plugin type unchanged.
+[ADR-0026](0026-pluggable-scope-submodules.md) (scopes shipped by
+submodules). Keeps [ADR-0025](0025-scope-access-plugin-type.md)'s
+and [ADR-0028](0028-scope-type-plugin.md)'s plugin type unchanged.
 **Date:** 2026-10-26
 
 ## In plain terms

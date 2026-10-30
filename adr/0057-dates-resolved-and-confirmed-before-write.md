@@ -1,6 +1,14 @@
 # ADR-0057: Dates resolved and confirmed before a fact is written
 
-**Status:** Proposed 2026-10-11 - points 3 (the `expires` input on `remember()`, `drush aim:remember`, batch/ingest entries and both remember tools) and the expiry sweep (`drush aim:expire`, hourly crontab, `hook_cron` as backup) built and live-tested 2026-10-11; points 1, 2, 4-7 not built.
+**Status:** Proposed 2026-10-11, partly built. Built: point 3 (the
+`expires` input on `remember()`, `drush aim:remember`, batch/ingest entries
+and the remember tool) and the expiry sweep (`drush aim:expire`, hourly
+crontab, `hook_cron` as backup), 2026-10-11; point 5 (`aim_remember`'s
+description asks for calendar dates, never relative ones); point 6 (facts
+with different `expires` are never compared, 2026-10-27, ADR-0036
+addendum); half of point 7 (`aim_recall` returns each fact's date and
+which kind it is). Not built: point 1 (the chat persona has no date),
+point 2 for chat, point 4 (extraction), point 7's persona wording.
 **Date:** 2026-10-11
 
 ## Context
@@ -8,7 +16,7 @@
 Facts with a relative date ("until Friday", "from now on", "for two months
 from now") go wrong over time, and nothing in aim catches it:
 
-- [ADR-0036](0036-memory-algorithm-appraisal.md) (2026-10-02): an UPDATE
+- [ADR-0036](resolved/0036-memory-algorithm-appraisal.md) (2026-10-02): an UPDATE
   merge of "opens an hour earlier on Tuesdays for two months from when this
   was noted" into the standing hours kept the phrase and lost its anchor,
   so the merged fact is wrong once the two months pass. Three options were
@@ -61,7 +69,7 @@ have a person confirm it where one is present.
    the ingest form's prose mode) resolves against the document's own date
    when it states one, else the ingest date, and says which in the fact
    ("as of 11 October 2026"). Review is the trust gate
-   ([ADR-0002](0002-governance-deferred-guardrails-mandatory.md)), not a
+   ([ADR-0002](resolved/0002-governance-deferred-guardrails-mandatory.md)), not a
    new step.
 5. **MCP: the caller's job.** The `aim_remember` tool description asks for
    calendar dates; aim cannot confirm on another agent's behalf (the same

@@ -19,7 +19,7 @@ chat-facing role `recall aim facts`, `remember aim facts` and the
 `view`/`create` permissions of the scopes it should reach (the demo: `site`
 only). A visitor's fact waits for staff review (the `chat` trust channel
 ships as `hold`). See
-[ADR-0062](../../adr/0062-chat-on-the-shared-tools.md).
+[ADR-0062](../../adr/resolved/0062-chat-on-the-shared-tools.md).
 
 ## Requirements
 
@@ -36,4 +36,5 @@ ships as `hold`). See
    `ai_agents` agent using `tool:aim_recall`/`tool:aim_remember`.
 
 Full mechanism and gotchas: [DEVELOPING.md](DEVELOPING.md). Decision
-record: [ADR-0008](../../adr/0008-chatbot-integration-mechanism.md).
+record: [ADR-0062](../../adr/resolved/0062-chat-on-the-shared-tools.md)
+(superseding [ADR-0008](../../adr/resolved/0008-chatbot-integration-mechanism.md)).

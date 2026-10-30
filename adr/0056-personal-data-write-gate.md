@@ -2,7 +2,11 @@
 
 **Status:** Parked (2026-10-11, Nik: revisit personal data later) - proposed
 2026-10-10, design only. Decision 7 (no stored passages) was built on its
-own merits as part of ADR-0037 on 2026-10-11. Needs a
+own merits as part of ADR-0037 on 2026-10-11, then overtaken by
+[ADR-0060](resolved/0060-adopt-ai-logging-for-model-calls.md): passages are
+not on the fact but are in `ai_log`. Position 2026-10-30: all data stored
+now, a zero-data mode (stealth) planned; this gate decides what may enter
+in the first place, which neither mode answers. Needs a
 personal-data eval set first (decision 4). If accepted, replaces
 [ADR-0037](resolved/0037-transient-source-passages-for-grounding.md) decisions 1-4
 (decision 7 below).

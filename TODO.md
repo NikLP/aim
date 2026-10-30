@@ -24,7 +24,7 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
 
 State: recall not forced (`require_usage` off since 2026-10-22, see
 `modules/aim_chatbot/CLAUDE.md`), persona says "recall first", the demo
-recipe installs `literals_finder` and puts its block on the gate, chat writes untrusted and permission-checked,
+recipe installs `literals_finder` and puts its block on the gate, chat writes held (`hold`) and permission-checked,
 turns about 4.7 s with 2 hosted calls (details in the Literals entry below
 and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
 
@@ -90,18 +90,6 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       deciding whether `AimChatbotEvalCommands` can go. The eval plan and
       its decisions are in `eval/DRAFT-eval-plan.md`; the assertion list
       there is mostly not yet kernel tests.
-- [ ] **Parked by Nik:** visitor/staff assistant split (staff agent with
-      remember; fine for a demo, not essential), the accept/pass widget with
-      outcome tracking, a combined MCP "ask" tool that does finder-first
-      then recall on the server.
-- [ ] **Do not commit `config/sync/key.key.amazeeio_ai*.yml` (found
-      2026-10-16).** The live keys now use the `config` provider (the key
-      value sits in the config itself, after the amazee re-authorization),
-      and a `config:export` wrote the plaintext values into the tracked
-      sync directory. Either put the keys back on the `file`/env provider
-      and re-export, or keep these three files out of git (config_ignore or
-      `.gitignore`) before the next commit. Check with
-      `git diff config/sync/key.key.*` (values not shown here).
 - [ ] **Housekeeping.** `aim_chatbot`'s shipped block still uses the plain
       processor (the demo recipe switches it to the gate). Recipe `literals_demo_library` does
       not grant `view restricted literals` to authenticated. The `login` literal
@@ -124,10 +112,10 @@ gate are built. Work on the literals modules themselves is in
       to pay.
 - [ ] **Finder-first gate: open points.** Whether gate replies go into the
       stored history; a friendlier reply than the bare template (our own
-      wording: Jev is a decision model and cannot write text); local Jev latency unmeasured; a gate-hit line in the
+      wording: a decision model cannot write text); latency on a local decision model unmeasured; a gate-hit line in the
       review queue (design in `modules/aim_chatbot/CLAUDE.md`).
 
-## Plugin, skills and the verbal webform (raised 2026-10-09, important)
+## Plugin and skills (raised 2026-10-09, important)
 
 - [ ] **A Claude Code plugin for aim.** Bundle the skills (`aim-discovery`,
       `aim-memory`, the ones below), the MCP server config with its OAuth
@@ -150,16 +138,6 @@ gate are built. Work on the literals modules themselves is in
 - [ ] **Skill chain: grill, then recipe.** The grill writes site memory; a
       recipe-building skill reads it and proposes a Recipe. ADR-0035's gate
       applies (dry-run and human review before any apply). Own ADR.
-- [ ] **Verbal webform.** Chain: a webform builder tool (the `webform`
-      module is not installed; search drupal.org for an existing Webform
-      Tool API / MCP builder before building one) so a form is designed by
-      talking; annotations on each element (purpose, plain-language help, what
-      a good answer looks like); a walkthrough skill that asks each question,
-      writes the answer back, and uses aim for anything already known. In
-      use: an everyman describes the form they want, then is interviewed through
-      it. Blockers: `annotations` has no write path and the `aim_annotations`
-      bridge (ADR-0024) is unbuilt; submissions need a narrow,
-      permission-gated write tool, not general entity writes.
 - [ ] **Fresh install docs.** The recipe README's "Fresh install" should
       say to apply `aim_ollama_local` (or set the Ollama host and
       embeddings default) before this recipe, since facts are embedded on
@@ -207,19 +185,6 @@ gate are built. Work on the literals modules themselves is in
       then let consolidation dedupe across chunks. A small local extractor
       has a much smaller window, so chunk size should be per model
       (see `adr/model-call-budget.md`).
-- [ ] **PARKED 2026-10-15 (Nik): file ingest from Claude.ai over MCP.** Idea:
-      `aim_media_upload` (filename + text/base64 content -> Media entity in
-      the private file store, returns the ID) plus `aim_ingest` (media ID ->
-      the ADR-0016 pipeline, facts untrusted). Both gated on `ingest aim
-      facts` plus an `aim_tool_oauth` scope. Limit: Claude.ai can only hand a
-      file to an MCP tool as an argument, so bytes go through model context
-      (fine for small text, poor for PDFs/images/large files). WebMCP is a
-      possible route, UNVERIFIED (checked 2026-10-16): its spec lists binary
-      inputs as an open question, doesn't name Claude.ai as a caller, and is
-      Chrome 146+ behind a flag. Revisit when binary input is resolved.
-      Small text files could skip the upload and pass text straight to
-      `aim_ingest`.
-      Raise the PII gate (ADR-0056) before real files go through.
 
 ## Decision models (ADR-0021 open questions and addenda, ADR-0037)
 
@@ -232,8 +197,9 @@ only work to do is listed here.
       retention/training policy of the hosted decision host (blocks real
       data); attach a guardrail set to a Decision call and verify the
       built-in length/regex plugins run for it (then a separate set, not
-      `aim_write_guardrails`); raise `drupal/ai` to `^1.6` once tagged
-      (enabling `ai_provider_typesafeai` needs `config:export` parity).
+      `aim_write_guardrails`). aim's `composer.json` requires `drupal/ai`
+      `^1.6` since 2026-10-30 (the Decision API); until 1.6.0 is tagged a
+      site needs `1.6.x-dev`.
 - [ ] **Per-model thresholds and editable question text** for the decision
       backend (ADR-0021 decision 5; text hardcoded in `AimMemoryManager`).
       Limits: `tev1` input ~2,050 tokens, Ollama max 26 options. Optional:
@@ -252,10 +218,13 @@ only work to do is listed here.
       provider with the `decision` operation (no chat path, ADR-0037).
       Consolidation and the verifier keep their chat option: it is the
       baseline any chat provider can run; a decision model is the upgrade.
-- [ ] **`subq-snap-1.1`: find why the eval was refused, then re-measure**
-      the verifier and grounding thresholds on it (ADR-0021's 2026-10-22
-      addendum). The finder's calls on it work; `decision-eval.php`'s
-      grounding run got "not permitted for this API key".
+- [ ] **Re-measure the verifier and grounding thresholds on the live
+      decision model** with `decision-eval.php`. Live is `subq-snap-1.1`
+      (verifier 0.8, grounding 0.7), carried over from earlier models. On
+      2026-10-22 the eval script's run on it was refused ("not permitted
+      for this API key") while single calls worked; live calls and the
+      2026-10-27 merge measurements have used it since, so re-run before
+      assuming the refusal still stands.
 - [ ] **Sovereignty wording is stale (Nik, 2026-10-22).** Local chat model
       support is no longer forced, but ADR-0004 and CLAUDE.md decision 5
       still say extraction/consolidation "must support Ollama". Add an
@@ -265,11 +234,6 @@ only work to do is listed here.
       `ingest_max_chars` and a passage limit for the decision call (untested
       above ~1,000 words); MCP `source_text` is only as verbatim as the
       calling agent.
-- [ ] **Consolidation queue has no scheduler of its own (found 2026-10-19).**
-      The worker has no `cron` key (ADR-0003), no crontab/DDEV/systemd entry
-      was found, yet 28 queued items drained between two checks (cause
-      unknown). Add the `queue:run aim_consolidate` line or build ADR-0031's
-      cron fallback (Queue processing, below); `aim:status` flags a stall.
 - [ ] **Eval work** (none built beyond the sets in `aim_benchmark/scripts/`):
       classifyPair gold set (15-25 pairs per verb, hard negatives, human
       labels); harder UPDATE/NOOP pairs; verifyMerge set from mutated good
@@ -285,7 +249,7 @@ only work to do is listed here.
       214): a field constraint plus an extractor prompt hint.
 - [ ] **Atomic extraction.** Check the extraction prompt asks for one claim
       per fact; a compound fact makes a later update a partial overwrite.
-- [ ] **Jev rerank of recall results** (ADR-0036, pinned): widen the cutoff,
+- [ ] **Decision-model rerank of recall results** (ADR-0036, pinned): widen the cutoff,
       have the model filter the top N, for paraphrase misses. Measure on
       the known misses first; it sends fact text to the model.
 - [ ] **subq as decision host: open points** (history in ADR-0021's
@@ -298,7 +262,7 @@ only work to do is listed here.
       is `host` plus three `activities.*.model` values, then `config:export`.
 - [ ] **Check the facts View on data with retired facts** (the update hooks
       that touched it were removed; they had only run against empty data).
-- [ ] Verify Jev reports token usage live and the Anthropic key in watchdog
+- [ ] Verify the decision endpoint reports token usage live and the Anthropic key in watchdog
       is rotated and cleared; run
       `ai_provider_typesafeai/tests/check-decision-api.php` (offline class
       check, never run).
@@ -331,14 +295,6 @@ only work to do is listed here.
 
 ## Governance
 
-- [ ] Close [ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
-      deferred governance gate before ship - the `trusted` field/
-      `default_trusted` half is BUILT 2026-09-28 (see "PoC deviations"
-      below); per-scope `trust {scope} aim facts` permission BUILT
-      2026-09-30 (custom `trust` access operation, used by the Trust/
-      Untrust bulk actions). The `trusted: TRUE` override on `remember()`
-      now needs `administer aim` or the scope's trust permission (BUILT
-      2026-10-19).
 - [ ] **Record who trusted a fact (raised 2026-10-11; deferred 2026-10-19 to
       before real data, with ADR-0056; add a `trust_basis` field too:
       reviewer, policy, grounded or override).** Add `trusted_by`
@@ -350,20 +306,14 @@ only work to do is listed here.
       this?", the first audit question an enterprise buyer asks.
 - [ ] **Edit history for facts (raised 2026-10-11).** A text edit on
       `/admin/content/aim-facts/{aim_fact}/edit` replaces the text in
-      place, so manual changes leave no trail, unlike consolidation's
-      non-destructive supersede. Proposed: make `aim_fact` revisionable
-      on its own, without Content Moderation (the ADR-0002 addendum
-      rejected CM and counted revisionability as one of its costs; on
-      its own it is much cheaper). The fact ID stays stable; each edit
-      gets a revision with author, time and log message, and core's
-      revision UI comes with it. Search API indexes the default revision
-      only, so recall and the vector table are unchanged. Costs:
-      `aim_fact_revision` tables and an update hook converting the
-      existing entity type (`updateFieldableEntityType()`; check Views,
-      the `subject_uid` rename broke one silently). Consolidation keeps
-      its supersede edge: a merge is two facts becoming one, not an
-      edit. Rejected: saving an edit as a new fact that supersedes the
-      old one, because the ID would change on every edit.
+      place, so manual changes leave no trail. Design in
+      [ADR-0064](adr/0064-revisions-for-fact-edits.md) (proposed
+      2026-10-30): revisionable without Content Moderation, a revision
+      only when `text` changes, only `text` and `grounding_score`
+      revisioned, revise for wording vs. supersede for a changed world.
+      Build while reinstalling is still free. Rejected: saving an edit as
+      a new fact that supersedes the old one, because the ID would change
+      on every edit.
 
 ## Queue processing (ADR-0031)
 
@@ -371,4 +321,6 @@ only work to do is listed here.
       ([ADR-0031](adr/0031-cron-fallback-for-queue-processing.md)):
       `consolidate_on_cron`/`cron_time` settings, `hook_queue_info_alter`,
       `aim:status` warning, then amend CLAUDE.md decision 4, README.md and
-      DEVELOPING.md's "never `hook_cron`" wording.
+      DEVELOPING.md's "never `hook_cron`" wording. This site needs neither:
+      the host crontab runs `drush cron` and `queue:run aim_consolidate`
+      hourly (found 2026-10-30; it explains the 2026-10-19 "unknown drain").

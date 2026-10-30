@@ -198,7 +198,7 @@ Settings (`aim.settings`, `/admin/config/aim/settings`):
   The verifier is a noul `faithful` question, true at probability >= 0.5.
   Set the verifier to a different model so one checks the other. The
   decision backend's confirmation cutoff is `activities.verifier.threshold`
-  (empty or 0 means 0.5; this site uses 0.8 for Jev). A local decision
+  (empty or 0 means 0.5; this site uses 0.8 for its decision model). A local decision
   model is parked, see [ADR-0021](adr/0021-jev-typed-decision-provider.md).
 - `merge_max_distance` (default 0 = off): merged embedding must sit within
   this cosine distance of each input. Measured 2026-10-01 on one pair, it
@@ -216,7 +216,8 @@ Settings (`aim.settings`, `/admin/config/aim/settings`):
   facts stay live), rather than merging and marking the result untrusted,
   which would retire two good facts for one doubtful one. An audit line
   per merge (kept and candidate IDs, score, cutoff, mode). Measured
-  2026-10-27 on hosted Jev (`subq-snap-1.1`) over 16 real merges (the
+  2026-10-27 on a hosted SystemOne-compatible decision endpoint
+  (`subq-snap-1.1`) over 16 real merges (the
   site's `demo/recall-eval/auto-band.php ground`): every correct merge
   scored 0.90 or more although it drops the superseded value, and each
   with one invented sentence added scored 0.07 or less, so the plain
@@ -637,10 +638,10 @@ to the model and never stored.
   candidates in one Decision call (per group, below) (`candidate_1` ... in the state, one
   strict Noul question each, `GROUNDING_QUESTION`). Extraction and an MCP
   batch check all their facts at once; each `remember()` then finds its
-  score in the request cache. About 0.35 s on hosted Jev.
+  score in the request cache. About 0.35 s on a hosted decision endpoint.
 - **Chunking.** More candidates than
-  `activities.grounding.max_questions` (default 16, subq's cap; raise it
-  for a model that takes more) go in groups, one call each; a failed group
+  `activities.grounding.max_questions` (default 16, the lowest cap
+  measured on a hosted endpoint; raise it for a model that takes more) go in groups, one call each; a failed group
   leaves only its own scores empty.
 - **Trust policy** (`aim.settings:trust_policy`, `AimTrustPolicy`): each
   write names its entry channel in code (`chat`, `mcp`, `ingest`, `drush`;
@@ -683,6 +684,40 @@ to the model and never stored.
   preflight canary's `ZZPREFLIGHT` token, 0.52-0.62). Narrower wordings did
   not fix it without passing real meaning-changing drops (ADR-0037
   addendum), so the preflight canary no longer carries a junk token.
+
+### Dates and time
+
+What aim does with dates today, in one place. The stance
+([ADR-0057](adr/0057-dates-resolved-and-confirmed-before-write.md)): store
+the date, show the date, do not reason about time. No recency ranking,
+decay or model-judged staleness
+([ADR-0036](adr/resolved/0036-memory-algorithm-appraisal.md) has the
+literature and what was parked).
+
+- **Four timestamps on `aim_fact`.** `created` (when aim recorded it);
+  `asserted` (optional, true since: `--asserted` on `aim:remember`);
+  `expires` (optional, the day it stops being true); `retired` (set when
+  it leaves recall, by consolidation, `aim:expire` or a reviewer).
+- **Writing.** The remember tool's `text` description asks for calendar
+  dates, never relative ones ("until Friday 16 October 2026"), and
+  `expires` is a `YYYY-MM-DD` input on the tool, `aim:remember`
+  (`--expires`) and JSON/batch entries; a past date is refused.
+  Not built: the chat persona is not given today's date (so it cannot
+  confirm "Friday" as a calendar date), and extraction does not resolve
+  relative dates against the document's date (ADR-0057 points 1, 2, 4).
+- **Expiry.** `aim:expire` retires every live fact past its `expires`
+  (hourly crontab, `hook_cron` as the stopgap backup; see
+  "`aim:consolidate`" above).
+- **Consolidation.** Facts with different `expires` are never compared,
+  so a temporary fact is not merged into a lasting one; a merge carries
+  `expires` and the candidate's `asserted` (see "`aim:consolidate`").
+- **Recall.** `aim_recall` returns each fact's `date` and `date_kind`:
+  `true_since` (from `asserted`) or `recorded` (from `created`), so the
+  reading model can word an old fact as "as of" rather than as current.
+  No `since`/`until` filters yet
+  ([ADR-0046](adr/0046-core-cutoff-time-axis-and-shared-gist-finder.md)
+  piece 2, parked); a non-vector listing by date is
+  [ADR-0032](adr/0032-dated-category-listing-for-quick-notes.md).
 
 ### Scope/bundle model
 
@@ -1256,7 +1291,7 @@ Model calls tagged `aim_*` (`aim_extract`, `aim_consolidate`,
 `aim_consolidate_verify`, `aim_consolidate_merge`, `aim_ground`), plus the
 chat assistant's `ai_agents_aim_chatbot` (applied by `ai_agents`), are
 recorded by `ai_logging` as `ai_log` entities, prompt and response text
-included ([ADR-0060](adr/0060-adopt-ai-logging-for-model-calls.md)). Browse
+included ([ADR-0060](adr/resolved/0060-adopt-ai-logging-for-model-calls.md)). Browse
 them at the Views listing `ai_logs`.
 
 `ai_logging.settings` is **site-wide, shared with every module**, and aim

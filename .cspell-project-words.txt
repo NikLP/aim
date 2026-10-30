@@ -29,6 +29,7 @@ deepchat
 delegators
 demoable
 dotdev
+droost
 drupalbrain
 ebbinghaus
 entrancy
@@ -67,6 +68,7 @@ linkit
 lowid
 makerspace
 medin
+memlo
 memoire
 memori
 mgmt
@@ -77,6 +79,7 @@ misattributing
 miscalibration
 misconstrual
 misroute
+nerra
 networkidle
 newq
 niklp

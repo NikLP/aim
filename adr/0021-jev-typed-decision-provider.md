@@ -1,10 +1,15 @@
-# ADR-0021: Decision models: hosted Jev is the live path, local models are parked
+# ADR-0021: Decision models: a hosted SystemOne-compatible endpoint is the live path, local models are parked
 
 **Status:** Accepted as current state (rewritten 2026-10-11; first
 proposed as a Jev spike 2026-09-26). Absorbs the former ADR-0038 (local
 decision models) and the processing-mode half of ADR-0033; the gate half
 of 0033 moved to [ADR-0037](resolved/0037-transient-source-passages-for-grounding.md).
 Open items (pass bar, retention, per-model config) are in TODO.md.
+Live 2026-10-30: all three activities on a hosted SystemOne-compatible
+decision endpoint (`typesafeai` provider, this site `subq-snap-1.1`,
+verifier 0.8, grounding 0.7). The model names below are what each
+measurement ran on; thresholds are per model, so re-measure on a change
+(TODO.md).
 **Date:** 2026-09-26
 
 ## Context

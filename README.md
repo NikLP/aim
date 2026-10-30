@@ -91,7 +91,7 @@ Five memory categories, composable at retrieval the way Mem0 composes
   the text is not kept in the fact (its model call is logged, ADR-0060), and the check can set `trusted` or only
   record its score. A
   lightweight `trusted` flag is the draft-to-trusted human-review gate
-  ([ADR-0002](adr/0002-governance-deferred-guardrails-mandatory.md)'s
+  ([ADR-0002](adr/resolved/0002-governance-deferred-guardrails-mandatory.md)'s
   addendum) - `recall()` excludes untrusted facts by default. Content
   Moderation was considered and not adopted (same addendum). One deliberate
   exception either way: an entity flagged as synchronizing

@@ -1,6 +1,8 @@
 # ADR-0003: Async processing via Queue API and a dedicated crontab, never `hook_cron`
 
-**Status:** Accepted; the "never `hook_cron`" rule is amended by [ADR-0031](../0031-cron-fallback-for-queue-processing.md) (proposed)
+**Status:** Accepted; the "never `hook_cron`" rule is amended by [ADR-0031](../0031-cron-fallback-for-queue-processing.md) (proposed); one stopgap exception in force since 2026-10-11: the expiry sweep
+(`aim:expire`, no model call, [ADR-0057](../0057-dates-resolved-and-confirmed-before-write.md))
+also runs from `hook_cron`, since aim cannot promise a site a cron job
 **Date:** 2026-09-09
 
 ## Context
@@ -88,7 +90,7 @@ enqueue happens, and a few pointers had gone stale.
   destinations set it on every entity they save, so migrated facts also
   skip consolidation. The flag is not exposed on any write path, so a
   caller cannot use it to keep a real fact out of consolidation - see
-  [ADR-0020](../0020-verbatim-facts-consolidation-opt-out.md) for a
+  [ADR-0020](0020-verbatim-facts-consolidation-opt-out.md) for a
   proposed explicit flag.
 - **Unchanged, re-checked against the code:** `AimConsolidateQueueWorker`
   still carries no `cron` key; `processItem()` still skips an

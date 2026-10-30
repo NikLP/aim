@@ -7,7 +7,8 @@ Reference material split out of DRAFT-eval-plan.md. Not decisions.
 One row per hop, updated 2026-10-28 from the code and this site's live
 config. "Hosted" means the text leaves this machine. Providers: chat and
 merge writing on amazeeio (`chat`, the site default chat model), every
-decision on hosted Jev (`typesafeai`, `subq-snap-1.1`), embeddings on local
+decision on a hosted SystemOne-compatible endpoint (`typesafeai`,
+`subq-snap-1.1`), embeddings on local
 Ollama (`nomic-embed-text`). The `ai_log` column holds only when
 `ai_logging.settings:prompt_logging` is on with the tags listed in the
 site's demo/README.md "Model settings"; verify against live config before
@@ -16,17 +17,17 @@ relying on a row.
 | Hop | In | Out | Provider | Leaves machine? | Stored where |
 | --- | --- | --- | --- | --- | --- |
 | Visitor to widget | Question | Answer | none | no | assistant history (private tempstore pool) |
-| Chat gate (finder, optional) | Question + literal gists (no values) | Literal key or none | Jev (hosted) | yes | not stored; `ai_log` (tag `literals_choose`) |
+| Chat gate (finder, optional) | Question + literal gists (no values) | Literal key or none | Decision endpoint (hosted) | yes | not stored; `ai_log` (tag `literals_choose`) |
 | Chat turn (assistant loop, up to 7 rounds) | Question + persona + history + tool results (recalled facts, literal values) | Answer, tool calls | amazeeio (hosted) | yes | not stored by aim; `ai_log` (tag `ai_agents_aim_chatbot`) |
 | Embedding | Fact text at index time, query text at recall | Vector | local Ollama | no | `aim_fact_vectors`; query vectors in the embedding cache (7 days) |
 | Recall | Query vector, viewer | Facts the viewer may see, `[literal:key]` filled in as the viewer | none | no | not stored (verbose log: counts and best score; query text only with `log_query_text`) |
-| Literal lookup (`aim_literal`) | Key, search words or question | Label and exact value, if the viewer may read it | none; the finder (Jev) in question mode | question mode only | not stored |
+| Literal lookup (`aim_literal`) | Key, search words or question | Label and exact value, if the viewer may read it | none; the finder (decision model) in question mode | question mode only | not stored |
 | Extraction | Whole source document | Candidate facts | amazeeio (hosted) | yes | facts; `ai_log` (tag `aim_extract`) |
-| Write-time grounded check | Source text (the document, or `source_text` from chat or MCP) + candidate facts | Score per fact | Jev (hosted) | yes | `grounding_score` on the fact, source text not kept; `ai_log` (tag `aim_ground`) |
-| Consolidation classifier | Two fact texts | ADD, UPDATE, NOOP or RETIRE | Jev (hosted) | yes | `superseded_by_reason` JSON (no text); `ai_log` (tag `aim_consolidate`) |
+| Write-time grounded check | Source text (the document, or `source_text` from chat or MCP) + candidate facts | Score per fact | Decision endpoint (hosted) | yes | `grounding_score` on the fact, source text not kept; `ai_log` (tag `aim_ground`) |
+| Consolidation classifier | Two fact texts | ADD, UPDATE, NOOP or RETIRE | Decision endpoint (hosted) | yes | `superseded_by_reason` JSON (no text); `ai_log` (tag `aim_consolidate`) |
 | Merge writer (UPDATE only) | Two fact texts | Merged text | amazeeio (hosted) | yes | the merged fact; `ai_log` (tag `aim_consolidate_merge`) |
-| Merge verifier | Two fact texts + merged text | Faithful probability | Jev (hosted) | yes | audit line on rejection (no text); `ai_log` (tag `aim_consolidate_verify`) |
-| Merge grounded check | Two fact texts (as the passage) + merged text | Score | Jev (hosted) | yes | `grounding_score` on the merged fact; `ai_log` (tag `aim_ground`) |
+| Merge verifier | Two fact texts + merged text | Faithful probability | Decision endpoint (hosted) | yes | audit line on rejection (no text); `ai_log` (tag `aim_consolidate_verify`) |
+| Merge grounded check | Two fact texts (as the passage) + merged text | Score | Decision endpoint (hosted) | yes | `grounding_score` on the merged fact; `ai_log` (tag `aim_ground`) |
 | LLM judge (ai_eval) | Question, answer, ground truth | Score | judge provider (to choose) | depends | eval result entity |
 | Review trace (proposed) | Whole turn + versions | none | none | no | trace store, 30-day retention |
 
@@ -36,7 +37,7 @@ are the first thing the retention and access decisions apply to.
 Gap this exposes: the same question travels to two or three hosted
 providers per turn (chat, finder, grounded check), and a fact's text
 reaches both hosted providers again whenever consolidation merges it
-(classifier, verifier and grounded check on Jev, the merge writer on
+(classifier, verifier and grounded check on the decision endpoint, the merge writer on
 amazeeio). The retention and disclosure decisions in section 1 should be
 made per hop, not per feature.
 

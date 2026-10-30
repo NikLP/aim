@@ -1,6 +1,14 @@
 # ADR-0030: Fact groups - a scope-agnostic `group` field, shipped as an `aim_group` submodule
 
-**Status:** Accepted 2026-09-30 - design only, nothing built.
+**Status:** Retired 2026-10-30, never built. Its motivation weakened
+when cases took names (2026-10-29): sessions that name the same case now
+join it, which covers "three grill sessions cannot see each other". The
+one piece worth keeping, the generic `extra_filters` seam on `recall()`
+(decision 3), moved to
+[ADR-0059](../0059-single-valued-category-and-ingress-labelling.md)
+decision 3, which needs it for the category filter. Revisit a
+cross-scope `group` only when a real need to tie facts of different
+scopes together shows up.
 **Date:** 2026-09-30
 
 ## Context
@@ -8,7 +16,7 @@
 Consolidation and `recall()` compare facts within one scope and, for
 non-account scopes, one `subject` (`AimMemoryManager::findNearestNeighbor()`
 filters on `scope`, then `user` or `subject`). Two consequences surfaced
-while planning repeated grill sessions ([aim-discovery](../skills/aim-discovery/)):
+while planning repeated grill sessions ([aim-discovery](../../skills/aim-discovery/)):
 
 - Each session that omits a subject mints a fresh case ID
   (`AimScopeCase::defaultSubject()`), so three sessions about one project
@@ -106,11 +114,11 @@ and is not decided here.
 
 ## Related
 
-[ADR-0001](resolved/0001-storage-and-scope-model.md),
-[ADR-0012](resolved/0012-fact-relation-graph.md),
-[ADR-0018](resolved/0018-index-subject-uid-with-btree.md),
-[ADR-0026](resolved/0026-pluggable-scope-submodules.md),
-[ADR-0028](resolved/0028-scope-type-plugin.md),
-[ADR-0029](0029-context-carrying-turns.md) (`batch_id` is per-turn
+[ADR-0001](0001-storage-and-scope-model.md),
+[ADR-0012](0012-fact-relation-graph.md),
+[ADR-0018](0018-index-subject-uid-with-btree.md),
+[ADR-0026](0026-pluggable-scope-submodules.md),
+[ADR-0028](0028-scope-type-plugin.md),
+[ADR-0029](../0029-context-carrying-turns.md) (`batch_id` is per-turn
 provenance, distinct from `group`; piece 5's case titles and membership
 overlap with open question 2).

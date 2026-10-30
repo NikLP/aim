@@ -1,6 +1,14 @@
 # ADR-0037: Transient source passages, so a decision model can check a candidate fact against what was actually said
 
-**Status:** Note 2026-10-14: the model call that carries the passage is now logged with its text by `ai_logging` ([ADR-0060](../0060-adopt-ai-logging-for-model-calls.md)); the fact table still stores none of it. Built 2026-10-11 as a write-time check: decisions 1-4 (side
+**Status:** Where the source text lives (2026-10-30): not on the fact,
+but the grounded check's model call (tag `aim_ground`) is logged with
+its full prompt, passage included, by `ai_logging` in `ai_log`
+([ADR-0060](0060-adopt-ai-logging-for-model-calls.md), 2026-10-14). The
+position is all data stored (subject to the site's `ai_logging` settings
+and pruning), with a zero-data mode (ADR-0060's stealth) as the planned
+opposite. So "nothing stored" below means "nothing on the fact", and
+decision 7's privacy controls (passage never logged,
+`source_check_allow_remote`) were never built and no longer apply. Built 2026-10-11 as a write-time check: decisions 1-4 (side
 table, queue step, retention sweep) replaced by checking while the source
 text is in memory and storing none of it (see "Built" below; first proposed
 as [ADR-0056](../0056-personal-data-write-gate.md) decision 7). Shadow mode on
@@ -105,7 +113,7 @@ later is acceptable; a bad fact becoming recallable at all is not.
    `default_trusted: false`, a new fact is saved untrusted and the check
    flips `trusted`; `recall()` needs no change. Facts below the cutoff stay
    untrusted for human review (the review queue in
-   [ADR-0002](../0002-governance-deferred-guardrails-mandatory.md)).
+   [ADR-0002](0002-governance-deferred-guardrails-mandatory.md)).
 2. **Fail closed.** If the model is unreachable, errors, or returns
    `STATE_TRUNCATED`, the fact stays untrusted. The failure mode is silence
    (a saved fact never recalled), not pollution, so make silence visible:
@@ -188,7 +196,7 @@ human-verified by Nik 2026-10-10, no changes. `jev-latest`, three runs, scores s
   a cutoff of about 0.7 holds every bad item but the misattribution on this
   set, tuned on the set so optimistic).
 
-## Built (2026-10-11): checked at write time, nothing stored
+## Built (2026-10-11): checked at write time, nothing stored on the fact
 
 Hosted Jev answers a batched call in 0.35 s, so the check runs when the
 fact is written, not later in the queue. That drops decisions 1-4: no
@@ -311,7 +319,7 @@ assumes the untrusted start.
 
 ### Not decided here
 
-- `trusted_by` / `trusted_at` base fields ([ADR-0002](../0002-governance-deferred-guardrails-mandatory.md)
+- `trusted_by` / `trusted_at` base fields ([ADR-0002](0002-governance-deferred-guardrails-mandatory.md)
   skipped `trusted_by` on purpose). They answer "who approved this?" for
   audit and would also feed the reviewer list and ADR-0024 promotion.
   Deferrable: nothing above needs them, and adding them later is one

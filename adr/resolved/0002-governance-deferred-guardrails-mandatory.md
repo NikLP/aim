@@ -1,6 +1,16 @@
 # ADR-0002: Governance deferred for PoC; Guardrails mandatory from day one
 
-**Status:** Accepted
+**Status:** Resolved 2026-10-30. Both halves built: Guardrails on every
+write (2026-09-09), and the draft-to-trusted gate as the `trusted` flag
+(addendum below, 2026-09-28), with per-scope trust permissions, the gated
+`trusted` override and per-channel starting trust
+([ADR-0037](0037-transient-source-passages-for-grounding.md) addenda,
+2026-10-19 and 2026-10-22). The Decision section below is the original
+2026-09-08 deferral: superseded by the addendum, kept as history (it names
+the since-removed `aim_eca` and the old `administer aim memory`
+permission). Left over: `trusted_by`/`trusted_at` audit fields (TODO.md
+"Governance"); fact revisions are
+[ADR-0064](../0064-revisions-for-fact-edits.md).
 **Date:** 2026-09-08 (deferral), 2026-09-09 (Guardrails cheap-path built)
 
 ## Context
@@ -78,7 +88,7 @@ doesn't imply a mandatory extra LLM call.
 
 ## Addendum (2026-09-28): draft-to-trusted resolved as a lightweight flag, not Content Moderation
 
-Re-examined while unblocking [ADR-0024](0024-annotations-integration-target-scoped-promotion.md).
+Re-examined while unblocking [ADR-0024](../0024-annotations-integration-target-scoped-promotion.md).
 Content Moderation was the obvious mechanism (this ADR's own Context
 section named it), but doesn't earn its cost here:
 
@@ -94,7 +104,7 @@ section named it), but doesn't earn its cost here:
   a module headed to drupal.org that's deliberately trying to stay thin.
 - Trust is a retrieval-quality decision ("should this be surfaced as
   authoritative"), not an identity-based access rule - it's orthogonal to
-  [ADR-0025](resolved/0025-scope-access-plugin-type.md)'s scope-access plugin work
+  [ADR-0025](0025-scope-access-plugin-type.md)'s scope-access plugin work
   and shouldn't be folded into it.
 
 **Decision: one new base field, `trusted` (boolean)**, indexed as a
@@ -151,7 +161,7 @@ site-scope facts but not user-scope ones, without update access to the
 fact text. `administer aim memory` still passes. Still open: the
 `trusted` override on `remember()` bypasses it.
 
-Promotion into Annotations ([ADR-0024](0024-annotations-integration-target-scoped-promotion.md))
+Promotion into Annotations ([ADR-0024](../0024-annotations-integration-target-scoped-promotion.md))
 doesn't depend on any of this either way - `annotation` entities are
 already revisioned on Annotations' own side, and promotion is fully
 custom/programmatic code, not bound to whatever mechanism `aim_fact`

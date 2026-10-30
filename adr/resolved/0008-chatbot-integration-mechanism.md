@@ -1,6 +1,14 @@
 # ADR-0008: Chatbot integration - `ai_agents` tools, not a CCC content source
 
-**Status:** Accepted; design for the CCC half not yet built (CCC not enabled)
+**Status:** Superseded 2026-10-30 by
+[ADR-0062](0062-chat-on-the-shared-tools.md) (chat on `aim_tool`'s shared
+tools, scope set by the visitor's permissions): the `#[FunctionCall]`
+plugins and the hardcoded `scope: site` below are gone. The split-assistants
+addendum is moot: its prerequisite (a permission check in the remember
+tool) came with ADR-0062, chat writes start on `hold`, and the split
+itself is parked in BACKLOG.md. Still standing: the CCC decision (aim
+exposes tools; CCC, if enabled, holds the policy on when to use them; no
+code either way).
 **Date:** 2026-09-09 (AI Assistant API), 2026-09-10 (migrated to `ai_agents`)
 
 ## Context

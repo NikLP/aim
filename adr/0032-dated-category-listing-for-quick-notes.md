@@ -1,6 +1,11 @@
 # ADR-0032: Category-and-date listing for quick notes (a non-vector "list" path)
 
-**Status:** Proposed 2026-10-01 - design only, nothing built.
+**Status:** Proposed 2026-10-01 - design only, nothing built. Category
+parts updated 2026-10-30: `category` is single-valued for the foreseeable
+future ([ADR-0059](0059-single-valued-category-and-ingress-labelling.md),
+accepted), so capture takes one term ID and the category filter and its
+indexing are ADR-0059's; this ADR keeps the list method, `asserted`
+capture and date filtering.
 **Date:** 2026-10-01
 
 ## Context
@@ -16,8 +21,8 @@ concern:
 
 - `scope=user` already gives per-person ownership and privacy (the
   diary's main requirement).
-- `category` (an `entity_reference` to the `aim_category` vocabulary,
-  unlimited cardinality) is the natural "type of thing" tag, chosen by
+- `category` (an `entity_reference` to the `aim_category` vocabulary;
+  unlimited cardinality when written, single-valued under ADR-0059) is the natural "type of thing" tag, chosen by
   the user at capture time instead of guessed by an extractor.
 - `asserted` (timestamp) already carries a date. Its description
   ("an earlier real-world date") only contemplates past dates, but
@@ -56,18 +61,18 @@ What is actually missing:
    `category` and an `asserted` date. Revisit a dedicated scope-type
    plugin ([ADR-0028](resolved/0028-scope-type-plugin.md)) only if a
    need appears that category plus date cannot express: grouping several
-   facts under one occurrence (see [ADR-0030](0030-fact-groups.md)'s
+   facts under one occurrence (see [ADR-0030](resolved/0030-fact-groups.md)'s
    `group` field first), auto-expiry at an event's end, or
    attendance-based visibility.
 2. **Add a non-vector list method** to `AimMemoryManager` (working name
    `listFacts()`): a plain entity query on `aim_fact`, filtered by
    `scope`, `user`/`subject`, `category` (term IDs), an `asserted`
-   range, and excluding retired (`expires`) and, by default, untrusted
+   range, and excluding retired (`retired` set) and, by default, untrusted
    facts, sorted by `asserted`. No embedding call, no index change.
    Exposed through a Drush command and an `aim_tool` Tool, each
    permission-gated and access-checked exactly as `recall()` is.
 3. **Capture by term ID.** `AimRemember` (Tool API) gains `category`
-   (array of term IDs, an entity reference in the Tool's schema) and
+   (one term ID, an entity reference in the Tool's schema; ADR-0059) and
    `asserted` (an ISO 8601 date-time, the format a mobile client
    sends). `remember()` today resolves category *names* via
    `resolveCategoryTerms()`; it should accept term IDs at this boundary,

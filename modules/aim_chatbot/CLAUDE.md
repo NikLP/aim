@@ -10,7 +10,7 @@ what is specific to `aim_chatbot`.
 ## Scope
 
 **Set by the visitor's permissions, not by code**
-([ADR-0062](../../adr/0062-chat-on-the-shared-tools.md)). The tools run as
+([ADR-0062](../../adr/resolved/0062-chat-on-the-shared-tools.md)). The tools run as
 the visitor: recall returns only facts they may view, remember checks
 `create {scope} aim facts` per fact. A chat-facing role needs `recall aim
 facts`/`remember aim facts` plus the per-scope permissions; whatever scopes
@@ -79,6 +79,6 @@ subscriber passes the same cutoff.
 ## CCC (`ai_context`)
 
 Not enabled on this site. If/when it is, the integration shape is
-`aim_chatbot` exposing tools (done) and CCC holding curated policy about
+`aim_tool`'s tools (done) and CCC holding curated policy about
 when to call them - not `aim` becoming a CCC content source. See
-[ADR-0008](../../adr/0008-chatbot-integration-mechanism.md).
+[ADR-0008](../../adr/resolved/0008-chatbot-integration-mechanism.md).

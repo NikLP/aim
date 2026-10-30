@@ -1,6 +1,11 @@
 # ADR-0029: Context-carrying turns - mention tokens, an API-first console, and one review pipeline
 
-**Status:** Accepted 2026-09-30 - design only, nothing built.
+**Status:** Parked 2026-10-30 (accepted 2026-09-30) - design only,
+nothing built. Trimmed 2026-10-30 to what is still unbuilt: mention
+tokens (piece 1), the API-first console (piece 2) and `batch_id`
+(piece 3). Pieces 4 and 5 were delivered or moved elsewhere (notes in
+place). Revisit when a console or another reference-carrying client is
+wanted.
 **Date:** 2026-09-30
 
 ## Context
@@ -109,45 +114,26 @@ utterance" and undoing or reviewing a whole turn. It does not affect
 retrieval.
 
 - `source` stays a short provenance tag; it is not made queryable.
-- **No `aim_turn` entity, no stored turn text.** With on-the-fly
+- **No `aim_turn` entity.** (Turn text is stored after all, in `ai_log`,
+  since [ADR-0060](resolved/0060-adopt-ai-logging-for-model-calls.md).) With on-the-fly
   validation (piece 4), the proposed facts, their tokens, and the
   `batch_id` are enough once reviewed. Stored raw text would matter only
   for re-extraction with a better model or auditing bad extractions.
-- **Why not store it now:** the text has already reached the provider
-  because AI is not yet sovereign, so local storage adds exposure risk,
-  not new leakage. Revisit when a sovereign model is in use (ADR-0004).
 
-### 4. One review pipeline with pluggable reviewers
+### 4. Review pipeline: delivered elsewhere
 
-Extraction produces proposed facts (`trusted=false`, shared `batch_id`)
-shown for confirmation before they count.
+Removed 2026-10-30. A turn's facts start untrusted and are promoted by a
+human or a decision model through the `trusted` flag and per-channel
+starting trust ([ADR-0002](resolved/0002-governance-deferred-guardrails-mandatory.md)'s
+addendum, [ADR-0037](resolved/0037-transient-source-passages-for-grounding.md)'s
+addenda); the console uses that, with `batch_id` as the per-turn handle.
 
-- **Reviewers, all acting on the same object:** a human ("verify these
-  facts", the gamified aide-memoire screen from the fact-verification
-  idea), a machine reviewer (Jev or Laya as a decision provider, ADR-0021),
-  or none (auto-trust, today's PoC behavior).
-- **Human-only mode is required**, not optional, since Jev/Laya are not
-  yet spiked.
-- **This builds the ADR-0002 draft-to-trusted gate** (the lightweight
-  `trusted` flag, ADR-0002's 2026-09-28 addendum). Review is what promotes
-  a fact, matching ADR-0024's review-as-promotion.
+### 5. Case naming and access: moved
 
-### 5. Case naming and membership are separate follow-ups
-
-Two gaps this ADR exposes but does not solve:
-
-- **Case names:** cases are opaque IDs. A `title` on the case scope (or a
-  lookup convention) is needed for the case chip's autocomplete to show
-  anything useful. Small, but a prerequisite for piece 2.
-- **Case scope access control (required, not optional):** who may view
-  a case-scoped fact is undesigned; `AimScopeCase::checkViewAccess()`
-  stays neutral. Console case chips and lookups must not expose cases the
-  viewer shouldn't see, so this must be built before case chips ship.
-  It needs its own ADR, and it depends on membership.
-- **Case membership:** "bring John into the pub project" is structured
-  data, not free text, if it drives access control. The membership model
-  (who belongs to a case, and how that is stored) is the first thing the
-  access-control ADR must decide.
+Removed 2026-10-30. Case names were built 2026-10-29 (the case plugin
+takes a name as the case ID); the subject constraint is in TODO.md "Case
+scope". Case-scope view access and membership are in BACKLOG.md "Case
+scope access control"; that work must land before console case chips.
 
 ## Open questions
 
@@ -155,7 +141,7 @@ Two gaps this ADR exposes but does not solve:
    (`aim_console`) over a stable API contract.
 2. **`aim_chatbot` future:** deferred. Not a priority against the
    console; revisit once the console API exists.
-3. **Case-name lookup:** deferred (piece 5). Token grammar is settled.
+3. **Case-name lookup:** case names exist (2026-10-29); a lookup for chips is still to design. Token grammar is settled.
 4. **`batch_id` type:** decided 2026-09-30 - plain UUID string field; a
    small entity stays possible later.
 
@@ -168,18 +154,18 @@ Two gaps this ADR exposes but does not solve:
 - Adds one base field (`batch_id`), an update hook, and a schema/API
   change to `extractFacts()` (a break for existing callers, mitigated by
   an empty token set meaning today's behavior).
-- The review pipeline finally exercises the `trusted` flag end to end, so
-  `default_trusted` will be false for console-originated facts.
+- Console writes need their own trust channel (ADR-0037's addenda), most
+  likely starting untrusted.
 - Storing tokens in fact text couples text to entity lifetimes; the
   placeholder-on-delete rule is the cost of that.
-- Case naming and membership remain open and block parts of piece 2.
+- Case access control and membership remain open and block console case chips.
 
 ## Related
 
 [ADR-0001](resolved/0001-storage-and-scope-model.md),
-[ADR-0002](0002-governance-deferred-guardrails-mandatory.md),
+[ADR-0002](resolved/0002-governance-deferred-guardrails-mandatory.md),
 [ADR-0006](resolved/0006-agent-native-write-path.md),
-[ADR-0008](0008-chatbot-integration-mechanism.md),
+[ADR-0008](resolved/0008-chatbot-integration-mechanism.md),
 [ADR-0011](resolved/0011-extraction-explicit-subject-uid.md),
 [ADR-0012](resolved/0012-fact-relation-graph.md) (fact-to-fact links, distinct from
 `batch_id`),
@@ -188,5 +174,5 @@ Two gaps this ADR exposes but does not solve:
 [ADR-0024](0024-annotations-integration-target-scoped-promotion.md),
 [ADR-0027](resolved/0027-entity-scope.md),
 [ADR-0028](resolved/0028-scope-type-plugin.md),
-[ADR-0030](0030-fact-groups.md) (a durable, cross-scope `group`,
+[ADR-0030](resolved/0030-fact-groups.md) (a durable, cross-scope `group`,
 distinct from per-turn `batch_id`; overlaps piece 5's case titles).

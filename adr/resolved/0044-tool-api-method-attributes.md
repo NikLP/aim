@@ -1,7 +1,10 @@
 # ADR-0044: Tool API method attributes - watch the upstream MR, shape new tools to adopt it
 
-**Status:** Retired 2026-10-12 - a watching brief, not a decision; the
-revisit trigger is in TODO.md. Was: Proposed 2026-10-04, nothing built and no
+**Status:** Resolved 2026-10-25: the trigger fired (`#[ToolMethod]`
+shipped in tool 1.0.0-beta12) and `aim_tool` adopted it: all three tools
+are `#[ToolMethod]` services in `aim_tool/src/Tool/`, same IDs, schema and
+MCP names; `aim_literal` stays a wrapper over `literals.lookup`. Retired
+2026-10-12 as a watching brief before that. Was: Proposed 2026-10-04, nothing built and no
 change to `aim_tool`. Touches [ADR-0013](0013-mcp-tool-exposure.md)
 (Tool API/MCP exposure) and [ADR-0040](../../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
 "The parts, settled" (the literal agent tools).
@@ -40,8 +43,8 @@ What it proposes:
 ## Decision
 
 Do not change `aim_tool` now. The API is unmerged and unstable, and
-`aim_tool` is two plugins ([AimRecall](../modules/aim_tool/src/Plugin/tool/Tool/AimRecall.php),
-[AimRemember](../modules/aim_tool/src/Plugin/tool/Tool/AimRemember.php), about
+`aim_tool` is two plugins (`AimRecall`,
+`AimRemember`, about
 575 lines). Instead:
 
 1. **New tools are designed as typed service methods first.** Put the

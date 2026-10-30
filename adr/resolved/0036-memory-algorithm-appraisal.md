@@ -1,13 +1,19 @@
 # ADR-0036: Memory algorithm appraisal - what to borrow from the literature, and what aim already does badly
 
-**Status:** Proposed 2026-10-02 - research only, nothing built. Each item
-under "Candidates" is a separate decision if taken up.
+**Status:** Resolved 2026-10-30 (research record). Taken up and built:
+dated recall (finding 1: `aim_recall` returns `date`/`date_kind`),
+top-3 consolidation (finding 4), the `retired`/`expires` split, facts
+with different end dates never compared, and merge grounding (2026-10-27
+addendum). Parked by [ADR-0057](../0057-dates-resolved-and-confirmed-before-write.md)'s
+time stance: the recency/importance re-rank and the access counter. The
+rest (`verified` fields, RRF keyword path, entity links) waits on a
+trigger in BACKLOG.md "Memory algorithm follow-ups".
 **Date:** 2026-10-02
 
 ## Context
 
-Prior comparisons ([ADR-0010](resolved/0010-drupal-native-agent-memory-rationale.md),
-the mem0 code read, [ADR-0012](resolved/0012-fact-relation-graph.md)) compared
+Prior comparisons ([ADR-0010](0010-drupal-native-agent-memory-rationale.md),
+the mem0 code read, [ADR-0012](0012-fact-relation-graph.md)) compared
 *products*. This ADR looks at the underlying *algorithms* and cognitive
 models, and checks each against what `AimMemoryManager` does today
 (`recall()`, `consolidate()`, `findNearestNeighbor()`).
@@ -165,7 +171,7 @@ the minimal alternative if only "when" is wanted. Not built.
 ## Pinned 2026-10-02: recency/importance re-rank (finding 2)
 
 **Parked 2026-10-11** by the time stance in
-[ADR-0057](0057-dates-resolved-and-confirmed-before-write.md): store the
+[ADR-0057](../0057-dates-resolved-and-confirmed-before-write.md): store the
 date, show the date, no time reasoning. Same for the access counter.
 
 Not to be built until the top-3 consolidation change and the dated
@@ -183,7 +189,7 @@ none built: have the classifier answer ADD for time-limited facts, give
 such facts a real `expires` sell-by date (TODO's `retired`/`expires`
 split), or have the merge writer resolve relative dates against
 `created`/`asserted`. Proposed answer (2026-10-11):
-[ADR-0057](0057-dates-resolved-and-confirmed-before-write.md), resolve and
+[ADR-0057](../0057-dates-resolved-and-confirmed-before-write.md), resolve and
 confirm at write time instead.
 
 ## Checked 2026-10-02: RRF keyword path is feasible without MariaDB FULLTEXT

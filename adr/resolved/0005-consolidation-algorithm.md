@@ -107,7 +107,7 @@ every inserted fact is queued. The lower id is `kept`, the higher id is
 a merge (UPDATE) when it is the newer fact, and can have its own text
 overwritten by a later fact's UPDATE when it is the older one. Proposed
 opt-out flag, not built, in
-[ADR-0020](../0020-verbatim-facts-consolidation-opt-out.md).
+[ADR-0020](0020-verbatim-facts-consolidation-opt-out.md).
 
 ## Addendum (2026-09-28): `related` renamed to `superseded_by`, cardinality 1
 

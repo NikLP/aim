@@ -1,8 +1,12 @@
 # ADR-0016: Document ingestion via a Drupal form - three modes, one shared core
 
-**Status:** Accepted for Mode 1 (build now). Mode 2 design only, not built,
-blocked on ADR-0002's gate. Mode 3 out of scope, named only to draw the
-boundary.
+**Status:** Mode 1 built 2026-10-02. Mode 2 design only, not built; no
+longer blocked (2026-10-30): the gate it waited on exists as the `trusted`
+flag plus per-channel starting trust, so a Mode 2 scan can start its
+facts untrusted (ADR-0002's addendum, ADR-0037's addenda). Mode 3 out of
+scope, named only to draw the boundary; "does aim keep source text" is
+now partly answered by ADR-0060 (model-call prompts, including source
+passages, are logged in `ai_log`, not kept for re-analysis).
 **Date:** 2026-09-14
 
 ## Context

@@ -1,6 +1,6 @@
 # ADR-0026: Pluggable scope submodules - config via ThirdPartySettings, behavior via the ADR-0025 plugin type
 
-**Status:** Superseded 2026-10-26 by [ADR-0063](../0063-scopes-as-config-on-core-plugins.md): the scope submodules are gone, scopes ship as config in core `aim`. Was built (pieces 1-5, live-verified 2026-09-28/29); piece 6, the bundling recipe, was dropped.
+**Status:** Superseded 2026-10-26 by [ADR-0063](0063-scopes-as-config-on-core-plugins.md): the scope submodules are gone, scopes ship as config in core `aim`. Was built (pieces 1-5, live-verified 2026-09-28/29); piece 6, the bundling recipe, was dropped.
 `AimScopeAccessInterface`/`AimScopeAccessPluginManager`, referenced throughout piece 4 below, were renamed `AimScopeTypeInterface`/`AimScopeTypePluginManager` on 2026-09-29 ([ADR-0028](0028-scope-type-plugin.md) piece 0).
 **Date:** 2026-09-28
 

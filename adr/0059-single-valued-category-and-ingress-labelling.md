@@ -1,6 +1,9 @@
 # ADR-0059: Single-valued category, filterable in recall, set on ingress
 
-**Status:** Proposed 2026-10-14 - design only, nothing built.
+**Status:** Accepted 2026-10-30 for decision 1 (Nik: if `category` stays,
+it is single-valued for the foreseeable future); decisions 2-5 proposed.
+Nothing built. Takes over the category capture and filter parts of
+[ADR-0032](0032-dated-category-listing-for-quick-notes.md).
 **Date:** 2026-10-14
 
 ## Before and after
@@ -59,7 +62,17 @@ notes. That use is real but small, and it is the one a single value costs.
    holding a large share of the table will post-filter, as a big user does,
    so the 5x over-fetch applies there too).
 3. **`recall()` gains a `category` filter** and the `aim_recall` tool an
-   optional `category` input.
+   optional `category` input. Build it as a generic seam, not a
+   category-only argument (taken from retired
+   [ADR-0030](resolved/0030-fact-groups.md), 2026-10-30): `recall()` takes
+   `extra_filters` (indexed attribute name => value) and adds each as a
+   condition on the vector query, honored only for attributes present on
+   `aim_vector_index`, so a submodule's own indexed field filters the same
+   way with no change to core. Post-filtering is not an option: it breaks
+   the result limit and ranking. A filter on a field missing from the
+   index is dropped silently by the provider (ADR-0032's Context), so the
+   seam must refuse or log an unknown attribute, and each filter needs a
+   test that it actually narrows results.
 4. **Label on ingress, per route:**
    - Extraction: the model picks one term from the existing vocabulary or
      none. It may not invent terms (an invented term is a new tag nobody
@@ -86,6 +99,6 @@ notes. That use is real but small, and it is the one a single value costs.
 ## Not decided here
 
 Hybrid keyword and semantic search stays parked in
-[ADR-0036](0036-memory-algorithm-appraisal.md) until a measured recall miss
+[ADR-0036](resolved/0036-memory-algorithm-appraisal.md) until a measured recall miss
 shows it is needed. Category filtering and `literals` cover the main cases it
 would help with (exact names and identifiers).

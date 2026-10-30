@@ -8,16 +8,18 @@ module reference in [../../DEVELOPING.md](../../DEVELOPING.md).
 
 ## Mechanism
 
-Uses `ai_agents` - see
-[ADR-0008](../../adr/0008-chatbot-integration-mechanism.md) for the
-mechanism and alternatives considered.
+Uses `ai_agents` on `aim_tool`'s shared tools - see
+[ADR-0062](../../adr/resolved/0062-chat-on-the-shared-tools.md) for the
+current mechanism and
+[ADR-0008](../../adr/resolved/0008-chatbot-integration-mechanism.md) (superseded)
+for its history and alternatives considered.
 
 - The `ai_agents.ai_agent.aim_chatbot` config entity
   (`guardrail_set: aim_write_guardrails`) with `tool:aim_recall` and
   `tool:aim_remember` (`aim_tool`, through `tool_ai_connector`; function
   names `tool__aim_recall`/`tool__aim_remember`). No scope lock: the tools
   run as the visitor, so a role's scope permissions are what chat reaches
-  ([ADR-0062](../../adr/0062-chat-on-the-shared-tools.md)). Recall's 5-result
+  ([ADR-0062](../../adr/resolved/0062-chat-on-the-shared-tools.md)). Recall's 5-result
   limit is a `tool_usage_limits` `force_value` with `hide_property`.
   `aim_remember` writes on the `chat` channel with source
   `chat:aim_remember` because its invoker is `tool_ai_connector`.
@@ -62,7 +64,7 @@ mechanism and alternatives considered.
 
 ## CCC (`ai_context`), not enabled here
 
-If/when it is, the integration shape is `aim_chatbot` exposing tools
+If/when it is, the integration shape is `aim_tool` exposing tools
 (done) and CCC holding curated policy about when to call them - not `aim`
 becoming a CCC content source. See
-[ADR-0008](../../adr/0008-chatbot-integration-mechanism.md).
+[ADR-0008](../../adr/resolved/0008-chatbot-integration-mechanism.md).

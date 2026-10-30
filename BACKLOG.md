@@ -95,20 +95,16 @@ are recommendations.
       `writeMerge()` chat call on the site default provider, not the
       consolidation model, and downgrades to ADD with no default. Not
       documented.
-- [ ] Shipped vs this site: `default_trusted` false/true,
-      `index_directly` off/on, `recall_max_distance` 0.48/0.52. Only
-      partly stated in the docs.
 
 ## Memory algorithm follow-ups (raised 2026-10-02, ADR-0036)
 
-- [ ] Real (non-dry) run and queue-worker check of top-N consolidation;
-      no automated tests cover it yet.
 - [ ] Time-limited facts ("for two months from now") must not be UPDATE
       merged into permanent facts: proposed fix in
       [ADR-0057](adr/0057-dates-resolved-and-confirmed-before-write.md)
       (resolve and confirm dates before write, `expires` plus its sweep).
-      `expires` input and `aim:expire` sweep BUILT 2026-10-11 (add the
-      hourly crontab line; `hook_cron` backs it up); still to do: today's date to the assistant,
+      `expires` input and `aim:expire` sweep BUILT 2026-10-11 (hourly
+      crontab here; `hook_cron` stays as the backup, since aim cannot
+      promise a site a cron job); still to do: today's date to the assistant,
       persona wording, extraction date resolution, dated eval items. Facts
       with different end dates are never compared (BUILT 2026-10-27).
 - [ ] Idea (raised 2026-10-27): `remember()` could skip a fact whose text
@@ -125,7 +121,7 @@ are recommendations.
 - [ ] Parked (ADR-0057 time stance): access counter / last-recalled.
 - [ ] Later, on a real recall miss: RRF keyword path via `search_api_db`
       (hybrid keyword + vector recall; second keyword-only index fused in
-      PHP, feasibility checked in [ADR-0036](adr/0036-memory-algorithm-appraisal.md)
+      PHP, feasibility checked in [ADR-0036](adr/resolved/0036-memory-algorithm-appraisal.md)
       "Checked 2026-10-02"; open question there: whether a keyword-only
       hit may bypass the ADR-0019 distance cutoff). Brushed past again
       2026-10-25 (Marcus Johansson's talk slide: FTS5 BM25 + sqlite-vec
@@ -250,8 +246,7 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       the `aim:status` count BUILT 2026-10-19 (ADR-0037 addendum); still no
       one holds the permission and no reason column on the facts list. None
       yet: nobody holds
-      `trust {scope} aim facts` and the grounded check is in shadow mode
-      (see "Loop back to the trust permission" under Governance). Decide
+      `trust {scope} aim facts` and the grounded check is in shadow mode. Decide
       the reviewer workflow before claiming draft-to-trusted is a feature.
 - [ ] **Packaging.** Not a one-line installer. `recipes/aim_demo_library/preflight/preflight.js` lives in
       the recipe, not the module proper; consider a module-level check (a
@@ -265,7 +260,7 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       starts. Earlier appraisal: it is a wiki, not a fact memory.
 - Not a new item: merging. Consolidation is already non-destructive
   (retire plus `superseded_by`), which meets his "keep originals so you can
-  undo". Jev as a judge is also largely done: one question per call, gate
+  undo". A decision model as a judge is also largely done: one question per call, gate
   and grounding eval sets built (44 items), thresholds separate per
   activity. What remains is under "Decision models" (per-model question
   text, enforce decision).
@@ -284,8 +279,50 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       others; later option, accept it but force `trusted=FALSE` so the
       per-scope trust permission reviews it. Same class of gap as the
       `trusted` override on `remember()` (closed 2026-10-19, ADR-0037
-      addendum). Not built.
+      addendum). Not built. Legitimate in some cases (staff noting facts
+      about a customer): then use two scopes sharing the user plugin with
+      different `settings` ([ADR-0028](adr/resolved/0028-scope-type-plugin.md)),
+      one own-subject-only, one allowing writes about others. Recall is
+      fine: a caller-supplied `user` returns nothing the viewer cannot see.
+      (Folded in 2026-10-30 from a duplicate "Cross-user writes" item, whose
+      "starts untrusted" mitigation no longer held under the per-channel
+      trust policy.)
       [ADR-0007](adr/resolved/0007-user-scope-requires-real-account.md)
+
+## Larger demo: page search + aim + FlowDrop (raised 2026-10-30)
+
+A future demo where aim sits beside a site's existing content search
+rather than replacing it, with FlowDrop managing the agents and tools.
+Positioning: many Drupal sites already run an `ai_search` chatbot, and
+"add aim beside it as the governed facts layer" is the likelier adoption
+path than "replace your assistant" (README line, once built). The demo's
+point: the page says one thing, a trusted fact says it changed on a date,
+and the assistant answers with the fact.
+
+- [ ] Page search is `ai_search`'s existing `ai_search:rag_search`
+      function call on a second search_api index over nodes; config in
+      the demo recipe, no code in `aim` (memory is aim's job, page search
+      is not). The tool does no access check of its own, so the node index
+      needs search_api's content access processor or the chatbot can quote
+      unpublished pages.
+- [ ] FlowDrop for agent/tool management: see the FlowDrop spike under
+      "ADR-0035" below; the two spikes can share a scratch site.
+- [ ] Precedence policy, decide before the persona wording (ADR when
+      decided). Draft from 2026-10-30: a literal wins for exact values
+      (ADR-0061, unchanged); a trusted, unexpired fact beats page content
+      when they conflict; untrusted facts are not recalled, so never
+      override anything; with no fact, answer from the page with its link;
+      a conflict is never resolved silently (the reply says what the page
+      says and what changed, and when). A page edited after the fact's
+      `asserted` date (node `changed` later than `asserted`): neither wins,
+      the reply states the contradiction (decided 2026-10-30, initial
+      stance). Not yet (too complex for now): a detected conflict flagging
+      the page for an editor, which is
+      [ADR-0043](adr/0043-content-truth-drift-audit.md)'s drift audit
+      (proposed; it needs a content index, which this demo's node index
+      would supply).
+- [ ] At least one demo question where the page is silent or stale, so
+      page search alone does not make aim look redundant.
 
 ## ADR-0035 - Standing constraints (design only, nothing built)
 
@@ -311,7 +348,8 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       laptop memory budget note). Recommendation: `*/5` day to day, queue_ui
       "Run" for a burst, every minute only for the demo (the
       save-then-recall beat needs the fact searchable quickly). Measure
-      before treating any of this as settled. Related: nothing records
+      before treating any of this as settled. This site runs it hourly from
+      the host crontab (with `drush cron`). Related: nothing records
       each decision (see the `superseded_by_reason` item below).
 - [ ] #5 - retrieval latency at realistic scale: still not benchmarked at
       thousands of facts. Local-Ollama half done and confirmed 2026-09-10
@@ -330,8 +368,16 @@ questions" section)
 
 ## Concrete near-term fixes flagged in CLAUDE.md/DEVELOPING.md
 
+- [ ] Clear `grounding_score` when an existing fact's `text` changes
+      (raised 2026-10-30). The edit form (`administer aim` only) changes
+      text in place, and the fact keeps a score measured against text it
+      no longer has. A check in `AimHooks::factPresave()` against
+      `getOriginal()`, like the subject check there; `trusted` stays as is
+      (an admin could trust it anyway). Absorbed by
+      [ADR-0064](adr/0064-revisions-for-fact-edits.md) decision 4 if that
+      is built; on its own otherwise.
 - [ ] Consolidation/recall baselines (none exist, so no improvement can be
-      claimed): merge-fidelity review of dry-run UPDATE/DELETE rows on a
+      claimed): merge-fidelity review of dry-run UPDATE/RETIRE rows on a
       snapshot copy; a disclosed LongMemEval slice (50-100 questions) for
       recall precision, knowledge-update correctness and abstention (parity
       targets 1, 4, 5); recall payload size vs. full-history tokens
@@ -370,15 +416,6 @@ questions" section)
       indexed, or the backend could treat offset >= total as offset 0.
       When fixed upstream, drop the post-request queue clearing in
       `AimMemoryManager::reindex()`.
-- [ ] Autowire the four tool and chatbot plugins (`aim_tool` and
-      `aim_chatbot`, `AimRecall` and `AimRemember` each). Left on their
-      `create()` overrides 2026-10-15: `ToolBase::create()` and
-      `FunctionCallBase::create()` build the instance with `new static(...)`
-      and never call `createInstanceAutowired()`, so `#[Required]` setters
-      would not run. Needs the parents to autowire (upstream in `tool` and
-      `ai`) or hand-wiring the parent constructors, which is worse than
-      today's override. Revisit when either parent adopts
-      `AutowiredInstanceTrait`.
 - [ ] Bulk actions for `category` on the admin facts view - deliberately
       not built (2026-09-30) because the field is not in use yet.
       `trusted`/retire/un-retire have them (`src/Plugin/Action/`,
@@ -514,7 +551,7 @@ questions" section)
       Same method as ADR-0018. `target_type`/`target_id` are not even
       indexed attributes yet, check that first.
 - [ ] Retention/erasure policy for retired facts (prune or archive old
-      `expires` rows out of `aim_fact`) - retired facts about a person are
+      `retired` rows out of `aim_fact`) - retired facts about a person are
       still personal data. Own ADR when needed, see ADR-0022's
       Consequences. Design sketch (2026-10-14, from the Oracle "enterprise
       brain" article): erase by **tombstone**, not delete. An `aim:erase`
@@ -525,9 +562,10 @@ questions" section)
       vector index, write an audit line (IDs only), keep ids, dates and the
       supersede chain so the trail survives. ADR-0056's `personal_data` flag
       is how it finds candidates. Check first what else holds text:
-      `superseded_by_reason` (meant to hold none), ADR-0037's
-      `aim_fact_source` (7 days), the unbuilt `aim_rejection` quarantine, and
-      the edit-history item under Governance (revisions would keep old text).
+      `superseded_by_reason` (meant to hold none), `ai_log`'s logged
+      prompts and replies (ADR-0060, which hold source passages), the unbuilt `aim_rejection` quarantine, and
+      [ADR-0064](adr/0064-revisions-for-fact-edits.md)'s revisions (decision 5:
+      erasure must clear old revisions too).
 - [ ] **Recall audit line (raised 2026-10-14).** `recall()` logs only counts
       and best score, and only at the verbose tier, so "what did the agent
       know when it acted" cannot be answered. Add an audit-tier line per
@@ -536,18 +574,6 @@ questions" section)
       [eval/DRAFT-eval-plan.md](eval/DRAFT-eval-plan.md) section 6. Facts
       are superseded not deleted, so IDs plus the timestamp reconstruct what
       was visible, except for in-place text edits (see edit history above).
-- [ ] **Cross-user writes (raised 2026-10-14, decide when the use case is
-      pinned).** `aim_remember` takes a caller-supplied `subject` and checks
-      only `create user aim facts`, so anyone holding it can write a
-      scope=user fact about any account
-      (`AimRemember::saveOne()`, `AimRememberService::remember()`). Mitigated
-      for now: new facts start untrusted and are not recalled until trusted.
-      Legitimate in some cases (staff noting facts about a customer). When it
-      matters, use two scope instances sharing one plugin with different
-      `settings` ([ADR-0028](adr/resolved/0028-scope-type-plugin.md)): `user`
-      own-subject-only, and a separate scope where writing about others is
-      allowed. No new mechanism needed. Recall side is fine: a caller-supplied
-      `user` for someone else's facts returns nothing the viewer cannot see.
 - [ ] **Recall over-fetch is a code constant (noted 2026-10-14).**
       `recall()` asks for `$limit * 5` when filtering by user
       (`AimMemoryManager::recall()`), measured in ADR-0018 before HNSW tuning
@@ -624,6 +650,33 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
       `gold.agentblind.yml` read as wrong when the set runs as uid 1 or a
       member. Not a chat fault; revisit with the eval set itself.
 
+- [ ] Read-only MCP connections from the consent screen (raised
+      2026-10-30, from Nerra's per-connection "save knowledge" toggle). A
+      "Let this assistant save facts" checkbox on simple_oauth's consent
+      screen; when it is cleared, the token is granted `aim:recall` but not
+      `aim:remember`. The per-tool scope gate that would enforce it works
+      since the `mcp_server_oauth` pin (see "`aim_tool_oauth` per-tool
+      scope gate" above); unchecked whether simple_oauth's consent form
+      can grant fewer scopes than the client asked for. Trigger: a real
+      user asking for a read-only connection.
+- [ ] **Parked by Nik (moved from TODO.md 2026-10-30):** visitor/staff
+      assistant split (staff agent with remember; fine for a demo, not
+      essential; [ADR-0008](adr/resolved/0008-chatbot-integration-mechanism.md)'s
+      addendum), the accept/pass widget with outcome tracking, a combined
+      MCP "ask" tool that does finder-first then recall on the server.
+- [ ] **Parked 2026-10-15 (Nik), moved from TODO.md 2026-10-30: file ingest from Claude.ai over MCP.** Idea:
+      `aim_media_upload` (filename + text/base64 content -> Media entity in
+      the private file store, returns the ID) plus `aim_ingest` (media ID ->
+      the ADR-0016 pipeline, facts untrusted). Both gated on `ingest aim
+      facts` plus an `aim_tool_oauth` scope. Limit: Claude.ai can only hand a
+      file to an MCP tool as an argument, so bytes go through model context
+      (fine for small text, poor for PDFs/images/large files). WebMCP is a
+      possible route, UNVERIFIED (checked 2026-10-16): its spec lists binary
+      inputs as an open question, doesn't name Claude.ai as a caller, and is
+      Chrome 146+ behind a flag. Revisit when binary input is resolved.
+      Small text files could skip the upload and pass text straight to
+      `aim_ingest`.
+      Raise the PII gate (ADR-0056) before real files go through.
 - [ ] Fact verification as a user-facing feature - now reinforced twice
       (OpenAI's editable memory summary, and OpenKB's review-as-UX pattern
       from this thread).
@@ -660,11 +713,29 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
 - [ ] Graduated-detail retrieval (L0/L1/L2) - source unverified, candidate
       mechanism only.
 - [ ] Media/source ingestion for re-analysis - gated behind the still-open
-      "does aim ever store source material" question.
-- [ ] `revision_graph` module - premise gone: Content Moderation isn't
-      landing (ADR-0002 addendum, 2026-09-28), so `aim_fact` has no
-      planned path to revisionable. Revisit only if that changes for an
-      unrelated reason.
+      "does aim ever store source material" question (ADR-0037 is probably
+      out of date, 2026-10-30). Plan: ingest from a Media item already on
+      the site, `source` naming it by ID rather than path. Staleness
+      (raised 2026-10-30, after droost_wiki's provenance check):
+      - The kept original plus the fact's `created` (ingestion date) is
+        enough. "Media changed after the fact was created" only says look
+        again; the verdict is re-running the grounded check of each fact
+        against the current file (still stated: keep; gone: untrust/retire,
+        or re-extract and let consolidation supersede). False alarms
+        (re-save, alt text, metadata) cost one check per fact, nothing
+        worse; a content hash stored at ingestion would skip them, later.
+      - Trigger: a media update hook (fires on change, covers a replaced
+        file), with a crontab sweep of `media.changed > fact.created` as
+        the safety net (ADR-0003, never `hook_cron`).
+      - Entity scope: the same comparison, "fact predates the entity's last
+        update". Strong signal when the fact's source is that item, weaker
+        when the fact is only about it, so it queues a re-check against the
+        entity's current text rather than deciding.
+      Likely the mechanism for the scheduled staleness review above.
+- [ ] `revision_graph` module - Content Moderation isn't landing
+      (ADR-0002 addendum), but [ADR-0064](adr/0064-revisions-for-fact-edits.md)
+      (proposed) would make `aim_fact` revisionable on its own. Revisit if
+      ADR-0064 is built.
 
 ## Parked ADRs, revisit triggers (retired 2026-10-11 and 2026-10-12)
 
@@ -672,17 +743,6 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
   consumer needs more than the supersede edge in `related`.
 - ADR-0014 (use-case archetype starter kits): revisit when a third Recipe
   beyond `aim_demo_library` and `aim_ollama_local` is wanted.
-- ADR-0044 (Tool API method attributes, drupal/tool MR 162): fired
-  2026-10-25, `#[ToolMethod]` shipped in tool 1.0.0-beta12. Decided: adopt.
-  All three `aim_tool` tools are now `#[ToolMethod]` services
-  (`aim_tool/src/Tool/`), same IDs, same schema byte for byte, same MCP
-  names. Gains: constructor injection, descriptions from the docblock,
-  the `limit` cap as a `#[ToolInput]` constraint. `aim_literal` stays a
-  wrapper: `literals.lookup::lookup()` takes an input array, not typed
-  parameters, and the ID is aim's. `aim_remember`'s per-scope create check
-  stays per entry, not in `$access`, which would make a batch
-  all-or-nothing (a bad-scope entry is reported and skipped,
-  `testBatchChecksEachEntry`).
 - ADR-0055 (decision rationale as entity-scope facts): revisit when a
   decision-provenance need is real. The test is to hand-model 5 to 10 ADRs
   as `scope=entity` facts and check recall beats grepping the ADR files.

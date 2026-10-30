@@ -31,7 +31,7 @@ an undeclared Write tool counts as destructive, which MCP clients read as
   `aim_tool.remember`/`aim_tool.recall`; see
   [DEVELOPING.md](DEVELOPING.md)), backed by `aim.memory_manager`
   directly. The one recall and remember for chat, MCP, Drush and Tool API
-  ([ADR-0062](../../adr/0062-chat-on-the-shared-tools.md)); not locked to
+  ([ADR-0062](../../adr/resolved/0062-chat-on-the-shared-tools.md)); not locked to
   any scope - the caller is a real account, so scope/subject are
   caller-supplied (same shape as `drush aim:remember`, per
   [ADR-0006](../../adr/resolved/0006-agent-native-write-path.md)).
@@ -60,7 +60,7 @@ an undeclared Write tool counts as destructive, which MCP clients read as
   person's question as they asked it" (what the chat gate gives the
   finder). With `literals_finder` enabled every query goes to the finder,
   keys included (it resolved every bare key exactly, 2026-10-25, and keeps
-  its ambiguity and gist checks: results over Jev tokens); without it a
+  its ambiguity and gist checks: results over decision-model tokens); without it a
   key-shaped query is tried as a key, then a search lists candidates. The
   caller never picks a mode, so a site without the finder advertises no
   input that would fail. Gated on `view literals` (or `view
@@ -92,5 +92,5 @@ fact as known.
 `AimRecall` results carry `date_kind` (`true_since`/`recorded`) beside
 `date`. An MCP client caches the output schema on connect: after an output
 change, reconnect it. History: [ADR-0013](../../adr/resolved/0013-mcp-tool-exposure.md)
-kept chat's tools separate; [ADR-0062](../../adr/0062-chat-on-the-shared-tools.md)
+kept chat's tools separate; [ADR-0062](../../adr/resolved/0062-chat-on-the-shared-tools.md)
 merged them.

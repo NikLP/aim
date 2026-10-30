@@ -3,8 +3,10 @@
 **Status:** Proposed - design only, the bridge module is unbuilt. Both
 blockers listed on 2026-09-27 are now cleared (re-checked 2026-10-11):
 the `trusted` flag and its Trust/Untrust actions are built
-([ADR-0002](0002-governance-deferred-guardrails-mandatory.md) addendum), and
-Annotations has a write path (see Context). Absorbs the former ADR-0041
+([ADR-0002](resolved/0002-governance-deferred-guardrails-mandatory.md) addendum), and
+Annotations has a write path (see Context; confirmed by Nik 2026-10-30,
+though this site's `contrib/annotations` copy still has no
+`annotations_tool`). Absorbs the former ADR-0041
 (Webform pre-fill) and ADR-0042 (fact-compiled briefs). The WebMCP
 direction may supersede part of this.
 **Date:** 2026-09-27
@@ -21,7 +23,7 @@ code and docs, not assumed:
   (`/api/annotations/{target_id}`) and its own MCP endpoint;
   `annotations_tool` provides Tool API plugins for function-calling
   agents. Annotations independently reached the conclusion of
-  [ADR-0008](0008-chatbot-integration-mechanism.md): Tool API, not a CCC
+  [ADR-0008](resolved/0008-chatbot-integration-mechanism.md): Tool API, not a CCC
   content-source plugin.
 - **`annotation_target` granularity is bundle/field/role** (`id =
   {entity_type}__{bundle}`, e.g. `node__article`), never one node
