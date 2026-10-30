@@ -89,8 +89,10 @@ not something `aim`'s own `composer.json` should carry (it just
    restart), and don't set `router_http_port` expecting it to pin a
    per-project value.
 6. Register and connect a real client: confirm
-   `/.well-known/oauth-protected-resource` and
-   `/.well-known/oauth-authorization-server` both resolve, every endpoint
+   `/.well-known/oauth-protected-resource`,
+   `/.well-known/oauth-protected-resource/mcp` (the endpoint's own
+   document, whose `resource` is `/mcp`; the 401 challenge names it) and
+   `/.well-known/oauth-authorization-server` all resolve, every endpoint
    (including `registration_endpoint`) comes back `https://`, and a real
    `POST /oauth/register` returns a genuine `client_id`.
 
