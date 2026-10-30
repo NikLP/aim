@@ -175,6 +175,19 @@ async function askWidget(page, question) {
       if (tests) throw new Error(tests + ' leftover test facts (ZZ...)');
       return `${live} live facts`;
     });
+    // ai_logging.settings is site-wide and a reinstall resets it to off;
+    // aim:status passes that, but the demo shows real model calls in ai_log.
+    await check('model-call logging on, with the finder tag', async () => {
+      const r = JSON.parse(php(`
+        $s = \\Drupal::config('ai_logging.settings');
+        echo json_encode(\\Drupal::service('aim.status_checker')->checkAll()['model_call_logging'] + ['on' => (bool) $s->get('prompt_logging'), 'tags' => (string) $s->get('prompt_logging_tags')]);
+      `));
+      const fix = ' (see the recipe README\'s "Fresh install")';
+      if (!r.on) throw new Error('ai_logging is off' + fix);
+      if (!r.ok) throw new Error(r.detail);
+      if (r.tags && !r.tags.split(',').map((t) => t.trim().toLowerCase()).includes('literals_choose')) throw new Error('literals_choose not in the logged tags' + fix);
+      return r.detail;
+    });
 
     let rpc = null;
     let init = null;

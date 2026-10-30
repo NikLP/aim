@@ -132,6 +132,16 @@ are recommendations.
       fused by the same RRF formula, for a Drupal docs search). Still
       parked: checked 2026-10-27 against the "any upcoming events?" miss
       and it would not help (no missed fact shares a word with the question).
+- [ ] Later, on a real recall miss: an optional "about to" hint on
+      `aim_recall` (raised 2026-10-30, from Memlo's `search_memories`
+      `about_to` field). The agent states the step it is about to take
+      ("About to deploy to production") alongside its query, and the hint
+      joins the text that gets embedded, so recall also finds facts about
+      the action ("never deploy on Fridays") that the question's own words
+      would not match. One optional tool input plus a line in the tool
+      description; no schema change. Trigger: a recall that missed a
+      relevant fact because the query described the question, not the
+      action.
 
 ## Outside advice (raised 2026-10-15, George Kastanis, OpenBrain author)
 

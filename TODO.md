@@ -31,11 +31,12 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
 - [ ] **Shared ai_logging settings (decided, deferred 2026-10-19).** The
       settings are site-wide and aim no longer writes them (tag list:
       `ActivityBackendInterface::LOGGED_TAGS`; see DEVELOPING.md "Model-call
-      logging"). When a second site needs it: an opt-in aim setting that only
-      appends or removes aim's tags and never touches retention; `aim:status`
-      flags an uncaptured tag, disabled logging or stealth mode and warns
-      under 90 days; the settings form says the settings are shared;
-      per-tag retention goes upstream (ADR-0060). New installs: opt-in.
+      logging"; `aim:status` checks a half setup, built 2026-10-30). When a
+      second site needs it: an opt-in aim setting that only appends or
+      removes aim's tags and never touches retention; the settings form says
+      the settings are shared; `aim:status` also flags stealth mode once
+      that exists; per-tag retention goes upstream (ADR-0060). New installs:
+      opt-in.
 - [ ] **"Any upcoming events?" misses Code Club and Baby Rhyme Time.**
       A ranking miss, not a cutoff one (measured 2026-10-27, site's
       `demo/recall-eval/` and `demo/chat-eval/`): Baby Rhyme Time ranks 11th

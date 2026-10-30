@@ -90,11 +90,16 @@ the settings above, and the facts are added on top of whatever is there
 3. Run Ollama with `nomic-embed-text`. At `/admin/config/ai/settings` set
    Embeddings (`ollama` / `nomic_embed_text_latest`), a Chat default and a
    Decision default (for the finder).
-4. Apply the recipe (above).
-5. `drush search-api:index aim_vector_index` (already 100% with
+4. Turn on model-call logging at `/admin/config/ai/logging/settings`
+   (site-wide, so the recipe leaves it alone, and a reinstall resets it to
+   off): log requests and responses on, restrict to the tags
+   `aim_extract,aim_consolidate,aim_consolidate_verify,aim_consolidate_merge,aim_ground,ai_agents_aim_chatbot,literals_choose`,
+   keep 10000 messages and 90 days. The pre-flight fails until it is on.
+5. Apply the recipe (above).
+6. `drush search-api:index aim_vector_index` (already 100% with
    `index_directly` on).
-6. `drush uli` and ask the widget; it is hidden from anonymous visitors.
-7. For the MCP part of the demo and the pre-flight: enable `aim_tool_oauth`
+7. `drush uli` and ask the widget; it is hidden from anonymous visitors.
+8. For the MCP part of the demo and the pre-flight: enable `aim_tool_oauth`
    and the OAuth/MCP stack, set the key paths and expose the site over
    HTTPS, per `aim_tool_oauth`'s
    [DEVELOPING.md](../../modules/aim_tool_oauth/DEVELOPING.md) "Setup". A

@@ -491,7 +491,10 @@ informational count of untrusted facts, and every configured model still existin
 with its provider (the AI module's chat, decision and embeddings defaults,
 plus any activity that names its own: a retired model is otherwise found by
 a failed call), and `index_directly` not being on with a hosted embeddings
-provider (each write would wait on it and send it the fact text). Exits
+provider (each write would wait on it and send it the fact text), and
+model-call logging (passes when off, a site's choice; when on, fails if an
+aim tag would not be recorded, replies are off or entries are kept under 90
+days - see "Model-call logging"). Exits
 1 if any check fails, 0 otherwise - safe to use in a preflight script.
 Covers the database-side items in "Upgrading an existing site" below, in
 place of walking them by hand.
@@ -1265,8 +1268,11 @@ turns it on at `/admin/config/ai/logging/settings`: `prompt_logging` and
 `AimCallTagsTest` guards the constant against the code). Retention has no
 per-tag control. This site runs 10000 entries or 90 days. Untagged calls
 (the vector index's embeddings) are not logged. A fresh install records
-nothing until set up as above. Planned, not built: an opt-in setting plus
-an `aim:status` check (TODO.md).
+nothing until set up as above; `aim:status` passes that (logging is the
+site's choice) but fails a half setup: on with an aim tag missing or
+excluded, replies off, or under 90 days kept. The demo recipe's pre-flight
+also fails while logging is off. Planned, not built: an opt-in aim setting
+(TODO.md).
 
 `AimCallLogSubscriber` adds `aim_run_id` and `aim_duration_ms` to each call's
 debug data, which lands in `extra_data`; group a replay with `setRunId()`.
