@@ -126,9 +126,11 @@ output.
 Each has a trigger in BACKLOG.md ("Write-path cuts, ADR-0065"):
 
 - **A per-channel exception** if an agent holding a trust-granting token
-  is shown writing something it was manipulated into. It would read the
-  fact's `source` label, which the Tool API invoker already sets
-  (`AimRememberInvokerSubscriber`, until tool#3583125 lands).
+  is shown writing something it was manipulated into. It needs the
+  channel stored on the fact, set by code: `source` will not do, since
+  Drush and the ingest form let the caller type it (the 2026-10-19 build
+  rejected it for that). The stored channel is planned with the audit
+  fields (TODO.md "Record who trusted a fact").
 - **Model promotion** only by a new decision: it is the model granting
   trust a permission withheld.
 - **A junk filter**: a guardrail, not the classifier.

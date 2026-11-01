@@ -127,11 +127,14 @@ failed recipe prints a long stack trace after the real error; the first
   `recall_gap`, Comparison distance `compare_distance`) were measured on this dataset with
   `nomic-embed-text` on MariaDB
   ([ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md)).
-  This recipe's Gate match threshold (`gate_match_threshold`, 0.8) and
-  Gate choice margin (`gate_choice_margin`, 0.4) were measured with a
-  hosted SystemOne-compatible decision endpoint (`typesafeai`) as the
-  Decision default. Re-check them if you change
-  either model.
+  The recipe sets Recall maximum distance to 0.60. Its Gate match
+  threshold (`gate_match_threshold`, 0.8), Gate choice margin
+  (`gate_choice_margin`, 0.4), the finder's Match threshold
+  (`literals_finder.settings:match_threshold`, 0.8) and the Verifier
+  threshold (`activities.verifier.threshold`, 0.9) were measured with a
+  hosted SystemOne-compatible decision endpoint (`typesafeai`,
+  `subq-snap-1.1`, 2026-11-01) as the Decision model. Re-check them if
+  you change either model.
 - **Review gate by writer.** Any signed-in visitor can tell the chat a
   fact (the recipe grants `access deepchat api` and `create site aim
   facts` to authenticated users only). A member's fact waits untrusted for

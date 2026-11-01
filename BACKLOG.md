@@ -649,8 +649,9 @@ would bring each back. Nothing here is built.
 
 - [ ] **Per-channel trust exception.** Trigger: an agent holding a
       trust-granting token is shown writing something it was manipulated
-      into (prompt injection). Read the fact's `source` label, which the
-      Tool API invoker sets; no `trust_policy` tree.
+      into (prompt injection). Read the stored channel (planned with the
+      audit fields, TODO.md), not `source`, which callers can type; no
+      `trust_policy` tree.
 - [ ] **Model promotion by the grounded check.** Trigger: none on its own;
       it needs a new decision, since it is a model granting trust a
       permission withheld.

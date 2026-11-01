@@ -47,8 +47,11 @@ Concerns raised when this was revisited (2026-10-30), checked:
   current value in the base table and copies revisionable fields into the
   revision table (`DefaultTableMapping::create()`). Views and entity
   queries keep reading `aim_fact`, Search API indexes the default revision
-  only, and `recall()` filters on the vector table's own attributes. No
-  join appears anywhere.
+  only, and `recall()` filters on the vector table's own attributes. The
+  one join is entity loading, which core does on the revision table's
+  primary key (`SqlContentEntityStorage::buildQuery()`): microseconds for
+  the ten or so facts a recall loads, next to an embedding call. Each save
+  also writes one revision row.
 - **`trusted` already does the governance job.** It still does; revisions
   record edits, they do not gate retrieval.
 - **Data privacy.** Real: revisions keep old text. See decision 5.

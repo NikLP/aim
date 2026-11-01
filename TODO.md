@@ -234,6 +234,17 @@ only work to do is listed here.
       cost-weighted threshold sweep (a wrong UPDATE loses data, a missed
       merge is cheap); a PHP replay command in `aim_benchmark` through
       `ChatBackend` and `DecisionBackend`, grouped by `setRunId()`.
+- [ ] **Grow the hard merge set (raised 2026-11-01).** The verifier's two
+      misses on `decision-eval-merges-hard.json` were a dropped limit ("up
+      to 4 hours" to "4 hours", 0.84) and an invented link ("because",
+      0.80); add 10-20 more of each kind (limits: up to, at least, only,
+      most; links: because, so, unless), written without first scoring
+      them, then re-check the 0.9 verifier and the grounded check on
+      merges. Also check the pairs set has unrelated pairs the classifier
+      must call ADD: both misses merged facts about different things. A
+      bulk ingest of hundreds of facts does not replace this (nobody knows
+      which of its merges are faithful), but its UPDATE merges, labeled by
+      hand, are good real cases to add.
 - [ ] **`drush aim:calibrate`** (ADR-0019): labeled queries in, answerable /
       near-topic / off-topic distance distributions and gap out, suggesting
       a `recall_max_distance`. Role and case scope never measured.
@@ -307,7 +318,12 @@ only work to do is listed here.
       service account). `uid` cannot stand in: it is the author, often a
       service account, and the reviewer is meant to be someone else
       (ADR-0002 addendum skipped this on purpose). Answers "who approved
-      this?", the first audit question an enterprise buyer asks.
+      this?", the first audit question an enterprise buyer asks. Add a
+      code-set `channel` field with them (`chat`, `mcp`, `ingest`, `drush`,
+      `consolidation`; also on the audit log line): `source` is typed by
+      the caller on Drush and the ingest form, so today nothing shows that
+      a fact by uid 5 came from a shell caller naming uid 5 with `--uid`
+      (ADR-0065 decision 2) rather than from user 5.
 - [ ] **Edit history for facts (raised 2026-10-11).** A text edit on
       `/admin/content/aim-facts/{aim_fact}/edit` replaces the text in
       place, so manual changes leave no trail. Design in
