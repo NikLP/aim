@@ -19,7 +19,7 @@ The Active table is one list; these are the threads running through it.
 - **Write-path gate and decision models** -
   [0002](resolved/0002-governance-deferred-guardrails-mandatory.md),
   [0064](0064-revisions-for-fact-edits.md) (revisions for fact edits, proposed),
-  [0065](0065-permissions-are-trust.md) (permissions are trust: write-path cuts, accepted, not built),
+  [0065](resolved/0065-permissions-are-trust.md) (permissions are trust: write-path cuts, built 2026-11-01),
   [0037](resolved/0037-transient-source-passages-for-grounding.md) (the grounded check, built 2026-10-11, with the gate semantics of the former 0033),
   [0056](0056-personal-data-write-gate.md) (personal-data gate, parked),
   [0021](0021-jev-typed-decision-provider.md) (decision models: a hosted SystemOne-compatible endpoint live, local parked, with the former 0038),
@@ -53,7 +53,6 @@ Still carrying work, proposed, or deferred.
 | [0061](0061-how-aim-uses-literals.md) | How aim uses literals: tokens replaced at recall as the viewer, `aim_literal` over `literals.lookup`, the finder as a gate ahead of the chat model (measured), no scope or mirror; convert-a-fact, finder as a recall source and answer modes designed | Built 2026-10-08 to 10-15 (sections 1-2); section 3 unbuilt, tracked in TODO.md; split out of 0040 2026-10-23 |
 | [0059](0059-single-valued-category-and-ingress-labelling.md) | Single-valued, indexed `category` that recall can filter on, set on every write route (labelled on ingress); free tagging becomes a scope-module concern | Accepted 2026-10-30 for single-valued `category`; the rest proposed (now including the generic `recall()` filter seam from 0030), nothing built |
 | [0064](0064-revisions-for-fact-edits.md) | Revisions for fact edits: `aim_fact` revisionable without Content Moderation, a revision only when `text` changes, only `text`/`grounding_score` revisioned, revise for wording vs. supersede for a changed world, erasure clears revisions; revisits ADR-0002's addendum on revisions only | Proposed 2026-10-30 - design only |
-| [0065](0065-permissions-are-trust.md) | Permissions are trust: starting trust from the writer's permission alone (trust policy, `hold`, `default_trusted` and the `trusted` argument go), the grounded check demotes but never promotes (`off`/`record`/`demote`), consolidation on trusted facts only, no classifier RETIRE, no merge distance check; amends 0002, replaces 0037's trust addenda, narrows 0005 | Accepted 2026-11-01 - not built |
 
 ## Resolved
 
@@ -94,5 +93,6 @@ remains binding, it just has nothing left to build.
 | [0044](resolved/0044-tool-api-method-attributes.md) | Tool API method attributes (drupal/tool MR 162): watch upstream | Resolved 2026-10-25: trigger fired, `aim_tool` adopted `#[ToolMethod]` |
 | [0055](resolved/0055-decision-rationale-as-entity-scope-facts.md) | Decision rationale as entity-scope facts: validate against grep before building a `decision` entity | Retired 2026-10-12 (parked) - test never run, nothing built; revisit trigger in TODO.md |
 | [0060](resolved/0060-adopt-ai-logging-for-model-calls.md) | Model-call logging through `ai_logging`, prompts and replies included; aim adds run ID and duration; stealth mode a later option | Built 2026-10-14; all data stored today, zero-data (stealth) mode planned in BACKLOG.md |
-| [0062](resolved/0062-chat-on-the-shared-tools.md) | Chat on the shared tools: one `aim_recall`/`aim_remember` for chat and MCP; scope gated by permissions; the tool picks its trust channel from its Tool API invoker and says which date recall returns; chat's evidence is the model's quote; changes ADR-0013 | Built 2026-10-25; upstream invoker parameter on tool#3583125 tracked in TODO.md, stopgap subscriber live |
+| [0062](resolved/0062-chat-on-the-shared-tools.md) | Chat on the shared tools: one `aim_recall`/`aim_remember` for chat and MCP; scope gated by permissions; the tool picks its source from its Tool API invoker (trust channel until ADR-0065) and says which date recall returns; chat's evidence is the model's quote; changes ADR-0013 | Built 2026-10-25; upstream invoker parameter on tool#3583125 tracked in TODO.md, stopgap subscriber live |
 | [0063](resolved/0063-scopes-as-config-on-core-plugins.md) | Scopes as config on core plugins: plugins and the five scopes move into core `aim` (literals' pattern), `status`/`description`/`weight` on `aim_scope`, the matrix becomes the user scope's settings, the scope submodules go; supersedes ADR-0026 | Built 2026-10-26, live-verified |
+| [0065](resolved/0065-permissions-are-trust.md) | Permissions are trust: starting trust from the writer's permission alone (trust policy, `hold`, `default_trusted` and the `trusted` argument go), the grounded check demotes but never promotes (`off`/`record`/`demote`), consolidation on trusted facts only, no classifier RETIRE, no merge distance check; amends 0002, replaces 0037's trust addenda, narrows 0005 | Built 2026-11-01 |

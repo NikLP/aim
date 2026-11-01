@@ -234,26 +234,27 @@ class AimToolPermissionsTest extends KernelTestBase {
   }
 
   /**
-   * The caller picks the trust channel and source, never an input.
+   * The invoker picks the source; trust is the writer's permission alone.
+   *
+   * ADR-0065: chat, MCP and Drush writes start alike for the same account.
    */
-  public function testChannelFollowsInvoker(): void {
-    // MCP writes start trusted here, so the channel shows in the result.
-    $this->config('aim.settings')->set('trust_policy.channels.mcp', 'trusted')->save();
-    $this->actAs($this->createUser(['remember aim facts', 'create site aim facts']));
-
-    $written = [];
-    foreach (['tool_ai_connector', 'mcp_server', 'drush'] as $invoker) {
-      $this->tool('aim_remember', new Invoker($invoker))
-        ->setInputValue('facts', [['text' => "Written by $invoker.", 'scope' => 'site']])
-        ->execute();
-      $facts = AimFact::loadMultiple();
-      $fact = end($facts);
-      $written[$invoker] = [$fact->get('source')->value, (bool) $fact->get('trusted')->value];
+  public function testSourceFollowsInvoker(): void {
+    foreach ([FALSE, TRUE] as $trusted) {
+      $permissions = ['remember aim facts', 'create site aim facts'];
+      $this->actAs($this->createUser($trusted ? [...$permissions, 'trust site aim facts'] : $permissions));
+      $written = [];
+      foreach (['tool_ai_connector', 'mcp_server', 'drush'] as $invoker) {
+        $this->tool('aim_remember', new Invoker($invoker))
+          ->setInputValue('facts', [['text' => "Written by $invoker.", 'scope' => 'site']])
+          ->execute();
+        $facts = AimFact::loadMultiple();
+        $fact = end($facts);
+        $written[$invoker] = [$fact->get('source')->value, (bool) $fact->get('trusted')->value];
+      }
+      $this->assertSame(['chat:aim_remember', $trusted], $written['tool_ai_connector']);
+      $this->assertSame(['tool:aim_remember', $trusted], $written['mcp_server']);
+      $this->assertSame(['drush:aim_remember', $trusted], $written['drush']);
     }
-    // Chat ships as hold, drush follows default_trusted (off).
-    $this->assertSame(['chat:aim_remember', FALSE], $written['tool_ai_connector']);
-    $this->assertSame(['tool:aim_remember', TRUE], $written['mcp_server']);
-    $this->assertSame(['drush:aim_remember', FALSE], $written['drush']);
 
     // A call with no invoker after one with: the invoker does not carry over.
     $this->remember(['text' => 'No invoker.', 'scope' => 'site']);
@@ -262,16 +263,16 @@ class AimToolPermissionsTest extends KernelTestBase {
   }
 
   /**
-   * A held fact's reply says it waits for review; an expiry is stated.
+   * An untrusted fact's reply says it waits for review; an expiry is stated.
    */
   public function testReplySaysWhatHappensNext(): void {
-    // Untrusted by default (default_trusted off), and no trust permission.
+    // No trust permission, so the fact waits for review.
     $this->actAs($this->createUser(['remember aim facts', 'create site aim facts']));
     $held = $this->remember(['text' => 'Open at nine.', 'scope' => 'site', 'expires' => '2030-01-31'])->getResult()->getContextValues()['results'];
     $this->assertStringContainsString('Waiting for staff review', $held);
     $this->assertStringContainsString('It retires after 2030-01-31.', $held);
 
-    // A writer who could trust it by hand starts it trusted: no note.
+    // A writer who may trust it starts it trusted: no note.
     $this->actAs($this->createUser(['remember aim facts', 'administer aim']));
     $trusted = $this->remember(['text' => 'Open at ten.', 'scope' => 'site'])->getResult()->getContextValues()['results'];
     $this->assertStringNotContainsString('Waiting for staff review', $trusted);

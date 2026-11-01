@@ -138,11 +138,10 @@ failed recipe prints a long stack trace after the real error; the first
 - **Review gate by writer.** Any signed-in visitor can tell the chat a
   fact (the recipe grants `access deepchat api` and `create site aim
   facts` to authenticated users only). A member's fact waits untrusted for
-  review (the chat channel ships as `hold`); a writer who could trust it
-  by hand (`administer aim`, `review aim facts`, `trust site aim facts`)
+  review, since members have no trust permission; a writer who may trust
+  it (`administer aim`, `review aim facts`, `trust site aim facts`)
   starts it trusted, so the presenter's own fact is live at once
-  ([ADR-0037](../../adr/resolved/0037-transient-source-passages-for-grounding.md)'s
-  2026-10-22 addendum).
+  ([ADR-0065](../../adr/resolved/0065-permissions-are-trust.md)).
 
 ## Running the demo
 
@@ -213,7 +212,7 @@ setup). A literal edited on stage is restored by the reinstall too.
    - `ddev drush aim:recall "opening hours" --scope=site --max-distance=0.48`
    - Save a near-duplicate ("The library opens at 9am on weekdays"), then
      `ddev drush aim:consolidate --scope=site --dry-run` to show the
-     merge/retire decision.
+     merge decision.
 
 ### Exact values (literals), about 3 minutes
 
@@ -256,7 +255,8 @@ not topics like opening hours, which vary by day.
 
 - It is a proof of concept. A member's chat fact waits for review, but a
   reviewer's own fact is live at once. The grounded check ships off; in
-  shadow mode it only records a score.
+  `record` mode it only stores a score, in `demote` it sends a fact the
+  source text doesn't state to review (it never trusts one).
 - The chat widget needs the `access deepchat api` permission, which only
   authenticated users have (registration is admin-only). Anyone you give an
   account can add held facts, so reset after a session.

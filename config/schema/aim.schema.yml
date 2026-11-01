@@ -33,16 +33,9 @@ aim.settings:
           type: aim.activity_choice
     grounding_mode:
       type: string
-      label: 'Grounded check: off, shadow (record the score only) or enforce (also set trusted)'
+      label: 'Grounded check: off, record (store the score only) or demote (also send a low-scoring fact to review)'
       constraints:
-        Choice: ['off', shadow, enforce]
-    merge_max_distance:
-      type: float
-      label: 'Maximum merged-to-input embedding distance, 0 disables'
-      constraints:
-        Range:
-          min: 0
-          max: 1
+        Choice: ['off', record, demote]
     merge_prompt:
       type: string
       label: 'Merge writer prompt, used when the classifier is a decision model'
@@ -63,32 +56,6 @@ aim.settings:
         Range:
           min: 0
           max: 1
-    default_trusted:
-      type: boolean
-      label: 'Trust new facts by default'
-    trust_policy:
-      type: mapping
-      label: 'Starting trust per entry channel and scope (ADR-0037 addendum 2026-10-18)'
-      mapping:
-        default:
-          type: string
-          label: 'Fallback policy: trusted, untrusted or hold; empty follows default_trusted'
-          constraints:
-            Choice: ['', trusted, untrusted, hold]
-        channels:
-          type: sequence
-          label: 'Policy per entry channel (chat, mcp, ingest, drush)'
-          sequence:
-            type: string
-            constraints:
-              Choice: [trusted, untrusted, hold]
-        scopes:
-          type: sequence
-          label: 'Policy per scope ID, used when the channel has no rule'
-          sequence:
-            type: string
-            constraints:
-              Choice: [trusted, untrusted, hold]
     show_redacted_facts:
       type: boolean
       label: 'Show a fact with [redacted] in place of a literal the viewer cannot read, instead of withholding it (debug)'

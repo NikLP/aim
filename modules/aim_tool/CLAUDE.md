@@ -40,10 +40,11 @@ an undeclared Write tool counts as destructive, which MCP clients read as
   optional), plus an optional `source_text` (the words the facts came
   from) for the grounded check, one call for the whole list
   ([ADR-0037](../../adr/resolved/0037-transient-source-passages-for-grounding.md)).
-  Neither `source` nor the trust channel is an input: both follow the Tool
-  API invoker (`AimRemember::CALLERS`; chat gets `chat`/`chat:aim_remember`),
-  handed over by `src/EventSubscriber/AimRememberInvokerSubscriber.php`
-  until Tool API passes it to the method. An
+  `source` is not an input: it follows the Tool API invoker
+  (`AimRemember::CALLERS`; chat gets `chat:aim_remember`), handed over
+  by `src/EventSubscriber/AimRememberInvokerSubscriber.php` until Tool
+  API passes it to the method. Starting trust is the caller's permission
+  alone (ADR-0065). An
   entry's `scope_fields` (ADR-0028 piece 4) gets its properties from the
   installed scopes' types (`getBaseFieldDefinitions()`) in
   `AimToolHooks::toolInfoAlter()`, and is dropped from the schema when none

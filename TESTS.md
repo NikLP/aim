@@ -12,7 +12,7 @@ updated when one is done. Hosted Jev takes synthetic or public data only
 | --- | --- | --- | --- |
 | **A. Model evals** | The configured provider through Drupal (`decision-eval.php`, `aim.backend.decision`), fixed hand-written sets, no aim write path. Never the model's API directly. | `modules/aim_benchmark/scripts/` | Can the model make this judgment at all? |
 | **B. Module runs** | The module: `drush aim:remember` / `aim:extract` / `aim:consolidate` / `aim:recall` on a snapshot, real backends, real queue. | `tests/ingest-test/`, `aim_benchmark` commands | Does aim, wired to a model, do the right thing end to end? |
-| **C. Automated tests** | PHPUnit (kernel/unit): 79 tests, every model step faked. Command in DEVELOPING.md. | `tests/src/Kernel/`, `tests/src/Unit/`, `modules/aim_chatbot/tests/` | Does a class behave, without a live site? |
+| **C. Automated tests** | PHPUnit (kernel/unit): 90 tests, every model step faked. Command in DEVELOPING.md. | `tests/src/Kernel/`, `tests/src/Unit/`, `modules/aim_chatbot/tests/` | Does a class behave, without a live site? |
 
 The drift audit (ADR-0043) so far is type A only. Nothing in aim calls it
 yet, so a pass there says nothing about the module.
@@ -61,7 +61,7 @@ yet, so a pass there says nothing about the module.
    supported / unsupported / misattributed. Needed before the grounded
    check build (TODO).
 5. **Harder UPDATE/NOOP pairs** and the **gold sets** TODO item (a)-(c):
-   15-25 hand-written pairs per ADD/UPDATE/RETIRE/NOOP with hard
+   15-25 hand-written pairs per ADD/UPDATE/NOOP with hard
    negatives, human-verified labels; merge set from mutated good merges;
    site-context contradictions for the `gate` set.
 6. **Pass bar** (ADR-0021 open question 2): decide before scoring, e.g.
@@ -125,7 +125,7 @@ unless noted; synthetic data only for hosted Jev.
    run for it. Plugin code not opened (TODO). Also run the offline
    `ai_provider_typesafeai/tests/check-decision-api.php` check.
 6. **Baselines** (none exist, so no improvement can be claimed): merge
-   fidelity review of dry-run UPDATE/RETIRE rows on a snapshot copy; a
+   fidelity review of dry-run UPDATE rows on a snapshot copy; a
    disclosed LongMemEval slice (50-100 questions) for recall precision,
    knowledge-update correctness and abstention; recall payload size vs
    full-history tokens; duplicate rate. Then tune `recall_max_distance`
@@ -147,7 +147,7 @@ unless noted; synthetic data only for hosted Jev.
 
 ## Automated tests (C)
 
-79 tests, none calls a provider (`FakeDecisionBackend`, which answers
+90 tests, none calls a provider (`FakeDecisionBackend`, which answers
 from scripted values; `ScriptedMergeConsolidationService` stands in for the
 merge writer's chat call; the vector search is stubbed by
 `FakeVectorSearchTrait`, since the real server needs MariaDB vectors).
@@ -158,14 +158,14 @@ merge writer's chat call; the vector search is stubbed by
 | `Kernel/AimRecallLiteralTokensTest` | `[literal:key]` resolved per viewer, withheld or `[redacted]`, read live (ADR-0040) |
 | `Kernel/AimPrivacyTest` | User-scope visibility: strangers, shared role, role-visibility matrix, administrator, bypass |
 | `Kernel/AimScopeBehaviorTest` | Shipped scope config, case ID minting, `requires_account`, entity-scope view access, role visibility, expiry sweep |
-| `Kernel/AimConsolidateTest` | Near-duplicate retire, dry run, distant facts, scope separation, retired facts ignored; an UPDATE's merge gets the grounded check (passage, stored score, no call when off) and enforce keeps both facts below the threshold |
-| `Kernel/AimGroundingTest` | Grounded check modes (shadow, enforce, off), fail-closed, one call per batch |
+| `Kernel/AimConsolidateTest` | Near-duplicate retire, dry run, distant facts, scope separation, retired facts ignored, untrusted facts not compared, trusting a fact queues it; an UPDATE's merge gets the grounded check (passage, stored score, no call when off) and demote keeps both facts below the threshold |
+| `Kernel/AimGroundingTest` | Starting trust from the writer's permission (remember() and the add form's default), grounded check modes (record, demote, off), demote never promotes, fail-closed, no model means no check, one call per batch |
 | `Kernel/AimIngestTest` | Ingest form lines and JSON modes, validation, per-scope create checks (form and extraction) |
 | `Kernel/AimTrustActionTest`, `AimRetireActionTest` | Bulk trust/retire actions and their access checks |
 | `Unit/AimEmbeddingCacheSubscriberTest` | Embedding cache hit, bypass, key identity (ADR-0017) |
 | `Unit/AimCallTagsTest` | Every `aim_*` call tag is in `ai_logging`'s prompt-logging list |
 | `aim_chatbot/.../AimChatbotRecallContextSubscriberTest` | Recall in code before the chat model |
-| `aim_tool/.../Kernel/AimToolPermissionsTest` | Tool permissions, per-scope create checks, channel and source from the invoker, reply notes, schema |
+| `aim_tool/.../Kernel/AimToolPermissionsTest` | Tool permissions, per-scope create checks, source from the invoker with the same trust for every invoker, reply notes, schema |
 
 Run (needs a separate `phpunit` database, see DEVELOPING.md's "Running the
 tests"):

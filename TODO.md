@@ -10,8 +10,7 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
 ## Tools (raised 2026-10-25)
 
 - [ ] **Upstream: hand a `#[ToolMethod]` its invoker** (ADR-0062 decision
-      2). `aim_remember` picks its trust channel and source from the Tool
-      API invoker, which a method service never receives;
+      2). `aim_remember` picks its source from the Tool API invoker, which a method service never receives;
       `AimRememberInvokerSubscriber` catches it from `ToolInputTransformEvent`
       meanwhile. Upstream: [tool#3583125](https://git.drupalcode.org/project/tool/-/work_items/3583125)
       (filed 2026-10-28) asks for a runner-filled `?Invoker` method
@@ -24,7 +23,7 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
 
 State: recall not forced (`require_usage` off since 2026-10-22, see
 `modules/aim_chatbot/CLAUDE.md`), persona says "recall first", the demo
-recipe installs `literals_finder` and puts its block on the gate, chat writes held (`hold`) and permission-checked,
+recipe installs `literals_finder` and puts its block on the gate, chat writes permission-checked (a member's wait for review: no trust permission),
 turns about 4.7 s with 2 hosted calls (details in the Literals entry below
 and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
 
@@ -204,17 +203,13 @@ only work to do is listed here.
       backend (ADR-0021 decision 5; text hardcoded in `AimMemoryManager`).
       Limits: `tev1` input ~2,050 tokens, Ollama max 26 options. Optional:
       per-activity `concurrency` (nice-to-have; only a bulk backfill is slow).
-- [ ] **Trust policy follow-ups** (ADR-0037 addenda): settings form for
-      `trust_policy`; reason column on the facts list; end-of-session
-      summary for the chat path (ADR-0029); shipped channel rules for real
-      data; the `tool:`/`mcp` channel still follows `default_trusted: true`
-      here. Also `review own aim facts` (owner check in the `trust`
-      operation of `AimFactAccessControlHandler`; build with the form), and
-      later an optional `aim_trust` submodule (`TrustPolicyResolverInterface`
-      out of `AimTrustPolicy`) when a second rule set or audit fields appear.
+- [ ] **Trust follow-ups** (ADR-0065): reason column on the facts list;
+      end-of-session summary for the chat path (ADR-0029); `review own aim
+      facts` (owner check in the `trust` operation of
+      `AimFactAccessControlHandler`).
 - [ ] **Settings form: say what is optional (raised 2026-10-22).** The
       Models tab's grounding fieldset should say the check is optional (off
-      by default; trust then comes from `trust_policy` alone) and needs a
+      by default; trust then comes from the writer's permission alone) and needs a
       provider with the `decision` operation (no chat path, ADR-0037).
       Consolidation and the verifier keep their chat option: it is the
       baseline any chat provider can run; a decision model is the upgrade.
@@ -297,18 +292,6 @@ only work to do is listed here.
       nothing that recall doesn't.
 
 ## Governance
-
-- [ ] **Build [ADR-0065](adr/0065-permissions-are-trust.md) (decided
-      2026-11-01): permissions are trust.** Starting trust from the
-      writer's permission only (trust policy, `hold`, `default_trusted`,
-      `remember()`'s `trusted` argument go); Drush `--uid` (uid-0 write
-      ban) switches account and runs the normal checks, the two skills
-      pass it; the grounded check never promotes, `grounding_mode`
-      is `off`/`record`/`demote`;
-      consolidation on trusted facts only (trusting a fact queues it);
-      classifier ADD/UPDATE/NOOP; `merge_max_distance` goes. Update hook
-      or reinstall, tests, then CLAUDE.md decision 3 and the docs. Build
-      before or with ADR-0064.
 
 - [ ] **Record who trusted a fact (raised 2026-10-11; deferred 2026-10-19 to
       before real data, with ADR-0056; add a `trust_basis` field too:

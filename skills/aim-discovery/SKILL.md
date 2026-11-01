@@ -68,9 +68,13 @@ every single reply:
 2. Save it to a scratch file (use the session's scratchpad directory if one
    is available, otherwise a temp file under the project root you delete
    afterward).
-3. Run `ddev drush aim:extract <file> --source=discovery:<short-topic-tag>
+3. Run `ddev drush aim:extract <file> --uid=<uid> --source=discovery:<short-topic-tag>
    --index`, from the project root (`/home/niklp/websites/aim` unless told
-   otherwise). Drush's cwd is `web/`, not the project root, so pass an
+   otherwise). `--uid` is required: the account the facts are written as,
+   normally the person you're interviewing. Ask once which uid that is at
+   the start of the session and reuse it; never guess one. Facts written as
+   an account without a trust permission wait for review before recall
+   returns them. Drush's cwd is `web/`, not the project root, so pass an
    absolute container path (`/var/www/html/<path-from-project-root>`) if the
    file lives outside `web/`.
 4. Almost everything here is `scope: site`. Voice/tone facts are still

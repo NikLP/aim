@@ -9,7 +9,6 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Service\AimGroundingChecker;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRememberService;
-use Drupal\aim\Service\AimTrustPolicy;
 use Drupal\tool\Attribute\ToolInput;
 use Drupal\tool\Attribute\ToolMethod;
 use Drupal\tool\Attribute\ToolOutput;
@@ -49,11 +48,12 @@ use Drupal\tool\TypedData\OutputDefinition;
  * mirroring aim:remember's own --file option. Bad entries are reported and
  * skipped; the rest are saved.
  *
- * Neither source nor the trust channel is an input: provenance is the
- * channel's to record, not the caller's to claim. Both follow the Tool API
- * invoker (CALLERS): an agent on this site writes as chat, Drush as drush,
- * anything else (MCP, direct PHP) as mcp. The account that wrote it is in
- * uid. AimRememberInvokerSubscriber hands the invoker over, since a
+ * Source is not an input: provenance is the path's to record, not the
+ * caller's to claim. It follows the Tool API invoker (CALLERS): an agent on
+ * this site records chat:aim_remember, Drush drush:aim_remember, anything
+ * else (MCP, direct PHP) tool:aim_remember. The account that wrote it is in
+ * uid, and its permissions alone decide the starting trust (ADR-0065).
+ * AimRememberInvokerSubscriber hands the invoker over, since a
  * #[ToolMethod] service is not given it.
  *
  * An entry's scope_fields (ADR-0028 piece 4) carries the extra fields a
@@ -77,13 +77,13 @@ final class AimRemember {
   const SOURCE = 'tool:aim_remember';
 
   /**
-   * Trust channel and source per Tool API invoker ID.
+   * The source recorded per Tool API invoker ID.
    */
   const CALLERS = [
     // tool_ai_connector's invoker: an ai_agents agent on this site, the
     // chat assistant.
-    'tool_ai_connector' => [AimTrustPolicy::CHANNEL_CHAT, 'chat:aim_remember'],
-    DrushInvoker::ID => [AimTrustPolicy::CHANNEL_DRUSH, 'drush:aim_remember'],
+    'tool_ai_connector' => 'chat:aim_remember',
+    DrushInvoker::ID => 'drush:aim_remember',
   ];
 
   /**
@@ -210,7 +210,7 @@ final class AimRemember {
       );
     }
     $sourceText = ($source_text ?? '') !== '' ? $source_text : NULL;
-    [$channel, $source] = self::CALLERS[$this->invoker?->id] ?? [AimTrustPolicy::CHANNEL_MCP, self::SOURCE];
+    $source = self::CALLERS[$this->invoker?->id] ?? self::SOURCE;
     $this->invoker = NULL;
 
     $lines = [];
@@ -226,7 +226,7 @@ final class AimRemember {
         continue;
       }
 
-      $fact = $this->rememberOne($entry, $sourceText, $channel, $source);
+      $fact = $this->rememberOne($entry, $sourceText, $source);
       if (isset($fact['error'])) {
         $lines[] = "Entry $i: " . $fact['error'];
         continue;
@@ -252,7 +252,7 @@ final class AimRemember {
   /**
    * What happens to a saved fact next, when that is not "recall finds it".
    *
-   * A held fact waits for review and recall skips it until then, so a
+   * An untrusted fact waits for review and recall skips it until then, so a
    * caller told only "Created" would report it as known.
    *
    * @param array $fact
@@ -279,8 +279,6 @@ final class AimRemember {
    *   One facts entry: text/scope/subject/expires/scope_fields.
    * @param string|null $sourceText
    *   The text the fact came from, for the grounded check, or NULL.
-   * @param string $channel
-   *   The trust channel, an AimTrustPolicy::CHANNEL_* constant.
    * @param string $source
    *   The source recorded on the fact.
    *
@@ -289,7 +287,7 @@ final class AimRemember {
    *   bool, 'expires' => int|null] on success, or ['error' => string] on
    *   failure.
    */
-  private function rememberOne(array $fields, ?string $sourceText, string $channel, string $source): array {
+  private function rememberOne(array $fields, ?string $sourceText, string $source): array {
     $scope = $fields['scope'] ?? NULL;
     $scopeFields = $fields['scope_fields'] ?? [];
     if (empty($scope)) {
@@ -320,12 +318,10 @@ final class AimRemember {
         $source,
         [],
         NULL,
-        NULL,
         $scopeFields['target_type'] ?? NULL,
         $scopeFields['target_id'] ?? NULL,
         $sourceText,
         $this->rememberService->parseExpires($fields),
-        $channel,
       );
     }
     catch (\InvalidArgumentException $e) {

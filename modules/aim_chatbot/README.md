@@ -17,8 +17,8 @@ the overall pitch.
 What chat can read and write is set by the visitor's permissions: give a
 chat-facing role `recall aim facts`, `remember aim facts` and the
 `view`/`create` permissions of the scopes it should reach (the demo: `site`
-only). A visitor's fact waits for staff review (the `chat` trust channel
-ships as `hold`). See
+only). A visitor's fact waits for staff review unless their role may trust facts
+in that scope ([ADR-0065](../../adr/resolved/0065-permissions-are-trust.md)). See
 [ADR-0062](../../adr/resolved/0062-chat-on-the-shared-tools.md).
 
 ## Requirements

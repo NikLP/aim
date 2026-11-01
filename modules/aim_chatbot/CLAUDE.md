@@ -14,10 +14,10 @@ what is specific to `aim_chatbot`.
 the visitor: recall returns only facts they may view, remember checks
 `create {scope} aim facts` per fact. A chat-facing role needs `recall aim
 facts`/`remember aim facts` plus the per-scope permissions; whatever scopes
-it holds, chat reaches. The demo recipe gives members `site` only. Chat
-writes go on the `chat` trust channel (shipped `hold`) because
-`aim_remember` picks the channel from its Tool API invoker
-(`tool_ai_connector`), not because of anything here. The one hardcoded
+it holds, chat reaches. The demo recipe gives members `site` only. A chat
+fact starts trusted only when the visitor may trust facts in its scope
+(ADR-0065); `aim_remember` records source `chat:aim_remember` from its
+Tool API invoker (`tool_ai_connector`), not because of anything here. The one hardcoded
 `site` left is `AimChatbotRecallContextSubscriber`'s; `site` ships with
 `aim`.
 

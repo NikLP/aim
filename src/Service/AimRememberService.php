@@ -35,8 +35,6 @@ class AimRememberService {
    *   The settings reader.
    * @param \Drupal\aim\Service\AimGroundingChecker $groundingChecker
    *   The grounded check (ADR-0037).
-   * @param \Drupal\aim\Service\AimTrustPolicy $trustPolicy
-   *   The trust policy resolver (ADR-0037 addendum 2026-10-18).
    * @param \Drupal\ai\AiProviderPluginManager $aiProvider
    *   The AI provider plugin manager, for extraction.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
@@ -54,7 +52,6 @@ class AimRememberService {
     protected AimMemoryManager $manager,
     protected AimSettings $settings,
     protected AimGroundingChecker $groundingChecker,
-    protected AimTrustPolicy $trustPolicy,
     #[Autowire(service: 'ai.provider')]
     protected AiProviderPluginManager $aiProvider,
     protected EntityTypeManagerInterface $entityTypeManager,
@@ -66,57 +63,36 @@ class AimRememberService {
   ) {}
 
   /**
-   * Reduces a caller's explicit trusted value to what it may set.
-   *
-   * FALSE is always honored (it only withholds). TRUE needs a permission
-   * that could trust the fact by hand (AimTrustPolicy::canApprove()); from
-   * anyone else it is ignored and the policy decides.
-   *
-   * @param bool|null $trusted
-   *   The caller's explicit value.
-   * @param string $scope
-   *   The fact's scope ID.
-   *
-   * @return bool|null
-   *   The value to honor, or NULL to let the trust policy decide.
-   */
-  protected function honoredTrusted(?bool $trusted, string $scope): ?bool {
-    if ($trusted !== TRUE) {
-      return $trusted;
-    }
-    if ($this->trustPolicy->canApprove($this->currentUser, $scope)) {
-      return TRUE;
-    }
-    $this->logger->warning('Explicit trusted=TRUE ignored for scope @scope (uid @uid): no trust permission.', [
-      '@scope' => $scope,
-      '@uid' => $this->currentUser->id(),
-    ]);
-    return NULL;
-  }
-
-  /**
    * Field values for a new fact's trusted flag and grounding score.
    *
-   * @param bool|null $explicit
-   *   The honored explicit trusted value, or NULL.
-   * @param string|null $channel
-   *   The entry channel.
+   * ADR-0065: the fact starts trusted when the current user, the writer,
+   * may trust facts in its scope. The grounded check can only withhold
+   * trust, never grant it.
+   *
    * @param string $scope
    *   The fact's scope ID.
    * @param bool $checked
-   *   Whether the grounded check ran.
+   *   Whether the grounded check ran (source text, a mode other than off
+   *   and a grounding model).
    * @param float|null $score
-   *   The check's score.
+   *   The check's score, NULL when it failed to run.
    *
    * @return array
-   *   trusted, plus grounding_score when checked. The policy is resolved
-   *   for the current user, the writer. An explicit value wins over the
-   *   policy and the check; the score is still recorded.
+   *   trusted, plus grounding_score when checked. In demote mode a score
+   *   below the threshold, or a check that failed to run, saves the fact
+   *   untrusted; in record mode the score is only stored.
    */
-  protected function trustValues(?bool $explicit, ?string $channel, string $scope, bool $checked, ?float $score): array {
-    $values = $this->trustPolicy->values($this->trustPolicy->resolve($channel, $scope, $this->currentUser), $checked, $score);
-    if ($explicit !== NULL) {
-      $values['trusted'] = $explicit;
+  protected function trustValues(string $scope, bool $checked, ?float $score): array {
+    /** @var \Drupal\aim\AimFactAccessControlHandler $access */
+    $access = $this->entityTypeManager->getAccessControlHandler('aim_fact');
+    $values = ['trusted' => $access->canApprove($this->currentUser, $scope)];
+    if (!$checked) {
+      return $values;
+    }
+
+    $values['grounding_score'] = $score;
+    if ($this->settings->getGroundingMode() === 'demote' && ($score === NULL || $score < $this->settings->getGroundingThreshold())) {
+      $values['trusted'] = FALSE;
     }
     return $values;
   }
@@ -162,14 +138,6 @@ class AimRememberService {
    * @param int|null $asserted
    *   When this fact became true in reality, as a Unix timestamp, if known
    *   and different from now. NULL means "same as created".
-   * @param bool|null $trusted
-   *   Explicit trusted value for this fact, bypassing the trust policy.
-   *   NULL (the default) lets the policy decide (AimTrustPolicy) - the
-   *   right fallback for every LLM/human-mixed caller the draft-to-trusted
-   *   gate exists for. FALSE is always honored. TRUE is honored only for a
-   *   caller who could trust the fact by hand (administer aim, review aim
-   *   facts or the scope's trust permission), and is otherwise ignored;
-   *   unlike the policy's start, it is never demoted by the grounded check.
    * @param string|null $targetType
    *   The referenced entity's type ID, for scope=entity (e.g. node).
    *   Ignored for every other scope.
@@ -179,15 +147,12 @@ class AimRememberService {
    * @param string|null $sourceText
    *   The text this fact was written from (a visitor's message, a
    *   document), for the grounded check (ADR-0037). Checked, never stored.
-   *   NULL leaves the fact unchecked.
+   *   NULL leaves the fact unchecked, so it keeps the writer's starting
+   *   trust (ADR-0065).
    * @param int|null $expires
    *   When this fact stops being true, as a Unix timestamp (ADR-0057).
    *   retireExpired() retires it once this passes. NULL means no end date.
    *   Must be in the future.
-   * @param string|null $channel
-   *   The entry channel (an AimTrustPolicy::CHANNEL_* constant) the trust
-   *   policy keys on. Named by the calling code, never by $source. NULL
-   *   falls to the scope rule and the default.
    *
    * @return \Drupal\aim\Entity\AimFact
    *   The created fact.
@@ -196,7 +161,7 @@ class AimRememberService {
    *   If scope is invalid, scope=user and subject does not resolve to a real
    *   account, or the text fails a guardrail check.
    */
-  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, array $category = [], ?int $asserted = NULL, ?bool $trusted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL, ?int $expires = NULL, ?string $channel = NULL): AimFact {
+  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, array $category = [], ?int $asserted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL, ?int $expires = NULL): AimFact {
     $allowed = $this->manager->allowedScopes();
     if (!in_array($scope, $allowed, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
@@ -245,9 +210,9 @@ class AimRememberService {
       $values['expires'] = $expires;
     }
 
-    $grounded = $sourceText !== NULL && $this->settings->getGroundingMode() !== 'off';
+    $grounded = $sourceText !== NULL && $this->settings->isGroundingOn();
     $score = $grounded ? $this->groundingChecker->checkGrounding($sourceText, [$text])[0] : NULL;
-    $values += $this->trustValues($this->honoredTrusted($trusted, $scope), $channel, $scope, $grounded, $score);
+    $values += $this->trustValues($scope, $grounded, $score);
 
     if ($targetType !== NULL) {
       $values['target_type'] = $targetType;
@@ -330,22 +295,14 @@ class AimRememberService {
    *   a document naming someone is no guarantee that person has an account
    *   on this site. NULL means no such account was supplied, so every
    *   scope=user candidate is skipped.
-   * @param bool|null $trusted
-   *   Explicit trusted value applied to every fact created from $facts,
-   *   bypassing aim.settings:default_trusted. See remember()'s own
-   *   $trusted docblock - NULL is the right default here too, since this
-   *   method's callers are extraction paths the draft-to-trusted gate
-   *   exists for.
    * @param string|null $sourceText
    *   The text the candidates were extracted from, for the grounded check
    *   (ADR-0037): one call for every candidate. Never stored. NULL leaves
    *   the facts unchecked.
-   * @param string|null $channel
-   *   The entry channel for the trust policy.
    * @param \Drupal\Core\Session\AccountInterface|null $writer
    *   An account whose "create {scope} aim facts" permission each candidate
-   *   is checked against (the ingest form's user), or NULL for no check
-   *   (Drush, which runs as anonymous).
+   *   is checked against (the ingest form's user, the Drush --uid account),
+   *   or NULL for no check. Starting trust is always the current user's.
    *
    * @return array
    *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[]), 'skipped'
@@ -357,7 +314,7 @@ class AimRememberService {
    * @throws \InvalidArgumentException
    *   If $subjectUid is given but does not resolve to a real account.
    */
-  public function createFactsFromCandidates(array $facts, string $source, ?string $subjectUid = NULL, ?bool $trusted = NULL, ?string $sourceText = NULL, ?string $channel = NULL, ?AccountInterface $writer = NULL): array {
+  public function createFactsFromCandidates(array $facts, string $source, ?string $subjectUid = NULL, ?string $sourceText = NULL, ?AccountInterface $writer = NULL): array {
     $storage = $this->entityTypeManager->getStorage('aim_fact');
     $created = [];
     $skipped = 0;
@@ -372,7 +329,7 @@ class AimRememberService {
       }
     }
 
-    $grounded = $sourceText !== NULL && $this->settings->getGroundingMode() !== 'off';
+    $grounded = $sourceText !== NULL && $this->settings->isGroundingOn();
     $scores = $grounded ? $this->groundingChecker->checkGrounding($sourceText, array_column($facts, 'text')) : [];
 
     foreach (array_values($facts) as $i => $fact) {
@@ -406,7 +363,7 @@ class AimRememberService {
         $values['subject'] = $fact['subject'] ?? '';
       }
 
-      $values += $this->trustValues($this->honoredTrusted($trusted, $fact['scope']), $channel, $fact['scope'], $grounded, $scores[$i] ?? NULL);
+      $values += $this->trustValues($fact['scope'], $grounded, $scores[$i] ?? NULL);
 
       $entity = $storage->create($values);
       try {
@@ -470,8 +427,6 @@ class AimRememberService {
    *   The chat provider, or NULL for the extraction activity's configured one.
    * @param string|null $modelId
    *   The chat model, or NULL for the extraction activity's configured one.
-   * @param string|null $channel
-   *   The entry channel for the trust policy.
    * @param \Drupal\Core\Session\AccountInterface|null $writer
    *   The account to check per-scope create access for, or NULL for none;
    *   see createFactsFromCandidates().
@@ -485,7 +440,7 @@ class AimRememberService {
    * @throws \RuntimeException
    *   If no provider/model is given and none is configured.
    */
-  public function ingestText(string $text, string $source, ?string $subjectUid = NULL, ?string $providerId = NULL, ?string $modelId = NULL, ?string $channel = NULL, ?AccountInterface $writer = NULL): array {
+  public function ingestText(string $text, string $source, ?string $subjectUid = NULL, ?string $providerId = NULL, ?string $modelId = NULL, ?AccountInterface $writer = NULL): array {
     if (empty($providerId) || empty($modelId)) {
       $default = $this->settings->getModelFor('extraction');
       if ($default === NULL) {
@@ -499,7 +454,7 @@ class AimRememberService {
     if (empty($facts)) {
       return ['created' => [], 'skipped' => 0, 'blocked' => 0, 'denied' => 0, 'extracted' => 0];
     }
-    $result = $this->createFactsFromCandidates($facts, $source, $subjectUid ?: NULL, NULL, trim($text), $channel, $writer);
+    $result = $this->createFactsFromCandidates($facts, $source, $subjectUid ?: NULL, trim($text), $writer);
     $result['extracted'] = count($facts);
     return $result;
   }
@@ -517,18 +472,16 @@ class AimRememberService {
    *   keys are ignored.
    * @param string|null $defaultSource
    *   The source for entries that name none.
-   * @param string|null $channel
-   *   The entry channel for the trust policy.
    * @param \Drupal\Core\Session\AccountInterface|null $writer
    *   An account whose "create {scope} aim facts" permission each entry is
-   *   checked against (the ingest form's user), or NULL for no check (Drush,
-   *   which runs as anonymous). A denied entry is an error, not a write.
+   *   checked against (the ingest form's user, the Drush --uid account), or
+   *   NULL for no check. A denied entry is an error, not a write.
    *
    * @return array
    *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[] keyed by
    *   entry index) and 'errors' (string messages keyed by entry index).
    */
-  public function rememberBatch(array $entries, ?string $defaultSource = NULL, ?string $channel = NULL, ?AccountInterface $writer = NULL): array {
+  public function rememberBatch(array $entries, ?string $defaultSource = NULL, ?AccountInterface $writer = NULL): array {
     $created = [];
     $errors = [];
     foreach ($entries as $i => $entry) {
@@ -553,11 +506,9 @@ class AimRememberService {
           $entry['source'] ?? $defaultSource,
           $category,
           $asserted,
-          NULL,
           $entry['target_type'] ?? NULL,
           $entry['target_id'] ?? NULL,
           expires: $this->parseExpires($entry),
-          channel: $channel,
         );
       }
       catch (\InvalidArgumentException $e) {

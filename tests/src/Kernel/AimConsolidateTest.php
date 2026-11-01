@@ -115,6 +115,43 @@ class AimConsolidateTest extends KernelTestBase {
   }
 
   /**
+   * An untrusted fact is not consolidated, as candidate or as neighbor.
+   *
+   * ADR-0065: a draft waits for review, and merging it into a trusted fact
+   * would make the merge untrusted and hide both from recall.
+   */
+  public function testUntrustedFactsNotCompared(): void {
+    [$kept, $draft] = [$this->fact('Open at nine.'), $this->fact('Open at nine.', trusted: FALSE)];
+    $this->setScores([$kept->id() => 0.02, $draft->id() => 0.03]);
+
+    $this->assertSame([], $this->sweep()['rows']);
+    $this->assertEmpty($this->reload($draft)->get('retired')->value);
+    $this->assertSame([], $this->container->get('aim.consolidation')->consolidateFact($draft, 'fake', 'fake-model', self::COMPARE));
+  }
+
+  /**
+   * Only a trusted fact is queued, on insert or when it becomes trusted.
+   */
+  public function testTrustingQueuesFact(): void {
+    $queue = $this->container->get('queue')->get('aim_consolidate');
+    $this->fact('Trusted at once.');
+    $this->assertSame(1, $queue->numberOfItems());
+
+    $draft = $this->fact('A draft.', trusted: FALSE);
+    $this->assertSame(1, $queue->numberOfItems());
+
+    // Another save while untrusted, then trusting it.
+    $draft->set('text', 'A reworded draft.')->save();
+    $this->assertSame(1, $queue->numberOfItems());
+    $draft->set('trusted', TRUE)->save();
+    $this->assertSame(2, $queue->numberOfItems());
+
+    // Saving it again while trusted queues nothing more.
+    $draft->set('text', 'Reworded once more.')->save();
+    $this->assertSame(2, $queue->numberOfItems());
+  }
+
+  /**
    * A dry run reports the decision and changes nothing.
    */
   public function testDryRunChangesNothing(): void {
@@ -230,11 +267,11 @@ class AimConsolidateTest extends KernelTestBase {
   /**
    * An UPDATE's merged text gets the grounded check against both inputs.
    *
-   * Shadow mode records the score on the merged fact; off makes no call.
+   * Record mode stores the score on the merged fact; off makes no call.
    */
   public function testMergeIsGrounded(): void {
     $this->scriptMerge(self::CORRECTION, 0.95);
-    $this->config('aim.settings')->set('grounding_mode', 'shadow')->save();
+    $this->config('aim.settings')->set('grounding_mode', 'record')->save();
     [$kept, $correction] = [$this->fact(self::KEPT), $this->fact(self::CORRECTION)];
     $this->setScores([$kept->id() => 0.01, $correction->id() => 0.016]);
 
@@ -258,14 +295,14 @@ class AimConsolidateTest extends KernelTestBase {
   }
 
   /**
-   * Enforce mode keeps both facts when the merge is not grounded.
+   * Demote mode keeps both facts when the merge is not grounded.
    *
    * Like a merge the verifier rejects: downgraded to ADD, nothing retired,
    * no merged fact.
    */
   public function testUngroundedMergeKeepsBoth(): void {
     $this->scriptMerge('Members can borrow up to 10 items, or 15 with a family card.', 0.1);
-    $this->config('aim.settings')->set('grounding_mode', 'enforce')->save();
+    $this->config('aim.settings')->set('grounding_mode', 'demote')->save();
     [$kept, $correction] = [$this->fact(self::KEPT), $this->fact(self::CORRECTION)];
     $this->setScores([$kept->id() => 0.01, $correction->id() => 0.016]);
 
@@ -333,7 +370,7 @@ class AimConsolidateTest extends KernelTestBase {
   }
 
   /**
-   * Saves a trusted fact.
+   * Saves a fact, trusted unless asked otherwise.
    *
    * @param string $text
    *   The fact text.
@@ -343,15 +380,17 @@ class AimConsolidateTest extends KernelTestBase {
    *   A retired timestamp, or NULL for a live fact.
    * @param int|null $expires
    *   An end date timestamp, or NULL for none.
+   * @param bool $trusted
+   *   Whether the fact is trusted.
    *
    * @return \Drupal\aim\Entity\AimFact
    *   The saved fact.
    */
-  protected function fact(string $text, string $scope = 'site', ?int $retired = NULL, ?int $expires = NULL): AimFact {
+  protected function fact(string $text, string $scope = 'site', ?int $retired = NULL, ?int $expires = NULL, bool $trusted = TRUE): AimFact {
     $fact = AimFact::create([
       'scope' => $scope,
       'text' => $text,
-      'trusted' => TRUE,
+      'trusted' => $trusted,
       'uid' => 1,
       'retired' => $retired,
       'expires' => $expires,

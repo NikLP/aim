@@ -25,10 +25,6 @@ are recommendations.
 
 **Identity and access**
 
-- [ ] Agreed: refuse new authored writes with uid 0 (Drush callers pass
-      `--uid`; part of [ADR-0065](adr/0065-permissions-are-trust.md)'s build). Consolidation retirements and merged facts are exempt
-      (a merged fact copies `uid` and `user` from the kept fact). The
-      current database is disposable, so no `uid` backfill is needed.
 - [ ] Docs: say "the fact is about this user" for `user` scope (`user` is
       the subject, `uid` is the author; keep `uid`, it is Drupal's idiom).
 - [ ] Grill access: what exists is fine for now (Drush with `--uid`, or
@@ -246,7 +242,8 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       the `aim:status` count BUILT 2026-10-19 (ADR-0037 addendum); still no
       one holds the permission and no reason column on the facts list. None
       yet: nobody holds
-      `trust {scope} aim facts` and the grounded check is in shadow mode. Decide
+      `trust {scope} aim facts` (the grounded check is in demote mode since
+      2026-11-01). Decide
       the reviewer workflow before claiming draft-to-trusted is a feature.
 - [ ] **Packaging.** Not a one-line installer. `recipes/aim_demo_library/preflight/preflight.js` lives in
       the recipe, not the module proper; consider a module-level check (a
@@ -263,7 +260,7 @@ OpenBrain, an in-house second brain. His points, and where each landed:
   undo". A decision model as a judge is also largely done: one question per call, gate
   and grounding eval sets built (44 items), thresholds separate per
   activity. What remains is under "Decision models" (per-model question
-  text, enforce decision).
+  text).
 
 ## PoC deviations to close before non-PoC data goes in
 
@@ -278,15 +275,14 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       `administer aim` or a new permission for writing about
       others; later option, accept it but force `trusted=FALSE` so the
       per-scope trust permission reviews it. Same class of gap as the
-      `trusted` override on `remember()` (closed 2026-10-19, ADR-0037
-      addendum). Not built. Legitimate in some cases (staff noting facts
+      `trusted` override on `remember()` (removed 2026-11-01, ADR-0065). Not built. Legitimate in some cases (staff noting facts
       about a customer): then use two scopes sharing the user plugin with
       different `settings` ([ADR-0028](adr/resolved/0028-scope-type-plugin.md)),
       one own-subject-only, one allowing writes about others. Recall is
       fine: a caller-supplied `user` returns nothing the viewer cannot see.
       (Folded in 2026-10-30 from a duplicate "Cross-user writes" item, whose
-      "starts untrusted" mitigation no longer held under the per-channel
-      trust policy.)
+      "starts untrusted" mitigation does not hold for a writer with a trust
+      permission.)
       [ADR-0007](adr/resolved/0007-user-scope-requires-real-account.md)
 
 ## Larger demo: page search + aim + FlowDrop (raised 2026-10-30)
@@ -377,7 +373,7 @@ questions" section)
       [ADR-0064](adr/0064-revisions-for-fact-edits.md) decision 4 if that
       is built; on its own otherwise.
 - [ ] Consolidation/recall baselines (none exist, so no improvement can be
-      claimed): merge-fidelity review of dry-run UPDATE/RETIRE rows on a
+      claimed): merge-fidelity review of dry-run UPDATE rows on a
       snapshot copy; a disclosed LongMemEval slice (50-100 questions) for
       recall precision, knowledge-update correctness and abstention (parity
       targets 1, 4, 5); recall payload size vs. full-history tokens
@@ -644,7 +640,7 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
 
 ## Write-path cuts, ADR-0065 (raised 2026-11-01)
 
-What [ADR-0065](adr/0065-permissions-are-trust.md) removes, and what
+What [ADR-0065](adr/resolved/0065-permissions-are-trust.md) removes, and what
 would bring each back. Nothing here is built.
 
 - [ ] **Per-channel trust exception.** Trigger: an agent holding a

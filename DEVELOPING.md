@@ -23,10 +23,18 @@ worth remembering - no extraction LLM round-trip. See
 alongside `extract()`.
 
 ```bash
-drush aim:remember <text> [--scope] [--subject] [--source] [--category] [--asserted] [--target-type] [--target-id]
+drush aim:remember <text> --uid=<uid> [--scope] [--subject] [--source] [--category] [--asserted] [--expires] [--target-type] [--target-id] [--file]
 ```
 
-- Validates scope, creates the fact directly, prints its ID.
+- `--uid` is required (the uid-0 write ban): the account the write runs
+  as, through core's `account_switcher`. It gets the web paths' checks:
+  `create {scope} aim facts` per fact, and the fact starts trusted only
+  if the account may trust it (ADR-0065); otherwise the message says it
+  waits for review. Missing, `0`, unknown or blocked is refused. This is
+  consistency, not authentication: anyone on the shell can name any uid.
+- Validates scope, creates the fact directly, prints its ID. A single
+  fact goes through `rememberBatch()` like `--file`, so both share the
+  create check.
 - `--category` resolves comma-separated term names against the
   `aim_category` vocabulary (admin-curated - a name with no matching term
   is skipped, never auto-created).
@@ -68,8 +76,7 @@ facts however far, which is what calibrating the cutoff needs);
 the MCP tool do by default with `aim.settings:recall_max_distance`.
 
 Untrusted facts (ADR-0002's addendum) are excluded unless
-`--include-untrusted` is given - the way to review what the trust policy
-is holding back (also the facts list's Trusted filter; `aim:status` shows the
+`--include-untrusted` is given - the way to review what waits for review (also the facts list's Trusted filter; `aim:status` shows the
 count). Reviewers hold `review aim facts`.
 
 Both commands live on `AimCommands`, backed by `AimMemoryManager` (also
@@ -78,8 +85,12 @@ used by `aim_tool` and the chatbot).
 ### `aim:extract` - LLM-driven extraction
 
 ```bash
-drush aim:extract <file> [--provider] [--model] [--source] [--index] [--subject-uid]
+drush aim:extract <file> --uid=<uid> [--provider] [--model] [--source] [--index] [--subject-uid]
 ```
+
+`--uid` as for `aim:remember`: candidates in a scope the account may not
+create in are dropped and counted, and the grounded check applies, since
+a model wrote these facts.
 
 Sends the file to a chat provider with a structured-JSON-schema request,
 creates one `AimFact` per returned item (scope/subject classified by the
@@ -106,8 +117,8 @@ one-fact-per-line and JSON modes), `parseFactFields()`. The form passes its
 user as `$writer`, so each fact needs its scope's `create {scope} aim facts`
 (`checkCreateAccess()`): the one-per-line scope list shows only those
 scopes, a JSON entry outside them is an error, an extracted candidate
-outside them is dropped and counted as `denied`. Drush passes no writer
-(it runs as anonymous) and is unchecked. Uploads are read
+outside them is dropped and counted as `denied`. Drush passes its `--uid`
+account the same way. Uploads are read
 from the request and never saved as a File entity; capped at 100 KB
 (`AimIngestForm::MAX_BYTES`). Submit is synchronous; consolidation stays
 queued. Test data: `tests/ingest-test/`.
@@ -127,7 +138,14 @@ drush aim:consolidate [--scope] [--provider] [--model] [--compare-distance] [--d
 ```
 
 On-demand sweep. Algorithm, schema, and thresholds in
-[ADR-0005](adr/resolved/0005-consolidation-algorithm.md). Pairs within
+[ADR-0005](adr/resolved/0005-consolidation-algorithm.md). Only trusted
+facts take part, as candidate or neighbor (ADR-0065): an untrusted fact is
+not queued on insert, and is queued when it becomes trusted
+(`AimHooks::factUpdate()`, from the Trust action or the edit form), so a
+draft is never merged into a trusted fact. A visitor repeating a known
+fact therefore waits in the review queue rather than being retired as a
+NOOP. The classifier decides ADD, UPDATE or NOOP; there is no RETIRE (a
+junk filter is a guardrail on `aim_write_guardrails`). Pairs within
 `compare_distance` (UI: Consolidation > Comparison distance, default
 0.45, calibrated against `ollama__nomic-embed-text:latest`) are
 compared: identical text (ignoring case, spacing and a final full stop,
@@ -147,13 +165,12 @@ is auditable and reversible with the Un-retire action (which also clears
 `superseded_by_reason`):
 
 - `NOOP` (and identical text): candidate retired, `superseded_by` = kept.
-- `RETIRE`: candidate retired, `superseded_by` left empty.
 - `UPDATE`: a **new merged fact** is created and both inputs are retired
   pointing at it. The old wording survives on the retired rows. Metadata
   carried over: scope, subject/user, target and owner from the kept fact;
   `asserted` from the candidate only; `source` from the candidate
   else the kept fact; `category` the union; `trusted` only if both inputs
-  were; `expires` (equal on both, see below); `grounding_score` from the
+  were (always, as only trusted facts are compared); `expires` (equal on both, see below); `grounding_score` from the
   merge's own grounded check (see "Merge verification"), empty when
   grounding is off. The merged fact is queued for consolidation like any
   new fact.
@@ -175,7 +192,7 @@ answer.
 fidelity, so an UPDATE's merged text must also pass `verifyMerge()`
 before it is accepted, and then the grounded check (below); failure
 downgrades the pair to **ADD** (keep both) and logs an audit line
-(`@check` = `model`, `distance`, `error` or `grounding`, never text).
+(`@check` = `model`, `error` or `grounding`, never text).
 Dry-run shows such rows as `ADD` with a non-empty "Merged text".
 Settings (`aim.settings`, `/admin/config/aim/settings`):
 
@@ -200,21 +217,18 @@ Settings (`aim.settings`, `/admin/config/aim/settings`):
   decision backend's confirmation cutoff is `activities.verifier.threshold`
   (empty or 0 means 0.5; this site uses 0.8 for its decision model). A local decision
   model is parked, see [ADR-0021](adr/0021-jev-typed-decision-provider.md).
-- `merge_max_distance` (default 0 = off): merged embedding must sit within
-  this cosine distance of each input. Measured 2026-10-01 on one pair, it
-  barely separates a faithful merge (0.02 / 0.11) from a lossy one
-  (0.08 / 0.14), so it is a weak tripwire, not a verifier; calibrate
-  before enabling.
-- Grounded check (`grounding_mode` not `off`): after the verifier passes,
+- Grounded check (`grounding_mode` not `off`, and a grounding model
+  set): after the verifier passes,
   the merged text goes through `checkGrounding()` with the two inputs as
   the passage (kept fact first, one per line), and the score is stored on
   the merged fact as `grounding_score`, so a merge carries the same
   provenance as any checked write and is checked by a second, separately
   calibrated question.
-  In `enforce`, a score below `activities.grounding.threshold`, or a check
+  In `demote`, a score below `activities.grounding.threshold`, or a check
   that failed to run, rejects the merge like the verifier does (ADD, both
   facts stay live), rather than merging and marking the result untrusted,
-  which would retire two good facts for one doubtful one. An audit line
+  which would retire two good facts for one doubtful one; `record` only
+  stores and logs the score. An audit line
   per merge (kept and candidate IDs, score, cutoff, mode). Measured
   2026-10-27 on a hosted SystemOne-compatible decision endpoint
   (`subq-snap-1.1`) over 16 real merges (the
@@ -524,10 +538,14 @@ Central service backing every write/read path. Key public methods:
 
 - `remember(string $text, ?string $scope, ?string $subject, ?string
   $source, ...): AimFact` - validated direct write. The
-  created fact's `trusted` comes from the trust policy
-  (`AimTrustPolicy`, see "Grounded check") via the `channel` argument; the
-  entity add form still takes `default_trusted` through
-  `AimFact::getDefaultTrusted()`.
+  created fact starts trusted when the current user may trust facts in
+  its scope (`AimFactAccessControlHandler::canApprove()`), and the grounded check may
+  then only demote it (see "Grounded check"); there is no `trusted`
+  argument. The entity add form defaults the same way
+  (`AimFact::getDefaultTrusted()`), and only a writer who may trust can
+  change the checkbox. Callers check `create {scope} aim facts`
+  themselves (`aim_remember`, the ingest form and Drush through
+  `rememberBatch()`'s `$writer`).
 - `recall(string $text, ?string $scope, ..., bool $includeUntrusted =
   FALSE): array` - semantic query, restricted to trusted facts unless
   `$includeUntrusted` is TRUE (ADR-0002's addendum).
@@ -643,35 +661,30 @@ to the model and never stored.
   `activities.grounding.max_questions` (default 16, the lowest cap
   measured on a hosted endpoint; raise it for a model that takes more) go in groups, one call each; a failed group
   leaves only its own scores empty.
-- **Trust policy** (`aim.settings:trust_policy`, `AimTrustPolicy`): each
-  write names its entry channel in code (`chat`, `mcp`, `ingest`, `drush`;
-  never the caller's `source`). Rule order: an explicit `trusted` (FALSE
-  always; TRUE only for a writer who `canApprove()`: `administer aim`,
-  `review aim facts` or the scope's trust permission), then `trusted` for
-  a writer who `canApprove()`, the channel's rule, the scope's rule,
-  `default` (empty follows `default_trusted`). The writer is the current
-  user: Drush runs as anonymous (Drush 13 has no `--uid`/`--user` option),
-  so Drush writes follow the `drush` channel's rule; an MCP caller is its
-  OAuth token's user with permissions narrowed to the token's scopes, so
+- **Starting trust** (ADR-0065, `AimRememberService::trustValues()`): a fact starts trusted
+  when its writer `canApprove()` (`administer aim`, `review aim facts` or
+  the scope's trust permission) and untrusted otherwise, on every path.
+  The writer is the current user: the signed-in user for chat and the
+  ingest form, the `--uid` account for Drush, and for MCP the OAuth
+  token's user with permissions narrowed to the token's scopes, so
   `aim_tool_oauth`'s two scopes never make a non-admin a reviewer (an
-  admin-role token keeps its bypass). Values: `trusted` (starts trusted, enforce
-  demotes below the threshold), `untrusted` (starts untrusted, enforce
-  promotes at or above it), `hold` (untrusted, never promoted). Shipped:
-  `channels: {chat: hold}`. A fact with no source text keeps its starting
-  state. No UI yet: edit via `drush config:set` or config import.
-  A writer who `canApprove()` is the source of truth, so their fact starts
-  trusted on any channel, by design (decided 2026-10-25, no four-eyes
-  rule). The gap is wording, not the person: on chat, MCP and extraction a
-  model writes the fact text, so a reviewer's trusted fact can be a
-  paraphrase nobody read. That is the grounded check's job: in `enforce`
-  it demotes a trusted fact whose text the source doesn't state (this site
-  runs `shadow`, so it only scores).
+  admin-role token keeps its bypass). A site that wants no review grants
+  the trust permission alongside create; one that wants review grants
+  create alone. A writer who `canApprove()` is the source of truth, by
+  design (no four-eyes rule). The gap is wording, not the person: on chat,
+  MCP and extraction a model writes the fact text, so a reviewer's trusted
+  fact can be a paraphrase nobody read. That is the grounded check's job.
 - **Modes** (`aim.settings:grounding_mode`, AIM settings > Models >
-  Grounded check): `off`; `shadow` records the score and leaves `trusted`
-  alone; `enforce` also moves `trusted` per the policy above (threshold
-  `activities.grounding.threshold`, default 0.7), untrusted when the check
-  fails or has no model (fail closed), including a reviewer's start. A
-  permitted explicit `trusted` wins. Decision backend only (`activities.grounding`).
+  Grounded check): `off` (the default; also for a site with no decision
+  model, one that won't send source text to a model, or a provider
+  outage); `record` stores the score and changes nothing else (try a new
+  grounding model on real traffic this way); `demote` also saves a fact
+  untrusted when it scores below `activities.grounding.threshold`
+  (default 0.7) or the check fails to run (fail closed), otherwise the
+  starting trust stands. The check never trusts a fact. It runs only with
+  source text and a decision model in `activities.grounding`
+  (`AimSettings::isGroundingOn()`): with no model nothing is checked or
+  demoted. This site runs `demote`.
 - **Checking reliability:** the Grounding column (sortable) and the
   "Grounding score below" filter on the facts list; an audit line per
   verdict (fact ID, score, cutoff, mode, no text); call time, tokens and the
@@ -970,11 +983,15 @@ each documented in their own submodule now:
 
 ---
 
-## Upgrading an existing site (no `hook_update_N()`)
+## Upgrading an existing site
 
-`config/install` does not re-run on an installed module and aim ships no
-update hooks (CLAUDE.md), so a site installed before 2026-09-26 needs these
-by hand. Fresh installs get all of it from config and the shim.
+`config/install` does not re-run on an installed module and aim ships
+only one update hook, `aim_update_10012()` (ADR-0065's settings: removes
+`trust_policy`, `default_trusted` and `merge_max_distance`, renames the
+grounded check's modes `shadow`/`enforce` to `record`/`demote`, drops
+RETIRE from the consolidation prompt; run `drush updatedb`). A site installed
+before 2026-09-26 needs the rest by hand. Fresh installs get all of it
+from config and the shim.
 
 1. **Retired facts out of the index**
    ([ADR-0022](adr/resolved/0022-exclude-retired-facts-from-vector-index.md)): add the
@@ -1204,8 +1221,7 @@ via the container, so only a hand-constructed instance is affected).
 - `/admin/config/aim/settings` (`AimSettingsForm`, `#config_target`-backed)
   - consolidation thresholds, the chatbot recall cutoff,
   the `log_audit`/`log_verbose` checkboxes (see "Logging"),
-  `default_trusted` (the initial value a new fact's `trusted` field gets,
-  ADR-0002), and the extraction/consolidation prompt text, all
+  and the extraction/consolidation prompt text, all
   admin-editable, no code deploy needed. The requested output *shape*
   (the JSON schema extraction/consolidation parse against) is not
   editable here - it's parsed by PHP downstream and isn't safe to hand to

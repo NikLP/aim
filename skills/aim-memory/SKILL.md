@@ -16,7 +16,7 @@ Both commands run via Bash, from the project root
 (`/home/niklp/websites/aim` unless told otherwise):
 
 ```
-ddev drush aim:remember "<text>" --scope=<user|role|site|case> [--subject=<id>] [--source=<tag>]
+ddev drush aim:remember "<text>" --scope=<user|role|site|case> --uid=<uid> [--subject=<id>] [--source=<tag>]
 ddev drush aim:recall "<query>" [--scope=<...>] [--subject=<...>] [--limit=<n>] [--format=json]
 ```
 
@@ -29,6 +29,14 @@ to parse the output rather than just read it.
 
 Use it as soon as you learn something worth keeping past this session, not
 saved up for the end. Small individual calls are fine and expected.
+
+- `--uid` is required: the account the fact is written as, normally the
+  person you're working for. Ask once which uid that is if you don't know,
+  then reuse it for the session; never guess one. Its permissions decide
+  which scopes it may write and whether the fact starts trusted: written
+  as an account without a trust permission, the fact waits for review and
+  `aim:recall` won't return it until someone trusts it (the command says
+  so).
 
 - `--scope=user` for a fact about one specific person (pass `--subject`).
 - `--scope=role` for something true of everyone holding a role.

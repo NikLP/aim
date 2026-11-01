@@ -36,13 +36,12 @@ $grounding_qs = [
 ];
 // The live verifier question (AimMemoryManager::modelConfirmsMerge()).
 $merge_q = 'Every detail of fact_a and fact_b (names, numbers, dates, conditions, negations) survives in merged, and merged adds nothing the two facts do not say, except that a value in fact_b which differs from the value fact_a gives for the same attribute (a duration, day, price or place) supersedes it, so the old value should be absent. Judge faithfulness to the inputs, not whether they are true.';
-// The live pair question (AimMemoryManager::classifyPairDecision()).
+// The live pair question (AimConsolidationService::classifyPair()).
 $pair_q = 'Decide what to do with the candidate fact relative to the existing fact. When unsure, choose ADD: keeping both facts is always safe.';
 $pair_options = [
   'ADD' => 'The facts are genuinely different; keep both.',
   'UPDATE' => 'The candidate refines, corrects or supersedes the existing fact.',
   'NOOP' => 'The candidate restates the existing fact with no new information.',
-  'RETIRE' => 'The candidate should not exist as a memory at all (nonsensical or clearly erroneous). Use sparingly.',
 ];
 
 $activities = \Drupal::config('aim.settings')->get('activities');
@@ -160,7 +159,7 @@ elseif ($task === 'pairs') {
     $got = $response->getChoice('decision')->getChoice();
     $conf[$p['label']][$got] = ($conf[$p['label']][$got] ?? 0) + 1;
     $hits += $got === $p['label'];
-    if (($got === 'RETIRE' && $p['label'] !== 'RETIRE') || ($got === 'UPDATE' && in_array($p['label'], ['ADD', 'NOOP'], TRUE))) {
+    if ($got === 'UPDATE' && in_array($p['label'], ['ADD', 'NOOP'], TRUE)) {
       $unsafe++;
       printf("  UNSAFE truth=%s got=%s | %s\n", $p['label'], $got, mb_substr($p['candidate'], 0, 70));
     }

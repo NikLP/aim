@@ -69,9 +69,10 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
   public function processItem($data): void {
     $fact_id = (int) $data;
     $fact = $this->memoryManager->loadFact($fact_id);
-    if (!$fact || !$fact->get('retired')->isEmpty()) {
+    if (!$fact || !$fact->get('retired')->isEmpty() || !$fact->get('trusted')->value) {
       // Already retired (by an earlier item in this same run finding it as
-      // its own neighbor), or deleted since being enqueued. Nothing to do.
+      // its own neighbor), deleted since being enqueued, or untrusted since
+      // (trusting it queues it again, ADR-0065). Nothing to do.
       return;
     }
 

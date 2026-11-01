@@ -142,8 +142,8 @@ final class AimStatusChecker {
   /**
    * Reports how many live facts are untrusted and so held out of recall.
    *
-   * Informational: always ok. The trust policy and the grounded check decide
-   * how many land here (ADR-0037 addendum 2026-10-18).
+   * Informational: always ok. Facts by writers without a trust permission
+   * and facts the grounded check demoted land here (ADR-0065).
    *
    * @return array
    *   ['label' => string, 'ok' => bool, 'detail' => string].
@@ -151,14 +151,14 @@ final class AimStatusChecker {
   private function checkUntrustedFacts(): array {
     $storage = $this->entityTypeManager->getStorage('aim_fact');
     $untrusted = (int) $storage->getQuery()->accessCheck(FALSE)->notExists('retired')->condition('trusted', 0)->count()->execute();
-    $unscored = (int) $storage->getQuery()->accessCheck(FALSE)->notExists('retired')->condition('trusted', 0)->notExists('grounding_score')->count()->execute();
+    $scored = (int) $storage->getQuery()->accessCheck(FALSE)->notExists('retired')->condition('trusted', 0)->exists('grounding_score')->count()->execute();
 
     return [
       'label' => 'Untrusted facts awaiting review',
       'ok' => TRUE,
       'detail' => $untrusted === 0
         ? 'none'
-        : "$untrusted untrusted ($unscored without a grounding score: held by policy, the rest below the threshold)",
+        : "$untrusted untrusted ($scored with a grounding score for the reviewer)",
     ];
   }
 

@@ -79,6 +79,7 @@ yet), `decision-eval-real-pairs.json` (25 real near-neighbor pairs),
 human-verified 2026-10-10, the 8 clean-up and meaning-changing-drop items
 added 2026-10-11 reviewed with Nik the same day). The drift sets belong to ADR-0043's parked
 prototype. Output: accuracy, a confusion matrix and unsafe errors (a
-data-losing UPDATE/RETIRE) for pairs; AUC, errors at the live cutoff and
+data-losing UPDATE) for pairs (RETIRE pairs removed with the decision,
+ADR-0065); AUC, errors at the live cutoff and
 score ranges for merges and grounding; per-call time. Local-model results:
 [ADR-0021](../../adr/0021-jev-typed-decision-provider.md).

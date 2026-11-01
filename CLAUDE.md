@@ -68,16 +68,15 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
    ([ADR-0063](adr/resolved/0063-scopes-as-config-on-core-plugins.md)).
 3. **Governance** - permissions/roles + a draft-to-trusted gate, built as
    the `trusted` flag rather than Content Moderation; `recall()` skips
-   untrusted facts. A new fact starts trusted when its writer could trust
-   it by hand (`administer aim`, `review aim facts` or the scope's trust
-   permission); otherwise its starting trust comes from
-   `aim.settings:trust_policy` (per entry channel, then per scope, then
-   `default_trusted`). The grounded check, in enforce mode, demotes or
-   promotes it per the policy (a reviewer's start can be demoted, only an
-   explicit `trusted` cannot), and `hold` is never promoted. The chat
-   channel ships as `hold`. ([ADR-0002](adr/resolved/0002-governance-deferred-guardrails-mandatory.md)'s
-   addendum; [ADR-0065](adr/0065-permissions-are-trust.md), decided
-   2026-11-01 and not built, cuts this to the writer's permission alone)
+   untrusted facts. A new fact starts trusted when its writer may trust
+   facts in its scope (`administer aim`, `review aim facts` or the scope's
+   trust permission) and untrusted otherwise, on every path; the writer is
+   always a real account (Drush takes `--uid`). Model checks only withhold
+   trust: the grounded check, in `demote` mode, sends a low-scoring fact to
+   review and never trusts one. Only trusted facts are consolidated
+   (trusting one queues it). ([ADR-0065](adr/resolved/0065-permissions-are-trust.md),
+   amending [ADR-0002](adr/resolved/0002-governance-deferred-guardrails-mandatory.md)'s
+   addendum)
 4. **Processing** - Queue API + a dedicated crontab entry, never
    `hook_cron`. ([ADR-0003](adr/resolved/0003-async-processing-dedicated-crontab.md))
    One stopgap exception: the expiry sweep (`aim:expire`, no model call)
@@ -174,11 +173,11 @@ duplicated here.
   strongly a decision model found the fact stated in the text it was
   written from, checked at write time; the text is not kept in the fact -
   [ADR-0037](adr/resolved/0037-transient-source-passages-for-grounding.md); see
-  [DEVELOPING.md](DEVELOPING.md)'s "Grounded check"), `trusted` (boolean, the draft-to-trusted gate - starts per
-  `aim.settings:trust_policy` (the add form: `default_trusted`), `recall()` excludes untrusted facts
-  unless asked otherwise, see
-  [ADR-0002](adr/resolved/0002-governance-deferred-guardrails-mandatory.md)'s
-  addendum).
+  [DEVELOPING.md](DEVELOPING.md)'s "Grounded check"), `trusted` (boolean, the draft-to-trusted gate - starts as
+  the writer's trust permission in the scope, the add form included, and
+  only a writer who may trust can change it there; `recall()` excludes
+  untrusted facts unless asked otherwise, see
+  [ADR-0065](adr/resolved/0065-permissions-are-trust.md)).
 - **`aim_scope`** config entity: `id`, `label`, `status`, `description`,
   `weight`, `plugin`, `settings`. `aim` ships five (site, role, user,
   case, entity) in `config/install`, like `literals` ships its literal
@@ -230,9 +229,11 @@ entity access operation used only by the Trust/Untrust bulk actions, so
 a scope's reviewer can flip the `trusted` flag without update access to
 the fact's text; retire/unretire stay on `administer aim`).
 The same three permissions (`administer aim`, `review aim facts`, the
-scope's trust permission) start a writer's fact trusted and are the only
-ones `remember()`'s explicit `trusted: TRUE` is honored for
-(`AimTrustPolicy::canApprove()`). Chat, Tool API and MCP:
+scope's trust permission) start a writer's fact trusted
+(`AimFactAccessControlHandler::canApprove()`, the trust operation's
+check): a site that wants no review grants the
+trust permission alongside create, one that wants review grants create
+alone (ADR-0065). Chat, Tool API and MCP:
 `remember aim facts` / `recall aim facts` (`aim_tool`; not `restrict
 access`, since each only opens a tool whose results and writes are
 checked per scope). The user scope's role-visibility grid (its own
@@ -256,7 +257,9 @@ look at other roles when a permission check unexpectedly fails.
   matches what a module ships.
 - No migration/`hook_update_N()` needed while there's no real data to
   preserve (PoC) - just change and reinstall (`drush pmu`/`drush en`).
-  Revisit once real data exists that reinstalling would destroy.
+  Revisit once real data exists that reinstalling would destroy. One
+  exception so far: `aim_update_10012()` (ADR-0065's settings), since
+  reinstalling this site would lose credentials stored in config.
 - **`AimMariaDBProvider` stays a thin shim** over `ai_vdb_provider_mariadb`.
   A workaround lives there only with an upstream issue in TODO.md/BACKLOG.md and is
   deleted when the provider ships the fix; generic features go upstream

@@ -88,11 +88,13 @@ Five memory categories, composable at retrieval the way Mem0 composes
   [ADR-0056](adr/0056-personal-data-write-gate.md)). A fact written with
   the text it came from is checked against that text by a decision model
   (the grounded check, [ADR-0037](adr/resolved/0037-transient-source-passages-for-grounding.md));
-  the text is not kept in the fact (its model call is logged, ADR-0060), and the check can set `trusted` or only
-  record its score. A
-  lightweight `trusted` flag is the draft-to-trusted human-review gate
-  ([ADR-0002](adr/resolved/0002-governance-deferred-guardrails-mandatory.md)'s
-  addendum) - `recall()` excludes untrusted facts by default. Content
+  the text is not kept in the fact (its model call is logged, ADR-0060), and the check can send a fact to
+  review or only record its score; it never trusts one. A
+  lightweight `trusted` flag is the draft-to-trusted human-review gate,
+  and permissions decide it: a writer who may trust facts in a scope
+  writes trusted facts there, anyone else's wait for review
+  ([ADR-0065](adr/resolved/0065-permissions-are-trust.md)) - `recall()`
+  excludes untrusted facts by default. Content
   Moderation was considered and not adopted (same addendum). One deliberate
   exception either way: an entity flagged as synchronizing
   (`setSyncing(TRUE)`, which core's Migrate destinations set on
@@ -190,9 +192,10 @@ each with its own requirements and setup:
    [DEVELOPING.md](DEVELOPING.md)'s "Setting up vector search" runbook.
    `config/install` ships the search server/index *structure*, not a
    working provider - this step is required on every fresh install.
-3. Try it: `drush aim:remember "some fact" --scope=site`, then
+3. Try it: `drush aim:remember "some fact" --scope=site --uid=1` (Drush
+   writes need the account they run as), then
    `drush aim:recall "some fact"`. For an unattended pipeline,
-   `drush aim:extract <file>` classifies and stores facts from raw text; the
+   `drush aim:extract <file> --uid=1` classifies and stores facts from raw text; the
    Content > AIM facts > Ingest form (`ingest aim facts`) does the same, plus
    one-fact-per-line and JSON imports without a model. A fact with an end
    date (`--expires=2026-10-16`) retires itself once it passes; add

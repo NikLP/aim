@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\aim\Drush\Commands;
 
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Session\AccountSwitcherInterface;
 use Drupal\aim\AimStatusChecker;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
@@ -11,7 +13,7 @@ use Drupal\aim\Service\AimConsolidationService;
 use Drupal\aim\Service\AimRecallService;
 use Drupal\aim\Service\AimRememberService;
 use Drupal\aim\Service\AimSettings;
-use Drupal\aim\Service\AimTrustPolicy;
+use Drupal\user\UserInterface;
 use Drush\Attributes as CLI;
 use Drush\Commands\AutowireTrait;
 use Drush\Commands\DrushCommands;
@@ -23,7 +25,9 @@ use Drush\Commands\DrushCommands;
  * in \Drupal\aim\Service\AimMemoryManager, shared with any other caller
  * (a Tool API plugin, an ECA action, a future Form). These commands only
  * handle CLI-specific concerns: parsing option strings, and printing
- * results or errors via $this->io().
+ * results or errors via $this->io(). The write commands run as the --uid
+ * account, through the same create and trust checks as the web paths
+ * (ADR-0065).
  */
 final class AimCommands extends DrushCommands {
 
@@ -44,6 +48,8 @@ final class AimCommands extends DrushCommands {
    *   The settings reader.
    * @param \Drupal\aim\AimStatusChecker $statusChecker
    *   The status checker, used by aim:status.
+   * @param \Drupal\Core\Session\AccountSwitcherInterface $accountSwitcher
+   *   The account switcher, for running a write as the --uid account.
    */
   public function __construct(
     protected AimMemoryManager $memoryManager,
@@ -52,6 +58,7 @@ final class AimCommands extends DrushCommands {
     protected AimRecallService $recallService,
     protected AimSettings $settings,
     protected AimStatusChecker $statusChecker,
+    protected AccountSwitcherInterface $accountSwitcher,
   ) {
     parent::__construct();
   }
@@ -70,8 +77,9 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'model', description: 'The chat model ID to use.')]
   #[CLI\Option(name: 'source', description: 'Provenance tag stored on every created fact.')]
   #[CLI\Option(name: 'subject-uid', description: 'A uid of a real account to attach any scope=user candidate to. Omit to skip all scope=user candidates.')]
+  #[CLI\Option(name: 'uid', description: 'Required. The uid of the account the write runs as: its permissions decide which scopes it may write and whether its facts start trusted.')]
   #[CLI\Option(name: 'index', description: 'Reindex the vector index immediately after saving.')]
-  #[CLI\Usage(name: 'drush aim:extract notes.txt', description: 'Extract facts from notes.txt using the default provider and model.')]
+  #[CLI\Usage(name: 'drush aim:extract notes.txt --uid=1', description: 'Extract facts from notes.txt as uid 1, using the default provider and model.')]
   public function extract(
     string $file,
     array $options = [
@@ -79,9 +87,14 @@ final class AimCommands extends DrushCommands {
       'model' => NULL,
       'source' => NULL,
       'subject-uid' => NULL,
+      'uid' => NULL,
       'index' => FALSE,
     ],
   ): void {
+    $writer = $this->writer($options);
+    if ($writer === NULL) {
+      return;
+    }
     if (!is_readable($file)) {
       $this->io()->error("Cannot read file: $file");
       return;
@@ -99,12 +112,16 @@ final class AimCommands extends DrushCommands {
     [$provider_id, $model_id] = $provider;
 
     $source = $options['source'] ?? ('extract:' . basename($file));
+    $this->accountSwitcher->switchTo($writer);
     try {
-      $result = $this->rememberService->ingestText($text, $source, $options['subject-uid'] ?: NULL, $provider_id, $model_id, AimTrustPolicy::CHANNEL_DRUSH);
+      $result = $this->rememberService->ingestText($text, $source, $options['subject-uid'] ?: NULL, $provider_id, $model_id, $writer);
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {
       $this->io()->error($e->getMessage());
       return;
+    }
+    finally {
+      $this->accountSwitcher->switchBack();
     }
     if ($result['extracted'] === 0) {
       $this->io()->note('The model returned no facts worth remembering.');
@@ -117,6 +134,10 @@ final class AimCommands extends DrushCommands {
 
     if ($result['blocked'] > 0) {
       $this->io()->warning("{$result['blocked']} fact(s) blocked by a guardrail check.");
+    }
+
+    if ($result['denied'] > 0) {
+      $this->io()->warning("{$result['denied']} fact(s) dropped: uid {$writer->id()} may not create facts in their scope.");
     }
 
     if (empty($result['created'])) {
@@ -171,9 +192,10 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'target-type', description: 'The referenced entity type ID, for scope=entity (e.g. node). Ignored for every other scope.')]
   #[CLI\Option(name: 'target-id', description: 'The referenced entity ID, for scope=entity. Ignored for every other scope.')]
   #[CLI\Option(name: 'file', description: 'Path to a JSON file of fact objects, saved in one bootstrap instead of $text/the other options.')]
-  #[CLI\Usage(name: 'drush aim:remember "Prefers email over phone." --scope=user --subject=42', description: 'Save a plain prose fact about a user, by uid.')]
-  #[CLI\Usage(name: 'drush aim:remember --file=facts.json', description: 'Save every fact in facts.json in one bootstrap.')]
-  #[CLI\Usage(name: 'drush aim:remember "The lobby mural was repainted in 2025." --scope=entity --target-type=node --target-id=42', description: 'Save a fact about a specific node.')]
+  #[CLI\Option(name: 'uid', description: 'Required. The uid of the account the write runs as: its permissions decide which scopes it may write and whether its facts start trusted.')]
+  #[CLI\Usage(name: 'drush aim:remember "Prefers email over phone." --scope=user --subject=42 --uid=1', description: 'Save a plain prose fact about a user, by uid, as uid 1.')]
+  #[CLI\Usage(name: 'drush aim:remember --file=facts.json --uid=1', description: 'Save every fact in facts.json in one bootstrap.')]
+  #[CLI\Usage(name: 'drush aim:remember "The lobby mural was repainted in 2025." --scope=entity --target-type=node --target-id=42 --uid=1', description: 'Save a fact about a specific node.')]
   public function remember(
     ?string $text = NULL,
     array $options = [
@@ -186,10 +208,16 @@ final class AimCommands extends DrushCommands {
       'target-type' => NULL,
       'target-id' => NULL,
       'file' => NULL,
+      'uid' => NULL,
     ],
   ): void {
+    $writer = $this->writer($options);
+    if ($writer === NULL) {
+      return;
+    }
+
     if (!empty($options['file'])) {
-      $this->rememberBatch($options['file']);
+      $this->rememberBatch($options['file'], $writer);
       return;
     }
 
@@ -206,18 +234,32 @@ final class AimCommands extends DrushCommands {
       return;
     }
 
+    // One entry through the batch path, which checks the writer's create
+    // permission per entry as the ingest form does.
+    $entry = [
+      'text' => $text,
+      'target_type' => $options['target-type'],
+      'target_id' => $options['target-id'],
+    ] + array_intersect_key($options, array_flip(['scope', 'subject', 'source', 'category', 'asserted', 'expires']));
+    $this->accountSwitcher->switchTo($writer);
     try {
-      [$category, $asserted] = $this->rememberService->parseFactFields($options);
-      $fact = $this->rememberService->remember($text, $options['scope'], $options['subject'], $options['source'], $category, $asserted, NULL, $options['target-type'], $options['target-id'], expires: $this->rememberService->parseExpires($options), channel: AimTrustPolicy::CHANNEL_DRUSH);
+      $result = $this->rememberService->rememberBatch([$entry], NULL, $writer);
     }
-    catch (\InvalidArgumentException $e) {
-      $this->io()->error($e->getMessage());
+    finally {
+      $this->accountSwitcher->switchBack();
+    }
+    if (isset($result['errors'][0])) {
+      $this->io()->error($result['errors'][0]);
       return;
     }
 
+    $fact = $result['created'][0];
     $message = 'Created aim_fact ' . $fact->id() . '.';
     if ($fact->bundle() === 'case') {
       $message .= ' Case ID: ' . $fact->get('subject')->value . ' - pass this as --subject to add more facts to this case.';
+    }
+    if (!$fact->get('trusted')->value) {
+      $message .= ' Untrusted: it waits for review before recall returns it.';
     }
     $this->io()->success($message);
   }
@@ -234,8 +276,10 @@ final class AimCommands extends DrushCommands {
    *   scope, subject, source, category, asserted, target_type,
    *   target_id); category may be a JSON array instead of a
    *   comma-separated string.
+   * @param \Drupal\Core\Session\AccountInterface $writer
+   *   The --uid account the facts are written as.
    */
-  private function rememberBatch(string $file): void {
+  private function rememberBatch(string $file, AccountInterface $writer): void {
     if (!is_readable($file)) {
       $this->io()->error("Cannot read file: $file");
       return;
@@ -247,7 +291,13 @@ final class AimCommands extends DrushCommands {
       return;
     }
 
-    $result = $this->rememberService->rememberBatch($entries, NULL, AimTrustPolicy::CHANNEL_DRUSH);
+    $this->accountSwitcher->switchTo($writer);
+    try {
+      $result = $this->rememberService->rememberBatch($entries, NULL, $writer);
+    }
+    finally {
+      $this->accountSwitcher->switchBack();
+    }
     foreach ($result['errors'] as $i => $message) {
       $this->io()->warning("Entry $i: $message" . (str_starts_with($message, 'missing') ? ', skipped.' : ''));
     }
@@ -277,7 +327,7 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'subject-uid', description: 'Restrict results to one user, by uid or username. Only meaningful with scope=user.')]
   #[CLI\Option(name: 'limit', description: 'Maximum number of results.')]
   #[CLI\Option(name: 'max-distance', description: 'Drop facts with a cosine distance above this. Omit for the raw nearest facts (used to calibrate the cutoff); the site default is aim.settings recall_max_distance.')]
-  #[CLI\Option(name: 'include-untrusted', description: 'Also return untrusted facts, for reviewing what aim.settings:default_trusted left out of ordinary recall() results (ADR-0002).')]
+  #[CLI\Option(name: 'include-untrusted', description: 'Also return untrusted facts, for reviewing what waits for review and is left out of ordinary recall() results (ADR-0065).')]
   #[CLI\Option(name: 'format', description: 'Output format: table or json.')]
   #[CLI\Usage(name: 'drush aim:recall "email preference"', description: 'Search all facts for anything related to email preference.')]
   #[CLI\Usage(name: 'drush aim:recall "email preference" --max-distance=0.48', description: 'Only facts within 0.48 cosine distance, as the chatbot and MCP tool do by default.')]
@@ -341,7 +391,7 @@ final class AimCommands extends DrushCommands {
    * neighbors (up to aim.settings neighbor_limit) within the same
    * scope/subject and end date: identical text is retired with no model
    * call, any other pair within the comparison distance gets a
-   * classification call (ADD/UPDATE/RETIRE/NOOP, Mem0's vocabulary), and
+   * classification call (ADD/UPDATE/NOOP, from Mem0's vocabulary), and
    * anything farther is left alone at zero cost. Retiring a fact sets its
    * `retired` field rather than deleting it, to keep an audit trail.
    *
@@ -486,6 +536,33 @@ final class AimCommands extends DrushCommands {
     }
 
     return [$default['provider_id'], $default['model_id']];
+  }
+
+  /**
+   * Resolves --uid to the account a write runs as (ADR-0065).
+   *
+   * Required, and never anonymous: the account's permissions decide which
+   * scopes it may write and whether its facts start trusted. This is
+   * consistency, not authentication - anyone on the shell can name any uid.
+   *
+   * @param array $options
+   *   Command options.
+   *
+   * @return \Drupal\Core\Session\AccountInterface|null
+   *   The account, or NULL after printing an error.
+   */
+  private function writer(array $options): ?AccountInterface {
+    $uid = (string) ($options['uid'] ?? '');
+    if ($uid === '' || $uid === '0') {
+      $this->io()->error('--uid is required: the uid of the account this write runs as. Its permissions decide which scopes it may write and whether its facts start trusted.');
+      return NULL;
+    }
+    $account = $this->memoryManager->resolveAccountByUid($uid);
+    if (!$account || $account->isAnonymous() || ($account instanceof UserInterface && $account->isBlocked())) {
+      $this->io()->error("No active account with uid $uid.");
+      return NULL;
+    }
+    return $account;
   }
 
 }

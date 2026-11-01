@@ -1,7 +1,7 @@
 # AIM memory workflow diagrams
 
-How a fact moves through the module, as the code stands on 2026-10-28
-(`AimRememberService`, `AimGroundingChecker`, `AimTrustPolicy`,
+How a fact moves through the module, as the code stands on 2026-11-01
+(`AimRememberService`, `AimGroundingChecker`, `AimFactAccessControlHandler`,
 `AimMemoryManager`, `AimConsolidationService`, `AimConsolidateQueueWorker`,
 `AimRecallService`, `AimCommands`, `aim_tool`, `aim_chatbot`). Not a
 decision record: for the reasoning see [0000-index.md](0000-index.md).
@@ -29,13 +29,13 @@ flowchart TD
   classDef code fill:#eceff1,stroke:#607d8b,color:#1f2a30
   classDef bad fill:#fdd,stroke:#c53030,color:#4a0000
 
-  subgraph IN["Write paths in (each names its trust channel in code)"]
-    A1["drush aim:remember<br/>(single, or --file batch)<br/>used by agents such as Claude Code<br/>via the aim-memory skill<br/>channel drush, runs as anonymous"]
-    A2["MCP / Tool API aim_remember<br/>needs 'remember aim facts' plus<br/>per-scope 'create {scope} aim facts'<br/>optional source_text from the caller<br/>channel mcp"]
-    A3["Chat: the same aim_remember via tool_ai_connector<br/>scope by the visitor's permissions<br/>source_text from the assistant<br/>channel chat"]
-    A4["drush aim:extract file<br/>aim-discovery skill runs this<br/>channel drush"]
-    A5["Ingest form, extract mode<br/>prose .txt, needs 'ingest aim facts'<br/>channel ingest"]
-    A6["Ingest form, lines or JSON mode<br/>no model call, rememberBatch()<br/>per-entry create check<br/>channel ingest, no source text"]
+  subgraph IN["Write paths in (each runs as a real account)"]
+    A1["drush aim:remember --uid<br/>(single, or --file batch)<br/>used by agents such as Claude Code<br/>via the aim-memory skill<br/>switches to the --uid account,<br/>rememberBatch() per-entry create check"]
+    A2["MCP / Tool API aim_remember<br/>needs 'remember aim facts' plus<br/>per-scope 'create {scope} aim facts'<br/>optional source_text from the caller<br/>runs as the token's user"]
+    A3["Chat: the same aim_remember via tool_ai_connector<br/>scope by the visitor's permissions<br/>source_text from the assistant<br/>runs as the visitor"]
+    A4["drush aim:extract file --uid<br/>aim-discovery skill runs this"]
+    A5["Ingest form, extract mode<br/>prose .txt, needs 'ingest aim facts'"]
+    A6["Ingest form, lines or JSON mode<br/>no model call, rememberBatch()<br/>per-entry create check<br/>no source text"]
   end
 
   A1 --> R["AimRememberService::remember()"]
@@ -46,9 +46,9 @@ flowchart TD
   A4 --> X
   A5 --> X["ingestText(): extractFacts()<br/>structured-output chat call<br/>(activities.extraction, else default chat)<br/>returns scope, subject, text list"]:::llm
   X --> C["createFactsFromCandidates()<br/>per candidate, one bad one<br/>does not abort the batch"]:::code
-  C -->|"writer lacks 'create {scope} aim facts'<br/>(form user; Drush has no writer)"| DEN["denied, counted"]:::bad
+  C -->|"writer lacks 'create {scope} aim facts'<br/>(form user, or the Drush --uid account)"| DEN["denied, counted"]:::bad
   C -->|"scope requires an account<br/>and no --subject-uid"| SK["skipped, counted"]:::bad
-  C --> GB["checkGrounding(document, all candidates)<br/>one decision call per 16 candidates<br/>(skipped when grounding_mode off)"]:::llm
+  C --> GB["checkGrounding(document, all candidates)<br/>one decision call per 16 candidates<br/>(skipped when grounding_mode off<br/>or no grounding model)"]:::llm
   GB --> TP
 
   R --> R1{"scope is an enabled<br/>aim_scope?"}:::code
@@ -58,28 +58,27 @@ flowchart TD
   R2 -->|"no"| R4["subject as given (or empty);<br/>on save, scope plugin resolveSubject()<br/>e.g. case names or mints a case ID"]:::code
   R3 --> R6["build entity: text, source,<br/>category terms, asserted,<br/>target_type/target_id,<br/>expires (a past date: exception)"]:::code
   R4 --> R6
-  R6 --> GQ{"source text given and<br/>grounding_mode not off?"}:::code
+  R6 --> GQ{"source text given, grounding_mode<br/>not off and a grounding model?"}:::code
   GQ -->|no| TP
   GQ -->|yes| GC["checkGrounding(source text, [text])<br/>decision model (activities.grounding),<br/>GROUNDING_QUESTION; a batch's score<br/>comes from the request cache"]:::llm
   GC --> TP
 
-  TP["AimTrustPolicy::resolve(): starting trust<br/>writer canApprove() (administer aim, review aim facts,<br/>trust {scope} aim facts): trusted<br/>else channel rule, scope rule, default<br/>(empty: default_trusted). Shipped: chat = hold"]:::code
-  TP --> TV{"AimTrustPolicy::values()<br/>grounding_mode?"}:::code
-  TV -->|"off, or no source text"| TS["trusted = starting trust"]:::code
-  TV -->|shadow| TSH["grounding_score stored,<br/>trusted = starting trust"]:::code
-  TV -->|enforce| TE["grounding_score stored;<br/>at or above threshold (0.7): trusted,<br/>below or check failed: untrusted<br/>hold never promoted"]:::code
-  TS --> EXP
-  TSH --> EXP
-  TE --> EXP
-  EXP["explicit trusted from the caller wins:<br/>FALSE always, TRUE only if canApprove()"]:::code
+  TP["trustValues(): starting trust (ADR-0065)<br/>writer canApprove() (administer aim, review aim facts,<br/>trust {scope} aim facts): trusted, else untrusted"]:::code
+  TP --> TV{"grounding_mode?"}:::code
+  TV -->|"off, or not checked"| TS["trusted = starting trust"]:::code
+  TV -->|record| TSH["grounding_score stored,<br/>trusted = starting trust"]:::code
+  TV -->|demote| TE["grounding_score stored;<br/>below threshold (0.7) or check failed:<br/>untrusted, else starting trust<br/>(never promotes)"]:::code
+  TS --> V
+  TSH --> V
+  TE --> V
 
-  EXP --> V["saveFact(): $entity->validate()"]:::code
+  V["saveFact(): $entity->validate()"]:::code
   V --> G["AimGuardrails constraint on text<br/>runGuardrails(): set aim_write_guardrails"]:::code
   G --> G1{"aggregated stop score<br/>reaches threshold 1.0?"}:::code
   G1 -->|"yes: aim_max_length 2000 chars,<br/>or aim_no_markup regex for HTML tags"| REJ["violation, InvalidArgumentException<br/>nothing saved<br/>warning logged without text<br/>remember: error to caller<br/>extract: counted as blocked"]:::bad
   G1 -->|no| SAVE["entity save()<br/>audit lines: write, and grounding<br/>(ID, score, cutoff, mode, no text)"]:::code
 
-  SAVE --> H["hook_aim_fact_insert<br/>skipped when entity is syncing"]:::code
+  SAVE --> H["hook_aim_fact_insert<br/>trusted facts only, skipped when syncing;<br/>hook_aim_fact_update queues a fact<br/>when trusted goes off to on"]:::code
   H --> Q["enqueue fact ID on queue aim_consolidate<br/>see diagram 2"]:::code
   SAVE --> T["Search API tracker marks item<br/>for (re)index"]:::code
   T --> IDX{"index_directly?<br/>shipped: off, this site: on"}:::code
@@ -98,8 +97,8 @@ Notes on diagram 1:
   targets) skip the model and have no source text, so they stay
   unchecked.
 - The grounded check sends the source text to the decision model and
-  never stores it (ADR-0037). This site runs `shadow`: scores are
-  recorded, `trusted` is left to the policy.
+  never stores it (ADR-0037). This site runs `demote`: a low score sends
+  the fact to review; the check never trusts a fact (ADR-0065).
 - Indexed fields: `text` is the embedded content. `scope`, `subject`,
   `source`, `user` and `trusted` are stored as attributes. The filterable
   ones used by code are `scope`, `subject`, `user` (BTREE index) and
@@ -120,16 +119,16 @@ flowchart TD
   classDef bad fill:#fdd,stroke:#c53030,color:#4a0000
 
   QI["queue aim_consolidate<br/>item = fact ID<br/>drained by dedicated crontab:<br/>drush queue:run aim_consolidate<br/>(no cron key, not hook_cron)"]:::code
-  QI --> W1{"fact still exists<br/>and not retired?"}:::code
+  QI --> W1{"fact still exists,<br/>not retired and trusted?"}:::code
   W1 -->|no| DONE0["return, nothing to do"]:::bad
   W1 -->|yes| W2["reindex() so the fact and<br/>its neighbors are searchable"]:::vec
   W2 --> W3{"consolidation model?<br/>activities.consolidation,<br/>else default chat"}:::code
   W3 -->|none| SUSP["SuspendQueueException<br/>queue stops, item released"]:::bad
   W3 -->|yes| N
 
-  MAN["drush aim:consolidate<br/>sweeps all non-retired facts by ID,<br/>each pair once;<br/>--dry-run computes decisions, saves nothing"]:::code --> N
+  MAN["drush aim:consolidate<br/>sweeps all non-retired trusted facts by ID,<br/>each pair once;<br/>--dry-run computes decisions, saves nothing"]:::code --> N
 
-  N["findNeighbors(), up to neighbor_limit (3)<br/>embed this fact's text as a query<br/>(query-embedding cache applies)<br/>filter scope, plus user or subject<br/>skip self, handled, retired,<br/>or a different end date (expires);<br/>each neighbor decided in turn,<br/>stop if this fact retires"]:::vec
+  N["findNeighbors(), up to neighbor_limit (3)<br/>embed this fact's text as a query<br/>(query-embedding cache applies)<br/>filter scope, plus user or subject<br/>trusted only (index condition and entity);<br/>skip self, handled, retired,<br/>or a different end date (expires);<br/>each neighbor decided in turn,<br/>stop if this fact retires"]:::vec
   N --> N1{"neighbor found?"}:::code
   N1 -->|no| DONE1["done, no change"]:::code
   N1 -->|yes| S{"cosine distance<br/>score"}:::vec
@@ -140,37 +139,31 @@ flowchart TD
   CL --> D{"decision"}:::llm
   D -->|ADD| ADD["both stand, no change"]:::code
   D -->|NOOP| NOOP["decision NOOP"]:::code
-  D -->|RETIRE| DEL["decision RETIRE"]:::code
   D -->|UPDATE| MT["merged text<br/>chat backend: from the same reply<br/>decision backend: writeMerge(), default<br/>chat model with merge_prompt<br/>(no default chat model: ADD)"]:::llm
 
   MT --> MG["runGuardrails(merged text)"]:::code
   MG -->|rejected| BLK["BLOCKED: both facts untouched<br/>warning logged"]:::bad
   MG -->|passed| VM["verifyMerge()"]:::code
-  VM --> VM1{"merge_max_distance > 0?<br/>shipped 0 = off"}:::code
-  VM1 -->|"on: embed merged text and<br/>both inputs, cosine distance<br/>over the max fails"| FAIL
-  VM1 --> VM2{"merge_verify on?<br/>shipped: on"}:::code
-  VM2 -->|"yes: verifier (activities.verifier,<br/>else the classifier's model)<br/>asked: every detail kept, nothing added?<br/>decision: noul 'faithful' at threshold<br/>(0.8 on this site)"| VM3["faithful or not"]:::llm
-  VM3 -->|"not faithful, or error"| FAIL["merge rejected:<br/>downgrade UPDATE to ADD<br/>both facts stand, audit line<br/>(check: distance, model, error<br/>or grounding)"]:::bad
+  VM --> VM2{"merge_verify on?<br/>shipped: on"}:::code
+  VM2 -->|"yes: verifier (activities.verifier,<br/>else the classifier's model)<br/>asked: every detail kept, nothing added?<br/>decision: noul 'faithful' at threshold<br/>(0.9 on this site)"| VM3["faithful or not"]:::llm
+  VM3 -->|"not faithful, or error"| FAIL["merge rejected:<br/>downgrade UPDATE to ADD<br/>both facts stand, audit line<br/>(check: model, error<br/>or grounding)"]:::bad
   VM3 -->|faithful| GM
   VM2 -->|no| GM
-  GM{"grounding_mode?"}:::code
-  GM -->|off| UPD["UPDATE accepted"]:::code
-  GM -->|"shadow or enforce"| GR["groundMerge(): checkGrounding()<br/>passage = kept text, newline, candidate text<br/>candidate = merged text<br/>decision model, audit line"]:::llm
-  GR --> GE{"enforce, and score below<br/>threshold (0.7) or no score?"}:::code
+  GM{"grounding_mode, and a<br/>grounding model?"}:::code
+  GM -->|"off, or no model"| UPD["UPDATE accepted"]:::code
+  GM -->|"record or demote"| GR["groundMerge(): checkGrounding()<br/>passage = kept text, newline, candidate text<br/>candidate = merged text<br/>decision model, audit line"]:::llm
+  GR --> GE{"demote, and score below<br/>threshold (0.7) or no score?"}:::code
   GE -->|yes| FAIL
-  GE -->|"no (shadow: always)"| UPD
+  GE -->|"no (record: always)"| UPD
 
   NOOP --> RN
   AUTO --> RN
-  DEL --> RD
   UPD --> RU
 
   RN["retire candidate:<br/>retired = now<br/>superseded_by = kept fact<br/>superseded_by_reason = JSON"]:::code
-  RD["soft retire candidate:<br/>retired = now<br/>superseded_by stays empty<br/>superseded_by_reason = JSON"]:::code
-  RU["createMergedFact(): new fact via saveFact<br/>(guardrails run again)<br/>owner and identity from kept fact,<br/>asserted from candidate only,<br/>source candidate else kept,<br/>categories unioned, expires kept,<br/>trusted only if both inputs trusted,<br/>grounding_score = the merge's score<br/>then retire BOTH inputs:<br/>retired = now, superseded_by = merged fact<br/>reason JSON stored on candidate"]:::code
+  RU["createMergedFact(): new fact via saveFact<br/>(guardrails run again)<br/>owner and identity from kept fact,<br/>asserted from candidate only,<br/>source candidate else kept,<br/>categories unioned, expires kept,<br/>trusted (both inputs are),<br/>grounding_score = the merge's score<br/>then retire BOTH inputs:<br/>retired = now, superseded_by = merged fact<br/>reason JSON stored on candidate"]:::code
 
   RN --> IX["retired fact re-tracked: next index run<br/>removes it from aim_fact_vectors<br/>(aim_exclude_retired)"]:::vec
-  RD --> IX
   RU --> IX
   RU --> NEWQ["merged fact insert enqueues<br/>itself on aim_consolidate"]:::code
   NEWQ -.-> QI
@@ -179,7 +172,6 @@ flowchart TD
 
   JR["superseded_by_reason JSON:<br/>decision, by auto or model, score,<br/>provider, model ID<br/>never fact text"]:::code
   RN -.-> JR
-  RD -.-> JR
   RU -.-> JR
 ```
 
@@ -193,7 +185,7 @@ Notes on diagram 2:
 - A merge passes three checks in order: guardrails (policy), the
   verifier (both inputs' details survive, nothing added) and the
   grounded check (the inputs state the merge). Only the grounded check
-  leaves a trace on the result, as `grounding_score`. In `enforce` a
+  leaves a trace on the result, as `grounding_score`. In `demote` a
   failed grounding keeps both facts rather than merging into an
   untrusted fact, which would retire two good facts for one doubtful one.
 - Retirement is always soft. Nothing is deleted from `aim_fact`, and a
@@ -278,11 +270,10 @@ Notes on diagram 3:
 - **Grounded check.** When the text a fact came from is supplied, a
   decision model is asked whether that text states the fact, and the
   answer is stored as `grounding_score`. The source text is not kept.
-- **Trusted.** A new fact's starting trust comes from the trust policy:
-  trusted for a writer who could trust it by hand, else the entry
-  channel's rule (chat is held for review), the scope's rule, then the
-  default. In `enforce` mode the grounded check then promotes or demotes
-  it (never a held fact). Recall hides untrusted facts by default.
+- **Trusted.** A new fact starts trusted when its writer may trust facts
+  in its scope, untrusted otherwise (ADR-0065). In `demote` mode the
+  grounded check sends a low-scoring fact to review; it never trusts one.
+  Recall hides untrusted facts by default.
 - **Guardrails.** A fact is validated as an entity field constraint on
   `text` before it is saved. The shipped rules are a 2000 character cap
   and a no-HTML-tags pattern. A failure saves nothing; a single-fact
@@ -292,11 +283,10 @@ Notes on diagram 3:
   into an embedding and stored with a few filterable attributes in
   `aim_fact_vectors`. Retired facts are removed from that table.
 - **Consolidation.** Runs later, off the request path, one queue item per
-  new fact. Same-scope nearest neighbors with the same end date, by
+  new trusted fact (or a fact when it becomes trusted). Same-scope nearest neighbors with the same end date, by
   cosine distance: identical text is retired without a model, anything
   else close enough asks a model to choose ADD (keep both), NOOP
-  (restatement), RETIRE (should not exist) or UPDATE (merge into a new
-  fact). A merge must pass the guardrails, the verifier and, when it is
+  (restatement) or UPDATE (merge into a new fact). A merge must pass the guardrails, the verifier and, when it is
   on, the grounded check, or it falls back to keeping both.
 - **Retire.** Setting `retired` (and where there is a replacement,
   `superseded_by`) hides a fact from recall and the index without
@@ -431,7 +421,7 @@ flowchart TD
     T{"Calls a tool?"}:::code
     R["aim_recall (aim_tool), 5 results<br/>embed, nearest trusted facts the visitor may view,<br/>cutoff, [literal:key] filled in"]:::vec
     L["aim_literal<br/>one query: key first, then the finder<br/>(or search without it)"]:::code
-    W["aim_remember (aim_tool), chat channel<br/>Guardrails, grounded check (if on),<br/>saved held for review"]:::code
+    W["aim_remember (aim_tool), as the visitor<br/>Guardrails, grounded check (if on),<br/>a member's fact waits for review"]:::code
   end
 
   OUT["Reply shown; visitor message and<br/>reply kept in session history<br/>(not the recalled facts)"]:::code

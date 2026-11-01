@@ -178,8 +178,8 @@ class AimRecallService {
       }
       catch (SearchApiException) {
         // A stale index entry pointing at an aim_fact that no longer
-        // exists (deleted directly, or by consolidation's RETIRE
-        // decision) and hasn't been reindexed away yet - skip it rather
+        // exists (deleted since it was indexed) and hasn't been
+        // reindexed away yet - skip it rather
         // than let one stale row fail the whole recall() call.
         continue;
       }

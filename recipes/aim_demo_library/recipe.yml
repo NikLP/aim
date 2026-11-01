@@ -77,8 +77,8 @@ config:
     # at all; a member is given site only (ADR-0062: scope is permissions).
     # The lookup tool reads literals as the visitor too: everyone sees the
     # public ones, only signed-in visitors the restricted ones. A member can
-    # tell the assistant a fact, which waits untrusted for review (chat
-    # ships as hold); a reviewer's own fact starts trusted (ADR-0037).
+    # tell the assistant a fact, which waits untrusted for review (no trust
+    # permission); a reviewer's own fact starts trusted (ADR-0065).
     user.role.anonymous:
       grantPermissions:
         - 'view literals'

@@ -19,11 +19,12 @@ scope_fields?}` entries, saved in one call/bootstrap (a single-fact form
 beside it was removed 2026-10-25: it duplicated every field and the two
 descriptions drifted). `expires` (`YYYY-MM-DD`) retires the fact after that
 day via `drush aim:expire` or `hook_cron` (ADR-0057). Each entry is saved
-or reported on its own line. `source` and the trust channel are never
-inputs: they follow the Tool API invoker (`AimRemember::CALLERS`, ADR-0062).
-`tool_ai_connector` (an agent on this site: chat) writes `chat:aim_remember`
-on the `chat` channel, `drush` writes `drush:aim_remember` on `drush`,
-anything else (MCP, direct PHP) `tool:aim_remember` on `mcp`. A
+or reported on its own line. `source` is never an
+input: it follows the Tool API invoker (`AimRemember::CALLERS`, ADR-0062).
+`tool_ai_connector` (an agent on this site: chat) writes `chat:aim_remember`,
+`drush` writes `drush:aim_remember`, anything else (MCP, direct PHP)
+`tool:aim_remember`. Starting trust is the calling account's permission
+alone, the same on every invoker (ADR-0065). A
 `#[ToolMethod]` service is not given its invoker, so
 `AimRememberInvokerSubscriber` catches it from `ToolInputTransformEvent`
 when `facts` is set and hands it to the service, which uses it once and

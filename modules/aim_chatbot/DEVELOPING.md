@@ -21,8 +21,9 @@ for its history and alternatives considered.
   run as the visitor, so a role's scope permissions are what chat reaches
   ([ADR-0062](../../adr/resolved/0062-chat-on-the-shared-tools.md)). Recall's 5-result
   limit is a `tool_usage_limits` `force_value` with `hide_property`.
-  `aim_remember` writes on the `chat` channel with source
-  `chat:aim_remember` because its invoker is `tool_ai_connector`.
+  `aim_remember` writes with source `chat:aim_remember` because its
+  invoker is `tool_ai_connector`; trust follows the visitor's permission
+  (ADR-0065).
 - `ai_assistant_api.ai_assistant.aim_assistant` ships in this module's
   `config/install`; the demo chat block is the `aim_demo_library`
   recipe's own config. The assistant's `ai_agent` field

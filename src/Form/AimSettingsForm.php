@@ -91,7 +91,7 @@ final class AimSettingsForm extends ConfigFormBase {
       ],
       'consolidation' => [
         $this->t('Consolidation classifier'),
-        $this->t('Classifies ambiguous pairs as ADD/UPDATE/RETIRE/NOOP.'),
+        $this->t('Classifies ambiguous pairs as ADD/UPDATE/NOOP.'),
       ],
       'verifier' => [
         $this->t('Merge verifier'),
@@ -140,9 +140,10 @@ final class AimSettingsForm extends ConfigFormBase {
           '#title' => $this->t('Mode'),
           '#options' => [
             'off' => $this->t('Off: no check'),
-            'shadow' => $this->t("Shadow: record each fact's score, leave trusted alone"),
-            'enforce' => $this->t('Enforce: also set trusted from the score (untrusted when the check fails)'),
+            'record' => $this->t("Record: store each fact's score, change nothing else"),
+            'demote' => $this->t('Demote: also send a fact scoring below the threshold to review (and any fact when the check fails)'),
           ],
+          '#description' => $this->t("Runs when the writer sends the original words. It never trusts a fact: starting trust is the writer's permission."),
           '#default_value' => $config->get('grounding_mode') ?: 'off',
         ];
         continue;
@@ -223,7 +224,7 @@ final class AimSettingsForm extends ConfigFormBase {
     $form['consolidation']['compare_distance'] = [
       '#type' => 'number',
       '#title' => $this->t('Comparison distance'),
-      '#description' => $this->t('Facts closer than this are compared: identical text is retired as a copy with no model call, any other pair gets one classification call (ADD/UPDATE/RETIRE/NOOP). Farther pairs are left alone at zero cost. There is no automatic merge by distance: a correction ("up to 10 items" for "up to 20") sits as close as a reworded copy.'),
+      '#description' => $this->t('Facts closer than this are compared: identical text is retired as a copy with no model call, any other pair gets one classification call (ADD/UPDATE/NOOP). Farther pairs are left alone at zero cost. There is no automatic merge by distance: a correction ("up to 10 items" for "up to 20") sits as close as a reworded copy.'),
       '#config_target' => 'aim.settings:compare_distance',
       '#min' => 0,
       '#max' => 1,
@@ -239,15 +240,6 @@ final class AimSettingsForm extends ConfigFormBase {
       '#max' => 10,
       '#step' => 1,
       '#required' => TRUE,
-    ];
-    $form['consolidation']['merge_max_distance'] = [
-      '#type' => 'number',
-      '#title' => $this->t('Maximum merged-to-input distance'),
-      '#description' => $this->t('Cosine distance within which the merged text must sit from each input embedding, else the merge is downgraded to ADD. 0 disables. Unmeasured: leave at 0 until calibrated.'),
-      '#config_target' => 'aim.settings:merge_max_distance',
-      '#min' => 0,
-      '#max' => 1,
-      '#step' => 0.001,
     ];
 
     $form['recall'] = [
@@ -277,25 +269,11 @@ final class AimSettingsForm extends ConfigFormBase {
       '#required' => TRUE,
     ];
 
-    $form['governance'] = [
-      '#type' => 'details',
-      '#group' => 'settings_tabs',
-      '#title' => $this->t('Governance'),
-      '#description' => $this->t('The initial value a newly created fact gets for its own Trusted field (ADR-0002) - not a moderation gate, and editable per-fact afterward on the add/edit form.'),
-      '#open' => TRUE,
-    ];
-    $form['governance']['default_trusted'] = [
-      '#type' => 'checkbox',
-      '#title' => $this->t('Trust new facts by default'),
-      '#description' => $this->t('When off (recommended until the extraction/consolidation pipeline is vetted), a newly created fact starts untrusted and is excluded from recall() until someone reviews it at <code>/admin/content/aim-facts</code> and checks its Trusted box.'),
-      '#config_target' => 'aim.settings:default_trusted',
-    ];
-
     $form['prompts'] = [
       '#type' => 'details',
       '#group' => 'settings_tabs',
       '#title' => $this->t('Prompts'),
-      '#description' => $this->t('The instruction text sent to the chat provider for extraction and consolidation. The requested output shape (the ADD/UPDATE/RETIRE/NOOP decision enum, the scope enum) is enforced by a structured-output JSON schema in code, not by this text - editing the prose below changes how the model reasons, not what fields it must return.'),
+      '#description' => $this->t('The instruction text sent to the chat provider for extraction and consolidation. The requested output shape (the ADD/UPDATE/NOOP decision enum, the scope enum) is enforced by a structured-output JSON schema in code, not by this text - editing the prose below changes how the model reasons, not what fields it must return.'),
       '#open' => FALSE,
     ];
     $form['prompts']['extraction_prompt'] = [

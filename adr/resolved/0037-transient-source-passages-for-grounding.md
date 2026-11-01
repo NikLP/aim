@@ -11,12 +11,14 @@ decision 7's privacy controls (passage never logged,
 `source_check_allow_remote`) were never built and no longer apply. Built 2026-10-11 as a write-time check: decisions 1-4 (side
 table, queue step, retention sweep) replaced by checking while the source
 text is in memory and storing none of it (see "Built" below; first proposed
-as [ADR-0056](../0056-personal-data-write-gate.md) decision 7). Shadow mode on
-this site; the enforce decision, length cap and other follow-ups are in
-TODO.md. Proposed 2026-10-02. Absorbs the gate semantics of the former
+as [ADR-0056](../0056-personal-data-write-gate.md) decision 7). Demote mode on
+this site since 2026-11-01 (ADR-0065); the length cap and other follow-ups
+are in TODO.md. Proposed 2026-10-02. Absorbs the gate semantics of the former
 ADR-0033 (see "Gate semantics" below).
-[ADR-0065](../0065-permissions-are-trust.md) (accepted 2026-11-01, not built)
-replaces the trust policy and the grounded check's promotion and modes.
+[ADR-0065](0065-permissions-are-trust.md) (built 2026-11-01) replaces the
+trust policy and the grounded check's promotion: the modes are now
+`off`/`record`/`demote`, and the check only withholds trust. The 2026-10-18
+and 2026-10-22 addenda below are history.
 **Date:** 2026-10-02
 
 ## Context

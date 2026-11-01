@@ -217,17 +217,28 @@ class AimSettings {
   }
 
   /**
-   * Returns the grounded check's mode: off, shadow or enforce.
+   * Returns the grounded check's mode: off, record or demote.
    *
-   * Shadow records each fact's score and leaves trusted alone; enforce also
-   * sets trusted from the score (ADR-0037).
+   * Record stores each fact's score and changes nothing else; demote also
+   * saves a fact scoring below the threshold untrusted (ADR-0065).
    *
    * @return string
    *   The mode, off when unset or unknown.
    */
   public function getGroundingMode(): string {
     $mode = $this->configFactory->get('aim.settings')->get('grounding_mode');
-    return in_array($mode, ['shadow', 'enforce'], TRUE) ? $mode : 'off';
+    return in_array($mode, ['record', 'demote'], TRUE) ? $mode : 'off';
+  }
+
+  /**
+   * Whether the grounded check runs: a mode other than off and a model.
+   *
+   * @return bool
+   *   TRUE when grounding_mode is record or demote and a decision model is
+   *   chosen for activities.grounding.
+   */
+  public function isGroundingOn(): bool {
+    return $this->getGroundingMode() !== 'off' && $this->decisionModelFor('grounding') !== NULL;
   }
 
   /**

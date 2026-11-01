@@ -36,3 +36,30 @@ function aim_uninstall(): void {
   // createCollection() is not idempotent, so don't leave a stray table behind.
   \Drupal::database()->schema()->dropTable('aim_fact_vectors');
 }
+
+/**
+ * Removes the trust policy settings and renames the grounded check's modes.
+ *
+ * ADR-0065: starting trust is the writer's permission, so trust_policy and
+ * default_trusted go; merge_max_distance goes with the distance check;
+ * grounding_mode shadow and enforce become record and demote.
+ */
+function aim_update_10012(): void {
+  $config = \Drupal::configFactory()->getEditable('aim.settings');
+  $mode = $config->get('grounding_mode');
+  $config->set('grounding_mode', match ($mode) {
+    'shadow' => 'record',
+    'enforce' => 'demote',
+    'record', 'demote' => $mode,
+    default => 'off',
+  });
+  foreach (['trust_policy', 'default_trusted', 'merge_max_distance'] as $key) {
+    $config->clear($key);
+  }
+
+  // The RETIRE option goes from the classifier; its paragraph is removed
+  // from the prompt, as shipped or as saved by the settings form (CRLF).
+  $prompt = (string) $config->get('consolidation_prompt');
+  $config->set('consolidation_prompt', preg_replace('/^[ \t]*- "RETIRE":.*\R.*Use sparingly\.\R/m', '', $prompt));
+  $config->save();
+}

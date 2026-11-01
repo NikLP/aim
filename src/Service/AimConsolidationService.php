@@ -70,11 +70,12 @@ class AimConsolidationService {
   /**
    * Reviews existing facts for near-duplicates and merges or retires them.
    *
-   * See DEVELOPING.md's "aim:consolidate" section for the algorithm. Each
-   * fact is compared to its nearest vector neighbors within the same
-   * scope/subject and end date: identical text is retired with no model
-   * call, anything else gets a single classification call
-   * (ADD/UPDATE/RETIRE/NOOP), and anything past the comparison distance is
+   * See DEVELOPING.md's "aim:consolidate" section for the algorithm. Only
+   * trusted facts take part (ADR-0065): an untrusted one is consolidated
+   * once someone trusts it. Each fact is compared to its nearest vector
+   * neighbors within the same scope/subject and end date: identical text is
+   * retired with no model call, anything else gets a single classification
+   * call (ADD/UPDATE/NOOP), and anything past the comparison distance is
    * left alone at zero cost. Retiring a fact sets its
    * `retired` field rather than deleting it, to keep an audit trail; an
    * UPDATE creates a new merged fact and retires both inputs, and every
@@ -100,7 +101,7 @@ class AimConsolidationService {
    * @return array
    *   An array with keys 'rows' (each a [kept id, candidate id,
    *   score, decision, merged text] tuple) and 'has_facts' (bool, whether
-   *   any un-expired facts existed to sweep at all).
+   *   any un-retired trusted facts existed to sweep at all).
    *
    * @throws \RuntimeException
    *   If the vector index does not exist, or a query cannot be run.
@@ -112,7 +113,7 @@ class AimConsolidationService {
     }
 
     $fact_storage = $this->entityTypeManager->getStorage('aim_fact');
-    $query = $fact_storage->getQuery()->accessCheck(FALSE)->sort('id')->notExists('retired');
+    $query = $fact_storage->getQuery()->accessCheck(FALSE)->sort('id')->notExists('retired')->condition('trusted', 1);
 
     if (!empty($scope)) {
       $query->condition('scope', $scope);
@@ -169,13 +170,18 @@ class AimConsolidationService {
    *
    * @return array
    *   A list of [kept id, candidate id, score, decision, merged text]
-   *   tuples, one per neighbor compared; empty if no eligible neighbor
-   *   was found.
+   *   tuples, one per neighbor compared; empty if the fact is untrusted or
+   *   no eligible neighbor was found.
    *
    * @throws \RuntimeException
    *   If the vector index does not exist.
    */
   public function consolidateFact(AimFact $fact, string $providerId, string $modelId, float $compareDistance): array {
+    // Untrusted since it was queued: trusting it queues it again
+    // (AimHooks::factUpdate()).
+    if (!$fact->get('trusted')->value) {
+      return [];
+    }
     $index = $this->manager->loadVectorIndex();
     if (!$index) {
       throw new \RuntimeException('The aim_vector_index search index does not exist.');
@@ -237,7 +243,7 @@ class AimConsolidationService {
       [$decision, $merged_text] = $this->decideAndApply($kept, $candidate, $score, $providerId, $modelId, $dryRun);
       $rows[] = [$kept->id(), $candidate->id(), round($score, 3), $decision, $merged_text];
 
-      if (in_array($decision, ['NOOP', 'RETIRE'], TRUE)) {
+      if ($decision === 'NOOP') {
         $retired[$candidate->id()] = TRUE;
       }
       elseif ($decision === 'UPDATE') {
@@ -278,8 +284,8 @@ class AimConsolidationService {
    *   If TRUE, the decision is computed but nothing is saved.
    *
    * @return array
-   *   A [decision, merged text] pair: the decision is ADD, UPDATE, RETIRE,
-   *   NOOP, or the synthetic BLOCKED; the text is NULL unless the decision
+   *   A [decision, merged text] pair: the decision is ADD, UPDATE, NOOP,
+   *   or the synthetic BLOCKED; the text is NULL unless the decision
    *   is UPDATE, BLOCKED, or an ADD downgraded from a merge that failed
    *   verification.
    */
@@ -307,12 +313,13 @@ class AimConsolidationService {
       $unfaithful = FALSE;
       if ($decision === 'UPDATE') {
         $failed = $this->verifyMerge($kept, $candidate, (string) $merged_text, $providerId, $modelId);
-        if ($failed === NULL && $this->settings->getGroundingMode() !== 'off') {
+        if ($failed === NULL && $this->settings->isGroundingOn()) {
           $grounding_score = $this->groundMerge($kept, $candidate, (string) $merged_text);
-          // Enforce mode keeps both facts rather than merging and marking
+          // Demote mode keeps both facts rather than merging and marking
           // the result untrusted, which would retire two good facts for one
-          // doubtful one. A check that failed to run fails closed.
-          if ($this->settings->getGroundingMode() === 'enforce' && ($grounding_score === NULL || $grounding_score < $this->settings->getGroundingThreshold())) {
+          // doubtful one. A check that failed to run fails closed. Record
+          // mode only logs the score.
+          if ($this->settings->getGroundingMode() === 'demote' && ($grounding_score === NULL || $grounding_score < $this->settings->getGroundingThreshold())) {
             $failed = 'grounding';
           }
         }
@@ -363,14 +370,6 @@ class AimConsolidationService {
         $candidate->save();
         break;
 
-      case 'RETIRE':
-        // Soft retire with no replacement: superseded_by stays empty, the
-        // reason records why. Reversible with the un-retire action.
-        $candidate->set('retired', $this->time->getRequestTime());
-        $candidate->set('superseded_by_reason', $reason);
-        $candidate->save();
-        break;
-
       case 'ADD':
         // Genuinely distinct facts, nothing to change.
         break;
@@ -387,15 +386,12 @@ class AimConsolidationService {
   /**
    * Verifies that a merged text is faithful to both inputs.
    *
-   * Two independent checks, either of which fails the merge. The model
-   * check asks a verifier model whether every detail of both inputs
-   * survives and nothing was invented; the verifier is
-   * aim.settings:activities.verifier when set, so a different model can check
-   * the first, else the classifier's own model.
-   * The distance check requires the merged text's embedding to sit within
-   * aim.settings:merge_max_distance of each input (0 disables it). Both
-   * check faithfulness to the inputs, not real-world truth. A verifier
-   * error counts as a failure: the safe outcome is keeping both facts.
+   * Asks a verifier model whether every detail of both inputs survives and
+   * nothing was invented; the verifier is aim.settings:activities.verifier
+   * when set, so a different model can check the first, else the
+   * classifier's own model. It checks faithfulness to the inputs, not
+   * real-world truth. A verifier error counts as a failure: the safe
+   * outcome is keeping both facts.
    *
    * @param \Drupal\aim\Entity\AimFact $kept
    *   The established fact.
@@ -409,28 +405,11 @@ class AimConsolidationService {
    *   The classifier's model, the verifier fallback.
    *
    * @return string|null
-   *   NULL if the merge passed, else the failed check: model, distance or
-   *   error. The grounded check runs after this, in decideAndApply().
+   *   NULL if the merge passed, else the failed check: model or error. The
+   *   grounded check runs after this, in decideAndApply().
    */
   protected function verifyMerge(AimFact $kept, AimFact $candidate, string $mergedText, string $providerId, string $modelId): ?string {
     $config = $this->configFactory->get('aim.settings');
-
-    $max_distance = (float) $config->get('merge_max_distance');
-    if ($max_distance > 0) {
-      try {
-        $merged = $this->embedText($mergedText);
-        foreach ([$kept, $candidate] as $input) {
-          if ($this->cosineDistance($merged, $this->embedText((string) $input->get('text')->value)) > $max_distance) {
-            return 'distance';
-          }
-        }
-      }
-      catch (\Exception $e) {
-        $this->logger->warning('Merge distance check failed to run: @message', ['@message' => $e->getMessage()]);
-        return 'error';
-      }
-    }
-
     if ($config->get('merge_verify') ?? TRUE) {
       $verifier = $config->get('activities.verifier');
       if (($verifier['backend'] ?? 'chat') === 'chat' && !empty($verifier['provider']) && !empty($verifier['model'])) {
@@ -577,67 +556,13 @@ class AimConsolidationService {
   }
 
   /**
-   * Embeds a text with the vector server's own embeddings engine.
-   *
-   * @param string $text
-   *   The text to embed.
-   *
-   * @return float[]
-   *   The embedding vector.
-   *
-   * @throws \RuntimeException
-   *   If the index or its embeddings engine is not configured.
-   */
-  protected function embedText(string $text): array {
-    $index = $this->manager->loadVectorIndex();
-    $backend = $index?->getServerInstance()->getBackendConfig() ?? [];
-    $engine = (string) ($backend['embeddings_engine'] ?? '');
-    if (!str_contains($engine, '__')) {
-      throw new \RuntimeException('The vector server has no embeddings engine configured.');
-    }
-    [$provider_id, $model_id] = explode('__', $engine, 2);
-    $config = $backend['embeddings_engine_configuration'] ?? [];
-    $provider = $this->aiProvider->createInstance($provider_id);
-    if (!empty($config['set_dimensions']) && !empty($config['dimensions'])) {
-      $provider->setConfiguration(['dimensions' => (int) $config['dimensions']] + $provider->getConfiguration());
-    }
-    return $provider->embeddings($text, $model_id, ['aim_consolidate_verify'])->getNormalized();
-  }
-
-  /**
-   * Computes the cosine distance between two vectors.
-   *
-   * @param float[] $a
-   *   The first vector.
-   * @param float[] $b
-   *   The second vector.
-   *
-   * @return float
-   *   1 minus cosine similarity: 0 identical, larger less similar.
-   */
-  protected function cosineDistance(array $a, array $b): float {
-    $dot = 0.0;
-    $norm_a = 0.0;
-    $norm_b = 0.0;
-    foreach ($a as $i => $value) {
-      $dot += $value * ($b[$i] ?? 0.0);
-      $norm_a += $value * $value;
-      $norm_b += ($b[$i] ?? 0.0) ** 2;
-    }
-    if ($norm_a == 0.0 || $norm_b == 0.0) {
-      return 1.0;
-    }
-    return 1.0 - $dot / (sqrt($norm_a) * sqrt($norm_b));
-  }
-
-  /**
    * Builds the provenance string stored in superseded_by_reason.
    *
    * Compact JSON, never fact text. Kept as one small helper alongside
    * logConsolidation() so both move together if decideAndApply() changes.
    *
    * @param string $decision
-   *   UPDATE, RETIRE or NOOP (the decisions that retire a fact).
+   *   UPDATE or NOOP (the decisions that retire a fact).
    * @param float $score
    *   The similarity score between the pair.
    * @param array|null $model
@@ -665,7 +590,8 @@ class AimConsolidationService {
    * guardrail-checked merge; asserted is the candidate's only; source
    * prefers the candidate (the newer statement) and falls back to the
    * kept fact;
-   * category is the union; trusted only if both inputs were; the owner is
+   * category is the union; trusted only if both inputs were (always, since
+   * only trusted facts are consolidated); the owner is
    * the kept fact's; grounding_score is the merge's own check, not either
    * input's.
    *
@@ -742,7 +668,7 @@ class AimConsolidationService {
    * @param float $score
    *   The similarity score between the two.
    * @param string $decision
-   *   ADD, UPDATE, RETIRE, NOOP or BLOCKED.
+   *   ADD, UPDATE, NOOP or BLOCKED.
    * @param array|null $model
    *   A [provider ID, model ID] pair if the model decided, NULL if the
    *   auto threshold did.
@@ -779,7 +705,9 @@ class AimConsolidationService {
    *   The most neighbors to return.
    *
    * @return array
-   *   A list of [neighbor fact, score] pairs, possibly empty.
+   *   A list of [neighbor fact, score] pairs, possibly empty. Only trusted
+   *   facts are neighbors (ADR-0065): a draft merged into a trusted fact
+   *   would make the merge untrusted and hide both from recall.
    */
   protected function findNeighbors(IndexInterface $index, AimFact $fact, array $handled, float $maxScore, int $limit): array {
     $scope = $fact->bundle();
@@ -787,6 +715,7 @@ class AimConsolidationService {
 
     $query = $index->query()->keys($fact->get('text')->value);
     $query->addCondition('scope', $scope);
+    $query->addCondition('trusted', TRUE);
     if ($is_user_scope) {
       $user = $fact->get('user')->target_id;
       if ($user === NULL) {
@@ -842,6 +771,11 @@ class AimConsolidationService {
         continue;
       }
 
+      // Untrusted since its last index run.
+      if (!$candidate->get('trusted')->value) {
+        continue;
+      }
+
       // Facts with different end dates (or one with none) have different
       // lifetimes: merging them would drop the end date or make a lasting
       // fact expire ("temporary overwriting"). They are never compared; the
@@ -891,7 +825,7 @@ class AimConsolidationService {
    *
    * @return array
    *   A [decision, merged_text] pair. Decision is one of ADD, UPDATE,
-   *   RETIRE, NOOP. merged_text is only meaningful for UPDATE.
+   *   NOOP. merged_text is only meaningful for UPDATE.
    */
   protected function classifyPair(AimFact $kept, AimFact $candidate, string $providerId, string $modelId): array {
     $decision_model = $this->settings->decisionModelFor('consolidation');
@@ -906,7 +840,6 @@ class AimConsolidationService {
             'ADD' => 'The facts are genuinely different; keep both.',
             'UPDATE' => 'The candidate refines, corrects or supersedes the existing fact.',
             'NOOP' => 'The candidate restates the existing fact with no new information.',
-            'RETIRE' => 'The candidate should not exist as a memory at all (nonsensical or clearly erroneous). Use sparingly.',
           ]),
         ],
       );
@@ -939,7 +872,7 @@ class AimConsolidationService {
         'properties' => [
           'decision' => [
             'type' => 'string',
-            'enum' => ['ADD', 'UPDATE', 'RETIRE', 'NOOP'],
+            'enum' => ['ADD', 'UPDATE', 'NOOP'],
           ],
           'merged_text' => ['type' => 'string'],
         ],

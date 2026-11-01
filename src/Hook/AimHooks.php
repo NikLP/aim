@@ -103,8 +103,9 @@ class AimHooks {
   /**
    * Implements hook_ENTITY_TYPE_insert() for aim_fact.
    *
-   * Enqueues every newly created fact for consolidation (decision 4),
-   * universal for every save path. An entity flagged setSyncing(TRUE)
+   * Enqueues every newly created trusted fact for consolidation (decision
+   * 4), universal for every save path; an untrusted one waits until it is
+   * trusted (factUpdate(), ADR-0065). An entity flagged setSyncing(TRUE)
    * opts out - core's own "being synchronized, skip side effects" flag,
    * used by aim_benchmark's AimBenchmarkGenerator (synthetic benchmark
    * text needs no consolidation, see
@@ -114,7 +115,23 @@ class AimHooks {
    */
   #[Hook('aim_fact_insert')]
   public function factInsert(AimFact $entity): void {
-    if ($entity->isSyncing()) {
+    if ($entity->isSyncing() || !$entity->get('trusted')->value) {
+      return;
+    }
+    $this->memoryManager->enqueueForConsolidation((int) $entity->id());
+  }
+
+  /**
+   * Implements hook_ENTITY_TYPE_update() for aim_fact.
+   *
+   * Enqueues a fact for consolidation when it becomes trusted (the Trust
+   * action or the edit form), since untrusted facts are not consolidated
+   * (ADR-0065). Same syncing opt-out as factInsert().
+   */
+  #[Hook('aim_fact_update')]
+  public function factUpdate(AimFact $entity): void {
+    $original = $entity->getOriginal();
+    if ($entity->isSyncing() || !$entity->get('trusted')->value || !$entity->get('retired')->isEmpty() || !$original || $original->get('trusted')->value) {
       return;
     }
     $this->memoryManager->enqueueForConsolidation((int) $entity->id());

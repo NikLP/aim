@@ -157,8 +157,8 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
     // The draft-to-trusted gate (ADR-0002's addendum): every fact is live in
     // storage the moment it is saved regardless of this value - it is a
     // recall()-time filter, not a moderation state, and carries no revision
-    // history. New facts get aim.settings:default_trusted via
-    // getDefaultTrusted() below, uniformly across every creation path.
+    // history. A new fact starts trusted when its writer may trust facts in
+    // its scope (getDefaultTrusted() below, ADR-0065).
     $fields['trusted'] = BaseFieldDefinition::create('boolean')
       ->setLabel(t('Trusted'))
       ->setDescription(t('Whether this fact is trusted enough to surface in recall() results. Untrusted facts stay in storage and are visible in this admin listing for review.'))
@@ -233,16 +233,21 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
   /**
    * Default value callback for the trusted field.
    *
-   * Reads aim.settings:default_trusted so every creation path -
-   * remember(), createFactsFromCandidates(), the entity add form, a
-   * future migration - applies the same site-wide policy, rather than
-   * each caller branching on it individually (ADR-0002's addendum).
+   * The current user's trust permission in the fact's scope (ADR-0065), so
+   * the add form's checkbox starts where remember() would. Only a writer
+   * who may trust can change it (AimFactAccessControlHandler's field
+   * access).
+   *
+   * @param \Drupal\aim\Entity\AimFact $entity
+   *   The new fact.
    *
    * @return bool
-   *   The site's configured default.
+   *   TRUE when the current user may trust facts in the fact's scope.
    */
-  public static function getDefaultTrusted(): bool {
-    return (bool) \Drupal::config('aim.settings')->get('default_trusted');
+  public static function getDefaultTrusted(AimFact $entity): bool {
+    /** @var \Drupal\aim\AimFactAccessControlHandler $access */
+    $access = \Drupal::entityTypeManager()->getAccessControlHandler('aim_fact');
+    return $access->canApprove(\Drupal::currentUser(), $entity->bundle());
   }
 
 }

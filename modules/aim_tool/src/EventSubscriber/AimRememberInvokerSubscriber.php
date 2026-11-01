@@ -9,7 +9,7 @@ use Drupal\tool\Event\ToolInputTransformEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
- * Tells aim_remember who is calling it, so it can pick its trust channel.
+ * Tells aim_remember who is calling it, so it can record the source.
  *
  * A #[ToolMethod] service never sees the Tool API invoker (ADR-0062,
  * decision 2), but every input set on a tool carries it: when aim_remember's

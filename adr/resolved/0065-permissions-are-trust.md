@@ -1,14 +1,14 @@
 # ADR-0065: Permissions are trust: check the model, not the person
 
-**Status:** Accepted 2026-11-01 - not built. Amends
-[ADR-0002](resolved/0002-governance-deferred-guardrails-mandatory.md)'s
+**Status:** Built 2026-11-01 (see "Built" at the end). Amends
+[ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s
 addendum (how a new fact's trust starts), replaces
-[ADR-0037](resolved/0037-transient-source-passages-for-grounding.md)'s
+[ADR-0037](0037-transient-source-passages-for-grounding.md)'s
 2026-10-18 and 2026-10-22 addenda (the trust policy and the grounded
 check's promotion), and narrows
-[ADR-0005](resolved/0005-consolidation-algorithm.md) (the RETIRE decision
+[ADR-0005](0005-consolidation-algorithm.md) (the RETIRE decision
 and the merge distance check go). Pays for
-[ADR-0064](0064-revisions-for-fact-edits.md)'s revisions.
+[ADR-0064](../0064-revisions-for-fact-edits.md)'s revisions.
 **Date:** 2026-11-01
 
 ## In plain terms
@@ -170,3 +170,39 @@ Each has a trigger in BACKLOG.md ("Write-path cuts, ADR-0065"):
   `default_trusted` and `grounding_mode` rows change with the build.
 - CLAUDE.md decision 3, ADR-0002's and ADR-0037's status lines and the
   settings docs in DEVELOPING.md are rewritten when this is built.
+
+## Built (2026-11-01)
+
+As decided, with these specifics:
+
+- **Settings change by update hook**, `aim_update_10012` (removes
+  `trust_policy`, `default_trusted` and `merge_max_distance`, renames the
+  modes, drops the RETIRE paragraph from the consolidation prompt as
+  shipped or as saved by the form). Chosen over reinstalling this site:
+  the amazee.io keys are stored in config and four OAuth consumers are
+  registered, so a reinstall would have lost credentials and connectors,
+  and the recipe's thresholds already matched the live values.
+- **The add form follows decision 1 too**: `trusted` defaults to the
+  current user's trust permission in the scope (`AimFact::getDefaultTrusted()`),
+  and only a writer who may trust can change the checkbox
+  (`AimFactAccessControlHandler::checkFieldAccess()`). Before, anyone with
+  create access could tick it.
+- **"A grounding model is configured" is literal**: with no model in
+  `activities.grounding` the check does not run (no score, starting trust
+  stands), in `demote` as in `record` (`AimSettings::isGroundingOn()`).
+- **Queueing**: `AimHooks::factInsert()` queues only trusted facts;
+  `factUpdate()` queues a fact when `trusted` goes from off to on (Trust
+  action or edit form). The queue worker and `consolidateFact()` skip a
+  fact untrusted since it was queued, and the neighbor search filters on
+  `trusted` in the index and again on the loaded entity.
+- **Drush** single writes go through `rememberBatch()` with the `--uid`
+  account as writer, so the create check is the ingest form's; a refused
+  `--uid` (missing, 0, unknown or blocked) prints an error.
+- This site moved to `grounding_mode: demote` the same day.
+- **No `AimTrustPolicy` service.** With the rule chain gone it held only
+  `canApprove()`, a copy of the access handler's trust operation, so
+  `canApprove()` moved onto `AimFactAccessControlHandler` (the trust
+  operation and the method share one check) and the demote rule into
+  `AimRememberService::trustValues()`. The remember service, the
+  `trusted` default value callback and the field access all ask the
+  handler.
