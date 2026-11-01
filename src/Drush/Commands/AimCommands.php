@@ -70,6 +70,9 @@ final class AimCommands extends DrushCommands {
    *   Path to a text file, resolved from the Drupal root.
    * @param array $options
    *   Command options.
+   *
+   * @return int
+   *   The exit code: EXIT_FAILURE when a write or lookup was refused.
    */
   #[CLI\Command(name: 'aim:extract', aliases: ['aim-extract'])]
   #[CLI\Argument(name: 'file', description: 'Path to a text file to extract facts from.')]
@@ -90,24 +93,24 @@ final class AimCommands extends DrushCommands {
       'uid' => NULL,
       'index' => FALSE,
     ],
-  ): void {
+  ): int {
     $writer = $this->writer($options);
     if ($writer === NULL) {
-      return;
+      return self::EXIT_FAILURE;
     }
     if (!is_readable($file)) {
       $this->io()->error("Cannot read file: $file");
-      return;
+      return self::EXIT_FAILURE;
     }
     $text = trim(file_get_contents($file));
     if ($text === '') {
       $this->io()->warning('File is empty, nothing to extract.');
-      return;
+      return self::EXIT_SUCCESS;
     }
 
     $provider = $this->resolveChatProvider($options, 'extraction');
     if ($provider === NULL) {
-      return;
+      return self::EXIT_FAILURE;
     }
     [$provider_id, $model_id] = $provider;
 
@@ -118,14 +121,14 @@ final class AimCommands extends DrushCommands {
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {
       $this->io()->error($e->getMessage());
-      return;
+      return self::EXIT_FAILURE;
     }
     finally {
       $this->accountSwitcher->switchBack();
     }
     if ($result['extracted'] === 0) {
       $this->io()->note('The model returned no facts worth remembering.');
-      return;
+      return self::EXIT_SUCCESS;
     }
 
     if ($result['skipped'] > 0) {
@@ -142,7 +145,7 @@ final class AimCommands extends DrushCommands {
 
     if (empty($result['created'])) {
       $this->io()->note('No facts were saved.');
-      return;
+      return self::EXIT_SUCCESS;
     }
 
     $memoryManager = $this->memoryManager;
@@ -165,6 +168,7 @@ final class AimCommands extends DrushCommands {
     else {
       $this->io()->note('Not indexed yet, next cron run will pick these up. Pass --index to do it now.');
     }
+    return self::EXIT_SUCCESS;
   }
 
   /**
@@ -180,6 +184,9 @@ final class AimCommands extends DrushCommands {
    *   The fact text, one short statement. Omit when using --file.
    * @param array $options
    *   Command options.
+   *
+   * @return int
+   *   The exit code: EXIT_FAILURE when a write or lookup was refused.
    */
   #[CLI\Command(name: 'aim:remember', aliases: ['aim-remember'])]
   #[CLI\Argument(name: 'text', description: 'The fact text, one short statement. Omit when using --file.')]
@@ -210,20 +217,19 @@ final class AimCommands extends DrushCommands {
       'file' => NULL,
       'uid' => NULL,
     ],
-  ): void {
+  ): int {
     $writer = $this->writer($options);
     if ($writer === NULL) {
-      return;
+      return self::EXIT_FAILURE;
     }
 
     if (!empty($options['file'])) {
-      $this->rememberBatch($options['file'], $writer);
-      return;
+      return $this->rememberBatch($options['file'], $writer);
     }
 
     if ($text === NULL || trim($text) === '') {
       $this->io()->error('Provide fact text, or --file with a JSON array of fact objects.');
-      return;
+      return self::EXIT_FAILURE;
     }
 
     if (empty($options['scope'])) {
@@ -231,7 +237,7 @@ final class AimCommands extends DrushCommands {
       // aim_scope_* submodules are installed (ADR-0026), so core has no
       // sound default to assume.
       $this->io()->error('--scope is required: one of ' . implode(', ', $this->memoryManager->allowedScopes()) . '.');
-      return;
+      return self::EXIT_FAILURE;
     }
 
     // One entry through the batch path, which checks the writer's create
@@ -250,7 +256,7 @@ final class AimCommands extends DrushCommands {
     }
     if (isset($result['errors'][0])) {
       $this->io()->error($result['errors'][0]);
-      return;
+      return self::EXIT_FAILURE;
     }
 
     $fact = $result['created'][0];
@@ -262,6 +268,7 @@ final class AimCommands extends DrushCommands {
       $message .= ' Untrusted: it waits for review before recall returns it.';
     }
     $this->io()->success($message);
+    return self::EXIT_SUCCESS;
   }
 
   /**
@@ -278,17 +285,21 @@ final class AimCommands extends DrushCommands {
    *   comma-separated string.
    * @param \Drupal\Core\Session\AccountInterface $writer
    *   The --uid account the facts are written as.
+   *
+   * @return int
+   *   The exit code: EXIT_FAILURE when the file is unreadable or any entry
+   *   was not saved.
    */
-  private function rememberBatch(string $file, AccountInterface $writer): void {
+  private function rememberBatch(string $file, AccountInterface $writer): int {
     if (!is_readable($file)) {
       $this->io()->error("Cannot read file: $file");
-      return;
+      return self::EXIT_FAILURE;
     }
 
     $entries = json_decode(file_get_contents($file), TRUE);
     if (!is_array($entries)) {
       $this->io()->error('Expected --file to contain a JSON array of fact objects.');
-      return;
+      return self::EXIT_FAILURE;
     }
 
     $this->accountSwitcher->switchTo($writer);
@@ -310,6 +321,7 @@ final class AimCommands extends DrushCommands {
     }
 
     $this->io()->note('Created ' . count($result['created']) . ' of ' . count($entries) . ' fact(s).');
+    return $result['errors'] ? self::EXIT_FAILURE : self::EXIT_SUCCESS;
   }
 
   /**
@@ -319,6 +331,9 @@ final class AimCommands extends DrushCommands {
    *   The search text.
    * @param array $options
    *   Command options.
+   *
+   * @return int
+   *   The exit code: EXIT_FAILURE when a write or lookup was refused.
    */
   #[CLI\Command(name: 'aim:recall', aliases: ['aim-recall'])]
   #[CLI\Argument(name: 'text', description: 'The search text.')]
@@ -342,7 +357,7 @@ final class AimCommands extends DrushCommands {
       'include-untrusted' => FALSE,
       'format' => 'table',
     ],
-  ): void {
+  ): int {
     try {
       $rows = $this->recallService->recall(
         $text,
@@ -357,17 +372,17 @@ final class AimCommands extends DrushCommands {
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {
       $this->io()->error($e->getMessage());
-      return;
+      return self::EXIT_FAILURE;
     }
 
     if ($options['format'] === 'json') {
       $this->output()->writeln(json_encode($rows, JSON_PRETTY_PRINT));
-      return;
+      return self::EXIT_SUCCESS;
     }
 
     if (empty($rows)) {
       $this->io()->note('No facts found.');
-      return;
+      return self::EXIT_SUCCESS;
     }
 
     $table_rows = array_map(static fn (array $row): array => [
@@ -381,6 +396,7 @@ final class AimCommands extends DrushCommands {
       gmdate('Y-m-d', (int) ($row['asserted'] ?: $row['created'])),
     ], $rows);
     $this->io()->table(['ID', 'Distance', 'Scope', 'Subject', 'Text', 'Source', 'Trusted', 'Date'], $table_rows);
+    return self::EXIT_SUCCESS;
   }
 
   /**
@@ -402,6 +418,9 @@ final class AimCommands extends DrushCommands {
    *
    * @param array $options
    *   Command options.
+   *
+   * @return int
+   *   The exit code: EXIT_FAILURE when a write or lookup was refused.
    */
   #[CLI\Command(name: 'aim:consolidate', aliases: ['aim-consolidate'])]
   #[CLI\Option(name: 'scope', description: 'Restrict the sweep to one scope: user, role, site, case.')]
@@ -418,10 +437,10 @@ final class AimCommands extends DrushCommands {
       'compare-distance' => NULL,
       'dry-run' => FALSE,
     ],
-  ): void {
+  ): int {
     $provider = $this->resolveChatProvider($options, 'consolidation');
     if ($provider === NULL) {
-      return;
+      return self::EXIT_FAILURE;
     }
     [$provider_id, $model_id] = $provider;
 
@@ -441,12 +460,12 @@ final class AimCommands extends DrushCommands {
     }
     catch (\RuntimeException $e) {
       $this->io()->error($e->getMessage());
-      return;
+      return self::EXIT_FAILURE;
     }
 
     if (empty($result['rows'])) {
       $this->io()->note($result['has_facts'] ? 'No near-duplicate facts found.' : 'No facts to consolidate.');
-      return;
+      return self::EXIT_SUCCESS;
     }
 
     $this->io()->table(['Kept', 'Candidate', 'Score', 'Decision', 'Merged text'], $result['rows']);
@@ -456,6 +475,7 @@ final class AimCommands extends DrushCommands {
     else {
       $this->io()->success(count($result['rows']) . ' decision(s) applied.');
     }
+    return self::EXIT_SUCCESS;
   }
 
   /**

@@ -44,7 +44,7 @@ function aim_uninstall(): void {
  * default_trusted go; merge_max_distance goes with the distance check;
  * grounding_mode shadow and enforce become record and demote.
  */
-function aim_update_10012(): void {
+function aim_update_10014(): void {
   $config = \Drupal::configFactory()->getEditable('aim.settings');
   $mode = $config->get('grounding_mode');
   $config->set('grounding_mode', match ($mode) {

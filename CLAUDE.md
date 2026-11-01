@@ -153,7 +153,7 @@ duplicated here.
   Fields: `subject`/`user` (an entity reference to a real Drupal account,
   required for `scope=user` per
   [ADR-0007](adr/resolved/0007-user-scope-requires-real-account.md); renamed from
-  `subject_uid` 2026-09-28, `aim_update_10001()`, to stop colliding in
+  `subject_uid` 2026-09-28, to stop colliding in
   spirit with the unrelated `uid` field below),
   `target_type`/`target_id` (plain strings naming an arbitrary referenced
   entity, required for `scope=entity` in practice though not enforced at
@@ -258,7 +258,7 @@ look at other roles when a permission check unexpectedly fails.
 - No migration/`hook_update_N()` needed while there's no real data to
   preserve (PoC) - just change and reinstall (`drush pmu`/`drush en`).
   Revisit once real data exists that reinstalling would destroy. One
-  exception so far: `aim_update_10012()` (ADR-0065's settings), since
+  exception so far: `aim_update_10014()` (ADR-0065's settings), since
   reinstalling this site would lose credentials stored in config.
 - **`AimMariaDBProvider` stays a thin shim** over `ai_vdb_provider_mariadb`.
   A workaround lives there only with an upstream issue in TODO.md/BACKLOG.md and is

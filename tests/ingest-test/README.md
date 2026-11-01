@@ -15,8 +15,8 @@ Run it:
 
 ```bash
 ddev snapshot --name pre-ingest-test
-ddev exec drush aim:remember --file=web/modules/custom/aim/tests/ingest-test/facts.json
-ddev exec drush aim:extract web/modules/custom/aim/tests/ingest-test/notes-staff-meeting.txt --source=ingest-test --index
+ddev exec drush aim:remember --uid=1 --file=web/modules/custom/aim/tests/ingest-test/facts.json
+ddev exec drush aim:extract web/modules/custom/aim/tests/ingest-test/notes-staff-meeting.txt --uid=1 --source=ingest-test --index
 ddev drush aim:consolidate --dry-run
 ```
 

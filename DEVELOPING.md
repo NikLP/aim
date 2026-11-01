@@ -181,7 +181,7 @@ lasting one and lose its end date (`findNeighbors()`; ADR-0036's
 2026-10-27 addendum).
 - `superseded_by_reason` (on the retired candidate's row only; JSON,
   never fact text): `decision`, `by` (`auto` or `model`), `score`,
-  `provider`, `model`. Installed by `aim_update_10004()`.
+  `provider`, `model`.
 
 Retired facts stay out of the vector index (`aim_exclude_retired`), so
 history costs no recall precision or index size. They are still personal
@@ -240,9 +240,7 @@ Settings (`aim.settings`, `/admin/config/aim/settings`):
   correct merges, both of which grounding passed.
 
 Both check faithfulness to the inputs, not real-world truth. The shipped
-consolidation prompt also now says to choose ADD when unsure
-(`aim_update_10005()` adds that line to an unedited prompt and the new
-keys to an existing site).
+consolidation prompt also says to choose ADD when unsure.
 
 **Testing gotcha:** `drush aim:consolidate --scope=site` (any scope) acts
 on every live fact in that scope, not just test facts you just wrote.
@@ -306,7 +304,7 @@ ddev drush sapi-i aim_vector_index
 ```
 
 **`user` is an indexed attribute with a BTREE index** (the field was
-named `subject_uid` until 2026-09-28, `aim_update_10001()` - ADR-0018's
+named `subject_uid` until 2026-09-28 - ADR-0018's
 title and file name still say `subject_uid`, the field itself does not):
 `recall()` (with `--subject-uid`) and user-scope `findNeighbors()`
 filter by a `user` query condition, not in PHP. The column's BTREE index
@@ -986,7 +984,7 @@ each documented in their own submodule now:
 ## Upgrading an existing site
 
 `config/install` does not re-run on an installed module and aim ships
-only one update hook, `aim_update_10012()` (ADR-0065's settings: removes
+only one update hook, `aim_update_10014()` (ADR-0065's settings: removes
 `trust_policy`, `default_trusted` and `merge_max_distance`, renames the
 grounded check's modes `shadow`/`enforce` to `record`/`demote`, drops
 RETIRE from the consolidation prompt; run `drush updatedb`). A site installed
@@ -999,7 +997,7 @@ from config and the shim.
    retired rows already indexed (the snippet under "Enabling the processor
    on an existing site" in "Vector search").
 2. **`user` as an indexed attribute** (field renamed from `subject_uid`
-   2026-09-28, `aim_update_10001()`; the ADR title and file name still
+   2026-09-28; the ADR title and file name still
    say `subject_uid`)
    ([ADR-0018](adr/resolved/0018-index-subject-uid-with-btree.md)): add an `integer`
    field `user` (datasource `entity:aim_fact`, property path

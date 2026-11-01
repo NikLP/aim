@@ -175,7 +175,7 @@ Each has a trigger in BACKLOG.md ("Write-path cuts, ADR-0065"):
 
 As decided, with these specifics:
 
-- **Settings change by update hook**, `aim_update_10012` (removes
+- **Settings change by update hook**, `aim_update_10014` (removes
   `trust_policy`, `default_trusted` and `merge_max_distance`, renames the
   modes, drops the RETIRE paragraph from the consolidation prompt as
   shipped or as saved by the form). Chosen over reinstalling this site:
