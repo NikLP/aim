@@ -159,7 +159,14 @@ Each has a trigger in BACKLOG.md ("Write-path cuts, ADR-0065"):
   retire drafts would let a misread correction vanish unreviewed. The
   reviewer trusts it (consolidation then retires it as a duplicate) or
   deletes it. Trigger to revisit in BACKLOG.md.
-- On this site nothing a visitor sees changes: chat facts already wait
-  for review and admin writes are already trusted.
+- On this site chat visitors see no change (their facts already wait,
+  as `hold`) and admin writes stay trusted, including the preflight's
+  MCP and widget checks (both run as uid 1). What does change: the site
+  sets `default_trusted` on, so today a non-reviewer's MCP, ingest or
+  Drush write starts trusted; after the build it waits for review, and
+  Drush needs `--uid`.
+- The `aim_demo_library` recipe's comments and README (`hold`, "a
+  reviewer's own fact starts trusted (ADR-0037)") and demo/README.md's
+  `default_trusted` and `grounding_mode` rows change with the build.
 - CLAUDE.md decision 3, ADR-0002's and ADR-0037's status lines and the
   settings docs in DEVELOPING.md are rewritten when this is built.
