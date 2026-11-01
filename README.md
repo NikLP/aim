@@ -44,7 +44,7 @@ for things Drupal already ships:
 | Vector embedding per object | `VECTOR` field via `ai_vdb_provider_mariadb`, on the same entity |
 | `user_id`/`agent_id`/`run_id`/`org_id` scoping | User entity, Role, a case/session entity, a site-global bundle |
 | Provenance (fact -> source episode) | Entity reference to the source content/interaction |
-| Audit trail | Non-destructive supersede edges (`retired`/`superseded_by`) + an IDs-only audit log |
+| Audit trail | Non-destructive supersede edges (`retired`/`superseded_by`), revisions for manual text edits (who, when, why) + an IDs-only audit log |
 | Governed at the data layer | Permissions/roles, plus a `trusted` flag reviewers set (draft-to-trusted) |
 | Policy versioning | Config export/sync |
 

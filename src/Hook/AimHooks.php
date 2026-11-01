@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\aim\Hook;
 
+use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Hook\Order\Order;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\ai\AiVdbProviderPluginManager;
 use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Entity\AimFact;
@@ -42,6 +44,10 @@ class AimHooks {
    *   The scope type plugin manager, used by entityBaseFieldInfo() to
    *   merge every registered scope type's own base fields onto aim_fact,
    *   and by factPresave() to resolve a fact's subject.
+   * @param \Drupal\Core\Session\AccountInterface $currentUser
+   *   The current user, the author of a new revision.
+   * @param \Drupal\Component\Datetime\TimeInterface $time
+   *   The time service, for a new revision's creation time.
    */
   public function __construct(
     private readonly AimMemoryManager $memoryManager,
@@ -49,6 +55,10 @@ class AimHooks {
     private readonly AiVdbProviderPluginManager $vdbProviders,
     #[Autowire(service: 'plugin.manager.aim_scope_type')]
     private readonly AimScopeTypePluginManagerInterface $scopeTypeManager,
+    #[Autowire(service: 'current_user')]
+    private readonly AccountInterface $currentUser,
+    #[Autowire(service: 'datetime.time')]
+    private readonly TimeInterface $time,
   ) {}
 
   /**
@@ -87,9 +97,11 @@ class AimHooks {
    * one), so every write path - remember(), the add form, ingest - gets
    * the same result, e.g. the case plugin's minted or named case ID.
    * Only changes the value, never throws (see this class's docblock).
+   * Also decides whether an edit is a new revision (applyRevisionPolicy()).
    */
   #[Hook('aim_fact_presave')]
   public function factPresave(AimFact $entity): void {
+    $this->applyRevisionPolicy($entity);
     $subject = (string) $entity->get('subject')->value;
     if (!$entity->isNew() && $subject === (string) $entity->getOriginal()?->get('subject')->value) {
       return;
@@ -97,6 +109,57 @@ class AimHooks {
     $plugin = $this->scopeTypeManager->getTypePlugin($entity->bundle());
     if ($plugin) {
       $entity->set('subject', $plugin->resolveSubject($subject, $entity->bundle()));
+    }
+  }
+
+  /**
+   * Saves a new revision when, and only when, a fact's text changes.
+   *
+   * ADR-0064 decision 3: trust, retirement, expiry, the grounded check and
+   * consolidation save in place and keep the current revision's metadata,
+   * so the history holds edits only. A new revision clears a grounding
+   * score measured against the old text (decision 4) unless the same save
+   * sets a new one. A new fact's first revision is its writer's. Core's
+   * revert form saves an older revision, which is left to core: it is
+   * always a new revision and keeps that revision's own score.
+   *
+   * @param \Drupal\aim\Entity\AimFact $entity
+   *   The fact being saved.
+   */
+  private function applyRevisionPolicy(AimFact $entity): void {
+    if ($entity->isNew()) {
+      if (!$entity->getRevisionUserId()) {
+        $entity->setRevisionUserId($entity->getOwnerId());
+      }
+      return;
+    }
+    /** @var \Drupal\aim\Entity\AimFact|null $original */
+    $original = $entity->getOriginal();
+    if (!$original || (int) $entity->getLoadedRevisionId() !== (int) $original->getRevisionId()) {
+      return;
+    }
+    $metadata = ['revision_user', 'revision_created', 'revision_log_message'];
+    if ((string) $entity->get('text')->value === (string) $original->get('text')->value) {
+      $entity->setNewRevision(FALSE);
+      foreach ($metadata as $field) {
+        $entity->set($field, $original->get($field)->getValue());
+      }
+      return;
+    }
+
+    $entity->setNewRevision();
+    if ($entity->get('grounding_score')->equals($original->get('grounding_score'))) {
+      $entity->set('grounding_score', NULL);
+    }
+    // Metadata the caller left as it was belongs to the old revision.
+    if ((int) $entity->getRevisionUserId() === (int) $original->getRevisionUserId()) {
+      $entity->setRevisionUserId($this->currentUser->id());
+    }
+    if ((int) $entity->getRevisionCreationTime() === (int) $original->getRevisionCreationTime()) {
+      $entity->setRevisionCreationTime($this->time->getRequestTime());
+    }
+    if ($entity->getRevisionLogMessage() === $original->getRevisionLogMessage()) {
+      $entity->setRevisionLogMessage(NULL);
     }
   }
 

@@ -307,16 +307,6 @@ only work to do is listed here.
       the caller on Drush and the ingest form, so today nothing shows that
       a fact by uid 5 came from a shell caller naming uid 5 with `--uid`
       (ADR-0065 decision 2) rather than from user 5.
-- [ ] **Edit history for facts (raised 2026-10-11).** A text edit on
-      `/admin/content/aim-facts/{aim_fact}/edit` replaces the text in
-      place, so manual changes leave no trail. Design in
-      [ADR-0064](adr/0064-revisions-for-fact-edits.md) (proposed
-      2026-10-30): revisionable without Content Moderation, a revision
-      only when `text` changes, only `text` and `grounding_score`
-      revisioned, revise for wording vs. supersede for a changed world.
-      Build while reinstalling is still free. Rejected: saving an edit as
-      a new fact that supersedes the old one, because the ID would change
-      on every edit.
 
 ## Queue processing (ADR-0031)
 

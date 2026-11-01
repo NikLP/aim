@@ -1,7 +1,7 @@
 # ADR-0064: Revisions for fact edits
 
-**Status:** Proposed 2026-10-30 - design only, nothing built. Revisits the
-part of [ADR-0002](resolved/0002-governance-deferred-guardrails-mandatory.md)'s
+**Status:** Built 2026-11-01 (see "Built" at the end). Revisits the
+part of [ADR-0002](0002-governance-deferred-guardrails-mandatory.md)'s
 addendum that left `aim_fact` non-revisionable; keeps its decision
 (`trusted`, not Content Moderation) unchanged.
 **Date:** 2026-10-30
@@ -33,7 +33,7 @@ ADR-0002's addendum (2026-09-28) rejected Content Moderation for the
 draft-to-trusted gate and chose the `trusted` flag. Revisions were
 dropped with it, because Content Moderation needs them, and the addendum
 counted making `aim_fact` revisionable as part of CM's cost. Revisions on
-their own were not decided against. [ADR-0010](resolved/0010-drupal-native-agent-memory-rationale.md)
+their own were not decided against. [ADR-0010](0010-drupal-native-agent-memory-rationale.md)
 lists "Audit trail: Revisioning" among the reasons to build on Drupal at
 all, and TODO.md's "Edit history for facts" (raised 2026-10-11) proposed
 them alone.
@@ -110,3 +110,40 @@ It gets harder once real data exists.
 - The admin listing and review queue are unchanged.
 - Not decided here: showing a fact's edit history in recall output or to
   models. Nothing reads old revisions except the revision pages.
+
+## Built (2026-11-01)
+
+As decided, with these specifics:
+
+- **Schema change by update hook**, `aim_update_10015`
+  (`updateFieldableEntityType()` from the current definitions), not a
+  reinstall: same reason as ADR-0065's `aim_update_10014` (credentials
+  and OAuth consumers in config). Each existing fact gets one revision
+  with its writer (`uid`) and `created` as revision author and time and
+  the log message "Revision history starts here: earlier edits were not
+  recorded." Checked afterwards: the `aim_facts` View, the vector index
+  (33 rows before and after) and no pending entity definition updates.
+- **The policy is `AimHooks::applyRevisionPolicy()`**, called first in
+  `factPresave()`. A save that leaves `text` as it was is forced to
+  `setNewRevision(FALSE)` and keeps the current revision's author, time
+  and log message, so an in-place save cannot rewrite them. A text change
+  is a new revision; author, time and log message the caller left as
+  they were are replaced (current user, request time, empty), and the
+  score is cleared unless the same save changed it (compared with
+  `FieldItemList::equals()`: a fresh float and the stored string must
+  match). A new fact's first revision is its writer's. A save of a
+  non-default revision (core's revert form) is left to core: always a new
+  revision, keeping that revision's own score.
+- **No "Create new revision" checkbox**: `show_revision_ui` stays off, so
+  the editor cannot choose. `AimFactForm` (the default form) clears the
+  log field like core's revision UI, hides it on the add form, and gives
+  the text field the revise-vs-supersede description on the edit form
+  (decision 2).
+- **Routes** from core's `RevisionHtmlRouteProvider` under
+  `/admin/content/aim-facts/{aim_fact}/revisions`, with Edit and
+  Revisions tabs. A revision's page renders `text` and `grounding_score`
+  through view display options set on the base fields (there is no view
+  display config). Access stays on the default handler: `administer aim`
+  for every revision operation; core forbids reverting or deleting the
+  current revision.
+- **Tests**: `AimFactRevisionTest` (kernel).

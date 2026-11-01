@@ -695,6 +695,32 @@ to the model and never stored.
   preflight canary's `ZZPREFLIGHT` token, 0.52-0.62). Narrower wordings did
   not fix it without passing real meaning-changing drops (ADR-0037
   addendum), so the preflight canary no longer carries a junk token.
+- **A text edit clears the score** (ADR-0064 decision 4): the score
+  belongs to the wording it was measured against, so the old revision
+  keeps it and the new one starts unchecked, unless the same save sets a
+  new score. Reverting to an old revision brings its score back.
+
+### Fact revisions (ADR-0064)
+
+`aim_fact` is revisionable (`aim_fact_revision`, no data tables), with
+core's revision log fields. `AimHooks::applyRevisionPolicy()`, first in
+`factPresave()`, decides for every write path:
+
+- **Text unchanged** (trust, retire, expiry, the grounded check,
+  consolidation, any other field): saved in place, and the current
+  revision's author, time and log message are put back, so calling
+  `setNewRevision()` or setting the log yourself has no effect.
+- **Text changed**: a new revision. Author, time and log message you did
+  not set become the current user, the request time and empty;
+  `grounding_score` is cleared unless you changed it in the same save.
+- **New fact**: its first revision's author is the writer (`uid`).
+- **Saving a non-default revision** (core's revert form) is left to core.
+
+Only `text`, `grounding_score` and the revision metadata live in the
+revision table; Views, entity queries, Search API and `recall()` read the
+base table or the default revision only. Nothing reads old revisions
+except the revision pages (see "Admin UI"). Erasure must clear old
+revisions too (BACKLOG's `aim:erase`).
 
 ### Dates and time
 
@@ -984,10 +1010,13 @@ each documented in their own submodule now:
 ## Upgrading an existing site
 
 `config/install` does not re-run on an installed module and aim ships
-only one update hook, `aim_update_10014()` (ADR-0065's settings: removes
-`trust_policy`, `default_trusted` and `merge_max_distance`, renames the
-grounded check's modes `shadow`/`enforce` to `record`/`demote`, drops
-RETIRE from the consolidation prompt; run `drush updatedb`). A site installed
+two update hooks (run `drush updatedb`): `aim_update_10014()` (ADR-0065's
+settings: removes `trust_policy`, `default_trusted` and
+`merge_max_distance`, renames the grounded check's modes
+`shadow`/`enforce` to `record`/`demote`, drops RETIRE from the
+consolidation prompt) and `aim_update_10015()` (ADR-0064: makes `aim_fact`
+revisionable, one starting revision per fact by its writer at its
+creation time). A site installed
 before 2026-09-26 needs the rest by hand. Fresh installs get all of it
 from config and the shim.
 
@@ -1211,8 +1240,16 @@ via the container, so only a hand-constructed instance is affected).
   ("about") both shown, `trusted` shown and editable inline via the
   Edit link - this is the review queue ADR-0002's addendum leans on, not
   a bespoke UI. Per-row View/Edit/Delete dropbutton and bulk delete.
-- `/admin/content/aim-facts/add` - bundle picker, then a standard
-  `ContentEntityForm` per scope (`/admin/content/aim-facts/add/{aim_scope}`).
+- `/admin/content/aim-facts/{aim_fact}/edit` (`AimFactForm`,
+  `administer aim`) - no "Create new revision" checkbox: a text change is
+  always a new revision (see "Fact revisions"). The text field says when
+  to correct the wording and when to add a new fact instead; the log
+  message field is saved only with a text change. The Revisions tab
+  (`/admin/content/aim-facts/{aim_fact}/revisions`, core's
+  `VersionHistoryController`) lists the edits, with view, revert and
+  delete per old revision, all on `administer aim`.
+- `/admin/content/aim-facts/add` - bundle picker, then `AimFactForm`
+  per scope (`/admin/content/aim-facts/add/{aim_scope}`).
   Gated by the per-scope `create {scope} aim facts` permission (or
   `administer aim`).
 - `/admin/config/system/queue-ui` - manual consolidation-queue trigger.

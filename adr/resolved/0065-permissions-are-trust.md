@@ -8,7 +8,7 @@ addendum (how a new fact's trust starts), replaces
 check's promotion), and narrows
 [ADR-0005](0005-consolidation-algorithm.md) (the RETIRE decision
 and the merge distance check go). Pays for
-[ADR-0064](../0064-revisions-for-fact-edits.md)'s revisions.
+[ADR-0064](0064-revisions-for-fact-edits.md)'s revisions.
 **Date:** 2026-11-01
 
 ## In plain terms

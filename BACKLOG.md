@@ -364,14 +364,6 @@ questions" section)
 
 ## Concrete near-term fixes flagged in CLAUDE.md/DEVELOPING.md
 
-- [ ] Clear `grounding_score` when an existing fact's `text` changes
-      (raised 2026-10-30). The edit form (`administer aim` only) changes
-      text in place, and the fact keeps a score measured against text it
-      no longer has. A check in `AimHooks::factPresave()` against
-      `getOriginal()`, like the subject check there; `trusted` stays as is
-      (an admin could trust it anyway). Absorbed by
-      [ADR-0064](adr/0064-revisions-for-fact-edits.md) decision 4 if that
-      is built; on its own otherwise.
 - [ ] Consolidation/recall baselines (none exist, so no improvement can be
       claimed): merge-fidelity review of dry-run UPDATE rows on a
       snapshot copy; a disclosed LongMemEval slice (50-100 questions) for
@@ -560,7 +552,7 @@ questions" section)
       is how it finds candidates. Check first what else holds text:
       `superseded_by_reason` (meant to hold none), `ai_log`'s logged
       prompts and replies (ADR-0060, which hold source passages), the unbuilt `aim_rejection` quarantine, and
-      [ADR-0064](adr/0064-revisions-for-fact-edits.md)'s revisions (decision 5:
+      [ADR-0064](adr/resolved/0064-revisions-for-fact-edits.md)'s revisions (decision 5:
       erasure must clear old revisions too).
 - [ ] **Recall audit line (raised 2026-10-14).** `recall()` logs only counts
       and best score, and only at the verbose tier, so "what did the agent
@@ -751,9 +743,11 @@ would bring each back. Nothing here is built.
         entity's current text rather than deciding.
       Likely the mechanism for the scheduled staleness review above.
 - [ ] `revision_graph` module - Content Moderation isn't landing
-      (ADR-0002 addendum), but [ADR-0064](adr/0064-revisions-for-fact-edits.md)
-      (proposed) would make `aim_fact` revisionable on its own. Revisit if
-      ADR-0064 is built.
+      (ADR-0002 addendum), but `aim_fact` is revisionable on its own since
+      [ADR-0064](adr/resolved/0064-revisions-for-fact-edits.md)
+      (2026-11-01), so it would now work. No need yet: a fact's history
+      is a straight line of text edits, and core's Revisions tab lists it.
+      Revisit if revisions ever branch (e.g. drafts).
 
 ## Parked ADRs, revisit triggers (retired 2026-10-11 and 2026-10-12)
 

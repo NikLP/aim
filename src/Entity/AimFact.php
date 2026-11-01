@@ -8,17 +8,22 @@ use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Entity\Attribute\ContentEntityType;
 use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\ContentEntityDeleteForm;
-use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Entity\EntityChangedInterface;
 use Drupal\Core\Entity\EntityChangedTrait;
 use Drupal\Core\Entity\EntityListBuilder;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityViewBuilder;
 use Drupal\Core\Entity\Form\DeleteMultipleForm;
+use Drupal\Core\Entity\Form\RevisionDeleteForm;
+use Drupal\Core\Entity\Form\RevisionRevertForm;
+use Drupal\Core\Entity\RevisionLogEntityTrait;
+use Drupal\Core\Entity\RevisionLogInterface;
+use Drupal\Core\Entity\Routing\RevisionHtmlRouteProvider;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\AimFactAccessControlHandler;
 use Drupal\aim\AimFactViewsData;
+use Drupal\aim\Form\AimFactForm;
 use Drupal\aim\Routing\AimFactHtmlRouteProvider;
 use Drupal\user\EntityOwnerInterface;
 use Drupal\user\EntityOwnerTrait;
@@ -26,8 +31,11 @@ use Drupal\user\EntityOwnerTrait;
 /**
  * Defines the AIM fact content entity.
  *
- * Not revisionable and no Content Moderation: the draft-to-trusted gate is
- * the `trusted` field, which recall() filters on (ADR-0002 addendum).
+ * Revisionable but not translatable, and no Content Moderation: the
+ * draft-to-trusted gate is the `trusted` field, which recall() filters on
+ * (ADR-0002 addendum). Only text and grounding_score are revisionable, and
+ * a new revision is saved only when the text changes (AimHooks::
+ * factPresave(), ADR-0064).
  */
 #[ContentEntityType(
   id: 'aim_fact',
@@ -39,16 +47,20 @@ use Drupal\user\EntityOwnerTrait;
     'list_builder' => EntityListBuilder::class,
     'access' => AimFactAccessControlHandler::class,
     'form' => [
-      'default' => ContentEntityForm::class,
+      'default' => AimFactForm::class,
       'delete' => ContentEntityDeleteForm::class,
       'delete-multiple-confirm' => DeleteMultipleForm::class,
+      'revision-revert' => RevisionRevertForm::class,
+      'revision-delete' => RevisionDeleteForm::class,
     ],
     'route_provider' => [
       'html' => AimFactHtmlRouteProvider::class,
+      'revision' => RevisionHtmlRouteProvider::class,
     ],
   ],
   entity_keys: [
     'id' => 'id',
+    'revision' => 'revision_id',
     'uuid' => 'uuid',
     'langcode' => 'langcode',
     'bundle' => 'scope',
@@ -62,14 +74,25 @@ use Drupal\user\EntityOwnerTrait;
     'edit-form' => '/admin/content/aim-facts/{aim_fact}/edit',
     'delete-form' => '/admin/content/aim-facts/{aim_fact}/delete',
     'delete-multiple-form' => '/admin/content/aim-facts/delete',
+    'version-history' => '/admin/content/aim-facts/{aim_fact}/revisions',
+    'revision' => '/admin/content/aim-facts/{aim_fact}/revisions/{aim_fact_revision}/view',
+    'revision-revert-form' => '/admin/content/aim-facts/{aim_fact}/revisions/{aim_fact_revision}/revert',
+    'revision-delete-form' => '/admin/content/aim-facts/{aim_fact}/revisions/{aim_fact_revision}/delete',
   ],
   admin_permission: 'administer aim',
   base_table: 'aim_fact',
+  revision_table: 'aim_fact_revision',
+  revision_metadata_keys: [
+    'revision_user' => 'revision_user',
+    'revision_created' => 'revision_created',
+    'revision_log_message' => 'revision_log_message',
+  ],
 )]
-class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityChangedInterface {
+class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityChangedInterface, RevisionLogInterface {
 
   use EntityChangedTrait;
   use EntityOwnerTrait;
+  use RevisionLogEntityTrait;
 
   /**
    * {@inheritdoc}
@@ -111,8 +134,12 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
       // the entity add/edit form instead of an uncaught exception. See
       // AimGuardrailsConstraint's own docblock.
       ->addConstraint('AimGuardrails')
+      // A revision corrects the wording (ADR-0064); the view display is
+      // what a revision's page shows.
+      ->setRevisionable(TRUE)
       ->setDisplayConfigurable('form', TRUE)
-      ->setDisplayOptions('form', ['weight' => 0]);
+      ->setDisplayOptions('form', ['weight' => 0])
+      ->setDisplayOptions('view', ['label' => 'above', 'type' => 'basic_string', 'weight' => 0]);
 
     $fields['source'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Source'))
@@ -168,10 +195,17 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
 
     // ADR-0037's grounded check, run at write time against the text the fact
     // came from; that text is never stored. Empty means not checked.
+    // Revisionable: a score belongs to the wording it was measured against,
+    // and a new revision clears it (ADR-0064 decision 4).
     $fields['grounding_score'] = BaseFieldDefinition::create('float')
       ->setLabel(t('Grounding score'))
       ->setDescription(t('How likely a decision model judged it that the source text states this fact, 0 to 1, checked when the fact was written. Empty when there was no source text or the check was off or failed.'))
-      ->setDisplayConfigurable('view', TRUE);
+      ->setRevisionable(TRUE)
+      ->setDisplayConfigurable('view', TRUE)
+      ->setDisplayOptions('view', ['label' => 'inline', 'type' => 'number_decimal', 'weight' => 10]);
+
+    $fields += static::revisionLogBaseFieldDefinitions($entity_type);
+    $fields['revision_log_message']->setDisplayConfigurable('form', TRUE);
 
     $fields += static::ownerBaseFieldDefinitions($entity_type);
     $fields['uid']

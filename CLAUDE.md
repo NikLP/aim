@@ -178,6 +178,12 @@ duplicated here.
   only a writer who may trust can change it there; `recall()` excludes
   untrusted facts unless asked otherwise, see
   [ADR-0065](adr/resolved/0065-permissions-are-trust.md)).
+  Revisionable, not translatable, no Content Moderation
+  ([ADR-0064](adr/resolved/0064-revisions-for-fact-edits.md)): only
+  `text` and `grounding_score` are revisioned, a save makes a new
+  revision only when `text` changes (`AimHooks::applyRevisionPolicy()`;
+  it clears the score) and every other save is in place. A changed world
+  is a new fact that supersedes the old one, not a revision.
 - **`aim_scope`** config entity: `id`, `label`, `status`, `description`,
   `weight`, `plugin`, `settings`. `aim` ships five (site, role, user,
   case, entity) in `config/install`, like `literals` ships its literal
@@ -257,9 +263,10 @@ look at other roles when a permission check unexpectedly fails.
   matches what a module ships.
 - No migration/`hook_update_N()` needed while there's no real data to
   preserve (PoC) - just change and reinstall (`drush pmu`/`drush en`).
-  Revisit once real data exists that reinstalling would destroy. One
-  exception so far: `aim_update_10014()` (ADR-0065's settings), since
-  reinstalling this site would lose credentials stored in config.
+  Revisit once real data exists that reinstalling would destroy. Two
+  exceptions so far: `aim_update_10014()` (ADR-0065's settings) and
+  `aim_update_10015()` (ADR-0064's revisions), since reinstalling this
+  site would lose credentials stored in config.
 - **`AimMariaDBProvider` stays a thin shim** over `ai_vdb_provider_mariadb`.
   A workaround lives there only with an upstream issue in TODO.md/BACKLOG.md and is
   deleted when the provider ships the fix; generic features go upstream

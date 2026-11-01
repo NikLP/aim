@@ -9,8 +9,8 @@ write (2026-09-09), and the draft-to-trusted gate as the `trusted` flag
 2026-09-08 deferral: superseded by the addendum, kept as history (it names
 the since-removed `aim_eca` and the old `administer aim memory`
 permission). Left over: `trusted_by`/`trusted_at` audit fields (TODO.md
-"Governance"); fact revisions are
-[ADR-0064](../0064-revisions-for-fact-edits.md).
+"Governance"); fact revisions were built as
+[ADR-0064](0064-revisions-for-fact-edits.md) (2026-11-01).
 [ADR-0065](0065-permissions-are-trust.md) (built 2026-11-01) replaces how
 a fact's trust starts: the writer's permission alone, with no per-channel
 starting trust and no `trusted` override.
