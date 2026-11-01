@@ -218,19 +218,11 @@ only work to do is listed here.
       provider with the `decision` operation (no chat path, ADR-0037).
       Consolidation and the verifier keep their chat option: it is the
       baseline any chat provider can run; a decision model is the upgrade.
-- [ ] **Re-measure the verifier and grounding thresholds on the live
-      decision model** with `decision-eval.php`. Live is `subq-snap-1.1`
-      (verifier 0.8, grounding 0.7), carried over from earlier models. On
-      2026-10-22 the eval script's run on it was refused ("not permitted
-      for this API key") while single calls worked; live calls and the
-      2026-10-27 merge measurements have used it since, so re-run before
-      assuming the refusal still stands.
 - [ ] **Sovereignty wording is stale (Nik, 2026-10-22).** Local chat model
       support is no longer forced, but ADR-0004 and CLAUDE.md decision 5
       still say extraction/consolidation "must support Ollama". Add an
       ADR-0004 addendum with the current position and fix decision 5.
-- [ ] **Grounded check: enforce.** Review shadow scores on real use, then
-      set `grounding_mode: enforce`. Also: per-model question text;
+- [ ] **Grounded check follow-ups.** Per-model question text;
       `ingest_max_chars` and a passage limit for the decision call (untested
       above ~1,000 words); MCP `source_text` is only as verbatim as the
       calling agent.
@@ -295,9 +287,21 @@ only work to do is listed here.
 
 ## Governance
 
+- [ ] **Build [ADR-0065](adr/0065-permissions-are-trust.md) (decided
+      2026-11-01): permissions are trust.** Starting trust from the
+      writer's permission only (trust policy, `hold`, `default_trusted`,
+      `remember()`'s `trusted` argument go); Drush `--uid` (uid-0 write
+      ban) switches account and runs the normal checks, the two skills
+      pass it; the grounded check never promotes, `grounding_mode`
+      is `off`/`record`/`demote`;
+      consolidation on trusted facts only (trusting a fact queues it);
+      classifier ADD/UPDATE/NOOP; `merge_max_distance` goes. Update hook
+      or reinstall, tests, then CLAUDE.md decision 3 and the docs. Build
+      before or with ADR-0064.
+
 - [ ] **Record who trusted a fact (raised 2026-10-11; deferred 2026-10-19 to
       before real data, with ADR-0056; add a `trust_basis` field too:
-      reviewer, policy, grounded or override).** Add `trusted_by`
+      reviewer, writer's permission or grounded demotion, per ADR-0065).** Add `trusted_by`
       (user reference) and `trusted_at` (timestamp) base fields, set by the
       Trust/Untrust actions, the edit form and the grounded check (its
       service account). `uid` cannot stand in: it is the author, often a

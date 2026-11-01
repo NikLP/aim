@@ -76,7 +76,8 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
    promotes it per the policy (a reviewer's start can be demoted, only an
    explicit `trusted` cannot), and `hold` is never promoted. The chat
    channel ships as `hold`. ([ADR-0002](adr/resolved/0002-governance-deferred-guardrails-mandatory.md)'s
-   addendum)
+   addendum; [ADR-0065](adr/0065-permissions-are-trust.md), decided
+   2026-11-01 and not built, cuts this to the writer's permission alone)
 4. **Processing** - Queue API + a dedicated crontab entry, never
    `hook_cron`. ([ADR-0003](adr/resolved/0003-async-processing-dedicated-crontab.md))
    One stopgap exception: the expiry sweep (`aim:expire`, no model call)

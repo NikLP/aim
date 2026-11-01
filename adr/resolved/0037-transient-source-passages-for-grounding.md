@@ -15,6 +15,8 @@ as [ADR-0056](../0056-personal-data-write-gate.md) decision 7). Shadow mode on
 this site; the enforce decision, length cap and other follow-ups are in
 TODO.md. Proposed 2026-10-02. Absorbs the gate semantics of the former
 ADR-0033 (see "Gate semantics" below).
+[ADR-0065](../0065-permissions-are-trust.md) (accepted 2026-11-01, not built)
+replaces the trust policy and the grounded check's promotion and modes.
 **Date:** 2026-10-02
 
 ## Context

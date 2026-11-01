@@ -11,6 +11,8 @@ the since-removed `aim_eca` and the old `administer aim memory`
 permission). Left over: `trusted_by`/`trusted_at` audit fields (TODO.md
 "Governance"); fact revisions are
 [ADR-0064](../0064-revisions-for-fact-edits.md).
+[ADR-0065](../0065-permissions-are-trust.md) (accepted 2026-11-01, not built)
+replaces the trust policy and the grounded check's promotion and modes.
 **Date:** 2026-09-08 (deferral), 2026-09-09 (Guardrails cheap-path built)
 
 ## Context

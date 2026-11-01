@@ -26,7 +26,7 @@ are recommendations.
 **Identity and access**
 
 - [ ] Agreed: refuse new authored writes with uid 0 (Drush callers pass
-      `--uid`). Consolidation retirements and merged facts are exempt
+      `--uid`; part of [ADR-0065](adr/0065-permissions-are-trust.md)'s build). Consolidation retirements and merged facts are exempt
       (a merged fact copies `uid` and `user` from the kept fact). The
       current database is disposable, so no `uid` backfill is needed.
 - [ ] Docs: say "the fact is about this user" for `user` scope (`user` is
@@ -641,6 +641,27 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
       discovery channel.
 - [ ] Optional: use `drush tool:run aim_recall` / `aim_remember` as a
       smoke test of the tool layer without an MCP client.
+
+## Write-path cuts, ADR-0065 (raised 2026-11-01)
+
+What [ADR-0065](adr/0065-permissions-are-trust.md) removes, and what
+would bring each back. Nothing here is built.
+
+- [ ] **Per-channel trust exception.** Trigger: an agent holding a
+      trust-granting token is shown writing something it was manipulated
+      into (prompt injection). Read the fact's `source` label, which the
+      Tool API invoker sets; no `trust_policy` tree.
+- [ ] **Model promotion by the grounded check.** Trigger: none on its own;
+      it needs a new decision, since it is a model granting trust a
+      permission withheld.
+- [ ] **Duplicate drafts in the review queue.** Untrusted facts are not
+      consolidated, so a visitor repeating a known fact queues it.
+      Trigger: reviewers spend real time on duplicates. Then show a
+      "near-duplicate of #id" hint in the queue, or let NOOP retire drafts
+      (riskier: a misread correction vanishes unreviewed).
+- [ ] **Junk filter.** Trigger: junk facts seen in review. Add a
+      guardrail (restrict-to-topic or moderation) to
+      `aim_write_guardrails`, not a classifier decision.
 
 ## Backlog - explicitly "wait for a trigger" per the docs' own framing
 
