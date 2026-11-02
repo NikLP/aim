@@ -175,9 +175,10 @@ Each has a trigger in BACKLOG.md ("Write-path cuts, ADR-0065"):
 
 As decided, with these specifics:
 
-- **Settings change by update hook**, `aim_update_10014` (removes
-  `trust_policy`, `default_trusted` and `merge_max_distance`, renames the
-  modes, drops the RETIRE paragraph from the consolidation prompt as
+- **Settings change by update hook**, `aim_update_10014` (removed
+  2026-11-02 for a reinstall; it removed
+  `trust_policy`, `default_trusted` and `merge_max_distance`, renamed the
+  modes, dropped the RETIRE paragraph from the consolidation prompt as
   shipped or as saved by the form). Chosen over reinstalling this site:
   the amazee.io keys are stored in config and four OAuth consumers are
   registered, so a reinstall would have lost credentials and connectors,

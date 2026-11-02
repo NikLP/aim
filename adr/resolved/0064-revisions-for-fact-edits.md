@@ -115,14 +115,11 @@ It gets harder once real data exists.
 
 As decided, with these specifics:
 
-- **Schema change by update hook**, `aim_update_10015`
-  (`updateFieldableEntityType()` from the current definitions), not a
-  reinstall: same reason as ADR-0065's `aim_update_10014` (credentials
-  and OAuth consumers in config). Each existing fact gets one revision
-  with its writer (`uid`) and `created` as revision author and time and
-  the log message "Revision history starts here: earlier edits were not
-  recorded." Checked afterwards: the `aim_facts` View, the vector index
-  (33 rows before and after) and no pending entity definition updates.
+- **Schema change**: first applied to this site by an update hook, which
+  gave each existing fact one starting revision by its writer at its
+  creation time; removed 2026-11-02 with the other update hooks, since
+  the site is reinstalled. A fresh install creates `aim_fact_revision`
+  directly.
 - **The policy is `AimHooks::applyRevisionPolicy()`**, called first in
   `factPresave()`. A save that leaves `text` as it was is forced to
   `setNewRevision(FALSE)` and keeps the current revision's author, time

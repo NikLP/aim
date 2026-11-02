@@ -1010,14 +1010,10 @@ each documented in their own submodule now:
 ## Upgrading an existing site
 
 `config/install` does not re-run on an installed module and aim ships
-two update hooks (run `drush updatedb`): `aim_update_10014()` (ADR-0065's
-settings: removes `trust_policy`, `default_trusted` and
-`merge_max_distance`, renames the grounded check's modes
-`shadow`/`enforce` to `record`/`demote`, drops RETIRE from the
-consolidation prompt) and `aim_update_10015()` (ADR-0064: makes `aim_fact`
-revisionable, one starting revision per fact by its writer at its
-creation time). A site installed
-before 2026-09-26 needs the rest by hand. Fresh installs get all of it
+no update hooks (all removed 2026-11-02 for a reinstall;
+`aim_update_last_removed()` is 10015, so a site older than that must
+reinstall). The steps below are what a site installed before
+2026-09-26 needed by hand, kept for reference. Fresh installs get all of it
 from config and the shim.
 
 1. **Retired facts out of the index**
