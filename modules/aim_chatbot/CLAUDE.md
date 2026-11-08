@@ -41,6 +41,11 @@ Tool API invoker (`tool_ai_connector`), not because of anything here. The one ha
   is the switch: changing `chat_processor_plugin` back to
   `ai_assistant_api_processor` turns the gate off. Audit lines carry IDs
   only. Needs `literals_finder` to do anything; without it, a pass-through.
+  It also guards the assistant: `ai_agents` swallows a failed model call
+  and the plain processor then echoes the visitor's question back, so the
+  gate listens for the assistant's own agent finishing with `getLastError()`
+  set, shows the assistant's `error_message` and logs a warning.
+  Unit-tested in `tests/src/Unit/AimGateProcessorTest.php`.
 - Recall is not forced: `require_usage` is off on `tool:aim_recall`
   (shipped and in the `aim_demo_library` recipe, which also sets
   `max_loops` 7). Forcing it made `ai_agents` discard a correct answer

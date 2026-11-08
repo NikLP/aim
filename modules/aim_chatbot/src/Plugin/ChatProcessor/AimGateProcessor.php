@@ -10,12 +10,15 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\ai\Attribute\ChatProcessor;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\ai\OperationType\Chat\ChatOutput;
+use Drupal\ai_agents\Event\AgentFinishedExecutionEvent;
 use Drupal\ai_assistant_api\Data\UserMessage;
 use Drupal\ai_chatbot\Plugin\ChatProcessor\AiAssistantApiProcessor;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\literals\Entity\Literal;
 use Drupal\literals\LiteralReader;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Asks the literals finder before the assistant, so exact values are code.
@@ -26,6 +29,10 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * the plain processor would send it, tools included. The gate uses its own,
  * stricter finder thresholds: a hit is not checked by the chat model's
  * gist check, so it must be clear. It reads the last message only.
+ *
+ * It also reports a failed model call. ai_agents swallows a provider error
+ * and the plain processor then shows the visitor their own question back; here
+ * the assistant's configured error message is shown and a warning logged.
  */
 #[ChatProcessor(
   id: 'aim_chatbot_gate',
@@ -57,6 +64,16 @@ class AimGateProcessor extends AiAssistantApiProcessor {
   protected AccountInterface $currentUser;
 
   /**
+   * The event dispatcher, to see an agent's failed model call.
+   */
+  protected EventDispatcherInterface $eventDispatcher;
+
+  /**
+   * The aim logger channel.
+   */
+  protected LoggerInterface $logger;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
@@ -66,6 +83,8 @@ class AimGateProcessor extends AiAssistantApiProcessor {
     $instance->literalReader = $container->get('literals.reader');
     $instance->memoryManager = $container->get('aim.memory_manager');
     $instance->currentUser = $container->get('current_user');
+    $instance->eventDispatcher = $container->get('event_dispatcher');
+    $instance->logger = $container->get('logger.channel.aim');
     return $instance;
   }
 
@@ -113,7 +132,51 @@ class AimGateProcessor extends AiAssistantApiProcessor {
     if ($reply !== NULL) {
       return $reply;
     }
-    return parent::doExecute();
+    return $this->guardModelErrors(fn (): ChatOutput => parent::doExecute());
+  }
+
+  /**
+   * Runs the assistant, replacing a swallowed model failure with an error.
+   *
+   * @param callable $run
+   *   Runs the assistant and returns its ChatOutput.
+   *
+   * @return \Drupal\ai\OperationType\Chat\ChatOutput
+   *   The assistant's reply, or the assistant's error message when the
+   *   assistant's own agent could not get an answer from the model.
+   */
+  protected function guardModelErrors(callable $run): ChatOutput {
+    $error = NULL;
+    $listener = function (AgentFinishedExecutionEvent $event) use (&$error): void {
+      // Only the assistant's own agent: a failed sub-agent can be recovered
+      // from, and then the assistant still answers.
+      $assistant = isset($this->aiAssistantRunner) ? $this->aiAssistantRunner->getAssistant() : NULL;
+      if ($assistant && $event->getAgentId() !== (string) $assistant->get('ai_agent')) {
+        return;
+      }
+      $agent = $event->getAgent();
+      $message = method_exists($agent, 'getLastError') ? $agent->getLastError() : NULL;
+      if ($message !== NULL && $message !== '') {
+        $error = $message;
+      }
+    };
+    $this->eventDispatcher->addListener(AgentFinishedExecutionEvent::EVENT_NAME, $listener);
+    try {
+      $output = $run();
+    }
+    finally {
+      $this->eventDispatcher->removeListener(AgentFinishedExecutionEvent::EVENT_NAME, $listener);
+    }
+    if ($error === NULL) {
+      return $output;
+    }
+
+    $this->logger->warning('Chat model call failed, visitor shown the error message, uid @uid: @error', [
+      '@uid' => $this->currentUser->id(),
+      '@error' => mb_substr($error, 0, 200),
+    ]);
+    $text = str_replace('[error_message]', '', (string) $this->aiAssistantRunner->getAssistant()->get('error_message'));
+    return new ChatOutput(new ChatMessage('assistant', $text), $text, []);
   }
 
   /**
@@ -159,6 +222,10 @@ class AimGateProcessor extends AiAssistantApiProcessor {
     $resolved = $this->literalReader->resolveFound('match', $result->literals, $this->currentUser);
     $item = reset($resolved['items']);
     if (!$item) {
+      // The finder matched, but this visitor may not read the value.
+      $this->memoryManager->logAudit('Gate pass (match not readable), uid @uid.', [
+        '@uid' => $this->currentUser->id(),
+      ]);
       return NULL;
     }
     $key = (string) array_key_first($resolved['items']);

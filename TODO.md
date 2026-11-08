@@ -61,10 +61,14 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       where a fact names a value, so the widget needs no lookup call - a
       data-model choice for the recipe, not tuning to pass the eval.
 - [ ] **`aim:chatbot-eval` hides provider failures (found 2026-10-22).** When
-      the provider cannot be reached the agent swallows the error
+      the provider cannot be reached `ai_agents` swallows the error
       (`getLastError()`), so the eval reports 0 calls and the question
-      echoed back, not an error. Check `getLastError()` or zero calls and
-      report it; `aim:chatbot-converse` has the same gap.
+      echoed back, not an error. The gate processor now catches this for
+      visitors (2026-11-08); the evals call the runner directly and still
+      need the same check (`AgentFinishedExecutionEvent`, agent's
+      `getLastError()`), as does `aim:chatbot-converse`. Upstream:
+      `ai_assistant_api` never surfaces it, so the plain processor shows
+      the visitor their own question; file an issue.
 - [ ] **`aim:chatbot-eval` can't run anonymous questions.** With the demo
       assistant closed to anonymous, every gold question without `as:`
       errors "User does not have the required role to run the assistant"
@@ -78,9 +82,6 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       `AiAssistantApiRunner::userHasAccess()` tests
       `isset($chosen_roles['anonymous'])` on a list, so ticking only
       "anonymous" lets nobody but uid 1 in. Search the queue, then file.
-- [ ] **Processor test.** `AimGateProcessor` has no PHPUnit test; the finder
-      overrides and the "unavailable" outcome do. Also no test for the
-      chat remember permission check or the untrusted default.
 - [ ] **Review process.** Use `ai_logging`'s threads screen
       (`/admin/config/ai/logging/threads`) for reading chats; there is no
       verdict field, so labeling needs ai_eval or a small field. ai_eval
@@ -90,7 +91,8 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       its decisions are in `eval/DRAFT-eval-plan.md`; the assertion list
       there is mostly not yet kernel tests.
 - [ ] **Housekeeping.** `aim_chatbot`'s shipped block still uses the plain
-      processor (the demo recipe switches it to the gate). Recipe `literals_demo_library` does
+      processor (the demo recipe switches it to the gate), which echoes the
+      visitor's question when the model is down; only the gate reports it. Recipe `literals_demo_library` does
       not grant `view restricted literals` to authenticated. The `login` literal
       resolves to nothing for signed-in visitors (the widget is signed-in
       only), so "where do I log in" correctly finds nothing; the assistant
