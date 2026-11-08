@@ -225,10 +225,6 @@ only work to do is listed here.
       provider with the `decision` operation (no chat path, ADR-0037).
       Consolidation and the verifier keep their chat option: it is the
       baseline any chat provider can run; a decision model is the upgrade.
-- [ ] **Sovereignty wording is stale (Nik, 2026-10-22).** Local chat model
-      support is no longer forced, but ADR-0004 and CLAUDE.md decision 5
-      still say extraction/consolidation "must support Ollama". Add an
-      ADR-0004 addendum with the current position and fix decision 5.
 - [ ] **Grounded check follow-ups.** Per-model question text;
       `ingest_max_chars` and a passage limit for the decision call (untested
       above ~1,000 words); MCP `source_text` is only as verbatim as the

@@ -65,7 +65,7 @@ remains binding, it just has nothing left to build.
 | [0001](resolved/0001-storage-and-scope-model.md) | Storage and scope model | Accepted; scope-model deviation resolved 2026-09-15 |
 | [0002](resolved/0002-governance-deferred-guardrails-mandatory.md) | Governance deferred for PoC; Guardrails mandatory from day one | Resolved 2026-10-30: Guardrails on every write and the `trusted` gate built (flag 2026-09-28, override gated 2026-10-19, writer-based starting trust 2026-10-22); `trusted_by` in TODO.md, revisions built as 0064 |
 | [0003](resolved/0003-async-processing-dedicated-crontab.md) | Async processing via Queue API and a dedicated crontab, never `hook_cron` | Accepted; enqueue mechanism updated 2026-09-26; `hook_cron` kept as a stopgap for the expiry sweep only (0057) |
-| [0004](resolved/0004-sovereignty-and-poc-build-order.md) | Sovereignty option and zero-API-key PoC build order | Accepted - standing principle |
+| [0004](resolved/0004-sovereignty-and-poc-build-order.md) | Sovereignty option and zero-API-key PoC build order | Accepted - standing principle; a local chat model optional since the 2026-11-08 addendum |
 | [0005](resolved/0005-consolidation-algorithm.md) | Consolidation algorithm: ADD/UPDATE/DELETE/NOOP with soft supersede | Accepted - built |
 | [0006](resolved/0006-agent-native-write-path.md) | Agent-native write path bypassing extraction's LLM call | Accepted - built |
 | [0007](resolved/0007-user-scope-requires-real-account.md) | User-scope facts must reference a real Drupal account | Accepted - built; extraction mechanism superseded by 0011 |

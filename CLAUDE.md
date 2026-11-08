@@ -82,11 +82,13 @@ Binding until superseded. Full context in [adr/](adr/0000-index.md):
    One stopgap exception: the expiry sweep (`aim:expire`, no model call)
    also runs from `hook_cron`, because aim cannot promise a site a cron
    job ([ADR-0057](adr/0057-dates-resolved-and-confirmed-before-write.md)).
-5. **Sovereignty** - extraction/consolidation must support Ollama; hosted
-   providers are additional options, not replacements.
-   ([ADR-0004](adr/resolved/0004-sovereignty-and-poc-build-order.md))
-   **Temporary deviation (2026-10-02):** this site's consolidation and
-   verifier run on a hosted SystemOne-compatible decision endpoint
+5. **Sovereignty** - a local model is an option, not a requirement:
+   extraction/consolidation run on any `drupal/ai` chat provider, and
+   local chat-model support is no longer forced.
+   ([ADR-0004](adr/resolved/0004-sovereignty-and-poc-build-order.md)'s
+   addendum)
+   **On this site (since 2026-10-02):** consolidation, the verifier and
+   the grounded check run on a hosted SystemOne-compatible decision endpoint
    (synthetic/demo data only); the chat path and
    `DecisionBackend` stay so a local decision model can be switched back
    in per activity. ([ADR-0021](adr/0021-jev-typed-decision-provider.md),

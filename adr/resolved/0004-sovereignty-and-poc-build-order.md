@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 **Date:** 2026-09-08, ongoing
+**Addendum 2026-11-08:** a local chat model is no longer required; see the
+end of this record.
 
 ## Context
 
@@ -64,3 +66,18 @@ API keys, zero recurring cost, for the schema/logic-proving phase.
   underneath the project mid-build (`titan-embed-text-v2:0` removed,
   `mistral-embed` the only replacement) - see README.md's "Setting up
   vector search" runbook, written directly from this incident.
+
+## Addendum (2026-11-08): a local chat model is optional
+
+The position since 2026-10-22, replacing "must support" in the decision
+above: aim does not require a local chat model for extraction or
+consolidation. Both run on any `drupal/ai` chat provider, Ollama included,
+and a change no longer has to keep working on a local chat model.
+
+The chat path of consolidation and the verifier stays, because it is the
+baseline any chat provider can run (decision providers are rare and a
+decision model is the upgrade), not on sovereignty grounds.
+
+Unchanged: a deployment whose data must not leave still needs local models
+for every activity, and a hosted provider can expose what is sent to it.
+The embeddings position and the PoC build order stand.
