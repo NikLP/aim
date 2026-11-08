@@ -220,7 +220,9 @@ each with its own requirements and setup:
 
 To see it working with a story already loaded, apply the
 [community library demo recipe](recipes/aim_demo_library/README.md) to a
-fresh site (untested so far, see its README).
+fresh site (untested so far, see its README). For one person's own memory
+in Claude, on a site of its own, there is
+[`aim_personal`](recipes/aim_personal/README.md).
 
 Full command reference and the developer API are in
 [DEVELOPING.md](DEVELOPING.md). What is tested, and what is not yet, is in

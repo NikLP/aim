@@ -1,0 +1,98 @@
+name: 'AIM: personal memory'
+description: 'One person''s long-term memory, reached from Claude or another MCP client over OAuth. Keeps the user and case scopes, and has no chat widget and no public registration. Apply to a site of its own.'
+type: 'AIM instance'
+input:
+  owner_name:
+    data_type: string
+    description: 'The name of the person this memory belongs to, as the model should refer to them.'
+    prompt:
+      method: ask
+      arguments:
+        question: 'Whose memory is this?'
+    default:
+      source: value
+      value: 'the site owner'
+install:
+  - aim
+  - aim_tool
+  - aim_tool_oauth
+  - tool
+  - mcp_server
+  - mcp_server_tool_bridge
+  - mcp_server_oauth
+  - consumers
+  - simple_oauth
+  - simple_oauth_21
+  - simple_oauth_server_metadata
+  - simple_oauth_client_registration
+  - simple_oauth_pkce
+  - search_api
+config:
+  strict: true
+  # Core installs a recipe's modules in config-syncing mode, which skips each
+  # module's config/install (dependencies included), so import it here.
+  import:
+    ai_vdb_provider_mariadb: '*'
+    aim: '*'
+    aim_tool_oauth: '*'
+    consumers: '*'
+    literals: '*'
+    mcp_server: '*'
+    mcp_server_oauth: '*'
+    mcp_server_tool_bridge: '*'
+    simple_oauth: '*'
+    simple_oauth_21: '*'
+    simple_oauth_server_metadata: '*'
+    simple_oauth_client_registration: '*'
+    simple_oauth_pkce: '*'
+  actions:
+    # What this instance is for: every MCP client reads this when it connects,
+    # ahead of the guidance aim_tool_oauth adds.
+    mcp_server.settings:
+      simpleConfigUpdate:
+        server_instructions: "This is the personal memory of ${owner_name}, the only person who uses it. It holds what ${owner_name} has chosen to keep: treat it as their own notes, not as an organization's knowledge."
+    # The account is the only way in, and the site is on the public internet.
+    user.settings:
+      simpleConfigUpdate:
+        register: admin_only
+    # hook_install() stores this as an absolute URL from the host it ran on,
+    # which a remote client can't reach. Empty means each request's host.
+    simple_oauth_server_metadata.settings:
+      simpleConfigUpdate:
+        registration_endpoint: ''
+    # aim_tool_oauth_install() puts these on the tool configs, but in a recipe
+    # it runs before they are imported and finds none. Without them the tools
+    # ask for no scope.
+    mcp_server_tool_bridge.mcp_tool_config.aim_remember:
+      setThirdPartySettings:
+        - { module: mcp_server_oauth, key: authentication_mode, value: required }
+        - { module: mcp_server_oauth, key: scopes, value: ['aim:remember'] }
+    mcp_server_tool_bridge.mcp_tool_config.aim_recall:
+      setThirdPartySettings:
+        - { module: mcp_server_oauth, key: authentication_mode, value: required }
+        - { module: mcp_server_oauth, key: scopes, value: ['aim:recall'] }
+    mcp_server_tool_bridge.mcp_tool_config.aim_brief:
+      setThirdPartySettings:
+        - { module: mcp_server_oauth, key: authentication_mode, value: required }
+        - { module: mcp_server_oauth, key: scopes, value: ['aim:recall'] }
+    # One person: everything is about them or about one of their projects.
+    aim.aim_scope.site:
+      disable: []
+    aim.aim_scope.role:
+      disable: []
+    aim.aim_scope.entity:
+      disable: []
+    aim.aim_scope.user:
+      setProperties:
+        description: "about the owner of this memory: who they are, how they like to work, the people and things in their life, and anything else worth keeping that belongs to no one project. Omit the subject."
+    # So a fact told to the model is searchable on the next question. Suits
+    # local embeddings (ADR-0015 addendum); with hosted embeddings each save
+    # ties up a worker for seconds, so drop this action.
+    search_api.index.aim_vector_index:
+      setProperties:
+        options.index_directly: true
+    # For nomic-embed-text, as in aim_demo_library: loose enough that the
+    # calling model judges relevance. Not tuned on personal data.
+    aim.settings:
+      simpleConfigUpdate:
+        recall_max_distance: 0.6

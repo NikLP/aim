@@ -147,7 +147,8 @@ unless noted; synthetic data only for hosted Jev.
 
 ## Automated tests (C)
 
-90 tests, none calls a provider (`FakeDecisionBackend`, which answers
+90 kernel and unit tests, plus `AimPersonalRecipeTest`, a functional test
+that applies the recipe to a fresh test site. None calls a provider (`FakeDecisionBackend`, which answers
 from scripted values; `ScriptedMergeConsolidationService` stands in for the
 merge writer's chat call; the vector search is stubbed by
 `FakeVectorSearchTrait`, since the real server needs MariaDB vectors).

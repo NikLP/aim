@@ -95,7 +95,7 @@ falls back to the tool definition only when it is empty). The MCP server
 instructions come from `aim_tool_oauth`, reading the same guide.
 
 `aim_remember`'s reply adds "Waiting for staff review: recall will not
-return it until it is approved." for an untrusted fact and "It retires
+return it until a reviewer trusts it." for an untrusted fact and "It retires
 after YYYY-MM-DD." when `expires` is set, per fact in a batch too (the same
 idea as `aim_chatbot`'s remember reply).
 

@@ -264,7 +264,7 @@ final class AimRemember {
   private function statusNote(array $fact): string {
     $note = '';
     if (!$fact['trusted']) {
-      $note .= ' Waiting for staff review: recall will not return it until it is approved.';
+      $note .= ' Waiting for staff review: recall will not return it until a reviewer trusts it.';
     }
     if ($fact['expires']) {
       $note .= ' It retires after ' . gmdate('Y-m-d', $fact['expires']) . '.';

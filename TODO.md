@@ -113,15 +113,27 @@ gate are built. Work on the literals modules themselves is in
       stored history; a friendlier reply than the bare template (our own
       wording: a decision model cannot write text); latency on a local decision model unmeasured; a gate-hit line in the
       review queue (design in `modules/aim_chatbot/CLAUDE.md`).
+- [ ] **literals tests: `@group` doc-comments to `#[Group]` attributes**
+      (raised 2026-11-03). All 14 test classes in literals and its
+      submodules use `@group`, which PHPUnit 12 drops; only
+      `LiteralChooserTest` (unit) warns so far. Use
+      `PHPUnit\Framework\Attributes\Group`, as core does. Not urgent: it
+      only breaks with Drupal 12. Suites and phpstan were all green against
+      the 2026-10-28 `ai` security update.
 
 ## Plugin and skills (raised 2026-10-09, important)
 
-- [ ] **A Claude Code plugin for aim.** Bundle the skills (`aim-discovery`,
-      `aim-memory`, the ones below), the MCP server config with its OAuth
-      endpoint, and the tools (`aim_recall`, `aim_remember`, `aim_literal`).
-      MCP tools alone do not tell a model *when* to use them; the skills do.
-      Build once the grill-to-recipe skill exists, so version one has
-      something to show. Needs an ADR.
+- [ ] **A Claude plugin per instance
+      ([ADR-0066](adr/0066-one-instance-one-recipe.md), proposed).** One
+      format covers chat, Cowork and Claude Code, with a fixed connector
+      URL. It carries what a connector can't: a chat version of the grill
+      (today's skills run `ddev drush`) and, for the library, a `/library`
+      persona. The server instructions already say when to use the tools,
+      so try the connector alone first.
+- [ ] **Run `aim_personal` on a real site (ADR-0066).** Only tested on a test
+      site, with no model call or real sign-in. Decide where a second site
+      runs, then check a connector connects as uid 1, a fact saves and
+      recalls, and what `aim:extract` does with the disabled scopes.
 - [ ] **Move `skills/` to `.agents/skills/` (raised 2026-10-25).** The
       convention `ai`, `tool` and `mcp_server` already use (Marcus
       Johansson's talk: drupal.org's knowledge base detects

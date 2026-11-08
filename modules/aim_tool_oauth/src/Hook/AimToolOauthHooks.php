@@ -37,7 +37,7 @@ class AimToolOauthHooks {
   #[Hook('mcp_server_instructions_alter')]
   public function mcpServerInstructionsAlter(?string &$instructions): void {
     $aim = <<<TEXT
-    This server is AIM, the site's long-term memory: short facts that staff have approved, not conversation transcripts.
+    This server is AIM, the site's long-term memory: short facts, not conversation transcripts. Recall returns only trusted facts: written by someone permitted to trust them, or accepted by a reviewer.
 
     - At the start of work, call aim_brief once for the newest facts about the site, your roles and you.
     - Call aim_recall before answering anything a stored fact could change, rather than relying on what is already in the conversation. Results are the nearest facts and may not answer the question: use only those that do. If none do, or the reply is "No relevant facts found", nothing is recorded; say so rather than guessing.

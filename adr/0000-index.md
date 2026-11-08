@@ -52,6 +52,7 @@ Still carrying work, proposed, or deferred.
 | [0058](0058-htmx-4-for-admin-forms.md) | htmx 4 for self-saving admin controls: per-row trusted toggle and the role-visibility matrix as candidates | Proposed 2026-10-13 - feasibility study only, nothing built |
 | [0061](0061-how-aim-uses-literals.md) | How aim uses literals: tokens replaced at recall as the viewer, `aim_literal` over `literals.lookup`, the finder as a gate ahead of the chat model (measured), no scope or mirror; convert-a-fact, finder as a recall source and answer modes designed | Built 2026-10-08 to 10-15 (sections 1-2); section 3 unbuilt, tracked in TODO.md; split out of 0040 2026-10-23 |
 | [0059](0059-single-valued-category-and-ingress-labelling.md) | Single-valued, indexed `category` that recall can filter on, set on every write route (labelled on ingress); free tagging becomes a scope-module concern | Accepted 2026-10-30 for single-valued `category`; the rest proposed (now including the generic `recall()` filter seam from 0030), nothing built |
+| [0066](0066-one-instance-one-recipe.md) | One instance, one recipe, one plugin: each use of AIM on its own site, its purpose in `server_instructions`, a plugin only for what a connector can't carry | Proposed 2026-11-07; `aim_personal` drafted and tested on a test site, no plugin built |
 
 ## Resolved
 

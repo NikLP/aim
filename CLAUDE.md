@@ -117,7 +117,7 @@ aim/                    ← root module (always required), ships the five scopes
 │   ├── aim_tool/        ← Tool API + MCP exposure, any scope
 │   ├── aim_tool_oauth/  ← OAuth2 scopes for remote MCP callers
 │   └── aim_benchmark/   ← synthetic fact generation, aim:benchmark commands
-├── recipes/             ← Drupal Recipes, one dir each (aim_demo_library)
+├── recipes/             ← Drupal Recipes, one dir each (aim_demo_library, aim_personal)
 └── adr/                 ← decision records, see 0000-index.md
 ```
 

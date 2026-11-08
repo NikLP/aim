@@ -1278,6 +1278,16 @@ ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>  # de
   (its pre-flight and reset steps are in the recipe README) is reset with it. The first archetype
   starter kit ([ADR-0014](adr/resolved/0014-usecase-archetype-starter-kits.md)).
   Details and caveats in its [README](recipes/aim_demo_library/README.md).
+- **`aim_personal`**: one person's memory over MCP and OAuth, on a site of
+  its own: `user` and `case` scopes only, a purpose statement in
+  `server_instructions`, no widget, closed registration
+  ([ADR-0066](adr/0066-one-instance-one-recipe.md),
+  [README](recipes/aim_personal/README.md)).
+- **A recipe installing `aim_tool_oauth` must set the tools' OAuth scopes.**
+  Modules install in config-syncing mode, so `aim_tool_oauth_install()` runs
+  before the tool configs are imported, finds none and stays silent.
+  `aim_personal` sets them with `setThirdPartySettings` actions, and
+  `AimPersonalRecipeTest` fails without them.
 - **Scripted tests carry chat history.** The demo assistant uses
   `allow_history: private_tempstore_pool`, so running it twice in one PHP
   process (one `drush php:eval`, say) carries the first question's history

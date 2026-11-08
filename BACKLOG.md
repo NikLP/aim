@@ -651,6 +651,17 @@ would bring each back. Nothing here is built.
 - [ ] **Junk filter.** Trigger: junk facts seen in review. Add a
       guardrail (restrict-to-topic or moderation) to
       `aim_write_guardrails`, not a classifier decision.
+- [ ] **Human gate on merges** (raised 2026-11-07). Permissions gate every
+      written fact, but a merge of two trusted facts is trusted on the model
+      checks alone (`createMergedFact()`), retires both inputs, and no person
+      reads the new text; no setting holds it. Trigger: a site needs every
+      recalled fact reviewed by a person. Then make a merge a proposal: both
+      inputs stay live and trusted, the merged text waits for a reviewer,
+      and the inputs retire only when it is accepted. Saving the merge
+      untrusted and retiring the inputs at once won't do: recall loses two
+      good facts until someone reviews it, which is why a merge that fails
+      the checks keeps both (ADR-0065). Needs a pending-merge state and adds
+      to the review queue.
 
 ## Backlog - explicitly "wait for a trigger" per the docs' own framing
 
