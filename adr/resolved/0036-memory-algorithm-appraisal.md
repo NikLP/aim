@@ -252,7 +252,7 @@ preprints or vendor blogs, not re-run by us):
 | Failure mode (don't) | aim, 2026-10-27 |
 | --- | --- |
 | Delete superseded facts | OK: soft retire with `superseded_by` and a reason |
-| Let one write steer behavior long-term (poisoning) | OK: trust gate, Guardrails, chat writes held |
+| Let one write steer behavior long-term (poisoning) | OK for untrusted writers: their facts wait for review. Since 2026-11-01 (ADR-0065) the gate is the writer's trust permission; a trusted writer or agent that is manipulated is the accepted residual, and Guardrails check only length and markup (ADR-0065's 2026-11-08 addendum) |
 | Store raw turns | OK: short single-claim facts |
 | Judge memory by retrieval scores alone | OK: site's chat eval scores answers end to end |
 | Temporary overwriting | Fixed today: facts with different `expires` are never compared; a merge carries `expires` |

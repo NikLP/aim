@@ -207,3 +207,36 @@ As decided, with these specifics:
   `AimRememberService::trustValues()`. The remember service, the
   `trusted` default value callback and the field access all ask the
   handler.
+
+## Addendum (2026-11-08): memory poisoning
+
+The review gate existed to stop memory poisoning: a false fact saved
+once and recalled as true to everyone after
+([ADR-0010](0010-drupal-native-agent-memory-rationale.md)'s "Memory
+poisoning", [ADR-0008](0008-chatbot-integration-mechanism.md)'s visitor
+case). This decision moves that defense onto permissions. Stated here
+because the decision above does not use the word.
+
+- **Covered: writers the site does not trust.** A visitor, a member, a
+  non-admin MCP token (`aim:remember` grants no trust permission) or a
+  Drush `--uid` without trust writes facts that wait for a person. On
+  this site that is stricter than before: `default_trusted` was on, so a
+  non-reviewer's MCP, ingest and Drush writes went live unreviewed.
+- **Not covered: a trusted writer manipulated into a false write.** An
+  agent on a trust-granting account (an admin token, Claude Code with a
+  reviewer's `--uid`) that reads injected content, or an extraction of
+  content someone less trusted wrote, run as a trusted account, saves a
+  trusted fact. The grounded check does not help: it scores whether the
+  fact is stated in the source, not whether the source is true, so a
+  poisoned document gives a well-grounded fact. Accepted residual risk.
+  The remedy today is to run agents and extraction of third-party content
+  as accounts without trust permission; the per-channel exception in
+  BACKLOG.md ("Write-path cuts") is the trigger to do more.
+- **Guardrails do not check meaning.** `aim_write_guardrails` ships
+  length and markup checks only. A semantic check (moderation or
+  restrict-to-topic, both in `drupal/ai`) can be added to the set and
+  runs on every write path; none is shipped.
+- **Merges are not an entry point.** Only trusted facts are consolidated,
+  so a merge can distort a trusted claim (the verifier and grounded check
+  guard that) but cannot bring in a new one. A merge has no human gate
+  either way (BACKLOG.md "Human gate on merges").

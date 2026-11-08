@@ -459,7 +459,9 @@ fact the extraction step proposes is untrusted input and should run through
 Guardrails before it's written anywhere - an automated first pass sitting in
 front of the draft-to-trusted Content Moderation gate already decided.
 Two-layer defense, not either/or: Guardrails catches the obvious cases fast,
-human review catches the judgment calls.
+human review catches the judgment calls. (As built, 2026-11-08: the write
+Guardrails check length and markup only, and review applies to writers
+without trust permission; see ADR-0065's poisoning addendum.)
 
 **CCC (Context Control Center)** - governed, moderated, revisioned, scoped
 context (brand voice, terminology, domain knowledge) injected into AI

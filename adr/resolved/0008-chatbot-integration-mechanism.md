@@ -5,7 +5,9 @@
 tools, scope set by the visitor's permissions): the `#[FunctionCall]`
 plugins and the hardcoded `scope: site` below are gone. The split-assistants
 addendum is moot: its prerequisite (a permission check in the remember
-tool) came with ADR-0062, chat writes start on `hold`, and the split
+tool) came with ADR-0062, a visitor's fact waits for review unless their
+role may trust facts in its scope (ADR-0065, whose 2026-11-08 addendum
+states the poisoning stance), and the split
 itself is parked in BACKLOG.md. Still standing: the CCC decision (aim
 exposes tools; CCC, if enabled, holds the policy on when to use them; no
 code either way).

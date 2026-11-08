@@ -651,6 +651,13 @@ would bring each back. Nothing here is built.
 - [ ] **Junk filter.** Trigger: junk facts seen in review. Add a
       guardrail (restrict-to-topic or moderation) to
       `aim_write_guardrails`, not a classifier decision.
+- [ ] **Contradiction check on trusted writes** (raised 2026-11-08).
+      Trigger: same as the per-channel exception (a manipulated trusted
+      writer). A trusted writer's fact that contradicts an existing trusted
+      fact goes to review instead of live: changing an established fact is
+      where poisoning bites (ADR-0065's 2026-11-08 addendum). Demote-style
+      like the grounded check, not a guardrail (those can only reject).
+      Consolidation's UPDATE already spots it, but after the fact is live.
 - [ ] **Human gate on merges** (raised 2026-11-07). Permissions gate every
       written fact, but a merge of two trusted facts is trusted on the model
       checks alone (`createMergedFact()`), retires both inputs, and no person

@@ -1,9 +1,13 @@
 # ADR-0016: Document ingestion via a Drupal form - three modes, one shared core
 
-**Status:** Mode 1 built 2026-10-02. Mode 2 design only, not built; no
-longer blocked (2026-10-30): the gate it waited on exists as the `trusted`
-flag plus per-channel starting trust, so a Mode 2 scan can start its
-facts untrusted (ADR-0002's addendum, ADR-0037's addenda). Mode 3 out of
+**Status:** Mode 1 built 2026-10-02. Mode 2 design only, not built. The
+gate it waited on exists (the `trusted` flag), but since ADR-0065 a fact
+starts trusted when its writer may trust, and per-channel starting trust
+is gone: a Mode 2 scan run by a reviewer would save trusted facts from
+content someone less trusted wrote, the poisoning case in ADR-0065's
+2026-11-08 addendum. So Mode 2 must write as an account without trust
+permission, or bring back a channel exception (BACKLOG.md "Write-path
+cuts"); decide that before building it. Mode 3 out of
 scope, named only to draw the boundary; "does aim keep source text" is
 now partly answered by ADR-0060 (model-call prompts, including source
 passages, are logged in `ai_log`, not kept for re-analysis).
@@ -132,9 +136,9 @@ different feature (persistence), not a bigger version of Mode 1 or 2.
 - Mode 1 needs neither Mode 3's open storage question resolved nor
   ADR-0002's gate built - it's a thin, low-risk UI addition on an
   already-trusted write path, and can ship on its own.
-- Mode 2 needs ADR-0002's gate built first. Building Mode 1 does not
-  imply Mode 2 is close behind - it's blocked on a real prerequisite, not
-  just unscheduled.
+- Mode 2 needs its facts to start untrusted whoever runs it (see the
+  status line: the gate exists, but under ADR-0065 a reviewer's scan
+  would start trusted).
 - `source` gains a second real provenance convention (`entity:type/id`)
   alongside the existing `extract:filename` and minted `case-xxxxxxxx`
   formats - no schema change, `source` is already a plain string field.

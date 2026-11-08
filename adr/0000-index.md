@@ -36,7 +36,7 @@ Still carrying work, proposed, or deferred.
 
 | ADR | Title | Status |
 | --- | --- | --- |
-| [0016](0016-document-ingestion-ui.md) | Document ingestion via a Drupal form: three modes, one shared core | Mode 1 built 2026-10-02; Mode 2 unblocked (the trust gate exists), not built; Mode 3 out of scope |
+| [0016](0016-document-ingestion-ui.md) | Document ingestion via a Drupal form: three modes, one shared core | Mode 1 built 2026-10-02; Mode 2 not built, and must write untrusted whoever runs it (ADR-0065); Mode 3 out of scope |
 | [0021](0021-jev-typed-decision-provider.md) | Decision models: a hosted SystemOne-compatible endpoint is the live path, local models measured and parked; absorbs the former 0033 (processing modes) and 0038 (local models, small-machine runbook) | Accepted as current state, rewritten 2026-10-11; pass bar, retention and per-model config open (TODO.md) |
 | [0024](0024-annotations-integration-target-scoped-promotion.md) | Annotations bridge: facts scoped to annotation targets, review as promotion; absorbs the former 0041 (Webform pre-fill) and 0042 (fact-compiled briefs) | Proposed - design only; prerequisites cleared (the `trusted` flag built, Annotations has a write path, `scope: entity` built); bridge module unbuilt |
 | [0029](0029-context-carrying-turns.md) | Context-carrying turns: mention tokens, an API-first console with context chips, `batch_id` provenance, one review pipeline | Parked 2026-10-30 (accepted 2026-09-30) - nothing built; trimmed to mention tokens, the console and `batch_id` |
