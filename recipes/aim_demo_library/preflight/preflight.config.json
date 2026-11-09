@@ -3,5 +3,6 @@
   "chatExpect": "(12|noon).*(4|four)",
   "mcpQuestion": "When is the library open on Sundays?",
   "mcpExpect": "Sunday",
-  "noAnswer": "Where can I park?"
+  "noAnswer": "Where can I park?",
+  "configIgnoreModules": ["image"]
 }

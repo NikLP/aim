@@ -18,12 +18,17 @@ config:
   strict: true
   # Core installs a recipe's modules in config-syncing mode, which skips each
   # module's config/install (dependencies included), so import it here.
+  # Preflight's "module config imported" check finds any module left out.
+  # image is left out on purpose: the base recipe sets up image styles.
   import:
+    ai_agents: '*'
+    ai_logging: '*'
     ai_vdb_provider_mariadb: '*'
     aim: '*'
     aim_chatbot: '*'
     literals: '*'
     literals_finder: '*'
+    taxonomy: '*'
   actions:
     system.site:
       simpleConfigUpdate:

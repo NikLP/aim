@@ -19,6 +19,31 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
       maintainer's request. When it lands: add `?Invoker $invoker = NULL`
       to `aim_remember` and delete the subscriber.
 
+## Settings defaults live in code (raised 2026-11-09)
+
+Found on the habanero demo site: a setting missing from `aim.settings`
+falls back silently to a constant in `AimSettings`, so the live value is
+invisible and a blank form field never saves one.
+
+- [ ] **Ship the missing keys.** `activities.grounding.threshold` (0.7) and
+      `activities.grounding.max_questions` (16) are not in
+      `config/install/aim.settings.yml` (`getGroundingThreshold()`,
+      `getGroundingMaxQuestions()` fall back; the form saves a threshold
+      only when non-empty). Add both, plus the schema entries if absent.
+- [ ] **Remove the in-code fallbacks** (decided direction, not yet
+      agreed): `DEFAULT_COMPARE_DISTANCE`, `DEFAULT_NEIGHBOR_LIMIT`,
+      `DEFAULT_RECALL_MAX_DISTANCE`, `GROUNDING_DEFAULT_THRESHOLD`,
+      `GROUNDING_MAX_QUESTIONS` in `src/Service/AimSettings.php`, so config
+      is the only source and a missing key is an error, not a silent
+      default. Cost: every test and recipe that builds `aim.settings` needs
+      the keys set (no update hook, per the PoC rule). Not settings
+      fallbacks, leave alone: `HNSW_M`, cache `TTL`, ingest `MAX_BYTES`,
+      tool/chat `MAX_LIMIT`/`RESULT_LIMIT`.
+- [ ] **`aim:status` check** for the grounding threshold and `max_questions`
+      (only when `grounding_mode` is not `off`), mirroring
+      `checkRecallCutoff()`; mostly redundant once the fallbacks are gone,
+      so build only if they stay.
+
 ## Chat quality and evals: open after the 2026-10-15/16 session
 
 State: recall not forced (`require_usage` off since 2026-10-22, see

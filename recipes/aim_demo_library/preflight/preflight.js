@@ -175,6 +175,30 @@ async function askWidget(page, question) {
       if (tests) throw new Error(tests + ' leftover test facts (ZZ...)');
       return `${live} live facts`;
     });
+    // Core installs a recipe's modules in config-syncing mode, which skips
+    // their config/install (dependencies included): the recipe's config.import
+    // must name each module, or its entities (a view, a log type) are missing.
+    await check('every enabled module\'s default config is imported', async () => {
+      const ignore = JSON.stringify(cfg.configIgnoreModules || []);
+      const missing = JSON.parse(php(`
+        $have = array_flip(\\Drupal::configFactory()->listAll());
+        $ignore = ${ignore};
+        $out = [];
+        foreach (\\Drupal::moduleHandler()->getModuleList() as $m => $e) {
+          if (in_array($m, $ignore, TRUE) || !is_dir($e->getPath() . '/config/install')) {
+            continue;
+          }
+          foreach (glob($e->getPath() . '/config/install/*.yml') as $f) {
+            if (!isset($have[basename($f, '.yml')])) {
+              $out[$m][] = basename($f, '.yml');
+            }
+          }
+        }
+        echo json_encode($out);
+      `) || '[]');
+      const mods = Object.keys(missing);
+      if (mods.length) throw new Error(mods.map((m) => m + ': ' + missing[m].join(', ')).join('; ') + ' (add the module to the recipe\'s config.import, or to configIgnoreModules)');
+    });
     // ai_logging.settings is site-wide and a reinstall resets it to off;
     // aim:status passes that, but the demo shows real model calls in ai_log.
     await check('model-call logging on, with the finder tag', async () => {
