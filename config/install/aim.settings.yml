@@ -44,7 +44,7 @@ consolidation_prompt: |
   Candidate fact: "{candidate_text}"
 
   Choose one decision:
-  - "ADD": the two facts are genuinely different and both should be   kept as-is.
+  - "ADD": the two facts are genuinely different and both should be kept as-is.
   - "UPDATE": the candidate refines, corrects, or supersedes the existing fact
   (e.g. a changed preference). Provide a single merged statement in merged_text
   that replaces the existing fact's text.

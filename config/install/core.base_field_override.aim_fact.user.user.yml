@@ -10,7 +10,7 @@ bundle: user
 label: 'Subject (user)'
 description: 'The real Drupal account this fact is about, when scope is user. A fact cannot be about a person with no account on this site; unlike subject, this is a real reference, not a free-text string that merely happens to hold a uid.'
 required: true
-translatable: true
+translatable: false
 default_value: {  }
 default_value_callback: ''
 settings:

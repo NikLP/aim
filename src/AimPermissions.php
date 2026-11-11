@@ -15,7 +15,7 @@ use Drupal\aim\Entity\AimScope;
  * Provides dynamic per-scope permissions for installed AimScope entities.
  *
  * Called as a permission_callbacks entry in aim.permissions.yml.
- * aim_fact's four scopes are real aim_scope config entities (see
+ * aim_fact's five scopes are real aim_scope config entities (see
  * CLAUDE.md's "Scope as a config entity" section), so
  * BundlePermissionHandlerTrait::generatePermissions() can be used directly,
  * same as node's NodePermissions - each generated permission carries its
@@ -35,6 +35,12 @@ class AimPermissions implements ContainerInjectionInterface {
   use BundlePermissionHandlerTrait;
   use StringTranslationTrait;
 
+  /**
+   * Constructs an AimPermissions object.
+   *
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   The entity type manager.
+   */
   public function __construct(
     protected EntityTypeManagerInterface $entityTypeManager,
   ) {}

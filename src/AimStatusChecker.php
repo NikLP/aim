@@ -8,6 +8,8 @@ use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Queue\DatabaseQueue;
+use Drupal\Core\Queue\QueueFactory;
 use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\AiVdbProviderPluginManager;
 use Drupal\aim\Service\AimSettings;
@@ -49,6 +51,9 @@ final class AimStatusChecker {
    * @param \Drupal\ai\AiProviderPluginManager $aiProvider
    *   The AI provider plugin manager, used to confirm the configured models
    *   still exist with their providers.
+   * @param \Drupal\Core\Queue\QueueFactory $queueFactory
+   *   The queue factory, used to count the consolidation queue on whatever
+   *   backend the site runs it on.
    */
   public function __construct(
     protected Connection $database,
@@ -59,6 +64,7 @@ final class AimStatusChecker {
     protected TimeInterface $time,
     #[Autowire(service: 'ai.provider')]
     protected AiProviderPluginManager $aiProvider,
+    protected QueueFactory $queueFactory,
   ) {}
 
   /**
@@ -119,22 +125,39 @@ final class AimStatusChecker {
    *   ['label' => string, 'ok' => bool, 'detail' => string].
    */
   private function checkConsolidationQueue(): array {
+    $queue = $this->queueFactory->get('aim_consolidate');
+    $items = (int) $queue->numberOfItems();
+
+    if ($items === 0) {
+      return [
+        'label' => 'Consolidation queue draining',
+        'ok' => TRUE,
+        'detail' => 'queue is empty',
+      ];
+    }
+
+    // The Queue API has no item age, so it is only measured on the database
+    // queue, where the item table can be read. Any other backend reports the
+    // count alone and cannot tell a stuck queue from a busy one.
+    if (!$queue instanceof DatabaseQueue) {
+      return [
+        'label' => 'Consolidation queue draining',
+        'ok' => TRUE,
+        'detail' => "$items item(s) waiting, age not measurable on this queue backend - check that `drush queue:run aim_consolidate` is in the crontab (ADR-0003)",
+      ];
+    }
+
     $query = $this->database->select('queue', 'q');
     $query->condition('q.name', 'aim_consolidate');
-    $query->addExpression('COUNT(*)', 'items');
     $query->addExpression('MIN(q.created)', 'oldest');
-    $result = $query->execute()->fetchAssoc();
-    $items = (int) ($result['items'] ?? 0);
-    $age = $items > 0 ? $this->time->getRequestTime() - (int) $result['oldest'] : 0;
+    $age = $this->time->getRequestTime() - (int) $query->execute()->fetchField();
 
     return [
       'label' => 'Consolidation queue draining',
-      'ok' => $items === 0 || $age < 7200,
-      'detail' => $items === 0
-        ? 'queue is empty'
-        : ($age < 7200
-          ? "$items item(s) waiting, oldest " . (int) ($age / 60) . ' minute(s) old'
-          : "$items item(s) waiting, the oldest " . (int) ($age / 3600) . ' hour(s) old - add `drush queue:run aim_consolidate` to the crontab (ADR-0003)'),
+      'ok' => $age < 7200,
+      'detail' => $age < 7200
+        ? "$items item(s) waiting, oldest " . (int) ($age / 60) . ' minute(s) old'
+        : "$items item(s) waiting, the oldest " . (int) ($age / 3600) . ' hour(s) old - add `drush queue:run aim_consolidate` to the crontab (ADR-0003)',
     ];
   }
 
@@ -209,13 +232,19 @@ final class AimStatusChecker {
     // MariaDB-only per ADR-0001, so this isn't reachable on another
     // driver today, but nothing about the query itself should assume
     // that.)
-    $factIds = $this->entityTypeManager->getStorage('aim_fact')->getQuery()
-      ->accessCheck(FALSE)
-      ->execute();
+    // The item ID ends in the fact's own langcode (the site's single
+    // operating language, not necessarily "en"), so read it with the ID.
+    $entityType = $this->entityTypeManager->getDefinition('aim_fact');
+    $idKey = $entityType->getKey('id');
+    $langKey = $entityType->getKey('langcode');
+    $facts = $this->database->select($entityType->getBaseTable(), 'f')
+      ->fields('f', [$idKey, $langKey])
+      ->execute()
+      ->fetchAll(\PDO::FETCH_NUM);
 
     $query = $this->database->select('aim_fact_vectors', 'v');
-    if ($factIds) {
-      $entityIds = array_map(static fn (int|string $id): string => "entity:aim_fact/$id:en", $factIds);
+    if ($facts) {
+      $entityIds = array_map(static fn (array $row): string => "entity:aim_fact/$row[0]:$row[1]", $facts);
       $query->condition('v.drupal_entity_id', $entityIds, 'NOT IN');
     }
 
@@ -387,6 +416,30 @@ final class AimStatusChecker {
     }
 
     $problems = [];
+    // The vector server's own two model IDs are per-site (DEVELOPING.md,
+    // "Setting up vector search"): the shipped values name this site's
+    // providers, so a fresh site has to repoint them. chat_model is checked
+    // the way the backend's own status page does (against the option list);
+    // embeddings_engine only for being set with a usable provider, since the
+    // stored model name is the provider's own (Ollama's has a ":latest" the
+    // option key lacks) and indexing works with it.
+    $server = $this->configFactory->get('search_api.server.aim_vector')->get('backend_config') ?? [];
+    $chatModel = (string) ($server['chat_model'] ?? '');
+    if (!isset($this->aiProvider->getSimpleProviderModelOptions('chat')[$chatModel])) {
+      $problems[] = 'vector server chat_model: ' . ($chatModel === '' ? 'not set' : "$chatModel is not an available chat model");
+    }
+    [$engineProvider, $engineModel] = array_pad(explode('__', (string) ($server['embeddings_engine'] ?? ''), 2), 2, '');
+    try {
+      $engineOk = $engineProvider !== '' && $engineModel !== '' && $this->aiProvider->createInstance($engineProvider)->isUsable('embeddings');
+    }
+    catch (\Throwable) {
+      $engineOk = FALSE;
+    }
+    if (!$engineOk) {
+      $problems[] = 'vector server embeddings_engine: not set, or its provider is not usable';
+    }
+
+    $problems = [];
     foreach ($targets as $label => [$operation, $providerId, $modelId]) {
       if ($providerId === '' || $modelId === '') {
         $problems[] = "$label: no provider or model set";
@@ -409,7 +462,7 @@ final class AimStatusChecker {
       'ok' => !$problems,
       'detail' => $problems
         ? implode('; ', $problems) . ' - fix at /admin/config/ai/settings (defaults) or the aim settings (activities)'
-        : count($targets) . ' model setting(s) checked',
+        : (count($targets) + 2) . ' model setting(s) checked, including the vector server',
     ];
   }
 

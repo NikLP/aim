@@ -85,7 +85,8 @@ resolved as it, so a restricted value shows only to an account allowed it.
 Use it to check what a given person or role gets. Without `--uid` Drush has
 no viewer: the search skips entity access, so every fact is found, but
 tokens resolve as anonymous and a fact naming a restricted literal is
-withheld from the output (not shown with the value). The site-wide
+withheld from the output (not shown with the value); the table format
+prints a note saying so (`--format=json` stays clean). The site-wide
 `show_redacted_facts` debug setting would show it as `[redacted]`, but chat
 and MCP viewers get the same change, so leave it off outside a debugging
 session.
@@ -516,10 +517,11 @@ resolving to `AimMariaDBProvider`, the collection table's build-time HNSW
 `M` and the server's `mhnsw_ef_search`, and `aim.settings:recall_max_distance`
 actually being set rather than silently using the in-code fallback, no
 fact overdue for the expiry sweep, the `aim_consolidate` queue being drained
-(oldest item under two hours; otherwise the crontab line is missing), an
+(oldest item under two hours, measured on the database queue only; other
+backends report the count alone), an
 informational count of untrusted facts, and every configured model still existing
 with its provider (the AI module's chat, decision and embeddings defaults,
-plus any activity that names its own: a retired model is otherwise found by
+the vector server's `chat_model` and `embeddings_engine`, plus any activity that names its own: a retired model is otherwise found by
 a failed call), and `index_directly` not being on with a hosted embeddings
 provider (each write would wait on it and send it the fact text), and
 model-call logging (passes when off, a site's choice; when on, fails if an
@@ -1046,8 +1048,7 @@ each documented in their own submodule now:
 
 `config/install` does not re-run on an installed module and aim ships
 no update hooks (all removed 2026-11-02 for a reinstall;
-`aim_update_last_removed()` is 10015, so a site older than that must
-reinstall). The steps below are what a site installed before
+a site older than that must reinstall). The steps below are what a site installed before
 2026-09-26 needed by hand, kept for reference. Fresh installs get all of it
 from config and the shim.
 

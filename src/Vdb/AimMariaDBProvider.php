@@ -49,20 +49,31 @@ use Drupal\ai_vdb_provider_mariadb\Plugin\VdbProvider\MariaDBProvider;
  */
 class AimMariaDBProvider extends MariaDBProvider {
 
-  // MariaDB's ER_TABLE_EXISTS_ERROR.
-  const TABLE_EXISTS_ERROR = 1050;
+  /**
+   * MariaDB's ER_TABLE_EXISTS_ERROR.
+   */
+  public const TABLE_EXISTS_ERROR = 1050;
 
-  // Rows fetched per page when resolving item IDs to row IDs.
-  const ID_PAGE_SIZE = 1000;
+  /**
+   * Rows fetched per page when resolving item IDs to row IDs.
+   */
+  public const ID_PAGE_SIZE = 1000;
 
-  // HNSW graph connectivity for a new collection. Build-time: an existing
-  // table keeps its M until its vector index is rebuilt (DEVELOPING.md).
-  // 16 is also the default in the provider's 1.0.x head.
-  const HNSW_M = 16;
+  /**
+   * HNSW graph connectivity for a new collection.
+   *
+   * Build-time: an existing table keeps its M until its vector index is
+   * rebuilt (DEVELOPING.md). 16 is also the default in the provider's 1.0.x
+   * head.
+   */
+  public const HNSW_M = 16;
 
-  // Search API field types the provider maps to numeric columns, where an
-  // empty string is not a valid value.
-  const NUMERIC_FIELD_TYPES = ['integer', 'decimal', 'date', 'boolean'];
+  /**
+   * Search API field types mapped to numeric columns.
+   *
+   * An empty string is not a valid value in those columns.
+   */
+  public const NUMERIC_FIELD_TYPES = ['integer', 'decimal', 'date', 'boolean'];
 
   /**
    * The index being written by indexItems(), for insertIntoCollection().

@@ -373,14 +373,11 @@ class AimRememberService {
 
       $entity = $storage->create($values);
       try {
-        // Guardrail check runs inside save() now, via hook_aim_fact_presave()
-        // - still per-candidate, since a rejected save throws before the
-        // loop's next iteration. One rejected fact should not abort the
-        // rest of an extraction batch, the same posture already taken for
-        // an unresolvable user-scope subject above. saveFact() unwraps the
-        // EntityStorageException SqlContentEntityStorage::save() wraps a
-        // presave hook's exception in, back to the \InvalidArgumentException
-        // this catch expects - see saveFact()'s own docblock.
+        // saveFact() runs the Guardrail check and entity validation and
+        // throws \InvalidArgumentException on rejection - still
+        // per-candidate, so one rejected fact does not abort the rest of an
+        // extraction batch, the same posture already taken for an
+        // unresolvable user-scope subject above.
         $this->manager->saveFact($entity);
       }
       catch (\InvalidArgumentException) {

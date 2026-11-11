@@ -92,6 +92,27 @@ are recommendations.
       consolidation model, and downgrades to ADD with no default. Not
       documented.
 
+## Operating language (raised 2026-11-11)
+
+Goal: a site runs aim in one language of its choice (Spanish, say), not
+translated facts. `aim_fact` stays non-translatable. Nothing in storage or
+recall assumes English; the work is model setup and tuning.
+
+- [ ] Multilingual embeddings model (the shipped `nomic-embed-text` is
+  English-centric). A new dimension count means the table rebuild in
+  DEVELOPING.md's "Setting up vector search", step 5.
+- [ ] Re-tune `recall_max_distance`, the verifier threshold and the grounded
+  check on the new model; the current values are English-on-nomic.
+- [ ] Prompts are English and the extraction prompt never says what language
+  to write a fact in, so a model may translate to English. Untested. Idea: an
+  `aim.settings` operating-language value (a selector on a multilingual
+  site) that the extraction, consolidation, verifier and grounded-check
+  prompts interpolate. Not built, not yet tested.
+- [ ] Interface strings and the chat persona are separate (Drupal interface
+  translation, the persona text).
+- Done 2026-11-11: the orphan-vector check reads each fact's real langcode
+  instead of assuming `en`.
+
 ## Memory algorithm follow-ups (raised 2026-10-02, ADR-0036)
 
 - [ ] Time-limited facts ("for two months from now") must not be UPDATE

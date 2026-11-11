@@ -13,3 +13,9 @@ entity.aim_fact.version_history:
   route_name: entity.aim_fact.version_history
   base_route: entity.aim_fact.edit_form
   weight: 10
+
+aim.status_tab:
+  title: 'Status'
+  route_name: aim.status
+  base_route: aim.settings
+  weight: 10

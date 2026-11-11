@@ -28,7 +28,9 @@
         "psr-4": {
             "Drupal\\aim\\": "src/",
             "Drupal\\aim_chatbot\\": "modules/aim_chatbot/src/",
-            "Drupal\\aim_tool\\": "modules/aim_tool/src/"
+            "Drupal\\aim_tool\\": "modules/aim_tool/src/",
+            "Drupal\\aim_tool_oauth\\": "modules/aim_tool_oauth/src/",
+            "Drupal\\aim_benchmark\\": "modules/aim_benchmark/src/"
         }
     }
 }

@@ -34,10 +34,14 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 class AimEmbeddingCacheSubscriber implements EventSubscriberInterface {
 
-  // Cache entry lifetime. The mapping (provider, model, configuration,
-  // text) -> vector is deterministic and needs no invalidation; the TTL
-  // exists only so the bin cannot grow without bound.
-  const TTL = 604800;
+  /**
+   * Cache entry lifetime, in seconds.
+   *
+   * The mapping (provider, model, configuration, text) -> vector is
+   * deterministic and needs no invalidation; the TTL exists only so the bin
+   * cannot grow without bound.
+   */
+  public const TTL = 604800;
 
   /**
    * Toggled by AimMemoryManager::executeSearchQuery(), around one query.

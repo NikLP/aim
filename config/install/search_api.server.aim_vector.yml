@@ -19,7 +19,7 @@ backend_config:
     collection: aim_fact_vectors
     metric: cosine_similarity
     mhnsw_ef_search: 100
-  embeddings_engine: ollama__nomic-embed-text:latest
+  embeddings_engine: ollama__nomic_embed_text_latest
   embeddings_engine_configuration:
     set_dimensions: true
     dimensions: 768

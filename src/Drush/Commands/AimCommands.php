@@ -234,9 +234,8 @@ final class AimCommands extends DrushCommands {
     }
 
     if (empty($options['scope'])) {
-      // No default here - which scopes exist depends entirely on which
-      // aim_scope_* submodules are installed (ADR-0026), so core has no
-      // sound default to assume.
+      // No default here - which scopes exist depends on the site's enabled
+      // aim_scope config entities, so core has no sound default to assume.
       $this->io()->error('--scope is required: one of ' . implode(', ', $this->memoryManager->allowedScopes()) . '.');
       return self::EXIT_FAILURE;
     }
@@ -400,6 +399,10 @@ final class AimCommands extends DrushCommands {
     if ($options['format'] === 'json') {
       $this->output()->writeln(json_encode($rows, JSON_PRETTY_PRINT));
       return self::EXIT_SUCCESS;
+    }
+
+    if ($viewer === NULL) {
+      $this->io()->note('Recalled with no --uid: access checks are skipped and literal tokens resolve as anonymous, so facts naming a restricted literal are withheld. Pass --uid=<uid> to recall as an account.');
     }
 
     if (empty($rows)) {

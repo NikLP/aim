@@ -291,9 +291,9 @@ final class AimRemember {
     $scope = $fields['scope'] ?? NULL;
     $scopeFields = $fields['scope_fields'] ?? [];
     if (empty($scope)) {
-      // No default here - which scopes exist depends entirely on which
-      // aim_scope_* submodules are installed (ADR-0026), so this tool has
-      // no sound default to assume.
+      // No default here - which scopes exist depends on the site's enabled
+      // aim_scope config entities, so this tool has no sound default to
+      // assume.
       return ['error' => 'Scope is required: one of ' . implode(', ', $this->memoryManager->allowedScopes()) . '.'];
     }
     $subject = $fields['subject'] ?? NULL;

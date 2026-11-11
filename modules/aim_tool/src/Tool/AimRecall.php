@@ -6,6 +6,7 @@ namespace Drupal\aim_tool\Tool;
 
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRecallService;
 use Drupal\aim\Service\AimSettings;
 use Drupal\tool\Attribute\ToolInput;
@@ -69,6 +70,8 @@ final class AimRecall {
    *
    * @param \Drupal\aim\Service\AimRecallService $recallService
    *   The recall service.
+   * @param \Drupal\aim\Service\AimMemoryManager $manager
+   *   The memory manager, to ask whether a scope requires an account.
    * @param \Drupal\aim\Service\AimSettings $settings
    *   The settings reader.
    * @param \Drupal\Core\Session\AccountInterface $currentUser
@@ -76,6 +79,7 @@ final class AimRecall {
    */
   public function __construct(
     private readonly AimRecallService $recallService,
+    private readonly AimMemoryManager $manager,
     private readonly AimSettings $settings,
     private readonly AccountInterface $currentUser,
   ) {}
@@ -136,7 +140,7 @@ final class AimRecall {
     #[ToolInput(constraints: ['Range' => ['min' => 1, 'max' => self::MAX_LIMIT]])]
     int $limit = 10,
   ): ExecutableResult {
-    if ($scope === 'user' && empty($user)) {
+    if ($scope !== NULL && empty($user) && $this->manager->scopeRequiresAccount($scope)) {
       $user = (string) $this->currentUser->id();
     }
 

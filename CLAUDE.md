@@ -273,8 +273,8 @@ look at other roles when a permission check unexpectedly fails.
 - No migration/`hook_update_N()` needed while there's no real data to
   preserve (PoC) - just change and reinstall (`drush pmu`/`drush en`).
   Revisit once real data exists that reinstalling would destroy. aim
-  ships no update hooks (`aim_update_last_removed()` is 10015, so a new
-  one is numbered 10016 or later).
+  ships no update hooks (there is no `aim_update_last_removed()`; the
+  first one added would be 10001 or later).
 - **`AimMariaDBProvider` stays a thin shim** over `ai_vdb_provider_mariadb`.
   A workaround lives there only with an upstream issue in TODO.md/BACKLOG.md and is
   deleted when the provider ships the fix; generic features go upstream
