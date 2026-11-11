@@ -387,6 +387,14 @@ questions" section)
       guardrail-blocked merge: needs a choice-answering fake decision
       backend), the ingest form's extract mode and file upload, the Tool
       API/MCP transport, and the user-scope role-visibility settings form.
+- [ ] Test suite runtime (raised 2026-11-10; same entry in literals'
+      BACKLOG.md for its suite). Removing `#[RunTestsInSeparateProcesses]`
+      saves nothing: `KernelTestBase`/`BrowserTestBase` force isolation in
+      their constructors, and from drupal:11.3 the attribute is required
+      (deprecation now, exception in 12, change record 3548485). Time
+      each class first, then merge small methods in the slowest ones (each
+      method pays a process plus module install) and try `run-tests.sh
+      --concurrency`.
 - [ ] Upstream: ai_search re-index of an already fully indexed item (raised
       2026-10-15). `indexItemsWithChunkSlicing()` starts at the item's
       `processed_chunks`, so a second `indexItems()` on an item whose
@@ -828,6 +836,34 @@ would bring each back. Nothing here is built.
       `target_type`/`target_id` on the admin form
       ([ADR-0027](adr/resolved/0027-entity-scope.md)). Today a targetless
       fact is just neutral for view access, not a security gap.
+
+**The fact form shows every scope's subject fields (raised 2026-11-11)**
+
+The edit form shows `subject`, `user`, `target_type` and `target_id` on
+every scope, because they are shared base fields and nothing says which
+one a scope uses. The cause underneath: who a fact is about is one idea
+stored four ways (`subject` holds a role or a case ID, `user` an account,
+`target_type`/`target_id` an entity, site none). Cheapest first:
+
+- [ ] Do now: the subject is fixed after creation. On the edit form,
+      show it as plain text, not editable fields: a fact about someone
+      or something else is a new fact
+      ([ADR-0064](adr/resolved/0064-revisions-for-fact-edits.md)).
+- [ ] A role scope plugin ([ADR-0028](adr/resolved/0028-scope-type-plugin.md)'s
+      addendum): moves `aim_brief`'s `$id === 'role'` branch into the
+      plugin, checks the subject is a real role and offers a role picker.
+      Site stays with no plugin.
+- [ ] When the add form gets real use: per-scope form displays, built
+      the way Media does it (`MediaSourceInterface::prepareFormDisplay()`).
+      `AimScope::postSave()` (when not syncing) creates or loads
+      `aim_fact.{scope}.default`, removes the subject fields and lets the
+      plugin add back its own. No plugin means no subject field (site).
+      Generated, never hand-typed config.
+- [ ] When cases become a real entity: one subject field pair
+      (entity type + ID) instead of four fields, rendered by the
+      plugin. Costs `user`'s real entity reference (integrity on user
+      deletion, Views relationships, the BTREE in the vector index,
+      ADR-0007/0018), so it needs its own ADR.
 
 - [ ] ADR-0060 follow-ups: stealth mode (presave hook on `ai_log` blanking
       `prompt`, `output_text`, `response_text`, `configuration`,

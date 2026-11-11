@@ -442,3 +442,21 @@ Piece 0 (the rename) and pieces 1-3 (field declaration, settings schema,
 plugin/scope decoupling) are built and verified. Piece 4 (the Tool
 API/MCP endpoint shape) is a named gap, design only - not part of this
 build.
+
+## Addendum (2026-11-11): role earns a plugin, site does not
+
+The Consequences rejected plugins for `role`/`site` because a no-op
+plugin behaves exactly like `plugin: null`. That still holds for site.
+Role now has behavior with no plugin to own it:
+
+- `aim_brief` checks `$id === 'role'` to recall the viewer's own roles'
+  facts, so a second role-like scope would not get that.
+- A role fact's subject is free text, never checked against real roles:
+  a typo saves and the fact never appears in anyone's brief.
+- Per-scope fact forms (BACKLOG.md, "The fact form shows every scope's
+  subject fields") need to tell site and role apart. With a role plugin,
+  no plugin simply means no subject field.
+
+So: a role plugin (the brief's subject lookup, `resolveSubject()`
+validation, a role picker) is backlogged; site keeps `plugin: null`.
+Not built.

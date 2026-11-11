@@ -145,6 +145,32 @@ scope access control"; that work must land before console case chips.
 4. **`batch_id` type:** decided 2026-09-30 - plain UUID string field; a
    small entity stays possible later.
 
+## Addendum 2026-11-11: mention tokens as the personal-data mitigation
+
+Still parked, but there is now a second reason to build piece 1 and the
+console: it is the main way to keep names out of stored facts and out of
+hosted models ([ADR-0056](0056-personal-data-write-gate.md)). A person
+picked from site accounts arrives as `@[user:12]`, a uid, so there is no
+name to catch at write time or to send to a provider. The human picks; no
+model interprets a name.
+
+- **Models see tokens, only the site resolves them.** The rendered label
+  (piece 1's "two renderings") is for display and for the local embedding
+  call. It must never be put into a prompt for a hosted model, or the
+  point is lost. A prompt carries `@[user:12]` as is.
+- **A user-reference picker, not name matching.** Where a client cannot
+  show a picker (claude.ai and most MCP clients), a lookup tool returns
+  candidate accounts and the caller or human chooses; the tool never
+  picks for them. A terminal TUI is a second client of the same
+  `/aim/api/lookup` contract as the web console. MCP elicitation (the
+  server asks the user a structured question) may also fit; not checked
+  against this stack.
+- **Names that are not site accounts** (suppliers, customers, a user's
+  family) have no token. The decision is not to build a register for them.
+  They stay in text only when authorized or are refused/restated by the
+  ADR-0056 gate, so that gate remains the backstop for anything typed
+  without the picker.
+
 ## Consequences
 
 - Extraction gets safer: it can no longer invent references, and

@@ -149,9 +149,51 @@ permission. Lost: re-checking a fact later against its passage.
   extraction, and a prompt is not a gate.
 - **A local named-entity recognizer.** Not ruled out; nothing Drupal-native
   exists, and the decision model is already wired. Revisit for sovereign
-  sites.
+  sites. Veil ([veil.spinetta.tech](https://veil.spinetta.tech/), Python, GPLv3, alpha, spaCy NER
+  plus validated patterns, localhost HTTP API) is the candidate to put in the
+  eval set next to Jev for the names tier. It needs a Python sidecar, so it
+  is a sovereign-site option, not a default.
+- **Plain regex for the pattern tier.** Superseded by decision 4's addendum
+  below (checksum and cue-word validators, ported from Veil's approach).
+
+## Addendum 2026-11-11: ideas taken from Veil
+
+Veil's ideas, reimplemented in PHP (no Veil code copied, so its GPLv3 does
+not apply):
+
+- **Decision 4's pattern tier** becomes an aim guardrail plugin, not core
+  `RegexpGuardrail`: emails and phones by pattern, card numbers only when
+  they pass Luhn, IBANs only when they pass mod-97, and loose digit runs
+  only with a cue word nearby ("account", "phone", "tel"). Fewer false
+  refusals than bare regex; still local, no model call. `[literal:key]`
+  tokens still pass.
+- **Names stay a model question.** PHP has no named-entity recognizer;
+  capitalized-word heuristics would miss real names and flag organizations.
+- **Tokenize and restore** (mask identifiers before text goes to a hosted
+  model, put the originals back in the reply) is a separate feature from the
+  write gate: it protects what a model sees, where this ADR protects what is
+  stored. Not decided; see the first open question below.
+- **Prevention by reference** (preferred over detecting names): a person
+  picked from site accounts is a mention token (`@[user:12]`), so the text
+  holds a uid, not a name
+  ([ADR-0029](0029-context-carrying-turns.md), addendum 2026-11-11). The
+  human picks; a model never interprets a name. This needs the picker or a
+  lookup tool in the client (web console, terminal TUI, MCP lookup), and
+  the rule that models see tokens, never rendered labels. People who are
+  not site accounts (suppliers, customers) have no token and no register is
+  planned for them, so this gate remains the backstop for names typed
+  without the picker.
 
 ## Open questions
+
+- Mask-before-hosted-call (Veil's token/restore). Structured identifiers
+  (email, phone, card, IBAN) can be masked in PHP with a per-request map
+  held in memory, which would shrink what extraction, chat and Jev see on a
+  hosted provider. Names cannot without a local recognizer, so it would be
+  partial. Open points: facts extracted from masked text hold tokens, so
+  restore happens before the guardrail, not after; the map must never be
+  logged (`ai_log` stores prompts, ADR-0060); a model may mangle a token in
+  its reply. Needs its own ADR if pursued.
 
 - Fail closed when the checker is down (decision 5) blocks every write
   during an outage. Acceptable for a PoC; a site may want "save untrusted"
