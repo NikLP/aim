@@ -266,19 +266,19 @@
  },
  {
   "scope": "role",
-  "subject": "communications_manager",
+  "subject": "content_editor",
   "text": "Press releases that mention funding need legal sign-off.",
   "source": "ingest-test"
  },
  {
   "scope": "role",
-  "subject": "communications_manager",
+  "subject": "content_editor",
   "text": "The Communications Manager approves every social media campaign.",
   "source": "ingest-test"
  },
  {
   "scope": "role",
-  "subject": "communications_manager",
+  "subject": "content_editor",
   "text": "Only the Communications Manager is allowed to publish press releases.",
   "source": "ingest-test"
  },

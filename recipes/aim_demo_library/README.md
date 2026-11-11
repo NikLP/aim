@@ -105,7 +105,7 @@ the settings above, and the facts are added on top of whatever is there
    [DEVELOPING.md](../../modules/aim_tool_oauth/DEVELOPING.md) "Setup". A
    recipe cannot do this part (site-specific key paths, the tunnel).
 
-Expected: "Applied AIM demo: community library", 31 facts, and
+Expected: "Applied AIM demo: community library", 30 facts, and
 `drush search-api:status` shows 31/31. Smoke test:
 `drush aim:recall "When are you open on Sundays?" --scope=site`.
 
