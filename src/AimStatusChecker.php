@@ -401,20 +401,27 @@ final class AimStatusChecker {
     $targets = [];
     foreach (['chat', 'decision', 'embeddings'] as $operation) {
       $default = $this->aiProvider->getDefaultProviderForOperationType($operation) ?? [];
-      $targets["default $operation"] = [
+      $targets["default $operation model"] = [
         $operation,
         (string) ($default['provider_id'] ?? ''),
         (string) ($default['model_id'] ?? ''),
+        'set it at /admin/config/ai/settings',
       ];
     }
     $activities = $this->configFactory->get('aim.settings')->get('activities') ?? [];
     foreach ($activities as $name => $activity) {
       if (!empty($activity['provider']) && !empty($activity['model'])) {
         $operation = ($activity['backend'] ?? 'chat') === 'decision' ? 'decision' : 'chat';
-        $targets["activity $name"] = [$operation, (string) $activity['provider'], (string) $activity['model']];
+        $targets["$name activity model"] = [
+          $operation,
+          (string) $activity['provider'],
+          (string) $activity['model'],
+          'set it at /admin/config/aim/settings, Models tab',
+        ];
       }
     }
 
+    $problems = [];
     $problems = [];
     // The vector server's own two model IDs are per-site (DEVELOPING.md,
     // "Setting up vector search"): the shipped values name this site's
@@ -426,7 +433,9 @@ final class AimStatusChecker {
     $server = $this->configFactory->get('search_api.server.aim_vector')->get('backend_config') ?? [];
     $chatModel = (string) ($server['chat_model'] ?? '');
     if (!isset($this->aiProvider->getSimpleProviderModelOptions('chat')[$chatModel])) {
-      $problems[] = 'vector server chat_model: ' . ($chatModel === '' ? 'not set' : "$chatModel is not an available chat model");
+      $problems[] = $chatModel === ''
+        ? 'The vector server has no chat model set (Search API > server aim_vector).'
+        : "The vector server's chat model $chatModel is not an available chat model (Search API > server aim_vector).";
     }
     [$engineProvider, $engineModel] = array_pad(explode('__', (string) ($server['embeddings_engine'] ?? ''), 2), 2, '');
     try {
@@ -436,24 +445,26 @@ final class AimStatusChecker {
       $engineOk = FALSE;
     }
     if (!$engineOk) {
-      $problems[] = 'vector server embeddings_engine: not set, or its provider is not usable';
+      $problems[] = "The vector server's embeddings engine is not set, or its provider is not usable (Search API > server aim_vector).";
     }
 
-    $problems = [];
-    foreach ($targets as $label => [$operation, $providerId, $modelId]) {
+    foreach ($targets as $label => [$operation, $providerId, $modelId, $fix]) {
       if ($providerId === '' || $modelId === '') {
-        $problems[] = "$label: no provider or model set";
+        $problems[] = "The $label is not set ($fix).";
         continue;
       }
       try {
         $models = $this->aiProvider->createInstance($providerId)->getConfiguredModels($operation);
       }
       catch (\Throwable) {
-        $problems[] = "$label: provider $providerId is not usable";
+        $problems[] = "The $label uses provider $providerId, which is not usable (check its settings and that it is reachable).";
         continue;
       }
       if (!isset($models[$modelId])) {
-        $problems[] = "$label: $providerId does not list model $modelId";
+        $available = array_slice(array_keys($models), 0, 6);
+        $problems[] = "The $label is $modelId, but $providerId offers no such model"
+          . ($available ? ' (it offers: ' . implode(', ', $available) . (count($models) > 6 ? ', ...' : '') . ')' : ' (it offers none for this operation)')
+          . "; $fix.";
       }
     }
 
@@ -461,7 +472,7 @@ final class AimStatusChecker {
       'label' => 'Configured models exist',
       'ok' => !$problems,
       'detail' => $problems
-        ? implode('; ', $problems) . ' - fix at /admin/config/ai/settings (defaults) or the aim settings (activities)'
+        ? implode(' ', $problems)
         : (count($targets) + 2) . ' model setting(s) checked, including the vector server',
     ];
   }

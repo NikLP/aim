@@ -1,5 +1,5 @@
 name: 'AIM demo: community library'
-description: 'A fictional community library as an AIM demo site: site identity, chat persona, recall cutoff, and 31 demo facts and eight literals as default content.'
+description: 'A fictional community library as an AIM demo site: site identity, chat persona, recall cutoff, and 30 demo facts and eight literals as default content.'
 type: 'Demo'
 install:
   - aim

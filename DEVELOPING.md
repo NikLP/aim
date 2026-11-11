@@ -1309,7 +1309,7 @@ ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>  # de
 ```
 
 - **`aim_demo_library`**: a fictional community library (site identity,
-  chat persona, recall cutoff, `index_directly`) plus its 31 facts and
+  chat persona, recall cutoff, `index_directly`) plus its 30 facts and
   eight literals as default content in `content/`. This site's demo kit
   (its pre-flight and reset steps are in the recipe README) is reset with it. The first archetype
   starter kit ([ADR-0014](adr/resolved/0014-usecase-archetype-starter-kits.md)).
@@ -1390,9 +1390,10 @@ them at the Views listing `ai_logs`.
 `ai_logging.settings` is **site-wide, shared with every module**, and aim
 no longer writes to it (the update hooks that did were removed). A site
 turns it on at `/admin/config/ai/logging/settings`: `prompt_logging` and
-`prompt_logging_output` on, `prompt_logging_tags` listing
+`prompt_logging_output` on, `prompt_logging_tags` empty (every model call
+is logged; this site) or listing
 `ActivityBackendInterface::LOGGED_TAGS` (an exact match, no wildcard, so
-**a new aim tag must be added to both that constant and the site's list**;
+**with a list, a new aim tag must be added to both that constant and the site's list**;
 `AimCallTagsTest` guards the constant against the code). Retention has no
 per-tag control. This site runs 10000 entries or 90 days. Untagged calls
 (the vector index's embeddings) are not logged. A fresh install records

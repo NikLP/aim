@@ -52,11 +52,17 @@ not something `aim`'s own `composer.json` should carry (it just
    drush en tool mcp_server mcp_server_tool_bridge consumers simple_oauth simple_oauth_21 simple_oauth_server_metadata simple_oauth_client_registration simple_oauth_pkce mcp_server_oauth aim_tool_oauth -y
    ```
 
+   Use Drush: the modules page refuses a `tool` dev checkout (`1.0.x-dev`
+   has no version string) against `mcp_server_tool_bridge`'s
+   `tool >=1.0.0-beta12`, and Drush does not enforce the constraint.
+
 2. Generate a key pair outside the docroot:
    `vendor/bin/drush simple-oauth:generate-keys <path>` (this site uses
    `keys/` at repo root, sibling to `web/`, already gitignored; the keys
    survive a site reinstall, so after one only the config needs setting).
-   `simple_oauth.settings`'s `public_key`/`private_key` must point at it:
+   `simple_oauth.settings`'s `public_key`/`private_key` must point at it
+   (config only: the settings page at `/admin/config/people/simple_oauth`
+   does not show them):
    `drush cset simple_oauth.settings public_key <path>/public.key -y`, and
    the same for `private_key`.
 3. Clear `registration_endpoint`:

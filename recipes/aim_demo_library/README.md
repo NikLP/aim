@@ -24,8 +24,8 @@ consolidation without any real data.
   visibility and the finder-first gate (`aim_chatbot_gate`, with
   `literals_finder` installed: a clear exact-value question is answered
   from the literal with no chat model).
-- `content/`: default content, imported when the recipe is applied: 31
-  fictional facts (19 site, 4 role, 4 user, 4 case) and eight literals
+- `content/`: default content, imported when the recipe is applied: 30
+  fictional facts (19 site, 3 role, 4 user, 4 case) and eight literals
   (`main_phone`, `accounts_phone`, `reservations_phone`, `login`,
   `password_reset`; `staff_line`, `my_account` and `site_name`,
   restricted), exported
@@ -80,6 +80,8 @@ the settings above, and the facts are added on top of whatever is there
 
 ## Fresh install
 
+On a reinstall of this dev site skip steps 1-2: the code is already there.
+
 1. Add the repository for `aim` (until it is on drupal.org; `literals` is,
    as `drupal/literals`):
    `composer config repositories.aim vcs https://github.com/NikLP/aim` and
@@ -87,26 +89,47 @@ the settings above, and the facts are added on top of whatever is there
 2. `composer require drupal/aim:dev-main drupal/literals:^1.0@alpha
    drupal/ai_provider_ollama` plus a chat provider (`literals` has only an
    alpha so far, which aim's `*` constraint does not pull on its own).
-3. Run Ollama with `nomic-embed-text`. At `/admin/config/ai/settings` set
-   Embeddings (`ollama` / `nomic_embed_text_latest`), a Chat default and a
-   Decision default (for the finder).
-4. Turn on model-call logging at `/admin/config/ai/logging/settings`
-   (site-wide, so the recipe leaves it alone, and a reinstall resets it to
-   off): log requests and responses on, restrict to the tags
-   `aim_extract,aim_consolidate,aim_consolidate_verify,aim_consolidate_merge,aim_ground,ai_agents_aim_chatbot,literals_choose`,
-   keep 10000 messages and 90 days. The pre-flight fails until it is on.
-5. Apply the recipe (above).
-6. `drush search-api:index aim_vector_index` (already 100% with
+3. Run Ollama with `nomic-embed-text`. Enable `ai` and the providers, then at
+   `/admin/config/ai/settings` set Embeddings (`ollama` /
+   `nomic_embed_text_latest`), a Chat default and a Decision default (for the
+   finder). Do this before the recipe, and do not touch anything else yet:
+   the recipe is strict.
+4. Apply the recipe (above). Do not change `ai_logging` settings before this
+   step: the recipe imports `ai_logging.settings` and, being strict, refuses
+   to apply over a changed one.
+5. `drush search-api:index aim_vector_index` (already 100% with
    `index_directly` on).
-7. `drush uli` and ask the widget; it is hidden from anonymous visitors.
-8. For the MCP part of the demo and the pre-flight: enable `aim_tool_oauth`
-   and the OAuth/MCP stack, set the key paths and expose the site over
-   HTTPS, per `aim_tool_oauth`'s
-   [DEVELOPING.md](../../modules/aim_tool_oauth/DEVELOPING.md) "Setup". A
-   recipe cannot do this part (site-specific key paths, the tunnel).
+6. Turn on model-call logging at `/admin/config/ai/logging/settings`
+   (site-wide, so the recipe leaves it alone, and a reinstall resets it to
+   off): log requests and responses on, leave the tag restriction empty (log
+   every model call; a list limited to aim's tags also works, see
+   [DEVELOPING.md](../../DEVELOPING.md) "Logging"), keep 10000 messages and
+   90 days. The pre-flight fails until it is on.
+7. Set the per-activity models and thresholds by hand at
+   `/admin/config/aim/settings` (the recipe only sets the Recall maximum
+   distance and Verifier threshold). The demo site's values are in its
+   `demo/README.md` "Model settings".
+8. `drush uli` and ask the widget; it is hidden from anonymous visitors.
+9. For the MCP part of the demo and the pre-flight, set up OAuth per
+   `aim_tool_oauth`'s [DEVELOPING.md](../../modules/aim_tool_oauth/DEVELOPING.md)
+   "Setup". A recipe cannot do this part (site-specific key paths, the
+   tunnel). In short:
+   - Enable with Drush, not the modules page, which refuses a `tool`
+     dev checkout (no version string) against `mcp_server_tool_bridge`'s
+     `>=1.0.0-beta12`: `drush en tool mcp_server mcp_server_tool_bridge
+     consumers simple_oauth simple_oauth_21 simple_oauth_server_metadata
+     simple_oauth_client_registration simple_oauth_pkce mcp_server_oauth
+     aim_tool_oauth -y` (`simple_oauth_pkce` is needed: the handshake uses
+     PKCE).
+   - `drush cset simple_oauth.settings public_key <path>/public.key` and
+     the same for `private_key` (no form for these; generate a pair with
+     `drush simple-oauth:generate-keys <path>` if there is none).
+   - `drush cset simple_oauth_server_metadata.settings
+     registration_endpoint ''`.
+   - Expose the site over HTTPS (a tunnel).
 
 Expected: "Applied AIM demo: community library", 30 facts, and
-`drush search-api:status` shows 31/31. Smoke test:
+`drush search-api:status` shows 30/30. Smoke test:
 `drush aim:recall "When are you open on Sundays?" --scope=site`.
 
 Known noise: `[warning] Schema errors...` lines on enable are harmless. A
