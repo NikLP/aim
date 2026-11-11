@@ -1,8 +1,20 @@
+aim.status_tab:
+  title: 'Status'
+  route_name: aim.status
+  base_route: aim.settings
+  weight: -10
+
+entity.aim_scope.collection_tab:
+  title: 'Scopes'
+  route_name: entity.aim_scope.collection
+  base_route: aim.settings
+  weight: 0
+
 aim.settings_tab:
   title: 'Settings'
   route_name: aim.settings
   base_route: aim.settings
-  weight: 0
+  weight: 100
 
 entity.aim_fact.edit_form:
   title: 'Edit'
@@ -12,10 +24,4 @@ entity.aim_fact.version_history:
   title: 'Revisions'
   route_name: entity.aim_fact.version_history
   base_route: entity.aim_fact.edit_form
-  weight: 10
-
-aim.status_tab:
-  title: 'Status'
-  route_name: aim.status
-  base_route: aim.settings
   weight: 10

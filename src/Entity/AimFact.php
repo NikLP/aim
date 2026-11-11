@@ -103,11 +103,11 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
   public static function baseFieldDefinitions(EntityTypeInterface $entity_type): array {
     $fields = parent::baseFieldDefinitions($entity_type);
 
-    $fields['scope'] = BaseFieldDefinition::create('string')
+    // The bundle key is scope, so core already defines it as a read-only
+    // reference to the aim_scope entity: only the wording is set here.
+    $fields['scope']
       ->setLabel(t('Scope'))
-      ->setDescription(t('Which scope this fact belongs to.'))
-      ->setRequired(TRUE)
-      ->setSetting('max_length', 32);
+      ->setDescription(t('Which scope this fact belongs to.'));
 
     $fields['subject'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Subject'))

@@ -796,6 +796,17 @@ would bring each back. Nothing here is built.
       is a straight line of text edits, and core's Revisions tab lists it.
       Revisit if revisions ever branch (e.g. drafts).
 
+- [ ] **Core `dr` CLI (raised 2026-11-11).** Drupal core's `dr`
+      (`vendor/bin/dr`, 11.4) can't run our Drush commands
+      (`AimCommands`, `AimBenchmarkCommands`, `AimChatbotEvalCommands`, all
+      in `src/Drush/Commands/`): it only discovers Symfony `#[AsCommand]`
+      classes in a module's `src/Command/`, not Drush's `#[CLI\Command]`.
+      Core `dr` also lacks `config:*`, `queue:run`, `php:eval` and `pm:*`,
+      which the demo kit, runbooks and crontab (ADR-0003) rely on. Trigger:
+      `dr` gains those. A port is mechanical (the logic is in injected
+      services): Symfony command classes in `src/Command/`, or thin
+      wrappers shared with Drush.
+
 ## Parked ADRs, revisit triggers (retired 2026-10-11 and 2026-10-12)
 
 - ADR-0012 (fact-to-fact relation graph, multi-hop retrieval): revisit when a
