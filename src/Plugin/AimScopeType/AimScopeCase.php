@@ -115,7 +115,7 @@ class AimScopeCase extends PluginBase implements AimScopeTypeInterface, Containe
   /**
    * {@inheritdoc}
    */
-  public function validateSubject(string $subject): ?TranslatableMarkup {
+  public function validateSubject(AimFact $fact): ?TranslatableMarkup {
     return NULL;
   }
 

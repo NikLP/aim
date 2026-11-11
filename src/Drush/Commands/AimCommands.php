@@ -6,6 +6,7 @@ namespace Drupal\aim\Drush\Commands;
 
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountSwitcherInterface;
+use Drupal\Core\Session\AnonymousUserSession;
 use Drupal\aim\AimStatusChecker;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
@@ -343,8 +344,10 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'limit', description: 'Maximum number of results.')]
   #[CLI\Option(name: 'max-distance', description: 'Drop facts with a cosine distance above this. Omit for the raw nearest facts (used to calibrate the cutoff); the site default is aim.settings recall_max_distance.')]
   #[CLI\Option(name: 'include-untrusted', description: 'Also return untrusted facts, for reviewing what waits for review and is left out of ordinary recall() results (ADR-0065).')]
+  #[CLI\Option(name: 'uid', description: 'Recall as this account (0 for anonymous): only the facts it may view, with literal tokens resolved as it. Omit to skip access checks and read literals as anonymous (restricted ones withhold their fact).')]
   #[CLI\Option(name: 'format', description: 'Output format: table or json.')]
   #[CLI\Usage(name: 'drush aim:recall "email preference"', description: 'Search all facts for anything related to email preference.')]
+  #[CLI\Usage(name: 'drush aim:recall "opening hours" --uid=5', description: 'Exactly what account 5 would get from chat or MCP, restricted literal values included only if it may see them.')]
   #[CLI\Usage(name: 'drush aim:recall "email preference" --max-distance=0.48', description: 'Only facts within 0.48 cosine distance, as the chatbot and MCP tool do by default.')]
   public function recall(
     string $text,
@@ -356,8 +359,22 @@ final class AimCommands extends DrushCommands {
       'max-distance' => NULL,
       'include-untrusted' => FALSE,
       'format' => 'table',
+      'uid' => NULL,
     ],
   ): int {
+    // Without --uid Drush has no viewer: the search skips entity access and
+    // literal tokens resolve as anonymous. With it, the whole recall runs as
+    // that account, as chat and MCP do.
+    $viewer = NULL;
+    $uid = (string) ($options['uid'] ?? '');
+    if ($uid !== '') {
+      $viewer = $uid === '0' ? new AnonymousUserSession() : $this->memoryManager->resolveAccountByUid($uid);
+      if (!$viewer || ($viewer instanceof UserInterface && $viewer->isBlocked())) {
+        $this->io()->error("No active account with uid $uid.");
+        return self::EXIT_FAILURE;
+      }
+      $this->accountSwitcher->switchTo($viewer);
+    }
     try {
       $rows = $this->recallService->recall(
         $text,
@@ -367,12 +384,17 @@ final class AimCommands extends DrushCommands {
         (int) $options['limit'],
         ($options['max-distance'] ?? NULL) !== NULL && $options['max-distance'] !== '' ? (float) $options['max-distance'] : NULL,
         (bool) $options['include-untrusted'],
-        accessCheck: FALSE,
+        accessCheck: $viewer !== NULL,
       );
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {
       $this->io()->error($e->getMessage());
       return self::EXIT_FAILURE;
+    }
+    finally {
+      if ($viewer !== NULL) {
+        $this->accountSwitcher->switchBack();
+      }
     }
 
     if ($options['format'] === 'json') {

@@ -7,8 +7,8 @@ namespace Drupal\aim\Plugin\Validation\Constraint;
 use Drupal\Core\DependencyInjection\AutowireTrait;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\aim\AimScopeTypePluginManagerInterface;
+use Drupal\aim\Entity\AimFact;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
@@ -38,22 +38,39 @@ final class AimScopeSubjectConstraintValidator extends ConstraintValidator imple
    * {@inheritdoc}
    */
   public function validate($value, Constraint $constraint): void {
-    if (!$value instanceof FieldItemListInterface) {
+    if (!$value instanceof AimFact) {
       return;
     }
-    $fact = $value->getEntity();
-    $subject = (string) $value->value;
-    if (!$fact->isNew()) {
-      $original = $this->entityTypeManager->getStorage('aim_fact')->loadUnchanged($fact->id());
-      if ($original && $subject === (string) $original->get('subject')->value) {
-        return;
-      }
+    if (!$value->isNew() && !$this->subjectChanged($value)) {
+      return;
     }
 
-    $message = $this->scopeTypeManager->getTypePlugin($fact->bundle())?->validateSubject($subject);
+    $message = $this->scopeTypeManager->getTypePlugin($value->bundle())?->validateSubject($value);
     if ($message !== NULL) {
       $this->context->addViolation((string) $message);
     }
+  }
+
+  /**
+   * Whether any subject field differs from the saved fact.
+   *
+   * @param \Drupal\aim\Entity\AimFact $fact
+   *   A saved fact being validated.
+   *
+   * @return bool
+   *   TRUE if a subject field changed, or the saved fact can't be loaded.
+   */
+  private function subjectChanged(AimFact $fact): bool {
+    $original = $this->entityTypeManager->getStorage('aim_fact')->loadUnchanged($fact->id());
+    if (!$original) {
+      return TRUE;
+    }
+    foreach ($this->scopeTypeManager->getSubjectFieldNames() as $name) {
+      if ($fact->get($name)->getString() !== $original->get($name)->getString()) {
+        return TRUE;
+      }
+    }
+    return FALSE;
   }
 
 }

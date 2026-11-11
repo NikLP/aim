@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\aim\Kernel;
 
-use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Form\FormState;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
@@ -21,40 +19,15 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  */
 #[Group('aim')]
 #[RunTestsInSeparateProcesses]
-class AimIngestTest extends KernelTestBase {
+class AimIngestTest extends AimKernelTestBase {
 
   use UserCreationTrait;
 
   /**
    * {@inheritdoc}
    */
-  protected static $modules = [
-    'system',
-    'user',
-    'field',
-    'text',
-    'filter',
-    'file',
-    'key',
-    'taxonomy',
-    'views',
-    'ai',
-    'search_api',
-    'literals',
-    'aim',
-  ];
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp(): void {
     parent::setUp();
-    $this->installEntitySchema('user');
-    $this->installEntitySchema('aim_fact');
-    $path = $this->container->get('extension.list.module')->getPath('aim');
-    $this->config('aim.settings')
-      ->setData(Yaml::decode(file_get_contents($path . '/config/install/aim.settings.yml')))
-      ->save();
     AimScope::create(['id' => 'site', 'label' => 'Site'])->save();
     AimScope::create(['id' => 'role', 'label' => 'Role'])->save();
     $this->createUser([], 'root');

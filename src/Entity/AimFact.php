@@ -39,6 +39,9 @@ use Drupal\user\EntityOwnerTrait;
  */
 #[ContentEntityType(
   id: 'aim_fact',
+  // The scope's plugin checks who or what a fact is about
+  // (validateSubject()), e.g. a role or entity target that does not exist.
+  constraints: ['AimScopeSubject' => []],
   label: new TranslatableMarkup('AIM fact'),
   label_collection: new TranslatableMarkup('AIM facts'),
   handlers: [
@@ -110,8 +113,6 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
       ->setLabel(t('Subject'))
       ->setDescription(t('Who or what the fact is about: a role machine name, or a case ID (a new case is named by it). Empty for site scope. Not used for user scope, see user.'))
       ->setSetting('max_length', 255)
-      // The scope's plugin may refuse it, e.g. a role that does not exist.
-      ->addConstraint('AimScopeSubject')
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['weight' => 10]);
 

@@ -63,7 +63,7 @@ drush aim:remember <text> --uid=<uid> [--scope] [--subject] [--source] [--catego
 ### `aim:recall` - semantic query
 
 ```bash
-drush aim:recall <text> [--scope] [--subject] [--subject-uid] [--limit] [--max-distance] [--include-untrusted] [--format]
+drush aim:recall <text> [--scope] [--subject] [--subject-uid] [--limit] [--max-distance] [--include-untrusted] [--uid] [--format]
 ```
 
 Real semantic query against `aim_vector_index`. `--format=json` for a
@@ -78,6 +78,17 @@ the MCP tool do by default with `aim.settings:recall_max_distance`.
 Untrusted facts (ADR-0002's addendum) are excluded unless
 `--include-untrusted` is given - the way to review what waits for review (also the facts list's Trusted filter; `aim:status` shows the
 count). Reviewers hold `review aim facts`.
+
+`--uid=<uid>` runs the whole recall as that account (`0` for anonymous), as
+chat and MCP do: only the facts it may view, and `[literal:key]` tokens
+resolved as it, so a restricted value shows only to an account allowed it.
+Use it to check what a given person or role gets. Without `--uid` Drush has
+no viewer: the search skips entity access, so every fact is found, but
+tokens resolve as anonymous and a fact naming a restricted literal is
+withheld from the output (not shown with the value). The site-wide
+`show_redacted_facts` debug setting would show it as `[redacted]`, but chat
+and MCP viewers get the same change, so leave it off outside a debugging
+session.
 
 Both commands live on `AimCommands`, backed by `AimMemoryManager` (also
 used by `aim_tool` and the chatbot).
@@ -98,8 +109,11 @@ model). The source file itself is never stored - only the extracted
 facts persist. `source` is a short provenance pointer.
 
 The structured-output schema's `scope` enum is built from
-`allowedScopes()` at call time, so a scope added as an `aim_scope` config
-entity is extractable with no code change.
+`extractableScopes()` at call time: `allowedScopes()` less any scope
+whose plugin declares fields of its own (entity's target), since a
+candidate carries only scope, subject and text and such a fact would
+always be refused. A scope added as an `aim_scope` config entity is
+extractable with no code change.
 
 `--subject-uid` (uid only) attaches every model-classified `scope=user`
 candidate to that one real account; without it every `scope=user`
@@ -118,7 +132,10 @@ user as `$writer`, so each fact needs its scope's `create {scope} aim facts`
 (`checkCreateAccess()`): the one-per-line scope list shows only those
 scopes, a JSON entry outside them is an error, an extracted candidate
 outside them is dropped and counted as `denied`. Drush passes its `--uid`
-account the same way. Uploads are read
+account the same way. In one-fact-per-line mode the Subject and target
+inputs show only for the scopes whose fact form shows those fields (built
+per scope through `EntityFormDisplay::collectRenderDisplay()`, so the
+plugins decide), with the chosen scope's own description as help. Uploads are read
 from the request and never saved as a File entity; capped at 100 KB
 (`AimIngestForm::MAX_BYTES`). Submit is synchronous; consolidation stays
 queued. Test data: `tests/ingest-test/`.
@@ -805,9 +822,11 @@ role the `subject` as a role select (`aim_role_select` widget), user the
 form build time, so no form display config is stored and a new scope
 needs none. On the edit form `AimFactForm` makes them read-only: a fact
 about someone or something else is a new fact (ADR-0064). The
-`AimScopeSubject` constraint on `subject` runs the plugin's
-`validateSubject()` for a new or changed subject only, so a fact whose
-role was deleted later still saves.
+`AimScopeSubject` constraint (entity-level, on `aim_fact`) runs the
+plugin's `validateSubject()` on a new fact, or a saved one whose subject
+fields changed, so a fact whose role or target was deleted later still
+saves. The role plugin refuses a role the site doesn't have, the entity
+plugin a missing target or one that doesn't exist.
 
 `links.field_ui_base_route` is deliberately unset - `bundle_entity_type`
 and Field UI's "Manage fields" tab are independently gated, and leaving

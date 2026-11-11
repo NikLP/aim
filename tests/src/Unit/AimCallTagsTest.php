@@ -27,10 +27,25 @@ class AimCallTagsTest extends UnitTestCase {
 
     $listed = ActivityBackendInterface::LOGGED_TAGS;
 
+    // Inline tags: any chat() or embeddings() call that names its own tag
+    // rather than going through ChatBackend::TAGS. Scans all of src/ so a
+    // call moved between services is still found.
     $used = array_values(ActivityBackendInterface::TAGS);
-    $manager = file_get_contents($root . '/src/Service/AimMemoryManager.php');
-    preg_match_all("/(?:chat|embeddings)\\([^;]*\\['(aim_[a-z_]+)'\\]\\)/", $manager, $inline);
-    $used = array_unique(array_merge($used, $inline[1]));
+    $inline = [];
+    $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/src', \FilesystemIterator::SKIP_DOTS));
+    foreach ($files as $file) {
+      if ($file->getExtension() !== 'php') {
+        continue;
+      }
+      preg_match_all("/(?:chat|embeddings)\\([^;]*\\['(aim_[a-z_]+)'\\]\\)/", file_get_contents($file->getPathname()), $found);
+      $inline = array_merge($inline, $found[1]);
+    }
+    // Guards the scan itself: it matched nothing for a while after the
+    // services were split, and the test still passed.
+    foreach (['aim_extract', 'aim_consolidate', 'aim_consolidate_verify', 'aim_consolidate_merge'] as $tag) {
+      $this->assertContains($tag, $inline, "The scan no longer finds the inline $tag call.");
+    }
+    $used = array_unique(array_merge($used, $inline));
 
     $this->assertNotEmpty($used);
     $this->assertSame([], array_values(array_diff($used, $listed)), 'Tags used by model calls but missing from the logging list.');

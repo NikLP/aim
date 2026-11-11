@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\aim\Kernel;
 
-use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
@@ -19,9 +17,9 @@ use Drupal\search_api\Entity\Server;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
-use Drupal\user\UserInterface;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Drupal\user\UserInterface;
 
 /**
  * Tests that recall() resolves [literal:key] tokens as the viewing account.
@@ -32,29 +30,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  */
 #[Group('aim')]
 #[RunTestsInSeparateProcesses]
-class AimRecallLiteralTokensTest extends KernelTestBase {
+class AimRecallLiteralTokensTest extends AimKernelTestBase {
 
   use UserCreationTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'system',
-    'user',
-    'field',
-    'text',
-    'filter',
-    'file',
-    'key',
-    'taxonomy',
-    'views',
-    'ai',
-    'search_api',
-    'search_api_test',
-    'literals',
-    'aim',
-  ];
 
   /**
    * A signed-in account that sees unrestricted literals only.
@@ -71,20 +49,12 @@ class AimRecallLiteralTokensTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installEntitySchema('user');
-    $this->installEntitySchema('literal');
-    $this->installEntitySchema('aim_fact');
     $this->installEntitySchema('search_api_task');
     $this->installSchema('search_api', ['search_api_item']);
     $this->installConfig(['search_api']);
 
     // Only aim.settings from aim's config: the rest is the real vector
     // server and index, which would need a MariaDB vector store.
-    $path = $this->container->get('extension.list.module')->getPath('aim');
-    $this->config('aim.settings')
-      ->setData(Yaml::decode(file_get_contents($path . '/config/install/aim.settings.yml')))
-      ->save();
-
     AimScope::create(['id' => 'site', 'label' => 'Site'])->save();
     LiteralType::create(['id' => 'text', 'label' => 'Text', 'resolver' => 'text'])->save();
 
@@ -217,6 +187,24 @@ class AimRecallLiteralTokensTest extends KernelTestBase {
     $stored = array_map(fn (AimFact $fact): string => $fact->get('text')->value, AimFact::loadMultiple());
     $this->assertContains('Call the library on [literal:main_phone].', $stored);
     $this->assertNotContains('Call the library on 0113 496 0000.', $stored);
+  }
+
+  /**
+   * Skipping entity access (Drush) does not lift literal restrictions.
+   *
+   * The aim:recall command without --uid passes accessCheck: FALSE (no
+   * viewer), but tokens still resolve as the current account, anonymous at the
+   * command line. A fact naming a restricted literal is therefore withheld
+   * there too. Pinned so changing it is a decision: the alternative is a
+   * Drush recall that shows restricted values to whoever holds the shell.
+   */
+  public function testBypassStillWithholdsRestrictedLiterals(): void {
+    $this->setCurrentUser(User::getAnonymousUser());
+    $rows = $this->container->get('aim.recall')->recall('library phone', 'site', NULL, NULL, 10, accessCheck: FALSE);
+    $this->assertSame([
+      'Call the library on 0113 496 0000.',
+      'The library is closed on bank holidays.',
+    ], array_column($rows, 'text'));
   }
 
   /**

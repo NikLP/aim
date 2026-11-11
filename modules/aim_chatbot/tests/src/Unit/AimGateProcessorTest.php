@@ -217,7 +217,7 @@ class AimGateProcessorTest extends UnitTestCase {
        * Returns the agent ID or the error message.
        */
       public function get(string $key): string {
-        return $key === 'ai_agent' ? 'aim_chatbot' : 'Sorry, something went wrong.';
+        return $key === 'ai_agent' ? 'aim_chatbot' : 'Something went wrong.';
       }
 
     };
@@ -249,7 +249,7 @@ class AimGateProcessorTest extends UnitTestCase {
     $logger = $this->createMock(LoggerInterface::class);
     $logger->expects($this->once())->method('warning');
     $output = $this->guard($this->finishedEvent('aim_chatbot', 'Connection refused'), $logger);
-    $this->assertSame('Sorry, something went wrong.', $output->getNormalized()->getText());
+    $this->assertSame('Something went wrong.', $output->getNormalized()->getText());
   }
 
   /**

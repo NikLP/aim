@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\aim\Unit;
 
 use Drupal\Tests\UnitTestCase;
-use Drupal\aim\AimStatusChecker;
+use Drupal\aim\AimModelCallLoggingCheck;
 use Drupal\aim\Backend\ActivityBackendInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
@@ -37,13 +37,7 @@ class AimModelCallLoggingCheckTest extends UnitTestCase {
       'prompt_logging_excluded_tags' => '',
       'prompt_logging_max_age' => 90,
     ];
-    // The check reads only config, and the VDB provider manager is final
-    // (no test double), so build the checker without its constructor.
-    $class = new \ReflectionClass(AimStatusChecker::class);
-    $checker = $class->newInstanceWithoutConstructor();
-    $class->getProperty('configFactory')->setValue($checker, $this->getConfigFactoryStub(['ai_logging.settings' => $settings]));
-
-    $result = (new \ReflectionMethod($checker, 'checkModelCallLogging'))->invoke($checker);
+    $result = AimModelCallLoggingCheck::check($this->getConfigFactoryStub(['ai_logging.settings' => $settings])->get('ai_logging.settings'));
 
     $this->assertSame($ok, $result['ok'], $result['detail']);
     $this->assertStringContainsString($detail, $result['detail']);

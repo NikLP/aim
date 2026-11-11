@@ -6,9 +6,10 @@ namespace Drupal\Tests\aim\Kernel;
 
 use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Entity\Entity\EntityFormDisplay;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Core\Render\Element;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
+use Drupal\aim\Form\AimIngestForm;
 use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\Group;
@@ -23,38 +24,13 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  */
 #[Group('aim')]
 #[RunTestsInSeparateProcesses]
-class AimScopeBehaviorTest extends KernelTestBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'system',
-    'user',
-    'field',
-    'text',
-    'filter',
-    'file',
-    'key',
-    'taxonomy',
-    'views',
-    'ai',
-    'search_api',
-    'literals',
-    'aim',
-  ];
+class AimScopeBehaviorTest extends AimKernelTestBase {
 
   /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installEntitySchema('user');
-    $this->installEntitySchema('aim_fact');
-
-    $path = $this->container->get('extension.list.module')->getPath('aim');
-    $settings = Yaml::decode(file_get_contents($path . '/config/install/aim.settings.yml'));
-    $this->config('aim.settings')->setData($settings)->save();
 
     foreach ($this->shippedScopes() as $data) {
       AimScope::create($data)->save();
@@ -233,9 +209,44 @@ class AimScopeBehaviorTest extends KernelTestBase {
     $this->assertTrue($fact->access('view', $this->makeUser('seer', ['profiles'])));
     $this->assertFalse($fact->access('view', $this->makeUser('blind')));
 
-    // A dangling target is neutral, so nobody is granted access.
-    $orphan = $this->container->get('aim.remember')->remember('About nothing.', 'entity', NULL, 'test', targetType: 'user', targetId: '9999');
+    // A target deleted after the fact was written is neutral, so nobody is
+    // granted access.
+    $this->installSchema('user', ['users_data']);
+    $gone = $this->makeUser('gone');
+    $orphan = $this->container->get('aim.remember')->remember('About nothing.', 'entity', NULL, 'test', targetType: 'user', targetId: (string) $gone->id());
+    $gone->delete();
     $this->assertFalse($orphan->access('view', $this->makeUser('seer2', ['profiles'])));
+  }
+
+  /**
+   * An entity fact must name an existing entity; extraction never offers it.
+   */
+  public function testEntityFactNeedsTarget(): void {
+    $remember = $this->container->get('aim.remember');
+    foreach ([[NULL, NULL], ['user', NULL], [NULL, '1'], ['no_such_type', '1'], ['user', '9999']] as [$type, $id]) {
+      try {
+        $remember->remember('About something.', 'entity', NULL, 'test', targetType: $type, targetId: $id);
+        $this->fail('Expected a rejected target: ' . var_export([$type, $id], TRUE));
+      }
+      catch (\InvalidArgumentException) {
+        $this->addToAssertionCount(1);
+      }
+    }
+    $this->assertSame(['site', 'role', 'user', 'case'], $remember->extractableScopes());
+  }
+
+  /**
+   * The ingest form's per-line subject inputs follow the scope plugins.
+   */
+  public function testIngestLineInputsFollowScopes(): void {
+    $this->grant('boss', ['administer aim', 'ingest aim facts']);
+    $this->container->get('current_user')->setAccount($this->makeUser('admin', ['boss']));
+    $form = $this->container->get('form_builder')->getForm(AimIngestForm::class);
+    $shownFor = static fn (array $element): array => array_column($element['#states']['visible'][':input[name="scope"]'], 'value');
+    $this->assertSame(['role', 'user', 'case'], $shownFor($form['lines']['subject']));
+    $this->assertSame(['entity'], $shownFor($form['lines']['target_type']));
+    $this->assertSame(['entity'], $shownFor($form['lines']['target_id']));
+    $this->assertSame(['site', 'role', 'user', 'case', 'entity'], Element::children($form['lines']['help']));
   }
 
   /**

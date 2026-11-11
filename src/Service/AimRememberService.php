@@ -14,6 +14,7 @@ use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\Dto\StructuredOutputSchema;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
+use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Entity\AimFact;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -47,6 +48,8 @@ class AimRememberService {
    *   The current user, recorded as the fact's author.
    * @param \Drupal\Core\Logger\LoggerChannelInterface $logger
    *   The aim logger channel.
+   * @param \Drupal\aim\AimScopeTypePluginManagerInterface $scopeTypeManager
+   *   The scope type plugin manager, for which scopes extraction offers.
    */
   public function __construct(
     protected AimMemoryManager $manager,
@@ -60,6 +63,8 @@ class AimRememberService {
     protected AccountProxyInterface $currentUser,
     #[Autowire(service: 'logger.channel.aim')]
     protected LoggerChannelInterface $logger,
+    #[Autowire(service: 'plugin.manager.aim_scope_type')]
+    protected AimScopeTypePluginManagerInterface $scopeTypeManager,
   ) {}
 
   /**
@@ -308,7 +313,8 @@ class AimRememberService {
    *   An array with keys 'created' (\Drupal\aim\Entity\AimFact[]), 'skipped'
    *   (int, the number of user-scope candidates skipped because no
    *   $subjectUid was supplied), 'blocked' (int, the number of candidates a
-   *   guardrail rejected, per decision 7) and 'denied' (int, the number in
+   *   guardrail or another check rejected, e.g. the scope plugin's
+   *   validateSubject(), per decision 7) and 'denied' (int, the number in
    *   a scope $writer may not create facts in).
    *
    * @throws \InvalidArgumentException
@@ -573,6 +579,24 @@ class AimRememberService {
   }
 
   /**
+   * Returns the scopes extraction may file a fact under.
+   *
+   * The enabled scopes, less any whose plugin needs fields of its own
+   * (getBaseFieldDefinitions(), e.g. entity's target): extraction gives a
+   * fact only a scope, subject and text, so such a fact would always be
+   * refused (validateSubject()).
+   *
+   * @return string[]
+   *   Scope IDs, in allowedScopes() order.
+   */
+  public function extractableScopes(): array {
+    return array_values(array_filter(
+      $this->manager->allowedScopes(),
+      fn (string $id): bool => !$this->scopeTypeManager->getTypePlugin($id)?->getBaseFieldDefinitions(),
+    ));
+  }
+
+  /**
    * Calls the configured chat provider and returns structured facts.
    *
    * The instruction prompt is aim.settings:extraction_prompt (admin-
@@ -614,7 +638,7 @@ class AimRememberService {
                   // The live aim_scope bundles, not a literal list, so a
                   // scope added as config is extractable with no code
                   // change (see CLAUDE.md's "Scope as a config entity").
-                  'enum' => $this->manager->allowedScopes(),
+                  'enum' => $this->extractableScopes(),
                 ],
                 'subject' => ['type' => 'string'],
                 'text' => ['type' => 'string'],

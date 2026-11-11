@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\aim\Form;
 
-use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Component\Utility\Html;
 use Drupal\Core\DependencyInjection\AutowireTrait;
+use Drupal\Core\Entity\Entity\EntityFormDisplay;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\aim\Entity\AimFact;
@@ -89,11 +91,29 @@ final class AimIngestForm extends FormBase {
     // Only the scopes this user may create facts in: ingest aim facts opens
     // the form, the per-scope permissions decide where it writes.
     $scopes = [];
+    $help = [];
+    // Which subject inputs each scope uses: the ones its fact form shows
+    // (the scope plugin's alterFormDisplay()), so no scope is named here.
+    $usesSubject = [];
+    $usesTarget = [];
     foreach ($this->entityTypeManager->getStorage('aim_scope')->loadMultiple($this->memoryManager->allowedScopes()) as $id => $scope) {
-      if ($this->memoryManager->checkCreateAccess($id, $this->currentUser())->isAllowed()) {
-        $scopes[$id] = $scope->label();
+      if (!$this->memoryManager->checkCreateAccess($id, $this->currentUser())->isAllowed()) {
+        continue;
+      }
+      $scopes[$id] = $scope->label();
+      $help[$id] = $scope->getDescription();
+      $display = EntityFormDisplay::collectRenderDisplay($this->entityTypeManager->getStorage('aim_fact')->create(['scope' => $id]), 'default');
+      if ($display->getComponent('subject') || $display->getComponent('user')) {
+        $usesSubject[] = $id;
+      }
+      if ($display->getComponent('target_type')) {
+        $usesTarget[] = $id;
       }
     }
+    // Shown while one of $ids is the chosen scope (#states ORs a list).
+    $shownFor = static fn (array $ids): array => [
+      'visible' => [':input[name="scope"]' => array_map(static fn (string $id): array => ['value' => $id], $ids)],
+    ];
     $form['lines'] = [
       '#type' => 'details',
       '#title' => $this->t('Scope for one-fact-per-line'),
@@ -107,23 +127,34 @@ final class AimIngestForm extends FormBase {
       '#empty_option' => $this->t('- Select -'),
       '#states' => ['required' => [':input[name="mode"]' => ['value' => 'lines']]],
     ];
+    // The chosen scope's own "which scope when" wording, which says what
+    // its subject is.
+    foreach ($help as $id => $description) {
+      $form['lines']['help'][$id] = [
+        '#type' => 'item',
+        '#markup' => Html::escape($description),
+        '#states' => $shownFor([$id]),
+      ];
+    }
     $form['lines']['subject'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Subject'),
-      '#description' => $this->t('For the user scope, a uid or username. Leave empty for site scope. For the case scope, empty mints a new case ID per line.'),
-      '#states' => ['invisible' => [':input[name="scope"]' => ['value' => 'entity']]],
+      '#description' => $this->t('Who or what every line is about. For a user, a uid or username.'),
+      '#states' => $shownFor($usesSubject),
+      '#access' => (bool) $usesSubject,
     ];
     $form['lines']['target_type'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Target entity type'),
-      '#description' => $this->t('Entity scope only, for example node.'),
-      '#states' => ['visible' => [':input[name="scope"]' => ['value' => 'entity']]],
+      '#description' => $this->t('The type of the content every line is about, for example node.'),
+      '#states' => $shownFor($usesTarget),
+      '#access' => (bool) $usesTarget,
     ];
     $form['lines']['target_id'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Target entity ID'),
-      '#description' => $this->t('Entity scope only.'),
-      '#states' => ['visible' => [':input[name="scope"]' => ['value' => 'entity']]],
+      '#states' => $shownFor($usesTarget),
+      '#access' => (bool) $usesTarget,
     ];
 
     $form['subject_uid'] = [
@@ -285,7 +316,7 @@ final class AimIngestForm extends FormBase {
       $summary[] = $this->t('@count user-scope fact(s) skipped: no user was given to attach them to.', ['@count' => $result['skipped']]);
     }
     if (!empty($result['blocked'])) {
-      $summary[] = $this->t('@count fact(s) blocked by a guardrail check.', ['@count' => $result['blocked']]);
+      $summary[] = $this->t('@count fact(s) refused: a guardrail check failed, or the subject is not valid for the scope (a role this site does not have, say).', ['@count' => $result['blocked']]);
     }
     if (!empty($result['denied'])) {
       $summary[] = $this->t('@count fact(s) not saved: they are in a scope you may not add facts to.', ['@count' => $result['denied']]);

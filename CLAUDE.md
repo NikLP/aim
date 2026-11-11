@@ -158,8 +158,8 @@ duplicated here.
   `subject_uid` 2026-09-28, to stop colliding in
   spirit with the unrelated `uid` field below),
   `target_type`/`target_id` (plain strings naming an arbitrary referenced
-  entity, required for `scope=entity` in practice though not enforced at
-  write time yet - see
+  entity, required for `scope=entity` and checked on write by the entity
+  plugin's `validateSubject()` - see
   [ADR-0027](adr/resolved/0027-entity-scope.md); not a real `entity_reference`
   since that field type needs one fixed target type, and not
   `drupal/dynamic_entity_reference` either, to keep the dependency out of
@@ -199,9 +199,10 @@ duplicated here.
   configuration; two scopes can share a plugin
   ([ADR-0028](adr/resolved/0028-scope-type-plugin.md) piece 3). The
   interface (ADR-0025/0028): `checkViewAccess()` (ORed against the flat
-  permission), `validateSubject()` (the `AimScopeSubject` constraint, on
-  a new or changed subject; the role plugin refuses a role the site
-  doesn't have), `resolveSubject()` (run on save by a presave hook; the
+  permission), `validateSubject()` (the entity-level `AimScopeSubject`
+  constraint, on a new fact or changed subject fields; the role plugin
+  refuses a role the site doesn't have, the entity plugin a missing or
+  nonexistent target), `resolveSubject()` (run on save by a presave hook; the
   case plugin mints or names case IDs under its `prefix` setting),
   `alterFormDisplay()` (puts back the subject fields its scope uses on
   the fact form: every subject field is on every fact, so

@@ -433,10 +433,12 @@ class AimMemoryManager {
    * (SearchApiAiSearchBackend::checkEntityAccess()) applies the per-scope
    * permission AimFactAccessControlHandler enforces, anonymous included.
    *
-   * Only Drush commands and consolidation pass FALSE: Drush has no viewer to
-   * check for and holds raw database credentials already, and consolidation
-   * compares against every fact in a scope and returns nothing to a viewer.
-   * Never switch accounts instead, see ADR-0006's 2026-09-18 addendum.
+   * Only Drush commands and consolidation pass FALSE: Drush with no --uid
+   * has no viewer to check for and holds raw database credentials already,
+   * and consolidation compares against every fact in a scope and returns
+   * nothing to a viewer. Never switch to an admin account to fake the bypass,
+   * see ADR-0006's 2026-09-18 addendum (aim:recall --uid switches to the
+   * account a person asked to see, and then checks access normally).
    *
    * @param \Drupal\search_api\Query\QueryInterface $query
    *   The query to execute.

@@ -82,7 +82,8 @@ class AimScopeRole extends PluginBase implements AimScopeTypeInterface, Containe
   /**
    * {@inheritdoc}
    */
-  public function validateSubject(string $subject): ?TranslatableMarkup {
+  public function validateSubject(AimFact $fact): ?TranslatableMarkup {
+    $subject = (string) $fact->get('subject')->value;
     if ($subject === '') {
       return new TranslatableMarkup('A role fact needs a subject: the machine name of a role on this site, e.g. content_editor.');
     }

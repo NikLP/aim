@@ -53,7 +53,8 @@ new form call this same method - no duplicated extraction logic.
 **Mode 1 - ephemeral upload (built 2026-10-02).** A plain Drupal form
 (`AimIngestForm`): a file upload or a textarea, with three input modes.
 *One fact per line* (no model): scope, subject and `target_type`/`target_id`
-chosen once on the form, each non-empty line goes to `remember()`.
+chosen once on the form (each input shown only for scopes that use it),
+each non-empty line goes to `remember()`.
 *Extract with a model* (prose): `ingestText()`, one call per file, the model
 picks scope, an optional uid attaches user-scope facts. *JSON* (advanced, no
 model): the `aim:remember --file` shape, via `rememberBatch()`, for mixed

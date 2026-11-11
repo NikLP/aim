@@ -22,8 +22,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Facts about one piece of content, viewable as that content is (ADR-0027).
  *
- * Adds target_type/target_id to aim_fact. checkViewAccess() returns the
- * referenced entity's own view access, never forbidden.
+ * Adds target_type/target_id to aim_fact, which must name an existing
+ * entity (validateSubject()). checkViewAccess() returns the referenced
+ * entity's own view access, never forbidden.
  */
 #[AimScopeType(
   id: 'entity',
@@ -96,7 +97,18 @@ class AimScopeEntity extends PluginBase implements AimScopeTypeInterface, Contai
   /**
    * {@inheritdoc}
    */
-  public function validateSubject(string $subject): ?TranslatableMarkup {
+  public function validateSubject(AimFact $fact): ?TranslatableMarkup {
+    $targetType = (string) $fact->get('target_type')->value;
+    $targetId = (string) $fact->get('target_id')->value;
+    if ($targetType === '' || $targetId === '') {
+      return new TranslatableMarkup('An entity fact needs a target: the entity type and ID of the content it is about, e.g. node and 12.');
+    }
+    if (!$this->entityTypeManager->hasDefinition($targetType)) {
+      return new TranslatableMarkup('No entity type "@type" on this site.', ['@type' => $targetType]);
+    }
+    if (!$this->entityTypeManager->getStorage($targetType)->load($targetId)) {
+      return new TranslatableMarkup('No @type with ID "@id" on this site.', ['@type' => $targetType, '@id' => $targetId]);
+    }
     return NULL;
   }
 

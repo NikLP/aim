@@ -831,11 +831,12 @@ would bring each back. Nothing here is built.
       ADR-0027 above). The bridge module's own write path is still
       unbuilt. Promotion logic itself is fully custom/programmatic, not
       gated on any of this.
-- [ ] Write-time validation that a `scope: entity` fact carries a target,
-      and an entity-type-select plus autocomplete widget for
+- [ ] An entity-type select plus autocomplete widget for
       `target_type`/`target_id` on the admin form
-      ([ADR-0027](adr/resolved/0027-entity-scope.md)). Today a targetless
-      fact is just neutral for view access, not a security gap.
+      ([ADR-0027](adr/resolved/0027-entity-scope.md)); write-time
+      validation of the target is built (`AimScopeEntity::
+      validateSubject()`). The scope is meant for notes added through a
+      widget on content pages; extraction does not offer it.
 
 **One subject field pair (raised 2026-11-11)**
 

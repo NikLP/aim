@@ -72,19 +72,21 @@ interface AimScopeTypeInterface {
   public function resolveSubject(string $subject, string $scopeId): string;
 
   /**
-   * Checks the subject a caller gave for a new fact, or an edited subject.
+   * Checks who or what a new fact is about, or an edited fact's subject.
    *
-   * Called by the AimScopeSubject constraint, so on validate(), before
-   * resolveSubject() runs on save: $subject is what the caller gave (a case
-   * name, say), not the stored ID. Not called for a scope with no plugin.
+   * Called by the AimScopeSubject constraint (on the fact, not one field)
+   * when the fact is new or any subject field changed, so on validate(),
+   * before resolveSubject() runs on save: subject holds what the caller
+   * gave (a case name, say), not the stored ID. Not called for a scope with
+   * no plugin.
    *
-   * @param string $subject
-   *   The subject the caller gave, or an empty string.
+   * @param \Drupal\aim\Entity\AimFact $fact
+   *   The fact being validated, of a scope that uses this plugin.
    *
    * @return \Drupal\Core\StringTranslation\TranslatableMarkup|null
-   *   Why the subject is refused, or NULL to accept it.
+   *   Why the fact's subject is refused, or NULL to accept it.
    */
-  public function validateSubject(string $subject): ?TranslatableMarkup;
+  public function validateSubject(AimFact $fact): ?TranslatableMarkup;
 
   /**
    * Puts this scope's subject fields on the fact form.

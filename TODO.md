@@ -21,7 +21,7 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
 
 ## Settings defaults live in code (raised 2026-11-09)
 
-Found on the habanero demo site: a setting missing from `aim.settings`
+Found on the upstream server demo site: a setting missing from `aim.settings`
 falls back silently to a constant in `AimSettings`, so the live value is
 invisible and a blank form field never saves one.
 

@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\aim\Kernel;
 
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
-use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
 use Drupal\user\Entity\User;
@@ -26,7 +24,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  */
 #[Group('aim')]
 #[RunTestsInSeparateProcesses]
-class AimConsolidateTest extends KernelTestBase {
+class AimConsolidateTest extends AimKernelTestBase {
 
   use FakeVectorSearchTrait;
 
@@ -34,26 +32,6 @@ class AimConsolidateTest extends KernelTestBase {
    * Distance above which a pair is not compared at all.
    */
   protected const COMPARE = 0.45;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'system',
-    'user',
-    'field',
-    'text',
-    'filter',
-    'file',
-    'key',
-    'taxonomy',
-    'views',
-    'ai',
-    'search_api',
-    'search_api_test',
-    'literals',
-    'aim',
-  ];
 
   /**
    * The established fact in the merge tests.
@@ -79,13 +57,6 @@ class AimConsolidateTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installEntitySchema('user');
-    $this->installEntitySchema('literal');
-    $this->installEntitySchema('aim_fact');
-    $path = $this->container->get('extension.list.module')->getPath('aim');
-    $this->config('aim.settings')
-      ->setData(Yaml::decode(file_get_contents($path . '/config/install/aim.settings.yml')))
-      ->save();
     AimScope::create(['id' => 'site', 'label' => 'Site'])->save();
     AimScope::create(['id' => 'role', 'label' => 'Role'])->save();
     $this->installFakeVectorIndex();
@@ -155,9 +126,9 @@ class AimConsolidateTest extends KernelTestBase {
    * A dry run reports the decision and changes nothing.
    */
   public function testDryRunChangesNothing(): void {
-    $this->fact('Open at nine.');
+    $kept = $this->fact('Open at nine.');
     $dupe = $this->fact('Open at nine.');
-    $this->setScores([1 => 0.02, 2 => 0.03]);
+    $this->setScores([$kept->id() => 0.02, $dupe->id() => 0.03]);
 
     $result = $this->sweep(dryRun: TRUE);
     $this->assertSame('NOOP', $result['rows'][0][3]);
@@ -192,15 +163,15 @@ class AimConsolidateTest extends KernelTestBase {
    * The scope argument limits the sweep to that scope.
    */
   public function testScopeArgumentLimitsSweep(): void {
-    $this->fact('Open at nine.');
-    $this->fact('Open at nine.');
+    $s1 = $this->fact('Open at nine.');
+    $s2 = $this->fact('Open at nine.');
     $r1 = $this->fact('Closed Sundays.', 'role');
     $r2 = $this->fact('Closed Sundays.', 'role');
-    $this->setScores([1 => 0.02, 2 => 0.03, $r1->id() => 0.02, $r2->id() => 0.03]);
+    $this->setScores([$s1->id() => 0.02, $s2->id() => 0.03, $r1->id() => 0.02, $r2->id() => 0.03]);
 
     $rows = $this->sweep(scope: 'role')['rows'];
     $this->assertCount(1, $rows);
-    $this->assertEmpty($this->reload(AimFact::load(2))->get('retired')->value, 'the site pair was not swept');
+    $this->assertEmpty($this->reload($s2)->get('retired')->value, 'the site pair was not swept');
     $this->assertNotEmpty($this->reload($r2)->get('retired')->value);
   }
 
@@ -209,8 +180,8 @@ class AimConsolidateTest extends KernelTestBase {
    */
   public function testRetiredFactsIgnored(): void {
     $live = $this->fact('Open at nine.');
-    $this->fact('Open at nine.', 'site', 1000);
-    $this->setScores([1 => 0.02, 2 => 0.03]);
+    $retired = $this->fact('Open at nine.', 'site', 1000);
+    $this->setScores([$live->id() => 0.02, $retired->id() => 0.03]);
 
     $this->assertSame([], $this->sweep()['rows']);
     $this->assertEmpty($this->reload($live)->get('retired')->value);

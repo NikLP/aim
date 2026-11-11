@@ -12,7 +12,7 @@ updated when one is done. Hosted Jev takes synthetic or public data only
 | --- | --- | --- | --- |
 | **A. Model evals** | The configured provider through Drupal (`decision-eval.php`, `aim.backend.decision`), fixed hand-written sets, no aim write path. Never the model's API directly. | `modules/aim_benchmark/scripts/` | Can the model make this judgment at all? |
 | **B. Module runs** | The module: `drush aim:remember` / `aim:extract` / `aim:consolidate` / `aim:recall` on a snapshot, real backends, real queue. | `tests/ingest-test/`, `aim_benchmark` commands | Does aim, wired to a model, do the right thing end to end? |
-| **C. Automated tests** | PHPUnit (kernel/unit): 90 tests, every model step faked. Command in DEVELOPING.md. | `tests/src/Kernel/`, `tests/src/Unit/`, `modules/aim_chatbot/tests/` | Does a class behave, without a live site? |
+| **C. Automated tests** | PHPUnit (kernel/unit): 109 tests, every model step faked. Command in DEVELOPING.md. | `tests/src/Kernel/`, `tests/src/Unit/`, `modules/aim_chatbot/tests/` | Does a class behave, without a live site? |
 
 The drift audit (ADR-0043) so far is type A only. Nothing in aim calls it
 yet, so a pass there says nothing about the module.
@@ -147,8 +147,8 @@ unless noted; synthetic data only for hosted Jev.
 
 ## Automated tests (C)
 
-90 kernel and unit tests, plus `AimPersonalRecipeTest`, a functional test
-that applies the recipe to a fresh test site. None calls a provider (`FakeDecisionBackend`, which answers
+109 kernel and unit tests, plus `AimPersonalRecipeTest`, a functional test
+that applies the recipe to a fresh test site. Kernel tests extend `Kernel/AimKernelTestBase` (module list, schemas, default settings). None calls a provider (`FakeDecisionBackend`, which answers
 from scripted values; `ScriptedMergeConsolidationService` stands in for the
 merge writer's chat call; the vector search is stubbed by
 `FakeVectorSearchTrait`, since the real server needs MariaDB vectors).
@@ -156,7 +156,7 @@ merge writer's chat call; the vector search is stubbed by
 | Class | Covers |
 | --- | --- |
 | `Kernel/AimRecallFilterTest` | Untrusted, retired and expired facts excluded; scope, subject and user filters; order, limit, max distance, gap |
-| `Kernel/AimRecallLiteralTokensTest` | `[literal:key]` resolved per viewer, withheld or `[redacted]`, read live (ADR-0040) |
+| `Kernel/AimRecallLiteralTokensTest` | `[literal:key]` resolved per viewer, withheld or `[redacted]`, read live (ADR-0040); Drush's `accessCheck: FALSE` still withholds restricted literals (tokens resolve as anonymous there) |
 | `Kernel/AimPrivacyTest` | User-scope visibility: strangers, shared role, role-visibility matrix, administrator, bypass |
 | `Kernel/AimScopeBehaviorTest` | Shipped scope config, case ID minting, `requires_account`, entity-scope view access, role visibility, expiry sweep |
 | `Kernel/AimConsolidateTest` | Near-duplicate retire, dry run, distant facts, scope separation, retired facts ignored, untrusted facts not compared, trusting a fact queues it; an UPDATE's merge gets the grounded check (passage, stored score, no call when off) and demote keeps both facts below the threshold |
@@ -164,7 +164,8 @@ merge writer's chat call; the vector search is stubbed by
 | `Kernel/AimIngestTest` | Ingest form lines and JSON modes, validation, per-scope create checks (form and extraction) |
 | `Kernel/AimTrustActionTest`, `AimRetireActionTest` | Bulk trust/retire actions and their access checks |
 | `Unit/AimEmbeddingCacheSubscriberTest` | Embedding cache hit, bypass, key identity (ADR-0017) |
-| `Unit/AimCallTagsTest` | Every `aim_*` call tag is in `ai_logging`'s prompt-logging list |
+| `Unit/AimCallTagsTest` | Every `aim_*` call tag (the `ChatBackend` constant and inline calls anywhere in `src/`) is in `ai_logging`'s prompt-logging list |
+| `Unit/AimModelCallLoggingCheckTest` | The `aim:status` model-call logging check (`AimModelCallLoggingCheck`) |
 | `aim_chatbot/.../AimChatbotRecallContextSubscriberTest` | Recall in code before the chat model |
 | `aim_tool/.../Kernel/AimToolPermissionsTest` | Tool permissions, per-scope create checks, source from the invoker with the same trust for every invoker, reply notes, schema |
 

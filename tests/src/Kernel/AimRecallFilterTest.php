@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\aim\Kernel;
 
-use Drupal\Component\Serialization\Yaml;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
 use Drupal\user\Entity\User;
@@ -23,43 +21,15 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  */
 #[Group('aim')]
 #[RunTestsInSeparateProcesses]
-class AimRecallFilterTest extends KernelTestBase {
+class AimRecallFilterTest extends AimKernelTestBase {
 
   use FakeVectorSearchTrait;
 
   /**
    * {@inheritdoc}
    */
-  protected static $modules = [
-    'system',
-    'user',
-    'field',
-    'text',
-    'filter',
-    'file',
-    'key',
-    'taxonomy',
-    'views',
-    'ai',
-    'search_api',
-    'search_api_test',
-    'literals',
-    'aim',
-  ];
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp(): void {
     parent::setUp();
-    $this->installEntitySchema('user');
-    $this->installEntitySchema('literal');
-    $this->installEntitySchema('aim_fact');
-
-    $path = $this->container->get('extension.list.module')->getPath('aim');
-    $this->config('aim.settings')
-      ->setData(Yaml::decode(file_get_contents($path . '/config/install/aim.settings.yml')))
-      ->save();
 
     AimScope::create(['id' => 'site', 'label' => 'Site'])->save();
     AimScope::create(['id' => 'case', 'label' => 'Case'])->save();

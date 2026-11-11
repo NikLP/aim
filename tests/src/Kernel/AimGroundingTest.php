@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\aim\Kernel;
 
-use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
@@ -18,28 +16,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  */
 #[Group('aim')]
 #[RunTestsInSeparateProcesses]
-class AimGroundingTest extends KernelTestBase {
+class AimGroundingTest extends AimKernelTestBase {
 
   use UserCreationTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'system',
-    'user',
-    'field',
-    'text',
-    'filter',
-    'file',
-    'key',
-    'taxonomy',
-    'views',
-    'ai',
-    'search_api',
-    'literals',
-    'aim',
-  ];
 
   /**
    * The text every test fact is written from.
@@ -69,11 +48,8 @@ class AimGroundingTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installEntitySchema('user');
-    $this->installEntitySchema('aim_fact');
 
-    $path = $this->container->get('extension.list.module')->getPath('aim');
-    $settings = Yaml::decode(file_get_contents($path . '/config/install/aim.settings.yml'));
+    $settings = $this->config('aim.settings')->get();
     $settings['activities']['grounding'] = [
       'backend' => 'decision',
       'provider' => 'fake',
