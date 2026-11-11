@@ -316,6 +316,8 @@ class AimToolPermissionsTest extends KernelTestBase {
       'view user aim facts',
     ]);
     $other = $this->createUser([]);
+    // The brief lists the caller's own roles' facts in a role-plugin scope.
+    AimScope::load('role')->set('plugin', 'role')->save();
     $roles = $caller->getRoles(TRUE);
     $role = reset($roles);
     $now = $this->container->get('datetime.time')->getRequestTime();

@@ -8,6 +8,7 @@ use Drupal\Component\Transliteration\TransliterationInterface;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
+use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
@@ -109,6 +110,21 @@ class AimScopeCase extends PluginBase implements AimScopeTypeInterface, Containe
     }
     $id = str_starts_with($slug, $prefix) ? $slug : $prefix . $slug;
     return rtrim(substr($id, 0, 64), '-');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function validateSubject(string $subject): ?TranslatableMarkup {
+    return NULL;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function alterFormDisplay(EntityFormDisplayInterface $display, array $removed): void {
+    // A case name or an existing case ID.
+    $display->setComponent('subject', $removed['subject'] ?? []);
   }
 
   /**

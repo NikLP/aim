@@ -194,14 +194,20 @@ duplicated here.
   facts can't be disabled or deleted. `description` is the wording models
   read to choose a scope, `weight` the order everything lists scopes in
   (dragged on the scope list). `plugin` names the `AimScopeTypeInterface`
-  plugin (`user`, `case`, `entity` in `src/Plugin/AimScopeType/`; null
-  for site and role), which gets the scope's `settings` as its
+  plugin (`role`, `user`, `case`, `entity` in `src/Plugin/AimScopeType/`;
+  null for site), which gets the scope's `settings` as its
   configuration; two scopes can share a plugin
   ([ADR-0028](adr/resolved/0028-scope-type-plugin.md) piece 3). The
   interface (ADR-0025/0028): `checkViewAccess()` (ORed against the flat
-  permission), `resolveSubject()` (run on save by a presave hook; the
+  permission), `validateSubject()` (the `AimScopeSubject` constraint, on
+  a new or changed subject; the role plugin refuses a role the site
+  doesn't have), `resolveSubject()` (run on save by a presave hook; the
   case plugin mints or names case IDs under its `prefix` setting),
-  `getBaseFieldDefinitions()` and `defaultSettings()`/
+  `alterFormDisplay()` (puts back the subject fields its scope uses on
+  the fact form: every subject field is on every fact, so
+  `AimHooks::entityFormDisplayAlter()` takes them all off first; the
+  edit form shows them read-only), `getBaseFieldDefinitions()` and
+  `defaultSettings()`/
   `buildSettingsForm()` (rendered inline on the scope form; the user
   plugin's are `requires_account` and the role-visibility grid, the
   case plugin's the case ID `prefix`). No

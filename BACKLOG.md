@@ -837,33 +837,17 @@ would bring each back. Nothing here is built.
       ([ADR-0027](adr/resolved/0027-entity-scope.md)). Today a targetless
       fact is just neutral for view access, not a security gap.
 
-**The fact form shows every scope's subject fields (raised 2026-11-11)**
+**One subject field pair (raised 2026-11-11)**
 
-The edit form shows `subject`, `user`, `target_type` and `target_id` on
-every scope, because they are shared base fields and nothing says which
-one a scope uses. The cause underneath: who a fact is about is one idea
-stored four ways (`subject` holds a role or a case ID, `user` an account,
-`target_type`/`target_id` an entity, site none). Cheapest first:
-
-- [ ] Do now: the subject is fixed after creation. On the edit form,
-      show it as plain text, not editable fields: a fact about someone
-      or something else is a new fact
-      ([ADR-0064](adr/resolved/0064-revisions-for-fact-edits.md)).
-- [ ] A role scope plugin ([ADR-0028](adr/resolved/0028-scope-type-plugin.md)'s
-      addendum): moves `aim_brief`'s `$id === 'role'` branch into the
-      plugin, checks the subject is a real role and offers a role picker.
-      Site stays with no plugin.
-- [ ] When the add form gets real use: per-scope form displays, built
-      the way Media does it (`MediaSourceInterface::prepareFormDisplay()`).
-      `AimScope::postSave()` (when not syncing) creates or loads
-      `aim_fact.{scope}.default`, removes the subject fields and lets the
-      plugin add back its own. No plugin means no subject field (site).
-      Generated, never hand-typed config.
-- [ ] When cases become a real entity: one subject field pair
-      (entity type + ID) instead of four fields, rendered by the
-      plugin. Costs `user`'s real entity reference (integrity on user
-      deletion, Views relationships, the BTREE in the vector index,
-      ADR-0007/0018), so it needs its own ADR.
+- [ ] When cases become a real entity: who a fact is about is one idea
+      stored four ways (`subject` holds a role or a case ID, `user` an
+      account, `target_type`/`target_id` an entity). Collapse them into
+      one pair (entity type + ID), rendered by the plugin. Costs `user`'s
+      real entity reference (integrity on user deletion, Views
+      relationships, the BTREE in the vector index, ADR-0007/0018), so it
+      needs its own ADR. Per-scope fact forms and the role plugin, built
+      2026-11-11, hide the symptom (DEVELOPING.md, "Fact forms show only
+      their scope's subject fields").
 
 - [ ] ADR-0060 follow-ups: stealth mode (presave hook on `ai_log` blanking
       `prompt`, `output_text`, `response_text`, `configuration`,

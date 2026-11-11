@@ -5,20 +5,23 @@ declare(strict_types=1);
 namespace Drupal\aim\Plugin\AimScopeType;
 
 use Drupal\Core\Access\AccessResultInterface;
+use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Entity\AimFact;
 
 /**
  * Interface for AimScopeType plugins.
  *
  * A plugin is everything specific to one kind of scope: extra view access
- * (checkViewAccess()), the stored subject (resolveSubject()), base fields
- * on aim_fact (getBaseFieldDefinitions()) and its settings
- * (defaultSettings()/buildSettingsForm()). Each aim_scope config names
- * the plugin it uses in `plugin` (or none), and the manager hands the
- * plugin that scope's `settings` as its configuration
- * (AimScopeTypePluginManager::getTypePlugin()). aim ships the user, case
+ * (checkViewAccess()), the stored subject (validateSubject(),
+ * resolveSubject()), which subject field the fact form shows
+ * (alterFormDisplay()), base fields on aim_fact (getBaseFieldDefinitions())
+ * and its settings (defaultSettings()/buildSettingsForm()). Each aim_scope
+ * config names the plugin it uses in `plugin` (or none), and the manager
+ * hands the plugin that scope's `settings` as its configuration
+ * (AimScopeTypePluginManager::getTypePlugin()). aim ships the role, user, case
  * and entity plugins; another module adds one in its own
  * src/Plugin/AimScopeType with the #[AimScopeType] attribute (ADR-0063).
  *
@@ -67,6 +70,37 @@ interface AimScopeTypeInterface {
    *   The subject to store.
    */
   public function resolveSubject(string $subject, string $scopeId): string;
+
+  /**
+   * Checks the subject a caller gave for a new fact, or an edited subject.
+   *
+   * Called by the AimScopeSubject constraint, so on validate(), before
+   * resolveSubject() runs on save: $subject is what the caller gave (a case
+   * name, say), not the stored ID. Not called for a scope with no plugin.
+   *
+   * @param string $subject
+   *   The subject the caller gave, or an empty string.
+   *
+   * @return \Drupal\Core\StringTranslation\TranslatableMarkup|null
+   *   Why the subject is refused, or NULL to accept it.
+   */
+  public function validateSubject(string $subject): ?TranslatableMarkup;
+
+  /**
+   * Puts this scope's subject fields on the fact form.
+   *
+   * Called from AimHooks::entityFormDisplayAlter() with every subject field
+   * (subject, user and each plugin's own base fields) already removed from
+   * $display, so a fact form shows only the fields its scope uses. A scope
+   * with no plugin shows none (site).
+   *
+   * @param \Drupal\Core\Entity\Display\EntityFormDisplayInterface $display
+   *   The runtime form display for a fact of this scope.
+   * @param array $removed
+   *   The removed components' options, keyed by field name, to put back
+   *   with setComponent() (optionally changing the widget).
+   */
+  public function alterFormDisplay(EntityFormDisplayInterface $display, array $removed): void;
 
   /**
    * Returns base field definitions this scope type needs on aim_fact.

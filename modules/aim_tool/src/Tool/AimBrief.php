@@ -6,6 +6,8 @@ namespace Drupal\aim_tool\Tool;
 
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\aim\AimScopeTypePluginManagerInterface;
+use Drupal\aim\Plugin\AimScopeType\AimScopeRole;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRecallService;
 use Drupal\aim_tool\AimScopeGuide;
@@ -17,6 +19,7 @@ use Drupal\tool\Tool\ToolOperation;
 use Drupal\tool\TypedData\ListOutputDefinition;
 use Drupal\tool\TypedData\MapOutputDefinition;
 use Drupal\tool\TypedData\OutputDefinition;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * The aim_brief tool: the newest facts the caller can see, per scope.
@@ -29,8 +32,9 @@ use Drupal\tool\TypedData\OutputDefinition;
  * same read permission as aim_recall.
  *
  * Per scope, a scope that requires an account lists the caller's own
- * facts and role lists the caller's roles' facts; every other installed
- * scope lists its newest facts the caller may view. Results have the same
+ * facts and a role-plugin scope lists the caller's roles' facts; every
+ * other installed scope lists its newest facts the caller may view.
+ * Results have the same
  * shape as aim_recall's (AimRecall::toResult()), grouped by scope in
  * AimScopeGuide's order (site first), newest first within each.
  */
@@ -52,12 +56,16 @@ final class AimBrief {
    *   The scope guide, for the installed scopes in order.
    * @param \Drupal\Core\Session\AccountInterface $currentUser
    *   The calling account.
+   * @param \Drupal\aim\AimScopeTypePluginManagerInterface $scopeTypeManager
+   *   The scope type plugin manager, for which scopes are about roles.
    */
   public function __construct(
     private readonly AimRecallService $recallService,
     private readonly AimMemoryManager $memoryManager,
     private readonly AimScopeGuide $scopeGuide,
     private readonly AccountInterface $currentUser,
+    #[Autowire(service: 'plugin.manager.aim_scope_type')]
+    private readonly AimScopeTypePluginManagerInterface $scopeTypeManager,
   ) {}
 
   /**
@@ -120,7 +128,7 @@ final class AimBrief {
         }
         $user = $this->currentUser;
       }
-      elseif ($id === 'role') {
+      elseif ($this->scopeTypeManager->getTypePlugin($id) instanceof AimScopeRole) {
         $subjects = $this->currentUser->getRoles();
       }
       array_push($rows, ...$this->recallService->recent($id, $subjects, $user, $limit));

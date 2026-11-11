@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\aim\Kernel;
 
 use Drupal\Component\Serialization\Yaml;
+use Drupal\Core\Entity\Entity\EntityFormDisplay;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
@@ -72,7 +73,7 @@ class AimScopeBehaviorTest extends KernelTestBase {
     $this->assertTrue($scopes['user']['settings']['requires_account']);
     $this->assertSame('case', $scopes['case']['plugin']);
     $this->assertSame('entity', $scopes['entity']['plugin']);
-    $this->assertNull($scopes['role']['plugin']);
+    $this->assertSame('role', $scopes['role']['plugin']);
     $this->assertNull($scopes['site']['plugin']);
     foreach ($scopes as $id => $scope) {
       $this->assertTrue($scope['status'], "$id ships enabled");
@@ -133,6 +134,64 @@ class AimScopeBehaviorTest extends KernelTestBase {
     $this->assertFalse($this->memory()->scopeRequiresAccount('site'));
     $this->assertFalse($this->memory()->scopeRequiresAccount('role'));
     $this->assertTrue($this->memory()->scopeRequiresAccount('user'));
+  }
+
+  /**
+   * A role fact must name a real role; one already saved keeps saving.
+   */
+  public function testRoleSubjectMustBeRealRole(): void {
+    $this->grant('editor', []);
+    $remember = $this->container->get('aim.remember');
+    $this->assertSame('editor', $remember->remember('Editors add alt text.', 'role', 'editor')->get('subject')->value);
+
+    foreach ([NULL, '', 'no_such_role'] as $bad) {
+      try {
+        $remember->remember('Nobody.', 'role', $bad);
+        $this->fail('Expected a rejected role: ' . var_export($bad, TRUE));
+      }
+      catch (\InvalidArgumentException) {
+        $this->addToAssertionCount(1);
+      }
+    }
+
+    // A role deleted after the fact was written: other edits still save,
+    // a changed subject is checked again.
+    $orphan = $remember->remember('Old guidance.', 'role', 'editor');
+    Role::load('editor')->delete();
+    $orphan->set('trusted', FALSE);
+    $this->memory()->saveFact($orphan);
+    $orphan->set('subject', 'gone');
+    $this->expectException(\InvalidArgumentException::class);
+    $this->memory()->saveFact($orphan);
+  }
+
+  /**
+   * Each scope's fact form shows only the subject fields it uses.
+   */
+  public function testFormShowsOnlyTheScopesSubjectFields(): void {
+    $subjectFields = ['subject', 'user', 'target_type', 'target_id'];
+    $expected = [
+      'site' => [],
+      'role' => ['subject'],
+      'user' => ['user'],
+      'case' => ['subject'],
+      'entity' => ['target_type', 'target_id'],
+    ];
+    foreach ($expected as $scope => $fields) {
+      $display = EntityFormDisplay::collectRenderDisplay(AimFact::create(['scope' => $scope]), 'default');
+      $shown = array_values(array_intersect($subjectFields, array_keys($display->getComponents())));
+      $this->assertSame($fields, $shown, "$scope form");
+      // The rest of the form is untouched.
+      $this->assertNotNull($display->getComponent('text'), "$scope keeps text");
+    }
+    $role = EntityFormDisplay::collectRenderDisplay(AimFact::create(['scope' => 'role']), 'default');
+    $this->assertSame('aim_role_select', $role->getComponent('subject')['type']);
+
+    // A user scope without requires_account takes a free-text subject.
+    $this->setUserScopeSettings(['requires_account' => FALSE]);
+    $display = EntityFormDisplay::collectRenderDisplay(AimFact::create(['scope' => 'user']), 'default');
+    $this->assertNotNull($display->getComponent('subject'));
+    $this->assertNull($display->getComponent('user'));
   }
 
   /**

@@ -6,6 +6,7 @@ namespace Drupal\aim\Plugin\AimScopeType;
 
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
+use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Form\FormStateInterface;
@@ -90,6 +91,21 @@ class AimScopeEntity extends PluginBase implements AimScopeTypeInterface, Contai
     // A referenced entity can't be auto-minted - the caller must supply
     // target_type/target_id explicitly.
     return $subject;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function validateSubject(string $subject): ?TranslatableMarkup {
+    return NULL;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function alterFormDisplay(EntityFormDisplayInterface $display, array $removed): void {
+    $display->setComponent('target_type', $removed['target_type'] ?? []);
+    $display->setComponent('target_id', $removed['target_id'] ?? []);
   }
 
   /**

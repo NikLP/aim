@@ -112,9 +112,9 @@ vague "everything about this site" finds whatever is nearest, or nothing
 past the cutoff. `AimBrief` walks `AimScopeGuide::scopeIds()` (site first)
 and calls `AimRecallService::recent()` per scope: an entity query for
 trusted, unretired, unexpired facts, newest `created` first. A scope that
-requires an account lists the caller's own facts, `role` lists facts whose
-subject is one of the caller's roles, and every other scope its newest
-facts. Entity queries don't apply `aim_fact` view access, so `recent()`
+requires an account lists the caller's own facts, a scope on the `role`
+plugin lists facts whose subject is one of the caller's roles, and every
+other scope its newest facts. Entity queries don't apply `aim_fact` view access, so `recent()`
 checks `access('view')` per loaded fact and pages on until the limit
 fills; rows then go through the same `row()` as `recall()` (literal tokens
 replaced or the fact withheld). Results reuse `AimRecall::toResult()`.

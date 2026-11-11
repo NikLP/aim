@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\aim\Hook;
 
 use Drupal\Component\Datetime\TimeInterface;
+use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Hook\Order\Order;
@@ -43,7 +44,8 @@ class AimHooks {
    * @param \Drupal\aim\AimScopeTypePluginManagerInterface $scopeTypeManager
    *   The scope type plugin manager, used by entityBaseFieldInfo() to
    *   merge every registered scope type's own base fields onto aim_fact,
-   *   and by factPresave() to resolve a fact's subject.
+   *   by factPresave() to resolve a fact's subject and by
+   *   entityFormDisplayAlter() for the subject fields a form shows.
    * @param \Drupal\Core\Session\AccountInterface $currentUser
    *   The current user, the author of a new revision.
    * @param \Drupal\Component\Datetime\TimeInterface $time
@@ -88,6 +90,37 @@ class AimHooks {
       $fields += $plugin->getBaseFieldDefinitions();
     }
     return $fields;
+  }
+
+  /**
+   * Implements hook_entity_form_display_alter().
+   *
+   * Every subject field (subject, user, each plugin's own) is on every
+   * fact, since scopes are bundles without fields of their own
+   * (DEVELOPING.md). This takes them all off a fact form, then lets the
+   * scope's plugin put back the ones it uses (alterFormDisplay()), so a
+   * scope with no plugin (site) shows none. At form build time, so it
+   * covers every scope, a new one included, with no stored display.
+   *
+   * @param \Drupal\Core\Entity\Display\EntityFormDisplayInterface $form_display
+   *   The form display about to build a fact form.
+   * @param array $context
+   *   The entity type, bundle and form mode.
+   */
+  #[Hook('entity_form_display_alter')]
+  public function entityFormDisplayAlter(EntityFormDisplayInterface $form_display, array $context): void {
+    if ($context['entity_type'] !== 'aim_fact') {
+      return;
+    }
+    $removed = [];
+    foreach ($this->scopeTypeManager->getSubjectFieldNames() as $name) {
+      $component = $form_display->getComponent($name);
+      if ($component !== NULL) {
+        $removed[$name] = $component;
+        $form_display->removeComponent($name);
+      }
+    }
+    $this->scopeTypeManager->getTypePlugin($context['bundle'])?->alterFormDisplay($form_display, $removed);
   }
 
   /**

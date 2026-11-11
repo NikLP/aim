@@ -62,7 +62,7 @@ class AimScopeTypePluginManager extends DefaultPluginManager implements AimScope
     $pluginId = $scope?->get('plugin');
 
     if (empty($pluginId) || !$this->hasDefinition($pluginId)) {
-      // No plugin configured for this scope (e.g. role/site's config-only
+      // No plugin configured for this scope (e.g. site's config-only
       // shape - ADR-0001's "a fifth scope needs zero PHP" promise, kept
       // by leaving `plugin` unset rather than pointing every plain scope
       // at a no-op placeholder plugin that would add ceremony without
@@ -75,6 +75,19 @@ class AimScopeTypePluginManager extends DefaultPluginManager implements AimScope
     /** @var \Drupal\aim\Plugin\AimScopeType\AimScopeTypeInterface $plugin */
     $plugin = $this->createInstance($pluginId, $scope->get('settings') ?? []);
     return $plugin;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSubjectFieldNames(): array {
+    $names = ['subject', 'user'];
+    foreach (array_keys($this->getDefinitions()) as $pluginId) {
+      /** @var \Drupal\aim\Plugin\AimScopeType\AimScopeTypeInterface $plugin */
+      $plugin = $this->createInstance($pluginId);
+      $names = array_merge($names, array_keys($plugin->getBaseFieldDefinitions()));
+    }
+    return array_values(array_unique($names));
   }
 
 }

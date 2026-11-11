@@ -769,8 +769,8 @@ automatically, no `hook_entity_bundle_info()` needed.
 **Scopes are config on core plugins (ADR-0063)**, the way `literals`
 ships resolvers and literal types. `aim` ships the five scopes in
 `config/install` (`aim.aim_scope.{site,role,user,case,entity}.yml`) and
-the three plugins in `src/Plugin/AimScopeType/` (`user`, `case`,
-`entity`; site and role have `plugin: null`). Each scope has:
+the four plugins in `src/Plugin/AimScopeType/` (`role`, `user`, `case`,
+`entity`; site has `plugin: null`). Each scope has:
 
 - `status` - a disabled scope takes no new facts (forbidden in
   `AimFactAccessControlHandler::checkCreateAccess()`, admins included)
@@ -792,6 +792,22 @@ for every plugin in code, so the entity plugin's `target_type`/
 `target_id` exist on every site, unused unless an entity scope is used.
 A plugin in another module must `->setProvider()` its own module on each
 field and install the storage in its `hook_install()`.
+
+**Fact forms show only their scope's subject fields.** `subject`, `user`
+and every plugin's own fields (`AimScopeTypePluginManager::
+getSubjectFieldNames()`) are on every fact, so
+`AimHooks::entityFormDisplayAlter()` (core's
+`hook_entity_form_display_alter()`) removes them all from the fact form,
+and the scope's plugin puts back what it uses (`alterFormDisplay()`):
+role the `subject` as a role select (`aim_role_select` widget), user the
+`user` reference (or `subject` without `requires_account`), case the
+`subject`, entity `target_type`/`target_id`, site nothing. It runs at
+form build time, so no form display config is stored and a new scope
+needs none. On the edit form `AimFactForm` makes them read-only: a fact
+about someone or something else is a new fact (ADR-0064). The
+`AimScopeSubject` constraint on `subject` runs the plugin's
+`validateSubject()` for a new or changed subject only, so a fact whose
+role was deleted later still saves.
 
 `links.field_ui_base_route` is deliberately unset - `bundle_entity_type`
 and Field UI's "Manage fields" tab are independently gated, and leaving

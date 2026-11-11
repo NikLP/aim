@@ -6,6 +6,7 @@ namespace Drupal\aim\Plugin\AimScopeType;
 
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
+use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
@@ -112,6 +113,22 @@ class AimScopeUser extends PluginBase implements AimScopeTypeInterface, Containe
   public function resolveSubject(string $subject, string $scopeId): string {
     // A user fact's subject is the user field (requires_account), not this.
     return $subject;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function validateSubject(string $subject): ?TranslatableMarkup {
+    return NULL;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function alterFormDisplay(EntityFormDisplayInterface $display, array $removed): void {
+    // Without requires_account the subject is free text.
+    $field = empty($this->configuration['requires_account']) ? 'subject' : 'user';
+    $display->setComponent($field, $removed[$field] ?? []);
   }
 
   /**

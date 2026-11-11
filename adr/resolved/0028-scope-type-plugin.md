@@ -457,6 +457,10 @@ Role now has behavior with no plugin to own it:
   subject fields") need to tell site and role apart. With a role plugin,
   no plugin simply means no subject field.
 
-So: a role plugin (the brief's subject lookup, `resolveSubject()`
-validation, a role picker) is backlogged; site keeps `plugin: null`.
-Not built.
+So `AimScopeRole` (built 2026-11-11): the brief lists the caller's
+roles' facts for any scope on it, `validateSubject()` (a new interface
+method, run by the `AimScopeSubject` constraint) refuses a role the site
+doesn't have, and the fact form offers a role select. Site keeps
+`plugin: null`. The same build added `alterFormDisplay()`, so each fact
+form shows only its scope's subject fields (DEVELOPING.md, "Fact forms
+show only their scope's subject fields").

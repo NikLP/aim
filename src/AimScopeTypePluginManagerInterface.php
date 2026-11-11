@@ -21,7 +21,7 @@ interface AimScopeTypePluginManagerInterface extends PluginManagerInterface {
    * differently-configured scope instances (e.g. a "project" and a
    * "document" entity-scope) at the same plugin. Unlike Annotations'
    * TargetPluginManager::getPlugins(), there is no generic/derived
-   * fallback plugin instance - a scope with no `plugin` set (role/site's
+   * fallback plugin instance - a scope with no `plugin` set (site's
    * config-only shape) simply has no dedicated logic, and the caller
    * (AimFactAccessControlHandler) already reproduces today's behavior
    * (the flat permission alone) whenever this returns NULL.
@@ -34,5 +34,17 @@ interface AimScopeTypePluginManagerInterface extends PluginManagerInterface {
    *   it has none set, or the scope itself does not exist.
    */
   public function getTypePlugin(string $scopeId): ?AimScopeTypeInterface;
+
+  /**
+   * Returns every field that says who or what a fact is about.
+   *
+   * Core aim_fact's subject and user, plus every plugin's own base fields
+   * (target_type/target_id), whatever scopes are in use: all of them are
+   * on every fact, and each scope uses at most a few.
+   *
+   * @return string[]
+   *   Field names.
+   */
+  public function getSubjectFieldNames(): array;
 
 }

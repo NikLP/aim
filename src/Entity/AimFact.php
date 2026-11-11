@@ -110,6 +110,8 @@ class AimFact extends ContentEntityBase implements EntityOwnerInterface, EntityC
       ->setLabel(t('Subject'))
       ->setDescription(t('Who or what the fact is about: a role machine name, or a case ID (a new case is named by it). Empty for site scope. Not used for user scope, see user.'))
       ->setSetting('max_length', 255)
+      // The scope's plugin may refuse it, e.g. a role that does not exist.
+      ->addConstraint('AimScopeSubject')
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayOptions('form', ['weight' => 10]);
 
