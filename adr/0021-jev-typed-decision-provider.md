@@ -216,3 +216,17 @@ only leaves two facts separate; a passed bad one loses detail). Grounding
 0.98 that no threshold catches; `activities.grounding.threshold` 0.8.
 `subq-snap-1.1` was refused for this site's key in the eval ("not permitted
 for this API key") though a single call worked, so it is unmeasured.
+
+## Addendum (2026-11-12): `subq-snap-1.2`
+
+All three activities moved from `subq-snap-1.1` to `subq-snap-1.2`
+(`ai_log` confirms each run used its model ID). `decision-eval.php` on the
+stored sets gave the same result as 1.1, run the same day, on every item:
+grounding (52, all three wordings) AUC 0.99 with one false trust and one
+false hold at 0.7; hard merge set (20) AUC 0.99, 0 of 12 bad merges passed
+and 1 of 8 good held at 0.9; real pairs 25/25 with no unsafe errors. Call
+time unchanged (median 0.22s). Thresholds stand (verifier 0.9, grounding
+0.7). The sets are small and near saturation, so they cannot show the
+announced gains; identical scores may also mean the endpoint serves the
+same weights under both IDs. The chat gate and finder thresholds were not
+re-measured on 1.2.

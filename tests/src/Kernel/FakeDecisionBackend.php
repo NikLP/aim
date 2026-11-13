@@ -16,7 +16,8 @@ use Drupal\aim\Backend\ActivityBackendInterface;
  * A question whose ID is in $answers gets that answer: a string is the
  * choice, a float the noul probability. Any other question is a noul whose
  * ID is a state key holding a candidate text; the answer is that text's
- * score from $scores (0.5 when absent).
+ * score from $scores (0.5 when absent). A question ID ending in _time is
+ * the time check's: the score is from $timeScores (0.0 when absent).
  */
 final class FakeDecisionBackend implements ActivityBackendInterface {
 
@@ -26,6 +27,13 @@ final class FakeDecisionBackend implements ActivityBackendInterface {
    * @var array<string, float>
    */
   public array $scores = [];
+
+  /**
+   * Time-check probability per candidate text (0.0 when absent).
+   *
+   * @var array<string, float>
+   */
+  public array $timeScores = [];
 
   /**
    * Answers per question ID: a choice key, or a noul probability.
@@ -67,6 +75,7 @@ final class FakeDecisionBackend implements ActivityBackendInterface {
       $answers[$id] = match (TRUE) {
         is_string($answer) => new ChoiceAnswer($answer, [$answer => 1.0], 1.0),
         is_float($answer) => new NoulAnswer($answer),
+        str_ends_with($id, '_time') => new NoulAnswer($this->timeScores[$state[substr($id, 0, -5)] ?? ''] ?? 0.0),
         default => new NoulAnswer($this->scores[$state[$id] ?? ''] ?? 0.5),
       };
     }

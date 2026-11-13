@@ -716,6 +716,23 @@ would bring each back. Nothing here is built.
       scope gate" above); unchecked whether simple_oauth's consent form
       can grant fewer scopes than the client asked for. Trigger: a real
       user asking for a read-only connection.
+- [ ] **Poppy (Personal Agent Protocol), parked 2026-11-12.** Sierra/Meta
+      open protocol (announced 2026-10-06, Apache 2.0, draft 0.2 in the
+      announcement and 0.4 in the site's example, ~35 design partners, mostly
+      commerce/payments/support): a company publishes
+      `/.well-known/poppy.json` declaring session start, OAuth sign-in,
+      `poppy:read`/`poppy:write` scopes and channels (website, OpenAPI/MCP,
+      company agent); the agent signs requests with its own key. Fit: our
+      `simple_oauth` + `aim_tool_oauth` + MCP stack already matches the
+      model, a `poppy.json` pointing at the existing MCP endpoint and scopes
+      would be cheap, and it could give per-site agent discovery that the
+      Claude plugin format lacks (fixed `.mcp.json` URL). Against: moving
+      draft, overlaps MCP (a second discovery surface to maintain), aim's
+      scopes (site/role/user/case/entity) don't map onto read/write, and
+      neglect is the main risk. Read from summaries only; the spec itself
+      is unread. Trigger: the spec stabilises, or a real caller asks. First
+      step then: a small `poppy.json` generator reusing the OAuth/MCP
+      config, nothing deeper. Spec: personalagentprotocol.org.
 - [ ] **Parked by Nik (moved from TODO.md 2026-10-30):** visitor/staff
       assistant split (staff agent with remember; fine for a demo, not
       essential; [ADR-0008](adr/resolved/0008-chatbot-integration-mechanism.md)'s

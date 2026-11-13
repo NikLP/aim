@@ -26,10 +26,10 @@ use Drupal\aim\Service\AimSettings;
  * default value, validates the submitted value against aim.schema.yml's
  * constraints (the 0..1 Range on each distance threshold), and saves it.
  * The Models tab is the exception: its provider pickers are built and
- * saved by submitForm() into the nested `activities` map and
- * `grounding_mode`. validateForm() adds the checks the schema can't
- * express: the cross-field ordering of the two thresholds, and the
- * placeholder tokens each prompt must keep.
+ * saved by submitForm() into the nested `activities` map,
+ * `grounding_mode` and `time_check_mode`. validateForm() adds the checks
+ * the schema can't express: the cross-field ordering of the two
+ * thresholds, and the placeholder tokens each prompt must keep.
  */
 final class AimSettingsForm extends ConfigFormBase {
 
@@ -99,7 +99,7 @@ final class AimSettingsForm extends ConfigFormBase {
       ],
       'grounding' => [
         $this->t('Grounded check'),
-        $this->t('Checks, when a fact is written, that the text it came from states it (ADR-0037). Decision models only. The source text is sent to this model and never stored.'),
+        $this->t('Checks, when a fact is written, that the text it came from states it (ADR-0037), and asks whether it is only true for a date or period (ADR-0057). Decision models only. The source text is sent to this model and never stored.'),
       ],
     ];
     $config = $this->config('aim.settings');
@@ -131,6 +131,26 @@ final class AimSettingsForm extends ConfigFormBase {
           '#title' => $this->t('Grounded threshold'),
           '#description' => $this->t('A fact counts as grounded when the score is at or above this value. Empty or 0 uses 0.7. Model-specific: calibrate with the grounding task in the aim_benchmark eval script (hosted Jev split cleanly at about 0.76 on a 44-item set, tuned on that set).'),
           '#default_value' => $choice['threshold'] ?? NULL,
+          '#min' => 0,
+          '#max' => 1,
+          '#step' => 0.01,
+        ];
+        $form['models'][$activity]['time_check_mode'] = [
+          '#type' => 'radios',
+          '#title' => $this->t('Time check'),
+          '#options' => [
+            'off' => $this->t('Off: no check'),
+            'flag' => $this->t('Flag: a fact true only for a date or period, with no end date, goes to review; aim_remember asks its caller for one'),
+            'reject' => $this->t('Reject: also refuse such a fact on the ingest form, extraction and Drush'),
+          ],
+          '#description' => $this->t('Asks this decision model, for each fact, whether it is only true for a date or period (ADR-0057). Runs with or without the grounded check, in the same call when both are on.'),
+          '#default_value' => $config->get('time_check_mode') ?: 'off',
+        ];
+        $form['models'][$activity]['time_threshold'] = [
+          '#type' => 'number',
+          '#title' => $this->t('Time-bound threshold'),
+          '#description' => $this->t('A fact counts as time-bound when the score is at or above this value. Empty or 0 uses 0.3.'),
+          '#default_value' => $choice['time_threshold'] ?? NULL,
           '#min' => 0,
           '#max' => 1,
           '#step' => 0.01,
@@ -370,10 +390,14 @@ final class AimSettingsForm extends ConfigFormBase {
       if (in_array($activity, ['verifier', 'grounding'], TRUE) && !empty($value['threshold'])) {
         $activities[$activity]['threshold'] = (float) $value['threshold'];
       }
+      if ($activity === 'grounding' && !empty($value['time_threshold'])) {
+        $activities[$activity]['time_threshold'] = (float) $value['time_threshold'];
+      }
     }
     $this->configFactory()->getEditable('aim.settings')
       ->set('activities', $activities)
       ->set('grounding_mode', $form_state->getValue(['models', 'grounding', 'grounding_mode']) ?: 'off')
+      ->set('time_check_mode', $form_state->getValue(['models', 'grounding', 'time_check_mode']) ?: 'off')
       ->save();
     parent::submitForm($form, $form_state);
   }
@@ -417,6 +441,11 @@ final class AimSettingsForm extends ConfigFormBase {
     $grounding_model = $form_state->getValue(['models', 'grounding', 'decision']) ?? [];
     if ($grounding_mode !== 'off' && (empty($grounding_model['provider']) || empty($grounding_model['model']))) {
       $form_state->setErrorByName('models][grounding][decision', $this->t('The grounded check is set to %mode but has no decision model. Choose one, or set the mode to Off.', ['%mode' => $grounding_mode]));
+    }
+
+    $time_mode = $form_state->getValue(['models', 'grounding', 'time_check_mode']) ?: 'off';
+    if ($time_mode !== 'off' && (empty($grounding_model['provider']) || empty($grounding_model['model']))) {
+      $form_state->setErrorByName('models][grounding][decision', $this->t('The time check is set to %mode but has no decision model. Choose one in the grounded check, or set the time check to Off.', ['%mode' => $time_mode]));
     }
 
     // A decision classifier hands UPDATE merges to the default chat model.

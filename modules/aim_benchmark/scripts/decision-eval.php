@@ -13,6 +13,7 @@
  *   ddev drush php:script .../decision-eval.php -- grounding [set-file]
  *   ddev drush php:script .../decision-eval.php -- merges [set-file] [cutoff]
  *   ddev drush php:script .../decision-eval.php -- pairs [set-file]
+ *   ddev drush php:script .../decision-eval.php -- time [set-file]
  *
  * Provider and model come from aim.settings activities (grounding, verifier,
  * consolidation).
@@ -33,6 +34,14 @@ $grounding_qs = [
   'strict' => 'Does the text state the fact in %1$s? Answer no if %1$s adds, changes or drops any detail, gives an old value the text has replaced, pins a detail on the wrong person or thing, or states as settled something the text only proposes, hedges or reports second-hand.',
   'narrow' => 'Does the text state the fact in %1$s? Answer no if %1$s adds or changes a detail, drops a detail that changes its meaning, gives an old value the text has replaced, pins a detail on the wrong person or thing, or states as settled something the text only proposes, hedges or reports second-hand.',
   'narrow_ok' => 'Does the text state the fact in %1$s? Answer no if %1$s adds or changes a detail, drops a detail that changes its meaning, gives an old value the text has replaced, pins a detail on the wrong person or thing, or states as settled something the text only proposes, hedges or reports second-hand. Leaving out greetings, filler, typos or a request to remember is fine.',
+];
+// Time-check wordings (ADR-0057 addendum); %1$s is the candidate's state key.
+// 'live' is AimGroundingChecker::TIME_QUESTION; 'period' was the first
+// candidate wording, not adopted (2026-11-12: it flags past events and
+// start-only dates).
+$time_qs = [
+  'live' => 'Does %1$s state or imply a date after which it stops being true?',
+  'period' => 'Is %1$s only true or relevant for a particular date or period?',
 ];
 // The live verifier question (AimMemoryManager::modelConfirmsMerge()).
 $merge_q = 'Every detail of fact_a and fact_b (names, numbers, dates, conditions, negations) survives in merged, and merged adds nothing the two facts do not say, except that a value in fact_b which differs from the value fact_a gives for the same attribute (a duration, day, price or place) supersedes it, so the old value should be absent. Judge faithfulness to the inputs, not whether they are true.';
@@ -121,6 +130,50 @@ if ($task === 'grounding') {
       $new = str_starts_with($item['passage'], 'chat_cleanup') || str_starts_with($item['passage'], 'chat_drop');
       if (($item['label'] === 'supported') !== ($s >= $cutoff) || $new) {
         printf("  %s %.2f %-13s %s | %s\n", ($item['label'] === 'supported') !== ($s >= $cutoff) ? 'MISS' : 'ok  ', $s, $item['label'], mb_substr($item['candidate'], 0, 60), $item['note']);
+      }
+    }
+  }
+}
+elseif ($task === 'time') {
+  $items = json_decode(file_get_contents($set('decision-eval-time.json')), TRUE)['time'];
+  $cutoff = (float) ($activities['grounding']['time_threshold'] ?? 0.3);
+  $scores = [];
+  // Chunked so a call stays within 16 questions (subq's cap).
+  foreach (array_chunk(array_keys($items), max(1, intdiv(16, count($time_qs)))) as $chunk) {
+    $state = $questions = [];
+    foreach ($chunk as $n => $i) {
+      $state['candidate_' . ($n + 1)] = $items[$i]['fact'];
+      foreach ($time_qs as $w => $q) {
+        $questions["{$w}_" . ($n + 1)] = new NoulQuestion(sprintf($q, 'candidate_' . ($n + 1)));
+      }
+    }
+    [$response, $t] = $ask('grounding', new DecisionInput($state, $questions));
+    $times[] = $t;
+    foreach ($chunk as $n => $i) {
+      foreach ($time_qs as $w => $q) {
+        $scores[$w][$i] = $response->getNoul("{$w}_" . ($n + 1))->getProbability();
+      }
+    }
+  }
+  foreach ($time_qs as $w => $q) {
+    $pos = $neg = $by = [];
+    foreach ($items as $i => $item) {
+      $s = $scores[$w][$i];
+      $item['label'] === 'bound' ? $pos[] = $s : $neg[] = $s;
+      $by[$item['kind']][] = $s;
+    }
+    // A false ask sends a caller a pointless retry; a miss lets a stale
+    // fact through unflagged.
+    $false_ask = count(array_filter($neg, fn ($s) => $s >= $cutoff));
+    $missed = count(array_filter($pos, fn ($s) => $s < $cutoff));
+    printf("time/%s: AUC %.2f, @%.2f false ask %d/%d, missed %d/%d\n", $w, $auc($pos, $neg), $cutoff, $false_ask, count($neg), $missed, count($pos));
+    foreach ($by as $kind => $vals) {
+      printf("  %-13s %s\n", $kind, $summary($vals));
+    }
+    foreach ($items as $i => $item) {
+      $s = $scores[$w][$i];
+      if (($item['label'] === 'bound') !== ($s >= $cutoff)) {
+        printf("  MISS %.2f %-13s %s\n", $s, $item['kind'], mb_substr($item['fact'], 0, 70));
       }
     }
   }

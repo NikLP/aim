@@ -1,0 +1,28 @@
+{
+  "note": "Gold set for the write-time time check (ADR-0057 addendum). Label 'bound' means the fact needs an expires: it stops being true or relevant after a date or period. 'open' means no expires is right: standing facts, past events (they stay true) and start-only dates (true from a date, with no end). Labelled by purpose, not by whether a date appears in the text.",
+  "time": [
+    {"fact": "The reading room is closed for painting until 16 October 2026.", "label": "bound", "kind": "explicit_end"},
+    {"fact": "Nik is travelling until the 20th.", "label": "bound", "kind": "relative_end"},
+    {"fact": "The Q3 report is due Friday.", "label": "bound", "kind": "relative_end"},
+    {"fact": "Alex is on leave next week.", "label": "bound", "kind": "relative_end"},
+    {"fact": "Opening hours are extended for two months from 1 October 2026.", "label": "bound", "kind": "period"},
+    {"fact": "The summer reading challenge runs from 1 July to 31 August 2026.", "label": "bound", "kind": "period"},
+    {"fact": "The 10% membership discount applies to sign-ups before 31 January 2027.", "label": "bound", "kind": "explicit_end"},
+    {"fact": "The dentist appointment is on 14 October 2026.", "label": "bound", "kind": "future_event"},
+    {"fact": "The car park is closed on 3 and 4 December 2026 for resurfacing.", "label": "bound", "kind": "future_event"},
+    {"fact": "The library is closed on Monday 28 December 2026 for the bank holiday.", "label": "bound", "kind": "future_event"},
+    {"fact": "Nik prefers answers as short bullet lists.", "label": "open", "kind": "standing"},
+    {"fact": "The library opens at 9am on weekdays.", "label": "open", "kind": "standing"},
+    {"fact": "Nik is allergic to peanuts.", "label": "open", "kind": "standing"},
+    {"fact": "Nik's sister is called Maria.", "label": "open", "kind": "standing"},
+    {"fact": "Editors must add alt text to every image.", "label": "open", "kind": "standing"},
+    {"fact": "Nik lives in Leeds.", "label": "open", "kind": "standing"},
+    {"fact": "Lost property is kept for four weeks.", "label": "open", "kind": "standing"},
+    {"fact": "The library has been open since 1998.", "label": "open", "kind": "standing"},
+    {"fact": "Nik had a peanut snack on 11 November 2026.", "label": "open", "kind": "past_event"},
+    {"fact": "The lobby mural was repainted in 2025.", "label": "open", "kind": "past_event"},
+    {"fact": "The website was redesigned in March 2026.", "label": "open", "kind": "past_event"},
+    {"fact": "Nik started the redesign project on 3 November 2026.", "label": "open", "kind": "start_only"},
+    {"fact": "The new borrowing limit of 10 books applies from 1 January 2027.", "label": "open", "kind": "start_only"}
+  ]
+}

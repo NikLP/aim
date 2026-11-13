@@ -36,6 +36,11 @@ aim.settings:
       label: 'Grounded check: off, record (store the score only) or demote (also send a low-scoring fact to review)'
       constraints:
         Choice: ['off', record, demote]
+    time_check_mode:
+      type: string
+      label: 'Time check: off, flag (a fact true only for a date or period, with no expires, goes to review or back to its caller) or reject (also refused where no caller can be asked)'
+      constraints:
+        Choice: ['off', flag, reject]
     merge_prompt:
       type: string
       label: 'Merge writer prompt, used when the classifier is a decision model'
@@ -128,6 +133,13 @@ aim.activity_choice:
       constraints:
         Range:
           min: 0
+    time_threshold:
+      type: float
+      label: 'Grounding only: probability at which the time check counts a fact as time-bound, 0 or absent for the default (0.3)'
+      constraints:
+        Range:
+          min: 0
+          max: 1
     threshold:
       type: float
       label: 'Verifier and grounding only: probability a decision model must reach, 0 or absent for the default (0.5 verifier, 0.7 grounding)'

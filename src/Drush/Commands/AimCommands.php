@@ -196,7 +196,7 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'source', description: 'Provenance tag for this fact.')]
   #[CLI\Option(name: 'category', description: 'Comma-separated term name(s) from the aim_category vocabulary.')]
   #[CLI\Option(name: 'asserted', description: 'When this fact became true in reality, if different from now.')]
-  #[CLI\Option(name: 'expires', description: 'Calendar date (YYYY-MM-DD) the fact stops being true; it is retired after that day.')]
+  #[CLI\Option(name: 'expires', description: 'The last day the fact is true, inclusive, in the site timezone (YYYY-MM-DD); it is retired after that day. "open-ended" states there is no end.')]
   #[CLI\Option(name: 'target-type', description: 'The referenced entity type ID, for scope=entity (e.g. node). Ignored for every other scope.')]
   #[CLI\Option(name: 'target-id', description: 'The referenced entity ID, for scope=entity. Ignored for every other scope.')]
   #[CLI\Option(name: 'file', description: 'Path to a JSON file of fact objects, saved in one bootstrap instead of $text/the other options.')]

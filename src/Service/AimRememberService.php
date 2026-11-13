@@ -16,6 +16,7 @@ use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Entity\AimFact;
+use Drupal\aim\Exception\AimTimeBoundException;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
@@ -81,16 +82,21 @@ class AimRememberService {
    *   and a grounding model).
    * @param float|null $score
    *   The check's score, NULL when it failed to run.
+   * @param bool $timeBound
+   *   Whether the time check flagged the fact: true only for a date or
+   *   period, with no end date (ADR-0057). It withholds trust like a low
+   *   grounding score.
    *
    * @return array
    *   trusted, plus grounding_score when checked. In demote mode a score
    *   below the threshold, or a check that failed to run, saves the fact
-   *   untrusted; in record mode the score is only stored.
+   *   untrusted; in record mode the score is only stored. A time-bound fact
+   *   is untrusted in either mode.
    */
-  protected function trustValues(string $scope, bool $checked, ?float $score): array {
+  protected function trustValues(string $scope, bool $checked, ?float $score, bool $timeBound = FALSE): array {
     /** @var \Drupal\aim\AimFactAccessControlHandler $access */
     $access = $this->entityTypeManager->getAccessControlHandler('aim_fact');
-    $values = ['trusted' => $access->canApprove($this->currentUser, $scope)];
+    $values = ['trusted' => $access->canApprove($this->currentUser, $scope) && !$timeBound];
     if (!$checked) {
       return $values;
     }
@@ -117,6 +123,43 @@ class AimRememberService {
       '@mode' => $this->settings->getGroundingMode(),
       '@trusted' => $fact->get('trusted')->value ? 'yes' : 'no',
     ]);
+  }
+
+  /**
+   * Applies the time check to a candidate with no end date (ADR-0057).
+   *
+   * @param string $text
+   *   The candidate text.
+   * @param string $mode
+   *   How to react: "retry" (a caller that can be asked for the date, so
+   *   throw), "flag" (save untrusted), or "reject" (refuse).
+   *
+   * @return bool
+   *   TRUE when the fact is time-bound and should be saved untrusted.
+   *
+   * @throws \Drupal\aim\Exception\AimTimeBoundException
+   *   When the fact is time-bound and the reaction is to refuse or retry.
+   */
+  protected function timeBoundVerdict(string $text, string $mode): bool {
+    if (!$this->settings->isTimeCheckOn()) {
+      return FALSE;
+    }
+    $score = $this->groundingChecker->checkTimeBound([$text])[0];
+    if ($score === NULL || $score < $this->settings->getTimeCheckThreshold()) {
+      return FALSE;
+    }
+    $this->manager->logAudit('Time check: a fact scored @score (cutoff @cutoff, mode @mode) as true only for a date or period, with no expires.', [
+      '@score' => round($score, 3),
+      '@cutoff' => $this->settings->getTimeCheckThreshold(),
+      '@mode' => $this->settings->getTimeCheckMode(),
+    ]);
+    if ($mode === 'retry') {
+      throw new AimTimeBoundException('This looks true only for a date or period, but no expires was given. Retry this entry with expires as YYYY-MM-DD (the last day it is true, inclusive), or expires "open-ended" if it has no end.');
+    }
+    if ($mode === 'reject' || $this->settings->getTimeCheckMode() === 'reject') {
+      throw new AimTimeBoundException('Refused: the fact looks true only for a date or period, but has no expires.');
+    }
+    return TRUE;
   }
 
   /**
@@ -158,15 +201,23 @@ class AimRememberService {
    *   When this fact stops being true, as a Unix timestamp (ADR-0057).
    *   retireExpired() retires it once this passes. NULL means no end date.
    *   Must be in the future.
+   * @param bool $openEnded
+   *   TRUE when the caller states the fact has no end, so the time check
+   *   is skipped (ADR-0057).
+   * @param bool $askForDate
+   *   TRUE for a caller that can be asked again: a time-bound fact with no
+   *   expires then throws AimTimeBoundException instead of being saved
+   *   untrusted.
    *
    * @return \Drupal\aim\Entity\AimFact
    *   The created fact.
    *
    * @throws \InvalidArgumentException
    *   If scope is invalid, scope=user and subject does not resolve to a real
-   *   account, or the text fails a guardrail check.
+   *   account, the text fails a guardrail check, or (time check mode reject,
+   *   or $askForDate) the fact is time-bound with no expires.
    */
-  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, array $category = [], ?int $asserted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL, ?int $expires = NULL): AimFact {
+  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, array $category = [], ?int $asserted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL, ?int $expires = NULL, bool $openEnded = FALSE, bool $askForDate = FALSE): AimFact {
     $allowed = $this->manager->allowedScopes();
     if (!in_array($scope, $allowed, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
@@ -210,14 +261,15 @@ class AimRememberService {
 
     if ($expires !== NULL) {
       if ($expires <= $this->time->getRequestTime()) {
-        throw new \InvalidArgumentException('Invalid expires ' . gmdate('Y-m-d', $expires) . ', it is already past.');
+        throw new \InvalidArgumentException('Invalid expires ' . $this->formatDay($expires) . ', it is already past.');
       }
       $values['expires'] = $expires;
     }
 
     $grounded = $sourceText !== NULL && $this->settings->isGroundingOn();
     $score = $grounded ? $this->groundingChecker->checkGrounding($sourceText, [$text])[0] : NULL;
-    $values += $this->trustValues($scope, $grounded, $score);
+    $timeBound = $expires === NULL && !$openEnded && $this->timeBoundVerdict($text, $askForDate ? 'retry' : 'flag');
+    $values += $this->trustValues($scope, $grounded, $score, $timeBound);
 
     if ($targetType !== NULL) {
       $values['target_type'] = $targetType;
@@ -337,6 +389,8 @@ class AimRememberService {
 
     $grounded = $sourceText !== NULL && $this->settings->isGroundingOn();
     $scores = $grounded ? $this->groundingChecker->checkGrounding($sourceText, array_column($facts, 'text')) : [];
+    // One call for the whole list when the grounded check is off.
+    $this->groundingChecker->checkBatch(NULL, array_column($facts, 'text'));
 
     foreach (array_values($facts) as $i => $fact) {
       // The model picks each candidate's scope, so the writer's per-scope
@@ -369,7 +423,16 @@ class AimRememberService {
         $values['subject'] = $fact['subject'] ?? '';
       }
 
-      $values += $this->trustValues($fact['scope'], $grounded, $scores[$i] ?? NULL);
+      // Extraction never sets an end date, so a time-bound candidate is
+      // flagged (or, in reject mode, refused like any rejected candidate).
+      try {
+        $timeBound = $this->timeBoundVerdict($fact['text'], 'flag');
+      }
+      catch (AimTimeBoundException) {
+        $blocked++;
+        continue;
+      }
+      $values += $this->trustValues($fact['scope'], $grounded, $scores[$i] ?? NULL, $timeBound);
 
       $entity = $storage->create($values);
       try {
@@ -487,6 +550,8 @@ class AimRememberService {
   public function rememberBatch(array $entries, ?string $defaultSource = NULL, ?AccountInterface $writer = NULL): array {
     $created = [];
     $errors = [];
+    // One time-check call for the whole list, not one per entry.
+    $this->groundingChecker->checkBatch(NULL, array_filter(array_map(fn ($entry) => is_array($entry) ? (string) ($entry['text'] ?? '') : '', $entries)));
     foreach ($entries as $i => $entry) {
       if (!is_array($entry) || empty($entry['text'])) {
         $errors[$i] = 'missing text';
@@ -512,6 +577,7 @@ class AimRememberService {
           $entry['target_type'] ?? NULL,
           $entry['target_id'] ?? NULL,
           expires: $this->parseExpires($entry),
+          openEnded: $this->isOpenEnded($entry),
         );
       }
       catch (\InvalidArgumentException $e) {
@@ -554,25 +620,66 @@ class AimRememberService {
   /**
    * Parses the expires field of a fact entry.
    *
+   * The date is the last day the fact is true, inclusive, in the site's
+   * timezone (ADR-0057): the sweep retires it once that day has ended.
+   *
    * @param array $fields
    *   A fact entry or command options, possibly with an expires date.
    *
    * @return int|null
-   *   A Unix timestamp (end of that day, UTC), or NULL when not given.
+   *   A Unix timestamp (the last second of that day in the site timezone),
+   *   or NULL when not given or "open-ended".
    *
    * @throws \InvalidArgumentException
    *   If expires cannot be parsed.
    */
   public function parseExpires(array $fields): ?int {
     $value = $fields['expires'] ?? NULL;
-    if ($value === NULL || $value === '') {
+    if ($value === NULL || $value === '' || $this->isOpenEnded($fields)) {
       return NULL;
     }
-    $parsed = strtotime((string) $value . ' 23:59:59 UTC');
-    if ($parsed === FALSE) {
-      throw new \InvalidArgumentException('Invalid expires "' . $value . '", expected a calendar date such as 2026-10-16.');
+    $day = date_create(trim((string) $value), $this->siteTimeZone());
+    if ($day === FALSE) {
+      throw new \InvalidArgumentException('Invalid expires "' . $value . '", expected a calendar date such as 2026-10-16 or "open-ended".');
     }
-    return $parsed;
+    return $day->setTime(23, 59, 59)->getTimestamp();
+  }
+
+  /**
+   * Whether a fact entry states the fact has no end date.
+   *
+   * @param array $fields
+   *   A fact entry or command options.
+   *
+   * @return bool
+   *   TRUE when expires is "open-ended" (also "open ended" or "open_ended").
+   */
+  public function isOpenEnded(array $fields): bool {
+    $value = strtolower(trim((string) ($fields['expires'] ?? '')));
+    return in_array($value, ['open-ended', 'open ended', 'open_ended'], TRUE);
+  }
+
+  /**
+   * Formats a timestamp as a day in the site timezone.
+   *
+   * @param int $timestamp
+   *   The timestamp.
+   *
+   * @return string
+   *   The day, YYYY-MM-DD.
+   */
+  public function formatDay(int $timestamp): string {
+    return (new \DateTimeImmutable('@' . $timestamp))->setTimezone($this->siteTimeZone())->format('Y-m-d');
+  }
+
+  /**
+   * Returns the site's default timezone.
+   *
+   * @return \DateTimeZone
+   *   system.date:timezone.default, UTC when unset.
+   */
+  protected function siteTimeZone(): \DateTimeZone {
+    return new \DateTimeZone($this->configFactory->get('system.date')->get('timezone.default') ?: 'UTC');
   }
 
   /**

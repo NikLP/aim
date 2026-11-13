@@ -754,10 +754,22 @@ literature and what was parked).
   `asserted` (optional, true since: `--asserted` on `aim:remember`);
   `expires` (optional, the day it stops being true); `retired` (set when
   it leaves recall, by consolidation, `aim:expire` or a reviewer).
-- **Writing.** The remember tool's `text` description asks for calendar
-  dates, never relative ones ("until Friday 16 October 2026"), and
+- **Writing.** The remember tool's `text` description asks for a calendar
+  date, never a relative one ("until Friday 16 October 2026"), in the text
+  only when it differs from the save date or is the point of the fact.
   `expires` is a `YYYY-MM-DD` input on the tool, `aim:remember`
-  (`--expires`) and JSON/batch entries; a past date is refused.
+  (`--expires`) and JSON/batch entries: the last day the fact is true,
+  inclusive, in the site timezone; a past date is refused, `open-ended`
+  states there is no end.
+- **Time check** (`time_check_mode`: `off` default, `flag`, `reject`; ADR-0057
+  addendum). One decision question per candidate, "does candidate_N state or
+  imply a date after which it stops being true?", on the grounded check's model
+  (`AimGroundingChecker::checkTimeBound()`, batched into the grounding call
+  when both run; cutoff `activities.grounding.time_threshold`, default 0.3).
+  A yes with no `expires` (and not `open-ended`): `aim_remember` returns a
+  retry error asking for one; the ingest form, `aim:extract` and Drush save
+  it untrusted (`flag`) or refuse it (`reject`). A failed check changes
+  nothing.
   Not built: the chat persona is not given today's date (so it cannot
   confirm "Friday" as a calendar date), and extraction does not resolve
   relative dates against the document's date (ADR-0057 points 1, 2, 4).

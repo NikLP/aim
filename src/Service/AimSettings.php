@@ -74,6 +74,15 @@ class AimSettings {
   protected const GROUNDING_DEFAULT_THRESHOLD = 0.7;
 
   /**
+   * The time check's cutoff when activities.grounding.time_threshold is unset.
+   *
+   * Set from decision-eval.php's time task (23 items, two runs 2026-11-12):
+   * time-bound facts scored 0.45 or more, everything else 0.11 or less;
+   * scores move between runs, so 0.3 sits in the middle of the gap.
+   */
+  protected const TIME_CHECK_DEFAULT_THRESHOLD = 0.3;
+
+  /**
    * Candidates per grounded-check call when none is configured (subq's cap).
    */
   protected const GROUNDING_MAX_QUESTIONS = 16;
@@ -263,6 +272,48 @@ class AimSettings {
   public function getGroundingMaxQuestions(): int {
     $max = (int) ($this->configFactory->get('aim.settings')->get('activities.grounding.max_questions') ?? 0);
     return $max > 0 ? $max : self::GROUNDING_MAX_QUESTIONS;
+  }
+
+  /**
+   * Returns the time check's mode: off, flag or reject.
+   *
+   * The check asks, per candidate, whether it is only true for a date or
+   * period (ADR-0057 addendum). Flag sends such a fact without an end date
+   * to review (and has aim_remember ask its caller for one); reject refuses
+   * it on the paths with no caller to ask.
+   *
+   * @return string
+   *   The mode, off when unset or unknown.
+   */
+  public function getTimeCheckMode(): string {
+    $mode = $this->configFactory->get('aim.settings')->get('time_check_mode');
+    return in_array($mode, ['flag', 'reject'], TRUE) ? $mode : 'off';
+  }
+
+  /**
+   * Whether the time check runs: a mode other than off and a model.
+   *
+   * It uses the grounded check's decision model, so grounding itself may be
+   * off.
+   *
+   * @return bool
+   *   TRUE when time_check_mode is flag or reject and a decision model is
+   *   chosen for activities.grounding.
+   */
+  public function isTimeCheckOn(): bool {
+    return $this->getTimeCheckMode() !== 'off' && $this->decisionModelFor('grounding') !== NULL;
+  }
+
+  /**
+   * Returns the score at or above which a fact counts as time-bound.
+   *
+   * @return float
+   *   aim.settings:activities.grounding.time_threshold, or the shipped
+   *   default when unset or 0.
+   */
+  public function getTimeCheckThreshold(): float {
+    $threshold = (float) ($this->configFactory->get('aim.settings')->get('activities.grounding.time_threshold') ?? 0);
+    return $threshold > 0 ? $threshold : self::TIME_CHECK_DEFAULT_THRESHOLD;
   }
 
 }

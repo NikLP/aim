@@ -29,6 +29,18 @@ class AimGroundingChecker {
   protected const GROUNDING_QUESTION = 'Does the text state the fact in %1$s? Answer no if %1$s adds, changes or drops any detail, gives an old value the text has replaced, pins a detail on the wrong person or thing, or states as settled something the text only proposes, hedges or reports second-hand.';
 
   /**
+   * The time check's question, %1$s being the candidate's state key.
+   *
+   * Says "candidate", not "fact": the decision model does not know the term.
+   * The "ends" wording of decision-eval.php's time task (23-item gold set,
+   * 2026-11-12): AUC 1.00, no false asks. "Only true or relevant for a
+   * particular date or period" scored past events and start-only dates 0.7
+   * to 1.0 too, which would have sent every dated memory for a pointless
+   * retry.
+   */
+  protected const TIME_QUESTION = 'Does %1$s state or imply a date after which it stops being true?';
+
+  /**
    * Grounding scores fetched this request, keyed by passage and candidate.
    *
    * Lets a caller check a whole batch in one call, after which remember()
@@ -37,6 +49,13 @@ class AimGroundingChecker {
    * @var array<string, float|null>
    */
   protected array $groundingCache = [];
+
+  /**
+   * Time-check scores fetched this request, keyed by candidate text.
+   *
+   * @var array<string, float|null>
+   */
+  protected array $timeCache = [];
 
   /**
    * Constructs an AimGroundingChecker object.
@@ -60,9 +79,10 @@ class AimGroundingChecker {
    * Asks the decision model whether a passage states each candidate fact.
    *
    * One call per group of candidates (activities.grounding.max_questions,
-   * 16 by default): every candidate goes into the state next
-   * to the passage with its own question, which measured as fast and as
-   * accurate as one call per fact (ADR-0037 addendum). Scores already
+   * 16 by default, counting every question): each candidate goes into the
+   * state next to the passage with its own question, which measured as fast
+   * and as accurate as one call per fact (ADR-0037 addendum). When the time
+   * check is on, its question rides in the same call. Scores already
    * fetched this request are reused. The passage is never stored; with
    * log_query_text on, it is logged with each score for diagnosis.
    *
@@ -76,58 +96,181 @@ class AimGroundingChecker {
    *   each candidate when the check is off, has no decision model, or failed.
    */
   public function checkGrounding(string $passage, array $candidates): array {
-    $scores = array_fill_keys(array_keys($candidates), NULL);
     $passage = trim($passage);
-    if ($this->settings->getGroundingMode() === 'off' || $passage === '' || !$candidates) {
+    $grounding = $this->settings->isGroundingOn() && $passage !== '';
+    $this->warnWithoutModel();
+    $this->fetch($passage, $candidates, $grounding, $this->settings->isTimeCheckOn());
+
+    $scores = array_fill_keys(array_keys($candidates), NULL);
+    if ($grounding) {
+      foreach ($candidates as $key => $candidate) {
+        $scores[$key] = $this->groundingCache[$this->groundingHash($passage, (string) $candidate)] ?? NULL;
+      }
+    }
+    return $scores;
+  }
+
+  /**
+   * Asks the decision model whether each candidate stops being true on a date.
+   *
+   * The time check (ADR-0057 addendum), see TIME_QUESTION. Scores fetched
+   * earlier this request, by checkBatch() or checkGrounding(), are reused.
+   *
+   * @param string[] $candidates
+   *   Candidate fact texts, keyed however the caller likes.
+   *
+   * @return array
+   *   A probability (0 to 1) per candidate, same keys, or NULL for each
+   *   candidate when the check is off, has no decision model, or failed.
+   */
+  public function checkTimeBound(array $candidates): array {
+    $scores = array_fill_keys(array_keys($candidates), NULL);
+    if (!$this->settings->isTimeCheckOn()) {
       return $scores;
+    }
+    $this->fetch('', $candidates, FALSE, TRUE);
+    foreach ($candidates as $key => $candidate) {
+      $scores[$key] = $this->timeCache[$this->timeHash((string) $candidate)] ?? NULL;
+    }
+    return $scores;
+  }
+
+  /**
+   * Fetches both checks for a whole list in the fewest calls.
+   *
+   * For a caller that will write the facts one by one: each remember() then
+   * finds its scores already fetched.
+   *
+   * @param string|null $passage
+   *   The text the facts were written from, or NULL for none (the grounded
+   *   check is then skipped).
+   * @param string[] $candidates
+   *   Candidate fact texts.
+   */
+  public function checkBatch(?string $passage, array $candidates): void {
+    $passage = trim((string) $passage);
+    $this->fetch($passage, $candidates, $this->settings->isGroundingOn() && $passage !== '', $this->settings->isTimeCheckOn());
+  }
+
+  /**
+   * Logs a warning when a check is on but no decision model is chosen.
+   */
+  protected function warnWithoutModel(): void {
+    if ($this->settings->decisionModelFor('grounding') !== NULL) {
+      return;
+    }
+    $modes = [
+      'grounded check' => $this->settings->getGroundingMode(),
+      'time check' => $this->settings->getTimeCheckMode(),
+    ];
+    foreach ($modes as $check => $mode) {
+      if ($mode !== 'off') {
+        $this->logger->warning('The @check is @mode but no decision model is chosen for it in the AIM settings; facts are not checked.', [
+          '@check' => $check,
+          '@mode' => $mode,
+        ]);
+      }
+    }
+  }
+
+  /**
+   * The cache key of a grounding score.
+   *
+   * @param string $passage
+   *   The passage.
+   * @param string $candidate
+   *   The candidate text.
+   *
+   * @return string
+   *   The key.
+   */
+  protected function groundingHash(string $passage, string $candidate): string {
+    return hash('sha256', $passage . "\0" . $candidate);
+  }
+
+  /**
+   * The cache key of a time-check score: the candidate alone.
+   *
+   * @param string $candidate
+   *   The candidate text.
+   *
+   * @return string
+   *   The key.
+   */
+  protected function timeHash(string $candidate): string {
+    return hash('sha256', $candidate);
+  }
+
+  /**
+   * Runs the checks not already cached, filling the caches.
+   *
+   * @param string $passage
+   *   The trimmed passage, unused when $grounding is FALSE.
+   * @param string[] $candidates
+   *   Candidate fact texts.
+   * @param bool $grounding
+   *   Whether to run the grounded check.
+   * @param bool $time
+   *   Whether to run the time check.
+   */
+  protected function fetch(string $passage, array $candidates, bool $grounding, bool $time): void {
+    if ((!$grounding && !$time) || !$candidates) {
+      return;
     }
     $model = $this->settings->decisionModelFor('grounding');
     if ($model === NULL) {
-      $this->logger->warning('Grounding is @mode but no decision model is chosen for it in the AIM settings; facts are not checked.', ['@mode' => $this->settings->getGroundingMode()]);
-      return $scores;
+      return;
     }
 
-    $state = ['text' => $passage];
-    $questions = [];
+    // Candidates with a check still to run, keyed by their question ID.
     $asked = [];
-    foreach ($candidates as $key => $candidate) {
-      $hash = hash('sha256', $passage . "\0" . $candidate);
-      if (array_key_exists($hash, $this->groundingCache)) {
-        $scores[$key] = $this->groundingCache[$hash];
+    foreach ($candidates as $candidate) {
+      $candidate = (string) $candidate;
+      $needGrounding = $grounding && !array_key_exists($this->groundingHash($passage, $candidate), $this->groundingCache);
+      $needTime = $time && !array_key_exists($this->timeHash($candidate), $this->timeCache);
+      if (!$needGrounding && !$needTime) {
         continue;
       }
-      $id = 'candidate_' . (count($asked) + 1);
-      $state[$id] = (string) $candidate;
-      $questions[$id] = new NoulQuestion(sprintf(self::GROUNDING_QUESTION, $id));
-      $asked[$id] = [$key, $hash];
+      $asked['candidate_' . (count($asked) + 1)] = [$candidate, $needGrounding, $needTime];
     }
     if (!$asked) {
-      return $scores;
+      return;
     }
 
-    // Providers cap the questions in one call (subq: 16), so ask in groups.
-    foreach (array_chunk($asked, $this->settings->getGroundingMaxQuestions(), TRUE) as $group) {
-      $groupState = ['text' => $passage];
-      $groupQuestions = [];
-      foreach (array_keys($group) as $id) {
-        $groupState[$id] = $state[$id];
-        $groupQuestions[$id] = $questions[$id];
+    // Providers cap the questions in one call (subq: 16), so ask in groups
+    // sized by questions, not candidates.
+    $perCandidate = ($grounding ? 1 : 0) + ($time ? 1 : 0);
+    $size = max(1, intdiv($this->settings->getGroundingMaxQuestions(), $perCandidate));
+    foreach (array_chunk($asked, $size, TRUE) as $group) {
+      $state = $grounding ? ['text' => $passage] : [];
+      $questions = [];
+      foreach ($group as $id => [$candidate, $needGrounding, $needTime]) {
+        $state[$id] = $candidate;
+        if ($needGrounding) {
+          $questions[$id] = new NoulQuestion(sprintf(self::GROUNDING_QUESTION, $id));
+        }
+        if ($needTime) {
+          $questions[$id . '_time'] = new NoulQuestion(sprintf(self::TIME_QUESTION, $id));
+        }
       }
       try {
-        $response = $this->decisionBackend->run('grounding', new DecisionInput($groupState, $groupQuestions), $model[0], $model[1]);
-        foreach ($group as $id => [$key, $hash]) {
-          $scores[$key] = $this->groundingCache[$hash] = $response->getNoul($id)->getProbability();
+        $response = $this->decisionBackend->run('grounding', new DecisionInput($state, $questions), $model[0], $model[1]);
+        foreach ($group as $id => [$candidate, $needGrounding, $needTime]) {
+          if ($needGrounding) {
+            $this->groundingCache[$this->groundingHash($passage, $candidate)] = $response->getNoul($id)->getProbability();
+          }
+          if ($needTime) {
+            $this->timeCache[$this->timeHash($candidate)] = $response->getNoul($id . '_time')->getProbability();
+          }
         }
       }
       catch (\Exception $e) {
-        $this->logger->warning('Grounding check failed to run for @count candidate(s): @message', [
+        $this->logger->warning('Grounding or time check failed to run for @count candidate(s): @message', [
           '@count' => count($group),
           '@message' => $e->getMessage(),
         ]);
       }
     }
-
-    return $scores;
   }
 
 }

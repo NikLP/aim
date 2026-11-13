@@ -8,7 +8,9 @@ description asks for calendar dates, never relative ones); point 6 (facts
 with different `expires` are never compared, 2026-10-27, ADR-0036
 addendum); half of point 7 (`aim_recall` returns each fact's date and
 which kind it is). Not built: point 1 (the chat persona has no date),
-point 2 for chat, point 4 (extraction), point 7's persona wording.
+point 2 for chat, point 4 (extraction), point 7's persona wording. The
+2026-11-12 addendum (time check at write time) supersedes the stance line
+"do not reason about time" and point 5; built, default off.
 **Date:** 2026-10-11
 
 ## Context
@@ -105,3 +107,49 @@ have a person confirm it where one is present.
 - Recurring or vague periods ("during the summer holidays", "most
   Thursdays") are not dates to resolve; keep them as words. The grounded
   check already marks dropping them down (eval item G8).
+
+## Addendum (2026-11-12): a time check at write time
+
+A chat test saved "peanut snack on 11 November" with the date repeated in
+the text, and time-bound facts ("closed until 16 October") carried no
+`expires`, so they went stale. This replaces the stance line "do not
+reason about time" and point 5, "MCP: the caller's job": a model now judges
+one narrow thing at write time, and the caller is asked for the date
+instead of trusted to give it. Recall still does no time reasoning.
+
+- **The check.** One yes/no decision question per candidate: "Does
+  candidate_N state or imply a date after which it stops being true?"
+  ("fact" is not used: Jev does not know the term). It runs on the grounded
+  check's decision model, in the same batched call when grounding is on, and
+  has its own setting, `time_check_mode` (`off` default, `flag`, `reject`),
+  so it does not vanish when grounding is off. Cutoff:
+  `activities.grounding.time_threshold`, 0.3.
+- **On a yes with no `expires`.** `aim_remember` (chat and MCP) refuses the
+  entry with a retry error asking for `expires` as `YYYY-MM-DD`, or the
+  explicit `"open-ended"`. Where no caller can be asked (the ingest form,
+  `aim:extract`, Drush): `flag` saves the fact untrusted for review, `reject`
+  refuses it. A failed check changes nothing (it never loops a caller).
+  `"open-ended"` skips the check.
+- **`expires` defined.** The last day the fact is true, inclusive, in the
+  site timezone; `aim:expire` retires it once that day has ended. (It was
+  UTC end of day.)
+- **Text.** `aim_remember`'s `text` input stops asking for dates in the text
+  as a rule: a date goes in only when it differs from the save date or is the
+  point of the fact.
+- **Evidence.** A 12-fact run on `subq-snap-1.2` (24 questions, 0.8s): the
+  "ends after a date" question separated cleanly while a four-way "kind"
+  question scored 11/12. The gold set (`decision-eval-time.json`, 23 facts:
+  explicit and relative ends, periods, future events, standing facts, past
+  events, start-only dates; labelled by whether an `expires` is right, so
+  past events and start-only dates are "open"; `decision-eval.php -- time`)
+  compared the wordings. The first candidate, "Is candidate_N only true or
+  relevant for a particular date or period?", had AUC 0.99 but flagged
+  every past event and start-only date (0.68 to 0.99; 5 of 13 open facts),
+  which would have sent "peanut snack on 11 November" back for an `expires`
+  it cannot have. "Does candidate_N state or imply a date after which it
+  stops being true?" had AUC 1.00, no false asks and no misses: bound facts
+  0.45 to 1.00 (future events lowest), open facts 0.00 to 0.11, across two
+  runs (scores move between runs). Cutoff 0.3 sits in the gap. Small set, authored by Claude and not blind, so recheck
+  on real traffic in `flag` mode before relying on `reject`.
+- **Later.** An `asserted` ("true from") input on `aim_remember`, for
+  start-only dates.

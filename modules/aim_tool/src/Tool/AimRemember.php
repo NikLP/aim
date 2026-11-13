@@ -167,7 +167,7 @@ final class AimRemember {
           'text' => new InputDefinition(
             data_type: 'string',
             label: new TranslatableMarkup('Fact text'),
-            description: new TranslatableMarkup('The fact, as a short atomic statement with calendar dates ("closed until Friday 16 October 2026"), never relative ones ("until Friday"), which go stale.'),
+            description: new TranslatableMarkup('The fact, as a short atomic statement. Put a date in the text only when it differs from the save date or is the point of the fact ("closed until Friday 16 October 2026"), as a calendar date, never a relative one ("until Friday"), which goes stale.'),
             required: TRUE,
           ),
           'scope' => new InputDefinition(
@@ -187,7 +187,7 @@ final class AimRemember {
           'expires' => new InputDefinition(
             data_type: 'string',
             label: new TranslatableMarkup('Expires'),
-            description: new TranslatableMarkup('Only when the fact has a stated end: the calendar date it stops being true, as YYYY-MM-DD. The fact is retired after that date. Omit for a fact with no end.'),
+            description: new TranslatableMarkup('The last day the fact is true, inclusive, in the site timezone, as YYYY-MM-DD; the fact is retired after that day ends. Give it for any fact that holds only for a date or period. Write "open-ended" for a fact with no end. If the save is refused for want of it, retry with one or the other.'),
             required: FALSE,
           ),
           'scope_fields' => new MapInputDefinition(
@@ -215,11 +215,9 @@ final class AimRemember {
 
     $lines = [];
     $created = 0;
-    if ($sourceText !== NULL) {
-      // One grounding call for the whole list; each remember() below then
-      // finds its score already fetched.
-      $this->groundingChecker->checkGrounding($sourceText, array_filter(array_map(fn ($entry) => (string) ($entry['text'] ?? ''), $facts)));
-    }
+    // One grounding and time-check call for the whole list; each remember()
+    // below then finds its scores already fetched.
+    $this->groundingChecker->checkBatch($sourceText, array_filter(array_map(fn ($entry) => (string) ($entry['text'] ?? ''), $facts)));
     foreach ($facts as $i => $entry) {
       if (empty($entry['text'])) {
         $lines[] = "Entry $i: missing text, skipped.";
@@ -267,7 +265,7 @@ final class AimRemember {
       $note .= ' Waiting for staff review: recall will not return it until a reviewer trusts it.';
     }
     if ($fact['expires']) {
-      $note .= ' It retires after ' . gmdate('Y-m-d', $fact['expires']) . '.';
+      $note .= ' It retires after ' . $this->rememberService->formatDay($fact['expires']) . '.';
     }
     return $note;
   }
@@ -322,6 +320,8 @@ final class AimRemember {
         $scopeFields['target_id'] ?? NULL,
         $sourceText,
         $this->rememberService->parseExpires($fields),
+        $this->rememberService->isOpenEnded($fields),
+        TRUE,
       );
     }
     catch (\InvalidArgumentException $e) {
