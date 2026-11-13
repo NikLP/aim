@@ -65,9 +65,10 @@ Five memory categories, composable at retrieval the way Mem0 composes
   natively - the candidate differentiator.
 - **Site memory** - one global/org-scoped graph of facts about the site
   itself.
-- **Support tracking** - session-scoped episodic memory, modeled as a real
-  entity with workflow states (open -> assigned -> resolved), not a bare
-  session-ID string.
+- **Case memory** - facts about one piece of ongoing work with a start
+  and an end (a support case, a site redesign), grouped under a case ID
+  the scope mints or takes from a case name. A case entity with workflow
+  states (open -> assigned -> resolved) is not built.
 - **Entity memory** - a fact about one specific piece of site content
   (a node, a media item, anything with its own Drupal access model),
   visible to whoever can already see that content rather than through a
@@ -80,8 +81,10 @@ Five memory categories, composable at retrieval the way Mem0 composes
 - **Storage:** entities with `VECTOR` fields via `ai_vdb_provider_mariadb`,
   in-database, full transaction support.
 - **Processing:** Queue API plus a dedicated crontab entry, separate from
-  `hook_cron` - extraction, consolidation, and decay run unattended, not
-  on the live request path.
+  `hook_cron` - consolidation runs unattended, not on the live request
+  path. Extraction runs when called (Drush or the ingest form), and there
+  is no decay: a fact leaves recall when it is retired or its `expires`
+  date passes.
 - **Governance:** every candidate fact passes through `drupal/ai`'s
   Guardrails before it's written (today a length limit and a no-markup
   rule; a personal-data check is designed but parked in
@@ -220,11 +223,12 @@ each with its own requirements and setup:
 
 To see it working with a story already loaded, apply the
 [community library demo recipe](recipes/aim_demo_library/README.md) to a
-fresh site (untested so far, see its README). For one person's own memory
+fresh site (verified on a fresh Drupal 11.4 install 2026-10-19, see its
+README). For one person's own memory
 in Claude, on a site of its own, there is
 [`aim_personal`](recipes/aim_personal/README.md).
 
 Full command reference and the developer API are in
 [DEVELOPING.md](DEVELOPING.md). What is tested, and what is not yet, is in
-[TESTS.md](TESTS.md) (54 PHPUnit tests, run command in DEVELOPING.md's
-"Running the tests").
+[TESTS.md](TESTS.md) (PHPUnit kernel, unit and functional tests, run
+command in DEVELOPING.md's "Running the tests").

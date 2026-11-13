@@ -225,7 +225,7 @@ duplicated here.
   for the field's old `subject_uid` name), HNSW is tuned to
   `M=16` and `ef_search=100` ([ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)),
   and the
-  provider plugin is swapped for `AimMariaDBProvider` to work around four
+  provider plugin is swapped for `AimMariaDBProvider` to work around three
   upstream bugs. Detail in [DEVELOPING.md](DEVELOPING.md).
 
 ## Permissions

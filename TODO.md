@@ -177,8 +177,8 @@ gate are built. Work on the literals modules themselves is in
       recipe-building skill reads it and proposes a Recipe. ADR-0035's gate
       applies (dry-run and human review before any apply). Own ADR.
 - [ ] **Fresh install docs.** The recipe README's "Fresh install" should
-      say to apply `aim_ollama_local` (or set the Ollama host and
-      embeddings default) before this recipe, since facts are embedded on
+      say to set the Ollama host and embeddings default before this
+      recipe, since facts are embedded on
       import, and add a stop after it for manual model setup (chat
       provider, decision models and thresholds on the Models tab,
       `grounding_mode`), then `node demo/preflight.js`.
@@ -199,7 +199,7 @@ gate are built. Work on the literals modules themselves is in
       NOOP lost on stage). Add `--changes-only`, or make it the dry-run
       default with a flag for all rows.
 - [ ] **MCP checks for `mcp_server_tool_bridge` beta5.** When
-      `aim_tool_oauth` is next enabled: check the three tools list without a cache rebuild and
+      `aim_tool_oauth` is next enabled: check the four tools list without a cache rebuild and
       that `pmu aim_tool` leaves no `mcp_tool_config.aim_*` behind; refresh
       the "observed with beta3" notes in aim_tool's README/DEVELOPING.md.
 - [ ] **Note: recall is tied to MariaDB and `nomic-embed-text` today**
@@ -217,7 +217,7 @@ gate are built. Work on the literals modules themselves is in
 ## Ingestion
 
 - [ ] Chunking for `aim:extract` and the ingest form: today the whole file
-      goes into one extraction prompt (`AimMemoryManager::extractFacts()`),
+      goes into one extraction prompt (`AimRememberService::extractFacts()`),
       so a file larger than the chat model's context fails. Split on
       paragraph/heading boundaries with a small overlap, extract per chunk,
       then let consolidation dedupe across chunks. A small local extractor
@@ -239,7 +239,8 @@ only work to do is listed here.
       `^1.6` since 2026-10-30 (the Decision API); until 1.6.0 is tagged a
       site needs `1.6.x-dev`.
 - [ ] **Per-model thresholds and editable question text** for the decision
-      backend (ADR-0021 decision 5; text hardcoded in `AimMemoryManager`).
+      backend (ADR-0021 decision 5; text hardcoded in `AimConsolidationService` and
+      `AimGroundingChecker`).
       Limits: `tev1` input ~2,050 tokens, Ollama max 26 options. Optional:
       per-activity `concurrency` (nice-to-have; only a bulk backfill is slow).
 - [ ] **Trust follow-ups** (ADR-0065): reason column on the facts list;
@@ -286,8 +287,8 @@ only work to do is listed here.
       have the model filter the top N, for paraphrase misses. Measure on
       the known misses first; it sends fact text to the model.
 - [ ] **subq as decision host: open points** (history in ADR-0021's
-      2026-10-19 addendum). Thresholds (0.8 verifier, 0.7 grounding) were
-      tuned on Jev; harder pairs unmeasured; subq retention and training
+      2026-10-19 addendum). Thresholds (0.9 verifier, 0.7 grounding)
+      re-measured on `subq-snap-1.2` 2026-11-12; harder pairs unmeasured; subq retention and training
       policy unread (synthetic data only); the `/models` shape fix in
       `TypeSafeAiClient::listModels()` is a local patch that `composer
       update` overwrites (upstream handoff); `tokens_output` reads 0 on

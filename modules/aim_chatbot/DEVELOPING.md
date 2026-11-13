@@ -44,9 +44,9 @@ for its history and alternatives considered.
 - **`aim_recall` abstains past a distance cutoff** - rows whose
   cosine distance exceeds `aim.settings:recall_max_distance` (default
   0.48, editable at `/admin/config/aim/settings`, read via
-  `AimMemoryManager::getRecallMaxDistance()`) are dropped, and an empty
+  `AimSettings::getRecallMaxDistance()`) are dropped, and an empty
   remainder returns "No relevant facts found." instead of a result list.
-  `AimMemoryManager::recall()` itself does not filter, so `drush
+  `AimRecallService::recall()` itself does not filter, so `drush
   aim:recall` without `--max-distance` still returns raw results.
   Calibrated against `nomic-embed-text` (question vs. fact): answerable
   questions' best match 0.12-0.29 (full questions and terse keyword
@@ -60,8 +60,6 @@ for its history and alternatives considered.
   drifts down (same queries against all scopes' 120 facts instead of
   site's 18 matched closer by up to 0.035). Decision, full measurements
   and the retuning checklist: [ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md).
-  Separately, `recall()` returns fewer than 5 live rows here because
-  retired facts take result slots - same ADR.
 
 ## CCC (`ai_context`), not enabled here
 

@@ -43,7 +43,7 @@ uid 1 (see "Be upfront about").
 From the site root, adjusting `custom` to wherever the module lives:
 
 ```bash
-ddev exec vendor/bin/dr recipe:apply --input=aim_personal.owner_name="Your Name" web/modules/custom/aim/recipes/aim_personal
+ddev drush recipe /var/www/html/web/modules/custom/aim/recipes/aim_personal --input=aim_personal.owner_name="Your Name"
 ```
 
 Then the parts a recipe can't do, which are site-specific:

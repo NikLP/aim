@@ -1,8 +1,8 @@
 # AIM Tool
 
-Exposes AIM memory as Tool API tools (`aim_remember`/`aim_recall`/`aim_brief`), and
-through them, over MCP via `mcp_server_tool_bridge`. Any scope, gated by
-permission rather than hardcoded like `aim_chatbot`. Part of
+Exposes AIM memory as Tool API tools (`aim_remember`/`aim_recall`/`aim_brief`,
+plus `aim_literal` for exact values), and through them, over MCP via
+`mcp_server_tool_bridge`. Any scope, gated by permission. Part of
 [AIM](../../README.md).
 
 Over MCP the tools are listed as `tool_api__aim_remember` and
@@ -46,7 +46,7 @@ name or case ID.
 ## Requirements
 
 - `aim` (this module's parent)
-- `drupal/tool` (`>=1.0.0-beta10`)
+- `drupal/tool` (`^1.0.0-beta12`)
 - Nothing else. MCP exposure is opt-in via
   [aim_tool_oauth](../aim_tool_oauth/README.md), which carries the MCP
   packages (see its Requirements).

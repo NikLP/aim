@@ -155,8 +155,10 @@ failed recipe prints a long stack trace after the real error; the first
   (`gate_choice_margin`, 0.4), the finder's Match threshold
   (`literals_finder.settings:match_threshold`, 0.8) and the Verifier
   threshold (`activities.verifier.threshold`, 0.9) were measured with a
-  hosted SystemOne-compatible decision endpoint (`typesafeai`,
-  `subq-snap-1.1`, 2026-11-01) as the Decision model. Re-check them if
+  hosted SystemOne-compatible decision endpoint (`typesafeai`) as the
+  Decision model: the verifier re-measured on `subq-snap-1.2`
+  (2026-11-12), the gate and finder values on `subq-snap-1.1`
+  (2026-11-01). Re-check them if
   you change either model.
 - **Review gate by writer.** Any signed-in visitor can tell the chat a
   fact (the recipe grants `access deepchat api` and `create site aim
@@ -177,7 +179,7 @@ node demo/preflight.js   # site wrapper; see below
 It checks the site (local and through the public funnel URL), Ollama, the
 vector index, the full OAuth handshake as Claude.ai does it (client
 registration, consent, PKCE), that the MCP server instructions carry aim's
-scope guide, all four scopes over MCP, save-then-search, and the chat
+scope guide, the site, role, user and case scopes over MCP, save-then-search, and the chat
 widget in a real browser (answer, write-then-read, then "nothing recorded"
 for a question with no fact), plus that anonymous visitors can't see or
 call the widget. It needs DDEV up, a public URL that reaches the site (a
@@ -195,7 +197,7 @@ Facts added during a run stay until you reset. The chat widget is for
 logged-in users only (anonymous visitors don't see it and `/api/deepchat`
 returns 403), so the audience can't add facts through it. Return to the
 starting state by reinstalling the site and following "Fresh install"
-below (the recipe is strict, so it will not re-apply over the manual model
+above (the recipe is strict, so it will not re-apply over the manual model
 setup). A literal edited on stage is restored by the reinstall too.
 
 ### Suggested flow (about 8 minutes)
@@ -232,7 +234,7 @@ setup). A literal edited on stage is restored by the reinstall too.
    - "When does the events calendar launch?" (case scope)
    - Tell Claude a new fact, then ask the widget about it.
 4. **Optional, from the terminal.**
-   - `ddev drush aim:recall "opening hours" --scope=site --max-distance=0.48`
+   - `ddev drush aim:recall "opening hours" --scope=site --max-distance=0.6`
    - Save a near-duplicate ("The library opens at 9am on weekdays"), then
      `ddev drush aim:consolidate --scope=site --dry-run` to show the
      merge decision.
@@ -262,14 +264,15 @@ not topics like opening hours, which vary by day.
 
 ### What to say about how it is built
 
-- Facts are content entities. The four scopes (user, role, site, case) are
-  bundles, real `aim_scope` config entities.
+- Facts are content entities. The five scopes (site, role, user, case,
+  entity) are bundles, real `aim_scope` config entities; the demo's facts
+  use the first four.
 - Search is Search API with the AI Search backend and MariaDB's native
   `VECTOR` type with an HNSW index, in the same database as everything
   else. Embeddings run locally on Ollama.
 - Every write goes through `drupal/ai` Guardrails. Consolidation
   (dedupe/supersede) runs from the Queue API, not on the request.
-- The MCP tools are Tool API plugins, exposed with `mcp_server`, secured
+- The MCP tools are Tool API tools (`#[ToolMethod]` services), exposed with `mcp_server`, secured
   with `simple_oauth` scopes and Drupal permissions per scope.
 - Recall drops matches past a calibrated distance, so an unrelated
   question gets "nothing relevant" instead of the nearest unrelated fact.

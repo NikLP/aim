@@ -135,6 +135,13 @@ recall assumes English; the work is model setup and tuning.
 - [ ] Pinned: `verified`/`verified_by` fields (not `trusted`), ADR-0036.
 - [ ] Parked (ADR-0057 time stance): recency/importance re-rank,
       weights default 0, needs a gold set.
+- [ ] Parked (raised 2026-11-13): recall-time decay for fuzzy user-scope
+      facts (preferences, interests): a result reorder by category or
+      scope, never a change to stored data. ADR-0057 declines decay for
+      discrete facts (opening hours) and that stands; "allergic to nuts"
+      must not fade like "likes jazz", so this needs a durable-versus-
+      perishable signal that `category` does not carry today. Trigger: a
+      real recall where a stale personal fact outranks a fresher one.
 - [ ] Parked (ADR-0057 time stance): access counter / last-recalled.
 - [ ] Later, on a real recall miss: RRF keyword path via `search_api_db`
       (hybrid keyword + vector recall; second keyword-only index fused in
@@ -288,7 +295,7 @@ OpenBrain, an in-house second brain. His points, and where each landed:
 - [ ] User-scope authorship gap (raised 2026-09-30): nothing checks that a
       `scope=user` fact's `user` (who it is about) is the poster (`uid`,
       who wrote it). `aim_tool`'s `AimRemember` only *defaults* `subject`
-      to the current user when omitted; a caller can pass any uid/username
+      to the current user when omitted; a caller can pass any uid
       and the fact is saved about that person, and `create user aim facts`
       is the only gate. The tool description asking the model to confirm
       first is prompt-level, not enforced. Proposed: in `remember()`,
@@ -730,9 +737,9 @@ would bring each back. Nothing here is built.
       draft, overlaps MCP (a second discovery surface to maintain), aim's
       scopes (site/role/user/case/entity) don't map onto read/write, and
       neglect is the main risk. Read from summaries only; the spec itself
-      is unread. Trigger: the spec stabilises, or a real caller asks. First
+      is unread. Trigger: the spec stabilizes, or a real caller asks. First
       step then: a small `poppy.json` generator reusing the OAuth/MCP
-      config, nothing deeper. Spec: personalagentprotocol.org.
+      config, nothing deeper. Spec: <https://personalagentprotocol.org>.
 - [ ] **Parked by Nik (moved from TODO.md 2026-10-30):** visitor/staff
       assistant split (staff agent with remember; fine for a demo, not
       essential; [ADR-0008](adr/resolved/0008-chatbot-integration-mechanism.md)'s
@@ -829,7 +836,7 @@ would bring each back. Nothing here is built.
 - ADR-0012 (fact-to-fact relation graph, multi-hop retrieval): revisit when a
   consumer needs more than the supersede edge in `related`.
 - ADR-0014 (use-case archetype starter kits): revisit when a third Recipe
-  beyond `aim_demo_library` and `aim_ollama_local` is wanted.
+  beyond `aim_demo_library` and `aim_personal` is wanted.
 - ADR-0055 (decision rationale as entity-scope facts): revisit when a
   decision-provenance need is real. The test is to hand-model 5 to 10 ADRs
   as `scope=entity` facts and check recall beats grepping the ADR files.

@@ -9,9 +9,9 @@ module reference in [../../DEVELOPING.md](../../DEVELOPING.md).
 ## Tool API + MCP exposure
 
 `aim_tool` ships the tools `aim_remember`/`aim_recall`/`aim_brief`/`aim_literal`
-wrapping `AimMemoryManager` directly (any scope, gated on `remember aim facts`/
+wrapping aim's memory services directly (`aim_literal`: `literals.lookup`; any scope, gated on `remember aim facts`/
 `recall aim facts`, not the admin UI's single `administer aim`).
-`mcp_server_tool_bridge` exposes both over MCP via config-only
+`mcp_server_tool_bridge` exposes them over MCP via config-only
 `mcp_tool_config` entities, shipped by `aim_tool_oauth` (`config/install`),
 so MCP is opt-in: enable that module to turn it on. `aim_remember` takes
 only `facts`, a list of one or more `{text, scope, subject?, expires?,
@@ -59,12 +59,13 @@ else `created` with `date_kind: recorded`), declared with
 publishes as `outputSchema` and returns as `structuredContent`. Scope and
 subject are there for the caller to act on, such as adding to a case by its
 ID. A few more tokens per result than a formatted line (field names repeat),
-bounded by the 25 cap. `aim_chatbot`'s recall keeps `formatFactLine()`'s
-lines. An MCP client validates results against the schema it cached when it
+bounded by the 25 cap. Chat's tool calls get the same structured
+results; only `aim_chatbot`'s optional recall-context subscriber uses
+`formatFactLine()`'s lines. An MCP client validates results against the schema it cached when it
 connected, so a connector opened before an output change reports "Structured
 content does not match the tool's output schema" until it reconnects.
 
-**All three tools are `#[ToolMethod]` services**, not
+**All four tools are `#[ToolMethod]` services**, not
 `#[Tool]` plugin classes (tool 1.0.0-beta12, ADR-0044): `src/Tool/`,
 registered in `aim_tool.services.yml`. Tool API builds each tool's inputs
 from the method's parameters and `@param` text, so a description lives in
@@ -96,8 +97,8 @@ instructions come from `aim_tool_oauth`, reading the same guide.
 
 `aim_remember`'s reply adds "Waiting for staff review: recall will not
 return it until a reviewer trusts it." for an untrusted fact and "It retires
-after YYYY-MM-DD." when `expires` is set, per fact in a batch too (the same
-idea as `aim_chatbot`'s remember reply).
+after YYYY-MM-DD." when `expires` is set, per fact in a batch too (chat gets
+the same reply, through the same tool).
 
 `mcp_server_tool_bridge` and `mcp_server_oauth`'s Composer package names
 were previously self-doubled on drupal.org (`drupal/x-x`, an empty

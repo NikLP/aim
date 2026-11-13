@@ -29,8 +29,8 @@ an undeclared Write tool counts as destructive, which MCP clients read as
 
 - `src/Tool/AimRemember.php` / `AimRecall.php` (`#[ToolMethod]` services
   `aim_tool.remember`/`aim_tool.recall`; see
-  [DEVELOPING.md](DEVELOPING.md)), backed by `aim.memory_manager`
-  directly. The one recall and remember for chat, MCP, Drush and Tool API
+  [DEVELOPING.md](DEVELOPING.md)), backed by aim's services (`aim.remember`,
+  `aim.recall`, `aim.memory_manager`) directly. The one recall and remember for chat, MCP, Drush and Tool API
   ([ADR-0062](../../adr/resolved/0062-chat-on-the-shared-tools.md)); not locked to
   any scope - the caller is a real account, so scope/subject are
   caller-supplied (same shape as `drush aim:remember`, per

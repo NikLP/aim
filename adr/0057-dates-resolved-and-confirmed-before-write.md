@@ -41,7 +41,10 @@ the reader to judge. Time logic in aim is limited to the points below.
 
 Not adopting: bi-temporal records (Zep/Graphiti), recency or decay ranking
 (Generative Agents, MemoryBank), a temporal graph, model-detected
-staleness. Most memory systems ignore time beyond a timestamp; the
+staleness. The decay rejection is for discrete facts (opening hours,
+policies); for fuzzy personal facts (preferences) a recall-time reorder
+is parked in BACKLOG.md, awaiting a real stale-outranks-fresh miss. Most
+memory systems ignore time beyond a timestamp; the
 benchmarks (LongMemEval, LoCoMo) show temporal reasoning is the weak spot
 of the whole field, and the machinery that targets it is not worth its
 complexity here. Silent staleness (the world changed and nobody said so)

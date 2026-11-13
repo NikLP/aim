@@ -75,7 +75,7 @@ facts however far, which is what calibrating the cutoff needs);
 `--max-distance=0.48` drops matches past that distance, as the chatbot and
 the MCP tool do by default with `aim.settings:recall_max_distance`.
 
-Untrusted facts (ADR-0002's addendum) are excluded unless
+Untrusted facts (ADR-0065) are excluded unless
 `--include-untrusted` is given - the way to review what waits for review (also the facts list's Trusted filter; `aim:status` shows the
 count). Reviewers hold `review aim facts`.
 
@@ -233,7 +233,7 @@ Settings (`aim.settings`, `/admin/config/aim/settings`):
   The verifier is a noul `faithful` question, true at probability >= 0.5.
   Set the verifier to a different model so one checks the other. The
   decision backend's confirmation cutoff is `activities.verifier.threshold`
-  (empty or 0 means 0.5; this site uses 0.8 for its decision model). A local decision
+  (empty or 0 means 0.5; this site uses 0.9 for its decision model). A local decision
   model is parked, see [ADR-0021](adr/0021-jev-typed-decision-provider.md).
 - Grounded check (`grounding_mode` not `off`, and a grounding model
   set): after the verifier passes,
@@ -307,7 +307,7 @@ rejects any fact with `retired` set, and Search API deletes a rejected
 item from the server. Retiring a fact is a plain `save()` that re-tracks
 it, so its row goes on the next `sapi-i` (`index_directly` is off), and
 clearing `retired` brings it back. `recall()`/`findNeighbors()` keep
-their PHP `expires` check as a safety net for that gap. Retired facts stay
+their PHP `retired` (and expiry) checks as a safety net for that gap. Retired facts stay
 `aim_fact` entities (audit trail, `superseded_by` edges, admin views) but are not
 vector-searchable. Design, verification and rollout in
 [ADR-0022](adr/resolved/0022-exclude-retired-facts-from-vector-index.md).
@@ -317,7 +317,7 @@ re-run on an installed module. Enable it on the index (admin UI, or config
 import), then purge the retired rows already indexed:
 
 ```bash
-ddev drush php:eval '$ids = \Drupal::entityQuery("aim_fact")->accessCheck(FALSE)->exists("expires")->execute(); \Drupal\search_api\Entity\Index::load("aim_vector_index")->trackItemsUpdated("entity:aim_fact", array_map(fn($id) => "$id:en", array_values($ids)));'
+ddev drush php:eval '$ids = \Drupal::entityQuery("aim_fact")->accessCheck(FALSE)->exists("retired")->execute(); \Drupal\search_api\Entity\Index::load("aim_vector_index")->trackItemsUpdated("entity:aim_fact", array_map(fn($id) => "$id:en", array_values($ids)));'
 ddev drush sapi-i aim_vector_index
 ```
 
@@ -341,7 +341,8 @@ works around three bugs in provider 1.0.1 and the 1.0.x head (checked
 2026-09-26/27) and applies HNSW tuning. Upstream status: the table-exists
 throw is #3609961 (its RTBC MR drops the whole collection on every index
 save, so do not take a provider release with that as written); the
-10-row delete cap and the empty numeric value have no issue yet. Saving
+10-row delete cap is #3626257 and the empty numeric value #3626262
+(both with an MR, neither released; see BACKLOG.md). Saving
 the index threw `Table 'aim_fact_vectors' already exists` (an unhandled
 `mysqli_sql_exception` from `createCollection()`, before `updateFields()`
 ran); `deleteItems()`/`deleteIndexItems()` removed at most 10 rows per
@@ -548,12 +549,13 @@ turns out to affect anything beyond this diagnostic's own parsing.
 
 ## Developer API
 
-### `AimMemoryManager` (`aim.memory_manager`, aliased from its FQCN for
-autowiring)
+### Memory services
 
-Central service backing every write/read path. Key public methods:
+`AimMemoryManager` (`aim.memory_manager`, aliased from its FQCN for
+autowiring) and the services split out of it (table under "Plumbing
+audit"), each aliased the same way. Key public methods:
 
-- `remember(string $text, ?string $scope, ?string $subject, ?string
+- `AimRememberService::remember(string $text, ?string $scope, ?string $subject, ?string
   $source, ...): AimFact` - validated direct write. The
   created fact starts trusted when the current user may trust facts in
   its scope (`AimFactAccessControlHandler::canApprove()`), and the grounded check may
@@ -563,29 +565,29 @@ Central service backing every write/read path. Key public methods:
   change the checkbox. Callers check `create {scope} aim facts`
   themselves (`aim_remember`, the ingest form and Drush through
   `rememberBatch()`'s `$writer`).
-- `recall(string $text, ?string $scope, ..., bool $includeUntrusted =
-  FALSE): array` - semantic query, restricted to trusted facts unless
-  `$includeUntrusted` is TRUE (ADR-0002's addendum).
-- `allowedScopes(): array` - reads `entity_type.bundle.info`'s
+- `AimRecallService::recall(string $text, ?string $scope, ..., bool
+  $includeUntrusted = FALSE): array` - semantic query, restricted to
+  trusted facts unless `$includeUntrusted` is TRUE (ADR-0065).
+- `AimMemoryManager::allowedScopes(): array` - reads `entity_type.bundle.info`'s
   `getBundleInfo('aim_fact')`, i.e. installed `aim_scope` entities. Every
   scope-validation call site uses this - a new scope needs zero code
   changes.
-- `saveFact(AimFact $entity): void` - `validate()` then `save()`, throws
+- `AimMemoryManager::saveFact(AimFact $entity): void` - `validate()` then `save()`, throws
   `\InvalidArgumentException` on any violation (including a Guardrails
   rejection - Guardrails runs as a real entity validation `Constraint`
   on the `text` field, not a presave hook, so `ContentEntityForm`'s own
   `validateForm()` picks it up as an ordinary field error too).
-- `checkCreateAccess(string $scope, AccountInterface $account): bool` -
-  wraps the access handler's `createAccess()`; `aim_tool` calls this
-  before every Tool API/MCP write.
-- `getCompareDistance()`/`getRecallMaxDistance()`
+- `AimMemoryManager::checkCreateAccess(string $scope, AccountInterface
+  $account): AccessResultInterface` - wraps the access handler's
+  `createAccess()`; `aim_tool` calls this before every Tool API/MCP write.
+- `AimSettings::getCompareDistance()`/`getRecallMaxDistance()`
   - live `aim.settings` values, not the class constants (those are only
   the shipped defaults and in-code fallback). `recall_max_distance` is
   applied only when a caller passes it to `recall()` as `$maxDistance`:
   `aim_tool`'s `aim_recall` and `aim_chatbot`'s recall-context subscriber
   do; `drush aim:recall`
   does with `--max-distance` and is raw otherwise.
-- `getDefaultChatProvider(): ?array` - resolves the site-wide default via
+- `AimSettings::getDefaultChatProvider(): ?array` - resolves the site-wide default via
   `AiProviderPluginManager`; `NULL` if none configured. `AimCommands`'
   `--provider`/`--model` options default to `NULL` and fall through to
   this, so they follow whatever the site default is.
@@ -889,7 +891,7 @@ brute-force scan). `text` indexed as `main_content`; `scope`/`subject`/
 `integer`, `NULL` for every scope but user, renamed from `subject_uid`
 2026-09-28; `trusted` as a `boolean`,
 BTREE-indexed on the collection table same as `user`, since
-`recall()` filters on it by default - see ADR-0002's addendum and
+`recall()` filters on it by default - see ADR-0065 and
 `AimHooks::BTREE_INDEXED_COLUMNS`).
 
 **`index_directly`:** off in the shipped config, so a saved fact is not
@@ -982,7 +984,7 @@ Not one "AI" - three different cost profiles:
 | Step | Needs | Cost |
 | --- | --- | --- |
 | Discovery, extraction, conflict/merge decisions, Recipe generation | Reasoning-grade LLM | Expensive |
-| Consolidation - similarity-threshold cases | Vector math only | Free |
+| Consolidation - identical text (every other compared pair is a model call, above) | String compare only | Free |
 | Embedding generation (every write and query) | Small embedding model | Cheap, local-friendly (Ollama) |
 
 Site-wide default chat provider/model live in `ai.settings`
@@ -1230,7 +1232,7 @@ Kernel tests need a database that is not the site's own. Create it once
 then:
 
 ```bash
-ddev exec "cd /var/www/html && SIMPLETEST_DB='mysql://db:db@db/phpunit' SIMPLETEST_BASE_URL=http://web vendor/bin/phpunit -c web/core/phpunit.xml.dist web/modules/custom/aim/tests web/modules/custom/aim/modules/aim_chatbot/tests"
+ddev exec "cd /var/www/html && SIMPLETEST_DB='mysql://db:db@db/phpunit' SIMPLETEST_BASE_URL=http://web vendor/bin/phpunit -c web/core/phpunit.xml.dist web/modules/custom/aim/tests web/modules/custom/aim/modules"
 ```
 
 A model-backed step is faked with `FakeDecisionBackend`; no test calls a
@@ -1280,10 +1282,13 @@ via the container, so only a hand-constructed instance is affected).
 
 - `/admin/content/aim-facts` (View `views.view.aim_facts`, gated
   `administer aim`) - table of every fact, "still live" for an
-  empty `expires`, `uid` ("Extracted by") and `subject`/`user`
-  ("about") both shown, `trusted` shown and editable inline via the
-  Edit link - this is the review queue ADR-0002's addendum leans on, not
-  a bespoke UI. Per-row View/Edit/Delete dropbutton and bulk delete.
+  empty `retired`, `uid` ("Extracted by") and `subject`/`user`
+  ("about") both shown, `trusted` shown with a Trusted filter - this is
+  the review queue (ADR-0065), not a bespoke UI. Per-row
+  View/Edit/Delete dropbutton; bulk Trust/Untrust, Retire/Un-retire and
+  Delete. Only `administer aim` reaches it today, so a reviewer holding
+  only `review aim facts` or a scope's trust permission has no screen
+  yet.
 - `/admin/content/aim-facts/{aim_fact}/edit` (`AimFactForm`,
   `administer aim`) - no "Create new revision" checkbox: a text change is
   always a new revision (see "Fact revisions"). The text field says when
@@ -1317,7 +1322,7 @@ via the container, so only a hand-constructed instance is affected).
 point. Apply one from the site root (recipes are applied by path):
 
 ```bash
-ddev exec vendor/bin/dr recipe:apply web/modules/custom/aim/recipes/<name>  # dev-site path; use modules/contrib/aim/... elsewhere
+ddev drush recipe /var/www/html/web/modules/custom/aim/recipes/<name>  # container path on this dev site; use modules/contrib/aim/... elsewhere
 ```
 
 - **`aim_demo_library`**: a fictional community library (site identity,

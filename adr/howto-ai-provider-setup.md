@@ -125,8 +125,6 @@ ddev drush ev 'echo implode(", ", array_keys(\Drupal::service("ai.provider")->cr
 
 Expected: `nomic_embed_text_latest`.
 
-The AIM module ships a recipe (`recipes/aim_ollama_local`) that does the Ollama part. Its own README says it is not verified end to end.
-
 ## 4. Check everything
 
 ```bash
