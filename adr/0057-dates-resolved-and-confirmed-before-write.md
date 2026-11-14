@@ -9,8 +9,9 @@ with different `expires` are never compared, 2026-10-27, ADR-0036
 addendum); half of point 7 (`aim_recall` returns each fact's date and
 which kind it is). Not built: point 1 (the chat persona has no date),
 point 2 for chat, point 4 (extraction), point 7's persona wording. The
-2026-11-12 addendum (time check at write time) supersedes the stance line
-"do not reason about time" and point 5; built, default off.
+2026-11-12 addendum (time check at write time) replaces point 5 and
+narrowed the stance (reworded 2026-11-13: no time reasoning at recall);
+built, default off.
 **Date:** 2026-10-11
 
 ## Context
@@ -34,10 +35,14 @@ from now") go wrong over time, and nothing in aim catches it:
 
 ## Stance
 
-Store the date, show the date, do not reason about time. Every fact
-records when it was told and, if it has one, when it ends; facts past their
-end retire themselves; everything else is shown with its age and left to
-the reader to judge. Time logic in aim is limited to the points below.
+Time is data, not inference: aim collects end dates at write time (a
+model may only ask whether one is needed, never choose it) and acts on them
+by rule; nothing reasons about time at recall. Every fact records when it
+was told and, if it has one, when it ends; facts past their end retire
+themselves; everything else is shown with its age and left to the reader
+to judge. (Until 2026-11-13 this read "store the date, show the date, do
+not reason about time", which was broader than meant: the argument below
+is against time reasoning at recall.) Time logic in aim is limited to the points below.
 
 Not adopting: bi-temporal records (Zep/Graphiti), recency or decay ranking
 (Generative Agents, MemoryBank), a temporal graph, model-detected
@@ -115,8 +120,9 @@ have a person confirm it where one is present.
 
 A chat test saved "peanut snack on 11 November" with the date repeated in
 the text, and time-bound facts ("closed until 16 October") carried no
-`expires`, so they went stale. This replaces the stance line "do not
-reason about time" and point 5, "MCP: the caller's job": a model now judges
+`expires`, so they went stale. This narrows the stance line (then "do not
+reason about time", reworded above) and replaces point 5, "MCP: the
+caller's job": a model now judges
 one narrow thing at write time, and the caller is asked for the date
 instead of trusted to give it. Recall still does no time reasoning.
 

@@ -41,7 +41,7 @@ provider.
 
 ## Requirements
 
-- Drupal 11 and MariaDB 11.7 or newer (for `VECTOR`).
+- Drupal 11.4 or newer and MariaDB 11.7 or newer (for `VECTOR`).
 - A default decision model (Decision on `/admin/config/ai/settings`) for
   the finder; without one the gate passes every question to the
   assistant.

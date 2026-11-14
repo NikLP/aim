@@ -161,6 +161,16 @@ gate are built. Work on the literals modules themselves is in
       site, with no model call or real sign-in. Decide where a second site
       runs, then check a connector connects as uid 1, a fact saves and
       recalls, and what `aim:extract` does with the disabled scopes.
+- [ ] **Delete the `aim-memory` skill (raised 2026-11-13, after the
+      `time-check` branch lands).** Never used; the MCP connector's
+      `aim_recall`/`aim_remember`/`aim_brief` and server instructions cover
+      it from anywhere, while the skill only runs `ddev drush` in this dev
+      checkout, and its text is stale (says `site` is the default scope,
+      omits `entity`, links a CLAUDE.md section that does not exist). Remove
+      `skills/aim-memory/`, the site's `.claude/skills/aim-memory` symlink,
+      and the mentions in DEVELOPING.md ("**Skill:**"),
+      `adr/workflow-diagram.md` and the ADR-0006/0065 references (history,
+      reword or leave). Keep `aim-discovery`.
 - [ ] **Move `skills/` to `.agents/skills/` (raised 2026-10-25).** The
       convention `ai`, `tool` and `mcp_server` already use (Marcus
       Johansson's talk: drupal.org's knowledge base detects
@@ -185,7 +195,7 @@ gate are built. Work on the literals modules themselves is in
 - [ ] **Re-check what the personas assume the assistant can see** (a
       signed-in member only gets facts through `view site aim facts`;
       `aim_literal` needs only `view literals` since 2026-10-10), and
-      the `aim-discovery` and `aim-memory` skills.
+      the `aim-discovery` skill.
 
 ## Recipes (raised 2026-09-27)
 

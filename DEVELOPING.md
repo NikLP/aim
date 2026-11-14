@@ -746,8 +746,10 @@ revisions too (BACKLOG's `aim:erase`).
 ### Dates and time
 
 What aim does with dates today, in one place. The stance
-([ADR-0057](adr/0057-dates-resolved-and-confirmed-before-write.md)): store
-the date, show the date, do not reason about time. No recency ranking,
+([ADR-0057](adr/0057-dates-resolved-and-confirmed-before-write.md)): time
+is data, not inference. End dates are collected at write time (a model may
+only ask whether one is needed, the time check below) and acted on by rule;
+nothing reasons about time at recall. No recency ranking,
 decay or model-judged staleness
 ([ADR-0036](adr/resolved/0036-memory-algorithm-appraisal.md) has the
 literature and what was parked).

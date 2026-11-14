@@ -28,7 +28,7 @@ uid 1 (see "Be upfront about").
 
 ## Requirements
 
-- A fresh Drupal 11 site on MariaDB 11.7 or newer, separate from any other
+- A fresh Drupal 11.4 (or newer) site on MariaDB 11.7 or newer, separate from any other
   AIM instance. A recipe sets up an instance but doesn't separate its data.
 - `ai_vdb_provider_mariadb`, `ai_search` and `search_api` **not** enabled
   yet, as for [`aim_demo_library`](../aim_demo_library/README.md).
