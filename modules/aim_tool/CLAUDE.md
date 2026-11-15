@@ -43,7 +43,16 @@ an undeclared Write tool counts as destructive, which MCP clients read as
   `source` is not an input: it follows the Tool API invoker
   (`AimRemember::CALLERS`; chat gets `chat:aim_remember`), handed over
   by `src/EventSubscriber/AimRememberInvokerSubscriber.php` until Tool
-  API passes it to the method. Starting trust is the caller's permission
+  API passes it to the method. The `site_agent` row lives here, not in
+  `aim_site_agent`: it matches the invoker ID as a plain string, so
+  `aim_tool` gains no dependency, and every write path's provenance stays
+  in one table that `AimToolPermissionsTest` covers. There is deliberately
+  no alter hook for it. An alter hook can be implemented by any enabled
+  module, so it would become a public API to document in `aim.api.php` and
+  keep stable. That is too much commitment for one row. It would not be a
+  security problem: `source` records provenance and grants nothing, since
+  trust comes from permissions (ADR-0065). If `site_agent` renames its
+  invoker ID, fix the row here. Starting trust is the caller's permission
   alone (ADR-0065). An
   entry's `scope_fields` (ADR-0028 piece 4) gets its properties from the
   installed scopes' types (`getBaseFieldDefinitions()`) in

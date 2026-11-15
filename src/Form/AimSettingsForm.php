@@ -140,8 +140,8 @@ final class AimSettingsForm extends ConfigFormBase {
           '#title' => $this->t('Time check'),
           '#options' => [
             'off' => $this->t('Off: no check'),
-            'flag' => $this->t('Flag: a fact true only for a date or period, with no end date, goes to review; aim_remember asks its caller for one'),
-            'reject' => $this->t('Reject: also refuse such a fact on the ingest form, extraction and Drush'),
+            'flag' => $this->t('Flag: ask the caller for an end date; where nobody can be asked, save the fact for review'),
+            'reject' => $this->t('Reject: ask the caller for an end date; where nobody can be asked, refuse the fact'),
           ],
           '#description' => $this->t('Asks this decision model, for each fact, whether it is only true for a date or period (ADR-0057). Runs with or without the grounded check, in the same call when both are on.'),
           '#default_value' => $config->get('time_check_mode') ?: 'off',

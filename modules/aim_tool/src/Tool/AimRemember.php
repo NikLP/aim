@@ -50,8 +50,9 @@ use Drupal\tool\TypedData\OutputDefinition;
  *
  * Source is not an input: provenance is the path's to record, not the
  * caller's to claim. It follows the Tool API invoker (CALLERS): an agent on
- * this site records chat:aim_remember, Drush drush:aim_remember, anything
- * else (MCP, direct PHP) tool:aim_remember. The account that wrote it is in
+ * this site records chat:aim_remember, Site Agent's chat
+ * site_agent:aim_remember, Drush drush:aim_remember, anything else (MCP,
+ * direct PHP) tool:aim_remember. The account that wrote it is in
  * uid, and its permissions alone decide the starting trust (ADR-0065).
  * AimRememberInvokerSubscriber hands the invoker over, since a
  * #[ToolMethod] service is not given it.
@@ -84,6 +85,9 @@ final class AimRemember {
     // chat assistant.
     'tool_ai_connector' => 'chat:aim_remember',
     DrushInvoker::ID => 'drush:aim_remember',
+    // The site_agent module's chat (staff), by id so aim_tool does not depend
+    // on it.
+    'site_agent' => 'site_agent:aim_remember',
   ];
 
   /**

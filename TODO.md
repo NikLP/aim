@@ -9,6 +9,12 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
 
 ## Tools (raised 2026-10-25)
 
+- [ ] **Upstream: Site Agent marks person-approved calls** (ADR-0067). File
+      the issue drafted in [ADR-0067](adr/0067-person-approved-calls-skip-grounding.md)
+      on `site_agent`; this site carries it as
+      `patches/site_agent-person-approved-invoker.patch` (site root). Then
+      build aim's side (ADR-0067 decision 3), and drop the patch once a
+      release ships it.
 - [ ] **Upstream: hand a `#[ToolMethod]` its invoker** (ADR-0062 decision
       2). `aim_remember` picks its source from the Tool API invoker, which a method service never receives;
       `AimRememberInvokerSubscriber` catches it from `ToolInputTransformEvent`

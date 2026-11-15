@@ -3,7 +3,7 @@ status: true
 dependencies: {  }
 id: user
 label: User
-description: 'about one person, by default the one you are talking to, e.g. how they like answers formatted. Subject: their account (uid); omit it for yourself. Never save a user fact about someone else without confirming who it is about.'
+description: 'about one person, by default the one you are talking to, e.g. how they like answers formatted. Subject: their account (uid); omit it for yourself. Write "The user ...", never their name or other details that identify them: the account says who it is about. Never save a user fact about someone else without confirming who it is about.'
 weight: 2
 plugin: user
 settings:

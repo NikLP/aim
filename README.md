@@ -185,6 +185,7 @@ each with its own requirements and setup:
 [aim_chatbot](modules/aim_chatbot/README.md),
 [aim_tool](modules/aim_tool/README.md),
 [aim_tool_oauth](modules/aim_tool_oauth/README.md),
+[aim_site_agent](modules/aim_site_agent/README.md) (Site Agent's chat),
 [aim_benchmark](modules/aim_benchmark/README.md) (dev tool, optional).
 
 ## Getting started

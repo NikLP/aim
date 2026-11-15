@@ -1,0 +1,54 @@
+{#
+/**
+ * @file
+ * The approval card of an aim_remember call: each fact and its details.
+ *
+ * A suggestion of site_agent's site-agent-card.html.twig. The data
+ * attributes and the actions block are that template's: Site Agent's chat
+ * script decides the call through them, so they must stay as they are.
+ *
+ * Available variables, besides site_agent_card's:
+ * - facts: One per fact in the call, in the payload's order, each with:
+ *   - text: The fact's text.
+ *   - details: Its scope, subject or account, scope fields and end date,
+ *     as one line.
+ * - description: The words the facts came from, when the call quotes them;
+ *   otherwise the tool's description.
+ *
+ * @see \Drupal\aim_site_agent\Hook\AimSiteAgentHooks
+ */
+#}
+<article class="site-agent-card" data-site-agent-card data-record="{{ record }}" data-hash="{{ hash }}" data-approve-url="{{ approve_url }}" data-reject-url="{{ reject_url }}">
+  <header class="site-agent-card__header">
+    <h3 class="site-agent-card__title">{{ tool }}</h3>
+    <span class="site-agent-card__class site-agent-card__class--{{ classification|clean_class }}">{{ classification_label }}</span>
+  </header>
+  {% if description %}
+    <p class="site-agent-card__description">{{ description }}</p>
+  {% endif %}
+  {% if facts %}
+    {% for fact in facts %}
+      <section class="site-agent-card__item">
+        <h4 class="site-agent-card__subject">{{ fact.text }}</h4>
+        <p class="site-agent-card__description">{{ fact.details }}</p>
+      </section>
+    {% endfor %}
+  {% elseif arguments %}
+    <dl class="site-agent-card__arguments">
+      {% for argument in arguments %}
+        <dt title="{{ argument.name }}">{{ argument.label }}</dt>
+        <dd>{{ argument.value }}</dd>
+      {% endfor %}
+    </dl>
+  {% endif %}
+  <div class="site-agent-card__actions" data-site-agent-card-actions>
+    {% if decision %}
+      {{ decision }}
+    {% else %}
+      <button type="button" class="button button--primary button--small" data-site-agent-decision="approve">{{ 'Approve'|t }}</button>
+      <button type="button" class="button button--small" data-site-agent-decision="reject">{{ 'Reject'|t }}</button>
+      <label class="visually-hidden" for="site-agent-reason-{{ record }}">{{ 'Reason for rejecting'|t }}</label>
+      <input type="text" class="form-text site-agent-card__reason" id="site-agent-reason-{{ record }}" data-site-agent-reason placeholder="{{ 'Reason (optional)'|t }}">
+    {% endif %}
+  </div>
+</article>

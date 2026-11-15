@@ -34,7 +34,7 @@ scope list's order. The shipped defaults:
 | --- | --- | --- |
 | `site` | Something true about the organization for everyone who asks: opening hours, a fees policy | None |
 | `role` | Guidance for everyone holding one site role: "editors must add alt text to every image" | The role machine name, e.g. `content_editor` |
-| `user` | Something about one person, by default the one talking: how they like answers formatted | Their account (uid). Never about someone else without confirming who |
+| `user` | Something about one person, by default the one talking: how they like answers formatted | Their account (uid). The text says "The user", not their name. Never about someone else without confirming who |
 | `case` | One piece of ongoing work with a start and an end: a site redesign | The case ID. Leave it empty on the first save and a new one comes back; reuse it to add more |
 | `entity` | One specific piece of content: a page, a product | None; the content's type and ID go in `scope_fields` |
 

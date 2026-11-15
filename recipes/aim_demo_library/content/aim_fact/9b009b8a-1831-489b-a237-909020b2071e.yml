@@ -10,7 +10,7 @@ default:
       target_id: 1
   text:
     -
-      value: 'Sam prefers short answers as bullet points.'
+      value: 'The user prefers short answers as bullet points.'
   source:
     -
       value: demo-seed

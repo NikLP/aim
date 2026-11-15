@@ -244,7 +244,7 @@ async function askWidget(page, question) {
           if (!expect.test(t)) throw new Error(`${args.scope}: expected ${expect} in: ` + t.replace(/\s+/g, ' ').slice(0, 140));
         };
         await ask({ text: 'What must editors do before publishing an image?', scope: 'role', subject: 'content_editor' }, /alt text/i);
-        await ask({ text: 'How does Sam like answers to be formatted?', scope: 'user' }, /bullet/i);
+        await ask({ text: 'How do I like answers to be formatted?', scope: 'user' }, /bullet/i);
         await ask({ text: 'When does the events calendar launch?', scope: 'case' }, /20 October/i);
       });
       await check('MCP: remember, then searchable', async () => {

@@ -22,6 +22,7 @@ day via `drush aim:expire` or `hook_cron` (ADR-0057). Each entry is saved
 or reported on its own line. `source` is never an
 input: it follows the Tool API invoker (`AimRemember::CALLERS`, ADR-0062).
 `tool_ai_connector` (an agent on this site: chat) writes `chat:aim_remember`,
+`site_agent` (the Site Agent chat) writes `site_agent:aim_remember`,
 `drush` writes `drush:aim_remember`, anything else (MCP, direct PHP)
 `tool:aim_remember`. Starting trust is the calling account's permission
 alone, the same on every invoker (ADR-0065). A

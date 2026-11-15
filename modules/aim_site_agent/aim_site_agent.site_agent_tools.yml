@@ -1,0 +1,13 @@
+# Classifications for Site Agent: what each aim_tool tool changes. An
+# unclassified tool counts as a destructive config write and asks on every
+# call. Site Agent reads every module's file, so these need not live in
+# aim_tool.
+tools:
+  'aim_brief':
+    kind: read
+  'aim_recall':
+    kind: read
+  'aim_literal':
+    kind: read
+  'aim_remember':
+    kind: content_write

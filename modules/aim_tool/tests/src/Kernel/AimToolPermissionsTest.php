@@ -243,7 +243,7 @@ class AimToolPermissionsTest extends KernelTestBase {
       $permissions = ['remember aim facts', 'create site aim facts'];
       $this->actAs($this->createUser($trusted ? [...$permissions, 'trust site aim facts'] : $permissions));
       $written = [];
-      foreach (['tool_ai_connector', 'mcp_server', 'drush'] as $invoker) {
+      foreach (['tool_ai_connector', 'mcp_server', 'drush', 'site_agent'] as $invoker) {
         $this->tool('aim_remember', new Invoker($invoker))
           ->setInputValue('facts', [['text' => "Written by $invoker.", 'scope' => 'site']])
           ->execute();
@@ -254,6 +254,7 @@ class AimToolPermissionsTest extends KernelTestBase {
       $this->assertSame(['chat:aim_remember', $trusted], $written['tool_ai_connector']);
       $this->assertSame(['tool:aim_remember', $trusted], $written['mcp_server']);
       $this->assertSame(['drush:aim_remember', $trusted], $written['drush']);
+      $this->assertSame(['site_agent:aim_remember', $trusted], $written['site_agent']);
     }
 
     // A call with no invoker after one with: the invoker does not carry over.

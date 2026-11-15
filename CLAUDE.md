@@ -29,7 +29,8 @@ Built with the expectation of a local reasoning model in production use.
 DDEV, `drupal11` type, PHP 8.4, MariaDB 11.8, docroot `web/`.
 
 **Enabled:** `aim`, `aim_chatbot`, `aim_tool`,
-`aim_tool_oauth`, `aim_benchmark`, `tool`, `mcp_server`, `mcp_server_tool_bridge`,
+`aim_tool_oauth`, `aim_site_agent` (+ `site_agent`), `aim_benchmark`,
+`tool`, `mcp_server`, `mcp_server_tool_bridge`,
 `mcp_server_oauth`, `simple_oauth`
 + `simple_oauth_21`/`simple_oauth_server_metadata`/
 `simple_oauth_client_registration`/`simple_oauth_pkce`/`consumers`
@@ -118,6 +119,7 @@ aim/                    ← root module (always required), ships the five scopes
 │   ├── aim_chatbot/     ← ai_agents chat agent on aim_tool's tools
 │   ├── aim_tool/        ← Tool API + MCP exposure, any scope
 │   ├── aim_tool_oauth/  ← OAuth2 scopes for remote MCP callers
+│   ├── aim_site_agent/  ← aim_tool's tools in Site Agent's chat, fact-list approval card
 │   └── aim_benchmark/   ← synthetic fact generation, aim:benchmark commands
 ├── recipes/             ← Drupal Recipes, one dir each (aim_demo_library, aim_personal)
 └── adr/                 ← decision records, see 0000-index.md
@@ -134,6 +136,7 @@ than relying on the site shell's manifest.
 | `aim_chatbot` | An `ai_agents` chat agent, assistant and block on `aim_tool`'s `aim_recall`/`aim_remember`; scope set by the visitor's permissions (ADR-0062) | [CLAUDE.md](modules/aim_chatbot/CLAUDE.md) |
 | `aim_tool` | `#[ToolMethod]` tools (any scope, permission-gated) for chat (through `tool_ai_connector`), Tool API and, via `mcp_server_tool_bridge`, MCP | [CLAUDE.md](modules/aim_tool/CLAUDE.md) |
 | `aim_tool_oauth` | OAuth2 scopes + third-party settings so a remote MCP client with no Drupal session can authenticate | [CLAUDE.md](modules/aim_tool_oauth/CLAUDE.md) |
+| `aim_site_agent` | Puts `aim_tool`'s tools in `site_agent`'s chat: tool classifications, the Memory toolset, and an approval card for `aim_remember` that lists each fact | [CLAUDE.md](modules/aim_site_agent/CLAUDE.md) |
 | `aim_benchmark` | Synthetic fact generation (`AimBenchmarkGenerator`) and the `aim:benchmark`/`aim:benchmark-cleanup` Drush commands, split out so production sites don't ship dev-only load generation | [CLAUDE.md](modules/aim_benchmark/CLAUDE.md) |
 
 `recipes/` holds hand-written Recipes (not AI-generated, so outside

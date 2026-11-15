@@ -57,8 +57,10 @@ provider.
 - `aim_chatbot`'s chat block only exists if Olivero was the front-end
   theme when the module was enabled. Without it the persona still applies
   and the block wording is skipped.
-- The four user-scope facts are about uid 1 ("Sam Okafor", the site
-  administrator, in the story). On your site that is your admin account.
+- The four user-scope facts are about uid 1, the site administrator in
+  the story. On your site that is your admin account. Their text says
+  "The user", never a name: the account says who (the user scope's
+  description asks models for the same).
 
 ## Apply
 
@@ -230,7 +232,7 @@ setup). A literal edited on stage is restored by the reinstall too.
    (OAuth, dynamic client registration, scopes `aim:recall aim:remember`).
    Then ask Claude:
    - "What must editors do before publishing an image?" (role scope)
-   - "How does Sam like answers formatted?" (user scope, your own account)
+   - "How do I like answers formatted?" (user scope, your own account)
    - "When does the events calendar launch?" (case scope)
    - Tell Claude a new fact, then ask the widget about it.
 4. **Optional, from the terminal.**

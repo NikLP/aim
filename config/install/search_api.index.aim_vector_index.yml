@@ -69,7 +69,7 @@ processor_settings:
   language_with_fallback: {  }
   rendered_item: {  }
 tracker_settings:
-  default:
+  ai_search_tracker:
     indexing_order: fifo
 options:
   cron_limit: 50

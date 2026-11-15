@@ -10,7 +10,7 @@ default:
       target_id: 1
   text:
     -
-      value: 'Sam wants the weekly website analytics summary on Monday mornings.'
+      value: 'The user wants the weekly website analytics summary on Monday mornings.'
   source:
     -
       value: demo-seed

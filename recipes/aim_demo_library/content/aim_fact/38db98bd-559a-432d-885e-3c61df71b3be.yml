@@ -10,7 +10,7 @@ default:
       target_id: 1
   text:
     -
-      value: 'Sam is presenting the new events calendar to the trustees on 14 October.'
+      value: 'The user is presenting the new events calendar to the trustees on 14 October.'
   source:
     -
       value: demo-seed

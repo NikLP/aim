@@ -22,6 +22,7 @@
         "drupal/simple_oauth": "Required by aim_tool_oauth to let a remote MCP client (no Drupal session) authenticate as an OAuth2 client, see CLAUDE.md's MCP OAuth section.",
         "e0ipso/simple_oauth_21": "Required by aim_tool_oauth for RFC 9728 discovery metadata and dynamic client registration (not on drupal.org, this is its real Packagist name).",
         "drupal/mcp_server_oauth": "Required by aim_tool_oauth to enforce OAuth2 scopes on aim_remember/aim_recall.",
+        "drupal/site_agent": "Required by aim_site_agent, which puts aim's tools in Site Agent's chat; composer cannot require it per submodule, so `composer require` it before `drush en aim_site_agent`.",
         "drupal/ai_provider_ollama": "The shipped search_api.server.aim_vector embeds with ollama__nomic-embed-text:latest, so a local Ollama with that model pulled is needed unless the server is pointed at another embeddings provider."
     },
     "autoload": {
@@ -30,6 +31,7 @@
             "Drupal\\aim_chatbot\\": "modules/aim_chatbot/src/",
             "Drupal\\aim_tool\\": "modules/aim_tool/src/",
             "Drupal\\aim_tool_oauth\\": "modules/aim_tool_oauth/src/",
+            "Drupal\\aim_site_agent\\": "modules/aim_site_agent/src/",
             "Drupal\\aim_benchmark\\": "modules/aim_benchmark/src/"
         }
     }

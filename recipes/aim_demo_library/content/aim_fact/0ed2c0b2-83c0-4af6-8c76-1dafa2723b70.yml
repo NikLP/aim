@@ -10,7 +10,7 @@ default:
       target_id: 1
   text:
     -
-      value: "Sam Okafor is the library's Head of Digital and the site administrator."
+      value: "The user is the library's Head of Digital and the site administrator."
   source:
     -
       value: demo-seed

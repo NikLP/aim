@@ -940,7 +940,15 @@ then export the index config.
   (ai_search's chunk slicing starts at `processed_chunks`, which the first
   pass left equal to `total_chunks`), while the tracker still said indexed,
   so `search-api:index` reported "up to date" and only `aim:status` parity
-  showed the gap. Found and fixed 2026-10-15. If parity fails anyway:
+  showed the gap. Found and fixed 2026-10-15.
+- The index uses ai_search's `ai_search_tracker`, not Search API's
+  `default`: only it zeroes `processed_chunks` when a fact changes. Under
+  `default`, every later save of an indexed fact (an edit, a trust toggle:
+  `trusted` is an indexed field) deleted its vector row and inserted
+  nothing, the same symptom as above (found 2026-11-14, five user facts and
+  one role fact lost). ai_search ships no config schema for the tracker's
+  settings, so saving the index logs a "missing schema" warning; harmless.
+  If parity fails anyway:
   `drush search-api:reset-tracker aim_vector_index` then
   `drush search-api:index aim_vector_index` (the reset also zeroes
   `processed_chunks`). Upstream status in TODO.md/BACKLOG.md.
