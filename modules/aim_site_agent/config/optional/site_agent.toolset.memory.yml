@@ -1,8 +1,6 @@
 langcode: en
 status: true
-dependencies:
-  module:
-    - site_agent
+dependencies: {  }
 id: memory
 label: Memory
 description: "Read and write the site's long-term memory (AIM facts)."

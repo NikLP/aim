@@ -57,6 +57,11 @@ use Drupal\tool\TypedData\OutputDefinition;
  * AimRememberInvokerSubscriber hands the invoker over, since a
  * #[ToolMethod] service is not given it.
  *
+ * A call a person approved word for word (Site Agent's approval card, or the
+ * thread's owner running it) is their own text, so the grounded check does
+ * not run on it, as for text typed on a form (ADR-0067). The time check and
+ * the writer's permissions still apply.
+ *
  * An entry's scope_fields (ADR-0028 piece 4) carries the extra fields a
  * scope type declares via getBaseFieldDefinitions() (piece 1), today only
  * the entity plugin's target_type/target_id. AimToolHooks::toolInfoAlter()
@@ -96,6 +101,16 @@ final class AimRemember {
   private ?Invoker $invoker = NULL;
 
   /**
+   * Site Agent's mark of a call a person approved word for word (ADR-0067).
+   *
+   * Named as a string, like CALLERS' site_agent row, so aim_tool does not
+   * depend on site_agent. Temporary: the case exists only with this site's
+   * patch to site_agent until upstream ships it; follow upstream's name if
+   * it differs.
+   */
+  private const PERSON_APPROVED = 'Drupal\site_agent\Tool\SiteAgentInvokerCapability::PersonApproved';
+
+  /**
    * Constructs an AimRemember tool service.
    *
    * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
@@ -125,6 +140,20 @@ final class AimRemember {
    */
   public function setInvoker(?Invoker $invoker): void {
     $this->invoker = $invoker;
+  }
+
+  /**
+   * Whether the invoker says a person approved this exact call.
+   *
+   * @return bool
+   *   TRUE when the invoker carries Site Agent's PersonApproved capability.
+   */
+  private function personApproved(): bool {
+    if ($this->invoker === NULL || !defined(self::PERSON_APPROVED)) {
+      return FALSE;
+    }
+    $case = constant(self::PERSON_APPROVED);
+    return $case instanceof \UnitEnum && $this->invoker->has($case);
   }
 
   /**
@@ -215,6 +244,14 @@ final class AimRemember {
     }
     $sourceText = ($source_text ?? '') !== '' ? $source_text : NULL;
     $source = self::CALLERS[$this->invoker?->id] ?? self::SOURCE;
+    if ($sourceText !== NULL && $this->personApproved()) {
+      // The person approved this exact text: no grounded check (ADR-0067).
+      $sourceText = NULL;
+      $this->memoryManager->logAudit('aim_remember: grounded check skipped, a person approved the call (@source, uid @uid).', [
+        '@source' => $source,
+        '@uid' => $this->currentUser->id(),
+      ]);
+    }
     $this->invoker = NULL;
 
     $lines = [];

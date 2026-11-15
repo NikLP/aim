@@ -26,6 +26,9 @@ to `aim_site_agent`.
 
 What stays in `aim_tool`: `AimRemember::CALLERS` maps the `site_agent`
 invoker to the `site_agent:aim_remember` source by ID, with no dependency,
-and its test is `aim_tool`'s `AimToolPermissionsTest`; see
+and its test is `aim_tool`'s `AimToolPermissionsTest`; and
+`AimRemember::PERSON_APPROVED` skips the grounded check for a call a person
+approved on the card ([ADR-0067](../../adr/0067-person-approved-calls-skip-grounding.md),
+needs this site's Site Agent patch until upstream ships it); see
 [aim_tool's CLAUDE.md](../aim_tool/CLAUDE.md) for why it is not an alter
 hook.

@@ -1,8 +1,8 @@
 # ADR-0067: A fact approved on a Site Agent card is the person's own words
 
-**Status:** Proposed. The Site Agent change is written and applied on this
-site as a local Composer patch; aim's side is not built; the upstream issue
-is not filed.
+**Status:** Accepted, built 2026-11-15 as a stopgap. The Site Agent change
+is a local Composer patch on this site; aim's side is built; the upstream
+issue is not filed.
 **Date:** 2026-11-15
 
 ## In plain terms
@@ -70,17 +70,18 @@ carried here as a patch until then) and a few lines in `aim_site_agent` and
    person approved its card, or a call the thread's owner ran themselves. It
    does not add it to a pre-approved call, including a `once` call after the
    first approval in a thread. The full change is in the appendix.
-3. **aim reads it, without depending on Site Agent** (not built).
-   `aim_tool` can't name Site Agent's enum, so `aim_site_agent` subscribes
-   to `ToolInputTransformEvent` (as `AimRememberInvokerSubscriber` does) and,
-   when `aim_remember`'s `facts` input is set by an invoker that
-   `has(SiteAgentInvokerCapability::PersonApproved)`, tells `AimRemember`
-   through a setter that is used once and cleared, like `setInvoker()`.
-   `AimRemember` then leaves `source_text` out of the grounded check for
-   that call. The card still shows `source_text`: it reads the stored
+3. **aim reads it, without depending on Site Agent** (built 2026-11-15).
+   `AimRemember` names the case as a string,
+   `AimRemember::PERSON_APPROVED`, the way `CALLERS` names the `site_agent`
+   invoker ID, and checks it with `defined()`/`constant()` and
+   `Invoker::has()` on the invoker it already gets. When it is set,
+   `source_text` is left out of the grounded check for that call, and an
+   audit line says so. Without the patch the constant is undefined and
+   nothing changes. The card still shows `source_text`: it reads the stored
    arguments, not what the tool did with them. If the case moves into Tool
-   API's own `InvokerCapability` (see below), `AimRemember` checks its
-   invoker directly and the subscriber goes.
+   API's own `InvokerCapability` (see below), the string becomes a plain
+   reference. Test: `aim_tool`'s `AimRememberApprovalTest` (skipped where
+   the case does not exist).
 4. **A conversational "shall I save this?" does not count.** The visitor
    chat's confirmation turn is the model's word, not something aim can
    verify, so chat writes keep the grounded check.
@@ -170,11 +171,10 @@ name or home for the case, follow theirs in step 3.
 - Staff approval on a card becomes the human check for that write; the
   review queue keeps facts nobody read word for word (extraction, ingest of
   unreviewed text, the visitor chat, MCP).
-- `aim_site_agent` gains one subscriber, `AimRemember` one setter; no
-  setting, no new public service.
-- Docs to update when built: the ADR-0037 and ADR-0065 lines on when the
-  check runs, `aim_tool`'s and `aim_site_agent`'s CLAUDE.md/DEVELOPING.md,
-  and TODO.md (the upstream item).
+- `AimRemember` gains one constant and one private method; no setting, no
+  subscriber, no new public API.
+- When upstream ships it (or names it differently), update
+  `AimRemember::PERSON_APPROVED` and drop the local patch.
 
 ## Appendix: the Site Agent patch
 

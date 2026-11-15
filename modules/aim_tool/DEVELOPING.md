@@ -25,7 +25,12 @@ input: it follows the Tool API invoker (`AimRemember::CALLERS`, ADR-0062).
 `site_agent` (the Site Agent chat) writes `site_agent:aim_remember`,
 `drush` writes `drush:aim_remember`, anything else (MCP, direct PHP)
 `tool:aim_remember`. Starting trust is the calling account's permission
-alone, the same on every invoker (ADR-0065). A
+alone, the same on every invoker (ADR-0065). An invoker carrying Site
+Agent's `SiteAgentInvokerCapability::PersonApproved` (a person approved the
+card, or the thread's owner ran the call) leaves `source_text` out of the
+grounded check, logged as an audit line; `AimRemember::PERSON_APPROVED`
+names it as a string, so `aim_tool` does not depend on `site_agent`, and it
+is a no-op where the case does not exist (ADR-0067). A
 `#[ToolMethod]` service is not given its invoker, so
 `AimRememberInvokerSubscriber` catches it from `ToolInputTransformEvent`
 when `facts` is set and hands it to the service, which uses it once and

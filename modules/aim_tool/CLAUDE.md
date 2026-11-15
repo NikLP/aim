@@ -53,7 +53,11 @@ an undeclared Write tool counts as destructive, which MCP clients read as
   security problem: `source` records provenance and grants nothing, since
   trust comes from permissions (ADR-0065). If `site_agent` renames its
   invoker ID, fix the row here. Starting trust is the caller's permission
-  alone (ADR-0065). An
+  alone (ADR-0065). A call Site Agent marks as approved by a person
+  (`AimRemember::PERSON_APPROVED`, the same string-only reference) skips
+  the grounded check: the person approved that exact text
+  ([ADR-0067](../../adr/0067-person-approved-calls-skip-grounding.md);
+  the mark needs this site's Site Agent patch until upstream ships it). An
   entry's `scope_fields` (ADR-0028 piece 4) gets its properties from the
   installed scopes' types (`getBaseFieldDefinitions()`) in
   `AimToolHooks::toolInfoAlter()`, and is dropped from the schema when none
