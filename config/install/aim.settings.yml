@@ -10,6 +10,7 @@ grounding_mode: 'off'
 time_check_mode: 'off'
 recall_max_distance: 0.48
 recall_gap: 0.0
+recall_literals: true
 show_redacted_facts: false
 log_audit: false
 log_verbose: false

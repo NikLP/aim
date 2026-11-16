@@ -1,7 +1,7 @@
 # CLAUDE.md — AIM Chatbot
 
 A chat assistant on AIM memory: an `ai_agents` agent using `aim_tool`'s
-`aim_recall`/`aim_remember` (and `aim_literal`) through `tool_ai_connector`.
+`aim_recall`/`aim_remember` through `tool_ai_connector`.
 Part of the [aim](../../CLAUDE.md) project - see the root module's
 CLAUDE.md for environment, architecture decisions, and the code-style/
 git rules shared across all of `aim`'s submodules; this file only covers
@@ -23,8 +23,11 @@ Tool API invoker (`tool_ai_connector`), not because of anything here. The one ha
 
 ## What lives here
 
-- No tools of its own: the agent lists `tool:aim_recall`,
-  `tool:aim_remember` and (in the demo recipe) `tool:aim_literal`. Recall
+- No tools of its own: the agent lists `tool:aim_recall` and
+  `tool:aim_remember`. Exact values come back from recall
+  (`aim.settings:recall_literals`), so the demo recipe no longer adds
+  `tool:aim_literal`; when the gate passes a turn on, the assistant's
+  recall asks the finder again (accepted, ADR-0061's addendum). Recall
   is limited to 5 results by the agent's `tool_usage_limits` (forced,
   hidden from the model). The grounded check's evidence is the
   `source_text` the model passes, as over MCP; reading the chat history

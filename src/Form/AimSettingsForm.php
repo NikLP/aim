@@ -288,6 +288,12 @@ final class AimSettingsForm extends ConfigFormBase {
       '#step' => 0.01,
       '#required' => TRUE,
     ];
+    $form['recall']['recall_literals'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Include exact values in recall'),
+      '#description' => $this->t("The aim_recall tool (chat, Site Agent and MCP) also asks the literals finder for an exact value that answers the query, such as a phone number or a web address, and returns it beside the facts, so the calling model never has to choose a separate lookup tool. Costs one decision-model call per recall. Has no effect unless the Literals finder module is enabled."),
+      '#config_target' => 'aim.settings:recall_literals',
+    ];
 
     $form['prompts'] = [
       '#type' => 'details',

@@ -66,7 +66,9 @@ an undeclared Write tool counts as destructive, which MCP clients read as
 - `src/Tool/AimBrief.php` (`aim_tool.brief`) - `aim_brief`, no search
   text: the newest trusted facts per installed scope the caller can view
   (own user facts, own roles' role facts), via
-  `AimRecallService::recent()`, results as `AimRecall::toResult()`. Gated
+  `AimRecallService::recent()`, results as `AimRecall::toResult()`. Its
+  reply names today (`AimRememberService::today()`): a model has no clock
+  and otherwise guesses expiry years from its training data. Gated
   on `recall aim facts`. See [DEVELOPING.md](DEVELOPING.md#aim_brief).
 - `src/Tool/AimLiteral.php` (`#[ToolMethod]` service `aim_tool.literal`) -
   `aim_literal`, a thin wrapper over
@@ -82,7 +84,8 @@ an undeclared Write tool counts as destructive, which MCP clients read as
   value, so a signed-in member can use it in chat. The lookup tool
   an aim site uses; `literals_tool`'s `literals:lookup` wraps the same
   service for sites without aim. Only the attribute (ID, descriptions) and
-  the permission live here.
+  the permission live here. Chat callers no longer need it: `aim_recall`
+  returns exact values itself (below); it stays for MCP, by key.
 - MCP exposure (`mcp_server_tool_bridge.mcp_tool_config.*.yml`) ships in
   `aim_tool_oauth/config/install`, not here: `aim_tool` alone is Tool API
   only, with no MCP packages needed. Those configs carry no
@@ -102,6 +105,16 @@ there is no per-call `max_distance`, so a remote caller can't switch the
 cutoff off. `limit` is capped at 25. `AimRemember`'s reply says when a
 fact waits for review or has an expiry, so a caller doesn't report a held
 fact as known.
+
+`AimRecall` also asks the literals finder (`literals.lookup` as a
+question, as the caller) when `literals_finder` is enabled and
+`aim.settings:recall_literals` is on (a missing key is off: sites
+installed before 2026-11-16 need it set), and returns hits in a `literals` list (key, value,
+label, kind, gist, `match`/`ambiguous`)
+([ADR-0061](../../adr/0061-how-aim-uses-literals.md)'s addendum). A lookup
+that can't run never fails recall: facts return, a warning is logged and
+the message says exact values could not be checked. "No relevant facts
+found." only when the finder was not asked.
 
 `AimRecall` results carry `date_kind` (`true_since`/`recorded`) beside
 `date`. An MCP client caches the output schema on connect: after an output

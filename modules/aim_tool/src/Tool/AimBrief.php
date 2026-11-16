@@ -10,6 +10,7 @@ use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Plugin\AimScopeType\AimScopeRole;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRecallService;
+use Drupal\aim\Service\AimRememberService;
 use Drupal\aim_tool\AimScopeGuide;
 use Drupal\tool\Attribute\ToolInput;
 use Drupal\tool\Attribute\ToolMethod;
@@ -37,6 +38,11 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * Results have the same
  * shape as aim_recall's (AimRecall::toResult()), grouped by scope in
  * AimScopeGuide's order (site first), newest first within each.
+ *
+ * The reply also names today (AimRememberService::today()): the calling
+ * model has no clock, and without it turns "this month" into an expires
+ * date in its training years. Not in the tool description, which is
+ * cached.
  */
 final class AimBrief {
 
@@ -58,6 +64,8 @@ final class AimBrief {
    *   The calling account.
    * @param \Drupal\aim\AimScopeTypePluginManagerInterface $scopeTypeManager
    *   The scope type plugin manager, for which scopes are about roles.
+   * @param \Drupal\aim\Service\AimRememberService $rememberService
+   *   The remember service, for today's date.
    */
   public function __construct(
     private readonly AimRecallService $recallService,
@@ -66,6 +74,7 @@ final class AimBrief {
     private readonly AccountInterface $currentUser,
     #[Autowire(service: 'plugin.manager.aim_scope_type')]
     private readonly AimScopeTypePluginManagerInterface $scopeTypeManager,
+    private readonly AimRememberService $rememberService,
   ) {}
 
   /**
@@ -82,7 +91,7 @@ final class AimBrief {
   #[ToolMethod(
     id: 'aim_brief',
     label: new TranslatableMarkup('Brief on memory'),
-    description: new TranslatableMarkup('Lists the newest remembered facts you can see in each scope (the site, your roles, yourself, ongoing work), with no search text. Call it once at the start of work to get oriented; use aim_recall to search for anything specific.'),
+    description: new TranslatableMarkup('Lists the newest remembered facts you can see in each scope (the site, your roles, yourself, ongoing work), with no search text, and gives the current date. Call it once at the start of work to get oriented; use aim_recall to search for anything specific.'),
     operation: ToolOperation::Read,
     permission: 'recall aim facts',
   )]
@@ -136,12 +145,15 @@ final class AimBrief {
 
     if (empty($rows)) {
       return ExecutableResult::success(
-        new TranslatableMarkup('No facts recorded yet.'),
+        new TranslatableMarkup('Today is @today. No facts recorded yet.', ['@today' => $this->rememberService->today()]),
         ['results' => []],
       );
     }
     return ExecutableResult::success(
-      new TranslatableMarkup('Listed @count fact(s).', ['@count' => count($rows)]),
+      new TranslatableMarkup('Today is @today. Listed @count fact(s).', [
+        '@today' => $this->rememberService->today(),
+        '@count' => count($rows),
+      ]),
       ['results' => array_map(AimRecall::toResult(...), $rows)],
     );
   }

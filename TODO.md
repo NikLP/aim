@@ -131,17 +131,30 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
 
 ## Literals, aim's side (design in [ADR-0061](adr/0061-how-aim-uses-literals.md))
 
-Token replacement at recall, the `aim_literal` tool and the finder-first
-gate are built. Work on the literals modules themselves is in
+Token replacement at recall, the `aim_literal` tool, the finder-first
+gate and the finder as a source in `aim_recall` (2026-11-16, ADR-0061's
+addendum) are built. Work on the literals modules themselves is in
 [literals/BACKLOG.md](../../contrib/literals/BACKLOG.md).
 
 - [ ] **Unbuilt design from ADR-0061 section 3 ("How aim could use
       literals further").** Convert-a-fact (retires the fact, never one
       click); the two answer modes and "think harder" escalation (a skill,
-      wired up later); the finder as a live recall source; copy controls
+      wired up later); copy controls
       (front-end only). Pull one out when a site needs it. Optional
       pre-gate ("is this a lookup?" ahead of the finder) only if measured
       to pay.
+- [ ] **After the finder went into recall (2026-11-16).** Re-run
+      `drush aim:chatbot-eval` (ADR-0061 section 2's `tool` row is stale:
+      `tool` mode now means recall carrying values). Measure the second
+      finder call when the gate passes a turn to the assistant; skip it
+      only if that calls for it (needs the invoker in `AimRecall`,
+      tool#3583125). On habanero (after the code settles): set
+      `recall_literals` (it predates the key, so it reads as off), update
+      the Memory toolset by hand (optional config), reconnect MCP
+      clients, then replay the 2026-11-15 "do you have any phone numbers"
+      Site Agent question and check `ai_log` for one `aim_recall`
+      returning `main_phone`. Replayed locally 2026-11-16: `main_phone`
+      matched, 1.5 s.
 - [ ] **Finder-first gate: open points.** Whether gate replies go into the
       stored history; a friendlier reply than the bare template (our own
       wording: a decision model cannot write text); latency on a local decision model unmeasured; a gate-hit line in the

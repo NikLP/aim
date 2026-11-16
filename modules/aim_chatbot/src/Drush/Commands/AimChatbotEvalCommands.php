@@ -29,8 +29,10 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  * End-to-end comparison of two ways to answer a one-shot value lookup.
  *
  * Answers the gate eval (ADR-0061 section 2).
- * Runs a gold set through the real assistant twice: "tool" (the assistant calls
- * aim_literal itself, the shipped design) and "prompt" (no tool, the
+ * Runs a gold set through the real assistant twice: "tool" (exact values
+ * come back from aim_recall, aim.settings:recall_literals, the shipped
+ * design; it was the assistant calling aim_literal itself until the ADR-0061
+ * addendum) and "prompt" (no tool, the
  * viewer's readable literals listed in the system prompt, so the large model
  * does the same lookup alone), and "gate" (the finder decides first: a
  * match is answered from the literal with no chat model, anything else goes
@@ -259,8 +261,9 @@ final class AimChatbotEvalCommands extends DrushCommands {
       $this->dispatcher->removeListener(PreGenerateResponseEvent::EVENT_NAME, $pre);
       $this->dispatcher->removeListener(PostGenerateResponseEvent::EVENT_NAME, $post);
       $this->dispatcher->removeListener(AgentToolPreExecuteEvent::EVENT_NAME, $tool);
-      unset($GLOBALS['config']['ai_agents.ai_agent.' . $agentId]);
+      unset($GLOBALS['config']['ai_agents.ai_agent.' . $agentId], $GLOBALS['config']['aim.settings']['recall_literals']);
       $this->configFactory->reset('ai_agents.ai_agent.' . $agentId);
+      $this->configFactory->reset('aim.settings');
       Cache::invalidateTags(['config:ai_agents.ai_agent.' . $agentId]);
     }
 
@@ -427,8 +430,9 @@ final class AimChatbotEvalCommands extends DrushCommands {
       $this->dispatcher->removeListener(PreGenerateResponseEvent::EVENT_NAME, $pre);
       $this->dispatcher->removeListener(PostGenerateResponseEvent::EVENT_NAME, $post);
       $this->dispatcher->removeListener(AgentToolPreExecuteEvent::EVENT_NAME, $tool);
-      unset($GLOBALS['config']['ai_agents.ai_agent.' . $agentId]);
+      unset($GLOBALS['config']['ai_agents.ai_agent.' . $agentId], $GLOBALS['config']['aim.settings']['recall_literals']);
       $this->configFactory->reset('ai_agents.ai_agent.' . $agentId);
+      $this->configFactory->reset('aim.settings');
       Cache::invalidateTags(['config:ai_agents.ai_agent.' . $agentId]);
     }
 
@@ -449,7 +453,10 @@ final class AimChatbotEvalCommands extends DrushCommands {
    */
   protected function applyRecallMode(string $mode, string $agentId): void {
     $name = 'ai_agents.ai_agent.' . $agentId;
-    unset($GLOBALS['config'][$name]);
+    unset($GLOBALS['config'][$name], $GLOBALS['config']['aim.settings']['recall_literals']);
+    if ($mode === 'gate' || $mode === 'prompt') {
+      $GLOBALS['config']['aim.settings']['recall_literals'] = FALSE;
+    }
     $this->configFactory->reset($name);
     if (!in_array($mode, ['forced', 'free', 'context'], TRUE)) {
       throw new \InvalidArgumentException("Unknown mode: $mode");
@@ -574,16 +581,21 @@ final class AimChatbotEvalCommands extends DrushCommands {
    *
    * @param string $mode
    *   The mode: "tool" leaves the agent alone; "prompt" drops the lookup
-   *   tool and lists the anonymous-readable literals in the system prompt.
+   *   tool and lists the anonymous-readable literals in the system prompt;
+   *   "gate" drops the lookup tool. Both also stop recall returning exact
+   *   values, so only the mode's own path supplies them.
    * @param string $agentId
    *   The ai_agent ID.
    */
   protected function applyMode(string $mode, string $agentId): void {
     $name = 'ai_agents.ai_agent.' . $agentId;
-    unset($GLOBALS['config'][$name]);
+    unset($GLOBALS['config'][$name], $GLOBALS['config']['aim.settings']['recall_literals']);
+    if ($mode === 'gate' || $mode === 'prompt') {
+      $GLOBALS['config']['aim.settings']['recall_literals'] = FALSE;
+    }
     if ($mode === 'gate') {
       $config = $this->configFactory->getEditable($name)->getRawData();
-      $prompt = preg_replace('/When a visitor needs an exact value.*$/s', '', (string) $config['system_prompt']);
+      $prompt = preg_replace('/Recall also returns exact values.*$/s', '', (string) $config['system_prompt']);
       $prompt .= "You have no lookup tool. If a visitor asks for an exact value such as a phone number or a web address and it is not in your recalled facts, say you don't have it recorded.";
       $tools = $config['tools'];
       $tools['tool:aim_literal'] = FALSE;
@@ -599,13 +611,14 @@ final class AimChatbotEvalCommands extends DrushCommands {
         }
       }
       // Replace the lookup-tool sentence; add the table of exact values.
-      $prompt = preg_replace('/When a visitor needs an exact value.*$/s', '', (string) $config['system_prompt']);
+      $prompt = preg_replace('/Recall also returns exact values.*$/s', '', (string) $config['system_prompt']);
       $prompt .= "When a visitor needs an exact value such as a phone number or a web address, take it from this list and give it exactly as written. If it is not on the list, say you don't have it recorded.\nExact values:\n" . implode("\n", $lines);
       $tools = $config['tools'];
       $tools['tool:aim_literal'] = FALSE;
       $GLOBALS['config'][$name] = ['system_prompt' => $prompt, 'tools' => $tools];
     }
     $this->configFactory->reset($name);
+    $this->configFactory->reset('aim.settings');
     Cache::invalidateTags(['config:' . $name]);
   }
 

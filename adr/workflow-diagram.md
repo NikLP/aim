@@ -1,275 +1,434 @@
 # AIM memory workflow diagrams
 
-How a fact moves through the module, as the code stands on 2026-11-01
+How a fact moves through the module, as the code stands on 2026-11-16
 (`AimRememberService`, `AimGroundingChecker`, `AimFactAccessControlHandler`,
 `AimMemoryManager`, `AimConsolidationService`, `AimConsolidateQueueWorker`,
-`AimRecallService`, `AimCommands`, `aim_tool`, `aim_chatbot`). Not a
-decision record: for the reasoning see [0000-index.md](0000-index.md).
+`AimRecallService`, `AimCommands`, `AimHooks`, `aim_tool`, `aim_chatbot`,
+`aim_site_agent`). Not a decision record: for the reasoning see
+[0000-index.md](0000-index.md).
 
-Six diagrams: write path (1), consolidation (2), recall (3), call
-counts for a sample round (4), exact values (5), and one chat turn end
-to end (6). The write path ends by enqueuing a fact for consolidation,
-which is the hand-off into diagram 2. Diagram 3 reads what diagrams 1 and
-2 left in the vector table.
+Seven diagrams: saving a fact (1), consolidation (2), recall (3), calls
+for a sample round (4), exact values (5), one chat turn (6) and one Site
+Agent turn (7). Saving ends by queueing a fact for consolidation (diagram
+2); recall reads what both left in the vector table. Each diagram keeps
+its boxes short; the detail is in the notes under it.
 
-Color key, used in every diagram:
+## Key
 
-- Blue, "LLM": a chat or decision model is called (can be remote).
-- Orange, "Vector": embedding or vector math (an embeddings model call
-  at index/query time, or MariaDB cosine distance in SQL).
-- Gray, "Code": plain PHP, config or database logic, no model.
-- Red: a rejection or dead end.
+Each kind of box has its own shape and border as well as its own color, so
+the key does not depend on color alone:
 
-## 1. Write path: input to saved, queued and indexed fact
+| Shape | Color | Means |
+| --- | --- | --- |
+| Rounded pill, solid blue border | Blue | A chat or decision model is called (can be remote) |
+| Hexagon, solid orange border | Orange | Embedding or vector math: an embeddings model call, or MariaDB cosine distance in SQL |
+| Rectangle, solid gray border | Gray | Plain PHP, config or database logic, no model |
+| Diamond | Gray | A yes/no or multi-way check in code |
+| Rectangle, dashed red border | Red | A rejection or dead end |
+
+How the diagrams are drawn: each starts with an `init` line that fixes its
+colors, so it looks the same in a light or dark viewer, and keeps the text
+at full size (a diagram too wide for the page scrolls sideways rather than
+shrinking). Every text color meets WCAG AA contrast (4.5:1) on its box.
+Copy the `init` line and the four `classDef` lines when adding a diagram.
+
+## 1. Saving a fact
 
 ```mermaid
+%%{init: {"theme": "base", "flowchart": {"useMaxWidth": false}, "themeCSS": ".nodeLabel p{margin:0}", "themeVariables": {"fontSize": "16px", "lineColor": "#7c8798", "textColor": "#0f172a", "primaryTextColor": "#0f172a", "edgeLabelBackground": "#f8fafc"}}}%%
 flowchart TD
-  classDef llm fill:#cfe3ff,stroke:#2b6cb0,color:#102a43
-  classDef vec fill:#ffe2c2,stroke:#c05621,color:#3d1f00
-  classDef code fill:#eceff1,stroke:#607d8b,color:#1f2a30
-  classDef bad fill:#fdd,stroke:#c53030,color:#4a0000
+  accTitle: Saving a fact
+  accDescr: Every write path ends in remember() or the extraction loop. Decision-model checks are batched per write, a person-approved call skips the grounded check, a time-bound fact with no end date is asked about, flagged or refused, starting trust comes from the writer's permissions, guardrails can refuse the text, and a saved fact is queued for consolidation and indexed.
+  classDef llm fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#0b2545
+  classDef vec fill:#ffedd5,stroke:#c2410c,stroke-width:2px,color:#431407
+  classDef code fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#0f172a
+  classDef bad fill:#fee2e2,stroke:#b91c1c,stroke-width:2px,stroke-dasharray:6 4,color:#450a0a
 
-  subgraph IN["Write paths in (each runs as a real account)"]
-    A1["drush aim:remember --uid<br/>(single, or --file batch)<br/>used by agents such as Claude Code<br/>via the aim-memory skill<br/>switches to the --uid account,<br/>rememberBatch() per-entry create check"]
-    A2["MCP / Tool API aim_remember<br/>needs 'remember aim facts' plus<br/>per-scope 'create {scope} aim facts'<br/>optional source_text from the caller<br/>runs as the token's user"]
-    A3["Chat: the same aim_remember via tool_ai_connector<br/>scope by the visitor's permissions<br/>source_text from the assistant<br/>runs as the visitor"]
-    A4["drush aim:extract file --uid<br/>aim-discovery skill runs this"]
-    A5["Ingest form, extract mode<br/>prose .txt, needs 'ingest aim facts'"]
-    A6["Ingest form, lines or JSON mode<br/>no model call, rememberBatch()<br/>per-entry create check<br/>no source text"]
-  end
+  A1["drush aim:remember,<br/>ingest lines or JSON"]:::code
+  A2["aim_remember tool:<br/>MCP, chat, Site Agent"]:::code
+  A3["drush aim:extract,<br/>ingest prose"]:::code
+  RB(["Time check for<br/>the whole list"]):::llm
+  PA{"A person approved<br/>this exact call?"}:::code
+  DS["source_text dropped:<br/>no grounded check"]:::code
+  CB(["Grounded and time checks<br/>for the whole list"]):::llm
+  X(["Extraction:<br/>one chat call per file"]):::llm
+  C{"Writer may create<br/>in the scope?"}:::code
+  SK["Skipped,<br/>counted"]:::bad
+  GB(["Grounded and time checks<br/>for every candidate"]):::llm
+  R["remember()"]:::code
+  ERR["Error to<br/>the caller"]:::bad
+  GQ{"Source text and<br/>grounded check on?"}:::code
+  GC(["Grounded check<br/>score"]):::llm
+  TQ{"No end date and<br/>time check on?"}:::code
+  TC(["Time check:<br/>true only for a<br/>date or period?"]):::llm
+  ASK["Refused: asked to<br/>retry with expires"]:::bad
+  REF["Refused"]:::bad
+  TP["Starting trust:<br/>the writer's permission"]:::code
+  DM{"demote, and score<br/>below 0.7 or failed?"}:::code
+  UNT["Untrusted:<br/>waits for review"]:::code
+  G{"Guardrails<br/>pass?"}:::code
+  REJ["Nothing saved"]:::bad
+  SAVE["Saved,<br/>audit lines"]:::code
+  Q["Queued for<br/>consolidation"]:::code
+  IDX{{"Text embedded,<br/>row in aim_fact_vectors"}}:::vec
 
-  A1 --> R["AimRememberService::remember()"]
-  A2 --> R
-  A3 --> R
-  A6 --> R
-
-  A4 --> X
-  A5 --> X["ingestText(): extractFacts()<br/>structured-output chat call<br/>(activities.extraction, else default chat)<br/>returns scope, subject, text list"]:::llm
-  X --> C["createFactsFromCandidates()<br/>per candidate, one bad one<br/>does not abort the batch"]:::code
-  C -->|"writer lacks 'create {scope} aim facts'<br/>(form user, or the Drush --uid account)"| DEN["denied, counted"]:::bad
-  C -->|"scope requires an account<br/>and no --subject-uid"| SK["skipped, counted"]:::bad
-  C --> GB["checkGrounding(document, all candidates)<br/>one decision call per 16 candidates<br/>(skipped when grounding_mode off<br/>or no grounding model)"]:::llm
-  GB --> TP
-
-  R --> R1{"scope is an enabled<br/>aim_scope?"}:::code
-  R1 -->|no| ERR["InvalidArgumentException<br/>returned to caller"]:::bad
-  R1 -->|yes| R2{"scope requires a<br/>real account?<br/>user scope, ADR-0007"}:::code
-  R2 -->|"yes: subject must be a<br/>uid of a real user"| R3["resolve account<br/>no match: exception"]:::code
-  R2 -->|"no"| R4["subject as given (or empty);<br/>on save, scope plugin resolveSubject()<br/>e.g. case names or mints a case ID"]:::code
-  R3 --> R6["build entity: text, source,<br/>category terms, asserted,<br/>target_type/target_id,<br/>expires (a past date: exception)"]:::code
-  R4 --> R6
-  R6 --> GQ{"source text given, grounding_mode<br/>not off and a grounding model?"}:::code
-  GQ -->|no| TP
-  GQ -->|yes| GC["checkGrounding(source text, [text])<br/>decision model (activities.grounding),<br/>GROUNDING_QUESTION; a batch's score<br/>comes from the request cache"]:::llm
-  GC --> TP
-
-  TP["trustValues(): starting trust (ADR-0065)<br/>writer canApprove() (administer aim, review aim facts,<br/>trust {scope} aim facts): trusted, else untrusted"]:::code
-  TP --> TV{"grounding_mode?"}:::code
-  TV -->|"off, or not checked"| TS["trusted = starting trust"]:::code
-  TV -->|record| TSH["grounding_score stored,<br/>trusted = starting trust"]:::code
-  TV -->|demote| TE["grounding_score stored;<br/>below threshold (0.7) or check failed:<br/>untrusted, else starting trust<br/>(never promotes)"]:::code
-  TS --> V
-  TSH --> V
-  TE --> V
-
-  V["saveFact(): $entity->validate()"]:::code
-  V --> G["AimGuardrails constraint on text<br/>runGuardrails(): set aim_write_guardrails"]:::code
-  G --> G1{"aggregated stop score<br/>reaches threshold 1.0?"}:::code
-  G1 -->|"yes: aim_max_length 2000 chars,<br/>or aim_no_markup regex for HTML tags"| REJ["violation, InvalidArgumentException<br/>nothing saved<br/>warning logged without text<br/>remember: error to caller<br/>extract: counted as blocked"]:::bad
-  G1 -->|no| SAVE["entity save()<br/>audit lines: write, and grounding<br/>(ID, score, cutoff, mode, no text)"]:::code
-
-  SAVE --> H["hook_aim_fact_insert<br/>trusted facts only, skipped when syncing;<br/>hook_aim_fact_update queues a fact<br/>when trusted goes off to on"]:::code
-  H --> Q["enqueue fact ID on queue aim_consolidate<br/>see diagram 2"]:::code
-  SAVE --> T["Search API tracker marks item<br/>for (re)index"]:::code
-  T --> IDX{"index_directly?<br/>shipped: off, this site: on"}:::code
-  IDX -->|on| EMB
-  IDX -->|"off: cron_limit 50<br/>or drush sapi-i, or the<br/>queue worker's reindex()"| EMB
-  EMB["aim_exclude_retired processor<br/>drops facts with retired set<br/>(plain code)"]:::code --> EMB2["embed field text only<br/>(main_content) via the<br/>server's embeddings engine"]:::vec
-  EMB2 --> VT["row in aim_fact_vectors<br/>MariaDB VECTOR column, HNSW index<br/>M=16, ef_search=100<br/>attributes stored beside the vector:<br/>scope, subject, source, user, trusted"]:::vec
+  A1 --> RB --> R
+  A2 --> PA
+  PA -->|yes| DS --> CB
+  PA -->|no| CB
+  CB -->|"per entry: create<br/>permission"| R
+  A3 --> X --> C
+  C -->|"no, or no account<br/>for a user fact"| SK
+  C -->|yes| GB --> TQ
+  R -->|"bad scope, subject<br/>or past expires"| ERR
+  R --> GQ
+  GQ -->|yes| GC --> TQ
+  GQ -->|no| TQ
+  TQ -->|no| TP
+  TQ -->|yes| TC
+  TC -->|no| TP
+  TC -->|"yes: flag mode,<br/>untrusted"| TP
+  TC -->|"yes: aim_remember"| ASK
+  TC -->|"yes: reject mode"| REF
+  TP --> DM
+  DM -->|yes| UNT --> G
+  DM -->|no| G
+  G -->|no| REJ
+  G -->|yes| SAVE
+  SAVE -->|"trusted only"| Q
+  SAVE --> IDX
 ```
+
+The ways in:
+
+| Path | Runs as | Source text | `source` recorded |
+| --- | --- | --- | --- |
+| `drush aim:remember --uid` (one fact, or `--file`), used by agents such as Claude Code through the aim-memory skill | the `--uid` account | none | `--source`, or the entry's own |
+| Ingest form, one fact per line or JSON (`ingest aim facts`) | the form's user | none | the form's |
+| `aim_remember` over MCP or Tool API (`remember aim facts`) | the token's user | optional `source_text` | `tool:aim_remember` |
+| `aim_remember` in the chat block, through `tool_ai_connector` | the visitor | from the assistant | `chat:aim_remember` |
+| `aim_remember` in Site Agent's chat, through the Memory toolset (diagram 7) | the thread's user | from the model | `site_agent:aim_remember` |
+| `aim_remember` through Tool API's Drush invoker | the Drush user | optional | `drush:aim_remember` |
+| `drush aim:extract FILE --uid` (the aim-discovery skill runs it), ingest form prose mode | the `--uid` account, the form's user | the whole file | the command's or form's |
 
 Notes on diagram 1:
 
-- The ingest form has three modes: prose goes through extraction (one
-  chat call per file, the model picks scope and subject, then one
-  grounding call per 16 candidates against the whole file); one fact per
-  line and JSON (the `aim:remember --file` shape, for case IDs and entity
-  targets) skip the model and have no source text, so they stay
-  unchecked.
-- The grounded check sends the source text to the decision model and
-  never stores it (ADR-0037). This site runs `demote`: a low score sends
-  the fact to review; the check never trusts a fact (ADR-0065).
-- Indexed fields: `text` is the embedded content. `scope`, `subject`,
-  `source`, `user` and `trusted` are stored as attributes. The filterable
-  ones used by code are `scope`, `subject`, `user` (BTREE index) and
-  `trusted` (BTREE index). `source` is stored but no code filters on it.
-  `retired` facts are removed by the processor; `expires` is not indexed
-  (recall withholds a past-due fact, and `aim:expire` retires it).
-- Guardrails here are deterministic (regexp plus length). The set has no
-  LLM-backed guardrail, so the gate makes no model call.
-- A rewriting guardrail would replace the text before save; none ships.
+- **Two methods.** Every path ends in `AimRememberService::remember()`,
+  which stores exactly what it is handed, or in
+  `createFactsFromCandidates()`, which saves what extraction proposed. The
+  `aim_remember` tool and `rememberBatch()` (Drush, the ingest form's lines
+  and JSON modes) check the writer's `create {scope} aim facts` per entry;
+  one bad entry is reported and skipped, never aborting the rest.
+- **`source`** on `aim_remember` facts follows the Tool API invoker
+  (`AimRemember::CALLERS`), not the caller's say. It records provenance
+  only; trust comes from the writer's permissions.
+- **A person approved this exact call?** Site Agent marks a call that ran
+  after its approval card was approved, or that the thread's owner ran
+  directly. `AimRemember` then drops `source_text`, so the grounded check
+  does not run, and writes an audit line (ADR-0067). The time check, the
+  writer's permissions and the guardrails still apply. The mark comes from
+  this site's patch to site_agent
+  (`patches/site_agent-person-approved-invoker.patch` at the site root);
+  without it every call is grounded.
+- **Batched checks.** Decision calls are made per write, not per fact:
+  `checkBatch()` (the tool, `rememberBatch()`) and `checkGrounding()`
+  (extraction) ask one question per candidate per check that is on, up to
+  16 questions per call (`activities.grounding.max_questions`): 16
+  candidates, or 8 with both checks on. `remember()` then finds its scores
+  in the request cache.
+- **Extraction.** `extractFacts()` makes one structured-output chat call
+  per file (`activities.extraction`, else the default chat model); the
+  model picks each candidate's scope and subject. A user-scope candidate
+  needs `--subject-uid` (or the form's account), or it is skipped. A
+  candidate a check or guardrail refuses is counted as blocked, and the
+  rest carry on.
+- **remember()** refuses a disabled or unknown scope, a user fact whose
+  subject is not a real account (ADR-0007) and an `expires` already past.
+  For other scopes the scope's plugin resolves the subject on save
+  (`resolveSubject()`; the case plugin names or mints a case ID).
+- **Grounded check** (ADR-0037): the decision model is asked whether the
+  source text states the fact, and the answer is stored as
+  `grounding_score`; the source text is never stored. It runs when
+  `grounding_mode` is `record` or `demote` and a decision model is set for
+  `activities.grounding`. This site runs `demote`: a score below 0.7, or a
+  check that failed, saves the fact untrusted. The check never trusts a
+  fact (ADR-0065).
+- **Time check** (ADR-0057's addendum, `time_check_mode`, shipped off,
+  `flag` here): for a fact with no `expires` and not `open-ended`, the
+  decision model is asked whether it is true only for a date or period
+  (threshold 0.3, `activities.grounding.time_threshold`). If so:
+  `aim_remember` refuses the entry and asks its caller to retry with
+  `expires`, in any mode; other paths save it untrusted (`flag`) or refuse
+  it (`reject`, which extraction counts as blocked). It needs the grounded
+  check's decision model, not the grounded check itself.
+- **Starting trust** (ADR-0065): trusted when the writer may trust facts in
+  the scope (`administer aim`, `review aim facts` or `trust {scope} aim
+  facts`), untrusted otherwise, or when the time check flagged it.
+- **Guardrails** run as an entity constraint on `text` (set
+  `aim_write_guardrails`): at most 2000 characters and no HTML tags, stop
+  threshold 1.0. They are deterministic, so they make no model call. A
+  failure saves nothing and logs a warning without the text; a single-fact
+  caller gets an error. A rewriting guardrail would replace the text before
+  save; none ships.
+- **Saved.** Audit lines record the write and the grounding verdict (IDs,
+  score, cutoff, mode; no text). `hook_aim_fact_insert` queues a trusted
+  fact on `aim_consolidate`, and `hook_aim_fact_update` queues one when it
+  becomes trusted; neither runs during a config sync.
+- **Indexed.** Search API tracks the fact; `index_directly` (shipped off,
+  on here) indexes it at once, otherwise cron (50 per run), `drush sapi-i`
+  or the queue worker's `reindex()` does. The `aim_exclude_retired`
+  processor drops retired facts. Only `text` is embedded; `scope`,
+  `subject`, `source`, `user` and `trusted` are stored beside the vector
+  (BTREE indexes on `user` and `trusted`; nothing filters on `source`).
+  HNSW index, M=16, ef_search=100. `expires` is not indexed: recall
+  withholds a past-due fact and `aim:expire` retires it.
+- **Edits are not drawn**: an edit changes an existing fact rather than
+  writing a new one. Only `text` and `grounding_score` are revisioned; a
+  save that changes `text` makes a new revision and clears the score
+  (unless the same save sets one), and any other save is in place
+  (ADR-0064, `AimHooks::applyRevisionPolicy()`).
 
-## 2. Consolidation: queue to retired or merged facts
+## 2. Consolidation
 
 ```mermaid
+%%{init: {"theme": "base", "flowchart": {"useMaxWidth": false}, "themeCSS": ".nodeLabel p{margin:0}", "themeVariables": {"fontSize": "16px", "lineColor": "#7c8798", "textColor": "#0f172a", "primaryTextColor": "#0f172a", "edgeLabelBackground": "#f8fafc"}}}%%
 flowchart TD
-  classDef llm fill:#cfe3ff,stroke:#2b6cb0,color:#102a43
-  classDef vec fill:#ffe2c2,stroke:#c05621,color:#3d1f00
-  classDef code fill:#eceff1,stroke:#607d8b,color:#1f2a30
-  classDef bad fill:#fdd,stroke:#c53030,color:#4a0000
+  accTitle: Consolidation
+  accDescr: A queued trusted fact is compared with its nearest trusted neighbors. Unrelated pairs are skipped, identical text retires the newer fact, and anything else close enough asks a model for ADD, NOOP or UPDATE. A merge must pass guardrails, the verifier and the grounded check, or both facts stand. Retired facts leave the vector table.
+  classDef llm fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#0b2545
+  classDef vec fill:#ffedd5,stroke:#c2410c,stroke-width:2px,color:#431407
+  classDef code fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#0f172a
+  classDef bad fill:#fee2e2,stroke:#b91c1c,stroke-width:2px,stroke-dasharray:6 4,color:#450a0a
 
-  QI["queue aim_consolidate<br/>item = fact ID<br/>drained by dedicated crontab:<br/>drush queue:run aim_consolidate<br/>(no cron key, not hook_cron)"]:::code
-  QI --> W1{"fact still exists,<br/>not retired and trusted?"}:::code
-  W1 -->|no| DONE0["return, nothing to do"]:::bad
-  W1 -->|yes| W2["reindex() so the fact and<br/>its neighbors are searchable"]:::vec
-  W2 --> W3{"consolidation model?<br/>activities.consolidation,<br/>else default chat"}:::code
-  W3 -->|none| SUSP["SuspendQueueException<br/>queue stops, item released"]:::bad
+  QI["Queue<br/>aim_consolidate"]:::code
+  MAN["drush<br/>aim:consolidate"]:::code
+  W1{"Still there, not<br/>retired, trusted?"}:::code
+  DONE0["Nothing to do"]:::bad
+  W3{"Consolidation<br/>model set?"}:::code
+  SUSP["Queue suspended,<br/>item released"]:::bad
+  N{{"Up to 3 nearest<br/>trusted neighbors"}}:::vec
+  NONE["No change"]:::code
+  S{{"Cosine distance<br/>to the neighbor"}}:::vec
+  SKIP["Unrelated:<br/>skipped"]:::code
+  AUTO["Same text: NOOP,<br/>no model call"]:::code
+  CL(["classifyPair():<br/>ADD, NOOP or UPDATE"]):::llm
+  ADD["Both stand"]:::code
+  MT(["Merged text<br/>written"]):::llm
+  MG{"Guardrails<br/>pass?"}:::code
+  BLK["BLOCKED:<br/>both untouched"]:::bad
+  VM(["Verifier: every<br/>detail kept?"]):::llm
+  GR(["Grounded check:<br/>inputs state the merge?"]):::llm
+  FAIL["Downgraded to ADD:<br/>both stand"]:::bad
+  RN["Candidate retired,<br/>superseded by the kept fact"]:::code
+  RU["New merged fact;<br/>both inputs retired"]:::code
+  IX{{"Retired facts leave<br/>aim_fact_vectors"}}:::vec
+  SW["drush aim:expire:<br/>past end date retired"]:::code
+
+  QI --> W1
+  W1 -->|no| DONE0
+  W1 -->|yes| W3
+  W3 -->|no| SUSP
   W3 -->|yes| N
-
-  MAN["drush aim:consolidate<br/>sweeps all non-retired trusted facts by ID,<br/>each pair once;<br/>--dry-run computes decisions, saves nothing"]:::code --> N
-
-  N["findNeighbors(), up to neighbor_limit (3)<br/>embed this fact's text as a query<br/>(query-embedding cache applies)<br/>filter scope, plus user or subject<br/>trusted only (index condition and entity);<br/>skip self, handled, retired,<br/>or a different end date (expires);<br/>each neighbor decided in turn,<br/>stop if this fact retires"]:::vec
-  N --> N1{"neighbor found?"}:::code
-  N1 -->|no| DONE1["done, no change"]:::code
-  N1 -->|yes| S{"cosine distance<br/>score"}:::vec
-  S -->|"above 0.45<br/>compare_distance"| SKIP["unrelated: skip, zero cost"]:::code
-  S -->|"identical text<br/>(case, spacing, final full stop ignored)"| AUTO["decision NOOP, no model call<br/>keeps the older fact"]:::code
-  S -->|"up to 0.45, any other text"| CL["classifyPair()<br/>kept = lower ID, candidate = higher ID<br/>decision backend (this site: Jev): one choice<br/>chat backend: one structured call<br/>returning decision and merged text"]:::llm
-
-  CL --> D{"decision"}:::llm
-  D -->|ADD| ADD["both stand, no change"]:::code
-  D -->|NOOP| NOOP["decision NOOP"]:::code
-  D -->|UPDATE| MT["merged text<br/>chat backend: from the same reply<br/>decision backend: writeMerge(), default<br/>chat model with merge_prompt<br/>(no default chat model: ADD)"]:::llm
-
-  MT --> MG["runGuardrails(merged text)"]:::code
-  MG -->|rejected| BLK["BLOCKED: both facts untouched<br/>warning logged"]:::bad
-  MG -->|passed| VM["verifyMerge()"]:::code
-  VM --> VM2{"merge_verify on?<br/>shipped: on"}:::code
-  VM2 -->|"yes: verifier (activities.verifier,<br/>else the classifier's model)<br/>asked: every detail kept, nothing added?<br/>decision: noul 'faithful' at threshold<br/>(0.9 on this site)"| VM3["faithful or not"]:::llm
-  VM3 -->|"not faithful, or error"| FAIL["merge rejected:<br/>downgrade UPDATE to ADD<br/>both facts stand, audit line<br/>(check: model, error<br/>or grounding)"]:::bad
-  VM3 -->|faithful| GM
-  VM2 -->|no| GM
-  GM{"grounding_mode, and a<br/>grounding model?"}:::code
-  GM -->|"off, or no model"| UPD["UPDATE accepted"]:::code
-  GM -->|"record or demote"| GR["groundMerge(): checkGrounding()<br/>passage = kept text, newline, candidate text<br/>candidate = merged text<br/>decision model, audit line"]:::llm
-  GR --> GE{"demote, and score below<br/>threshold (0.7) or no score?"}:::code
-  GE -->|yes| FAIL
-  GE -->|"no (record: always)"| UPD
-
-  NOOP --> RN
+  MAN --> N
+  N -->|none| NONE
+  N -->|"each, in turn"| S
+  S -->|"above 0.45"| SKIP
+  S -->|"same text"| AUTO
+  S -->|"0.45 or closer"| CL
+  CL -->|ADD| ADD
+  CL -->|NOOP| RN
+  CL -->|UPDATE| MT
   AUTO --> RN
-  UPD --> RU
-
-  RN["retire candidate:<br/>retired = now<br/>superseded_by = kept fact<br/>superseded_by_reason = JSON"]:::code
-  RU["createMergedFact(): new fact via saveFact<br/>(guardrails run again)<br/>owner and identity from kept fact,<br/>asserted from candidate only,<br/>source candidate else kept,<br/>categories unioned, expires kept,<br/>trusted (both inputs are),<br/>grounding_score = the merge's score<br/>then retire BOTH inputs:<br/>retired = now, superseded_by = merged fact<br/>reason JSON stored on candidate"]:::code
-
-  RN --> IX["retired fact re-tracked: next index run<br/>removes it from aim_fact_vectors<br/>(aim_exclude_retired)"]:::vec
+  MT --> MG
+  MG -->|no| BLK
+  MG -->|yes| VM
+  VM -->|"no, or error"| FAIL
+  VM -->|yes| GR
+  GR -->|"demote: below 0.7<br/>or no score"| FAIL
+  GR -->|pass| RU
+  RN --> IX
   RU --> IX
-  RU --> NEWQ["merged fact insert enqueues<br/>itself on aim_consolidate"]:::code
-  NEWQ -.-> QI
-
-  SWEEP["drush aim:expire (crontab),<br/>hook_cron as backup:<br/>retired = now once expires passes<br/>no model call"]:::code --> IX
-
-  JR["superseded_by_reason JSON:<br/>decision, by auto or model, score,<br/>provider, model ID<br/>never fact text"]:::code
-  RN -.-> JR
-  RU -.-> JR
+  RU -.->|"merged fact<br/>queued"| QI
+  SW --> IX
 ```
 
 Notes on diagram 2:
 
-- Distances are cosine distances, lower is closer: "at or below"
-  means more similar. The default 0.45 lives in
-  `AimSettings::DEFAULT_COMPARE_DISTANCE`; the live value comes from
-  `aim.settings` (`compare_distance`). There is no distance below which
-  pairs merge unchecked (removed 2026-10-27, ADR-0036's addendum).
-- A merge passes three checks in order: guardrails (policy), the
-  verifier (both inputs' details survive, nothing added) and the
-  grounded check (the inputs state the merge). Only the grounded check
-  leaves a trace on the result, as `grounding_score`. In `demote` a
-  failed grounding keeps both facts rather than merging into an
-  untrusted fact, which would retire two good facts for one doubtful one.
-- Retirement is always soft. Nothing is deleted from `aim_fact`, and a
-  retired fact can be un-retired by the admin action.
-- `ADD` and `BLOCKED` change nothing, and the same pair is simply
-  evaluated again on a later sweep.
-- The queue and the sweep both call the same `decideAndApply()`.
+- **Queue.** One item per fact ID, drained by a dedicated crontab entry
+  (`drush queue:run aim_consolidate`; no cron key, not `hook_cron`).
+  Before deciding, the worker calls `reindex()` so the fact and its
+  neighbors are searchable. With no consolidation model
+  (`activities.consolidation`, else the default chat model) the queue
+  stops and the item is released.
+- **`drush aim:consolidate`** sweeps every trusted, non-retired fact by ID,
+  each pair once; `--dry-run` decides and saves nothing. The queue and the
+  sweep share `decideAndApply()`.
+- **Neighbors** (`findNeighbors()`, `neighbor_limit` 3): this fact's text
+  embedded as a query (the query-embedding cache applies), filtered to the
+  same scope plus user or subject, trusted only (an index condition and a
+  check on the entity). Self, pairs already handled, retired facts and a
+  neighbor with a different end date (`expires`) are skipped. Each
+  neighbor is decided in turn, stopping if this fact retires.
+- **Distance** is cosine distance, lower is closer.
+  `compare_distance` defaults to 0.45 (`AimSettings::DEFAULT_COMPARE_DISTANCE`).
+  Identical text ignores case, spacing and a final full stop, and keeps the
+  older fact. There is no distance below which pairs merge unchecked
+  (removed 2026-10-27, ADR-0036's addendum).
+- **classifyPair()**: the kept fact is the lower ID, the candidate the
+  higher. With the decision backend (this site: Jev) it is one choice;
+  with the chat backend, one structured call that returns the decision and
+  the merged text together.
+- **Merged text**: from the chat backend's same reply, or, with the
+  decision backend, `writeMerge()` on the default chat model with
+  `merge_prompt`. With no default chat model an UPDATE becomes ADD.
+- **The merge's three checks**, in order:
 
-## 3. Recall: query to returned facts
+  | Check | Asks | Fails to |
+  | --- | --- | --- |
+  | Guardrails (`runGuardrails()`) | the same policy as a new fact | BLOCKED, warning logged |
+  | Verifier (`verifyMerge()`, `merge_verify`, shipped on) | every detail of both inputs kept, nothing added? A `noul` "faithful" at the threshold (`activities.verifier`, else the classifier's model; 0.9 on this site) | ADD, audit line |
+  | Grounded check (`groundMerge()`, when `grounding_mode` is not off and a model is set) | does "kept text, newline, candidate text" state the merge? | ADD in `demote` only; `record` always passes |
+
+  A check that is off passes. Only the grounded check leaves a trace on the
+  result, as `grounding_score`. In `demote` a failed grounding keeps both
+  facts rather than merging into an untrusted one, which would retire two
+  good facts for one doubtful one.
+- **Retiring the candidate** (NOOP): `retired` = now, `superseded_by` =
+  the kept fact, `superseded_by_reason` = JSON.
+- **The merged fact** (`createMergedFact()`, through `saveFact()`, so
+  guardrails run again): owner and identity from the kept fact, `asserted`
+  from the candidate only, source the candidate's else the kept one's,
+  categories unioned, `expires` kept, trusted (both inputs are),
+  `grounding_score` the merge's. Both inputs are then retired with
+  `superseded_by` = the merged fact; the reason JSON is stored on the
+  candidate. The merged fact queues itself.
+- **superseded_by_reason** records the decision, whether it was automatic
+  or a model's, the score, provider and model ID; never fact text.
+- **Retirement is soft.** Nothing is deleted from `aim_fact`; the admin
+  action can un-retire a fact. A retired fact is re-tracked, and the next
+  index run removes it from `aim_fact_vectors` (`aim_exclude_retired`).
+- **Expiry**: `drush aim:expire` (crontab, with `hook_cron` as a backup)
+  retires a fact once its `expires` passes, with no model call.
+- ADD and BLOCKED change nothing, so the same pair is decided again on a
+  later sweep.
+
+## 3. Recall
 
 ```mermaid
+%%{init: {"theme": "base", "flowchart": {"useMaxWidth": false}, "themeCSS": ".nodeLabel p{margin:0}", "themeVariables": {"fontSize": "16px", "lineColor": "#7c8798", "textColor": "#0f172a", "primaryTextColor": "#0f172a", "edgeLabelBackground": "#f8fafc"}}}%%
 flowchart TD
-  classDef llm fill:#cfe3ff,stroke:#2b6cb0,color:#102a43
-  classDef vec fill:#ffe2c2,stroke:#c05621,color:#3d1f00
-  classDef code fill:#eceff1,stroke:#607d8b,color:#1f2a30
-  classDef bad fill:#fdd,stroke:#c53030,color:#4a0000
+  accTitle: Recall
+  accDescr: A query is embedded (or taken from cache), matched against the nearest trusted vectors with attribute filters, and each row is dropped if the caller may not see it, it is too far, gone, retired or past its end date, or it names a value the caller may not read. The gap trims the loose tail. The aim_recall tool also asks the literals finder for exact values.
+  classDef llm fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#0b2545
+  classDef vec fill:#ffedd5,stroke:#c2410c,stroke-width:2px,color:#431407
+  classDef code fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#0f172a
+  classDef bad fill:#fee2e2,stroke:#b91c1c,stroke-width:2px,stroke-dasharray:6 4,color:#450a0a
 
-  C1["drush aim:recall<br/>max distance only if --max-distance given,<br/>no gap, access check off"]:::code
-  C2["MCP / Tool API aim_recall<br/>needs 'recall aim facts'<br/>scope=user with no user:<br/>defaults to the calling account<br/>recall_max_distance and recall_gap,<br/>access checked as the caller"]:::code
-  C3["Chat assistant: the same aim_recall<br/>via tool_ai_connector, as the visitor<br/>(ADR-0062)"]:::code
+  C1["drush aim:recall"]:::code
+  C2["aim_recall tool:<br/>MCP, chat, Site Agent"]:::code
+  RC["recall()"]:::code
+  I{"Index exists,<br/>user resolves?"}:::code
+  E1["Exception"]:::bad
+  F["Query: scope, subject,<br/>user, trusted only"]:::code
+  EC{"Query embedding<br/>cached?"}:::code
+  EM{{"Embed<br/>the query"}}:::vec
+  KNN{{"Nearest vectors,<br/>pre-filtered"}}:::vec
+  PR{"Row passes every<br/>check (table below)?"}:::code
+  DROP["Row dropped"]:::bad
+  OUT["Row: text with<br/>values filled in"]:::code
+  GAP["Gap trims<br/>the loose tail"]:::code
+  RET["Rows returned"]:::code
+  LQ{"Finder enabled,<br/>recall_literals on?"}:::code
+  LF(["Finder: one<br/>decision call"]):::llm
+  LV["Exact values<br/>beside the facts"]:::code
+  LX["Facts only: values<br/>could not be checked"]:::bad
 
   C1 --> RC
   C2 --> RC
-  C3 --> RC
-
-  RC["AimRecallService::recall()"]:::code --> I{"aim_vector_index exists?"}:::code
-  I -->|no| E1["RuntimeException"]:::bad
-  I -->|yes| U{"subject-uid given and<br/>resolves to a user?"}:::code
-  U -->|"given, no such user"| E2["InvalidArgumentException"]:::bad
-  U -->|"ok or not given"| F["build query with keys = query text<br/>conditions: scope, subject, user,<br/>trusted = TRUE unless include-untrusted<br/>range: limit, or limit x 5 when user-filtered"]:::code
-
-  F --> EX["executeSearchQuery()<br/>access check off (drush, consolidation):<br/>search_api_bypass_access on"]:::code
-  EX --> EC{"query embedding cached?<br/>key: provider, model, config, text<br/>TTL 7 days, query time only"}:::vec
-  EC -->|miss| EM["embed query text<br/>embeddings model call"]:::vec
-  EC -->|hit| KNN
-  EM --> KNN["MariaDB VEC_DISTANCE_COSINE over<br/>aim_fact_vectors, HNSW, pre-filtered<br/>by attribute conditions<br/>rows come back nearest first"]:::vec
-
-  KNN --> PR["per result row"]:::code
-  PR --> P1{"access checked?<br/>ai_search checks entity view access<br/>on each result: per-scope<br/>'view {scope} aim facts', user-scope<br/>role matrix, entity-scope plugin"}:::code
-  P1 -->|"no access"| DROP["result dropped"]:::bad
-  P1 -->|"allowed, or bypassed"| P2{"distance above<br/>max distance?"}:::vec
-  P2 -->|yes| DROP
-  P2 -->|no| P3{"entity still exists?<br/>(stale index row)"}:::code
-  P3 -->|no| DROP
-  P3 -->|yes| P4{"retired since the last index run,<br/>or expires already passed?"}:::code
-  P4 -->|yes| DROP
-  P4 -->|no| P5{"replaceTokens(): every<br/>[literal:key] readable<br/>by this viewer?"}:::code
-  P5 -->|"no: withheld whole<br/>(show_redacted_facts: [redacted])"| DROP
-  P5 -->|yes| OUT["row: id, score (distance),<br/>scope, subject, text with values in,<br/>source, trusted, created, asserted"]:::code
-  OUT --> LIM{"limit reached?"}:::code
-  LIM -->|yes| GAP
-  LIM -->|no| PR
-  GAP{"gap set?"}:::code
-  GAP -->|"yes: drop rows farther than<br/>best score + gap"| RET["return rows"]:::code
-  GAP -->|no| RET
+  RC --> I
+  I -->|no| E1
+  I -->|yes| F --> EC
+  EC -->|no| EM --> KNN
+  EC -->|yes| KNN
+  KNN -->|"each row,<br/>nearest first"| PR
+  PR -->|no| DROP
+  PR -->|yes| OUT --> GAP --> RET
+  C2 -.->|"tool only"| LQ
+  LQ -->|yes| LF
+  LF -->|"match or<br/>ambiguous"| LV
+  LF -->|"error or<br/>no model"| LX
 ```
+
+The callers:
+
+| Caller | Runs as | Max distance | Gap | Access check | Exact values |
+| --- | --- | --- | --- | --- | --- |
+| `drush aim:recall` | Drush (access not checked) | only with `--max-distance` | none | off | no |
+| `aim_recall` over MCP or Tool API (`recall aim facts`) | the token's user | `recall_max_distance` | `recall_gap` | as the caller | when on |
+| `aim_recall` in the chat block, through `tool_ai_connector` (ADR-0062) | the visitor | same | same | same | same |
+| `aim_recall` in Site Agent, pre-approved (diagram 7) | the thread's user | same | same | same | same |
+
+The checks on each row, in order (`ai_search` runs the access check; the
+rest is `recall()`):
+
+| Check | The row is dropped when |
+| --- | --- |
+| Access | the caller may not view the fact: per-scope `view {scope} aim facts`, the user scope's role matrix, the entity scope's plugin. Off for Drush and consolidation (`search_api_bypass_access`) |
+| Distance | it is above the max distance |
+| Still there | the entity is gone (a stale index row) |
+| Still live | it was retired since the last index run, or its `expires` has passed |
+| Values readable | a `[literal:key]` in it is not readable by this viewer: the fact is withheld whole (`show_redacted_facts` shows it as `[redacted]`) |
 
 Notes on diagram 3:
 
-- Recall makes no chat-model call. The only model involved is the
-  embeddings model, and only on a cache miss.
-- Score is a distance: 0 is identical. The default cutoff is 0.48 in
+- **No chat model.** The fact search uses only the embeddings model, and
+  only on a cache miss (key: provider, model, config and text; 7 days;
+  query time only). The `aim_recall` tool, not `aim:recall` or the recall
+  service, also makes one decision-model call, the literals finder's
+  chooser, when exact values are on (ADR-0061's addendum; diagram 5).
+- **Score is a distance**: 0 is identical. The default cutoff is 0.48 in
   code; this site uses 0.60 with no gap (demo/README.md's "Model
-  settings").
-- `recall()` checks access by default: per-result access is enforced
-  inside Search API's ai_search backend. Only Drush and consolidation
-  pass `accessCheck: FALSE`.
-- Untrusted facts are excluded by the `trusted = TRUE` condition unless
-  `--include-untrusted` is passed (no Tool API or chat path passes it).
+  settings"). The gap drops rows farther than the best score plus the gap.
+- **Query.** The range is the limit, or five times the limit when filtered
+  to a user. `scope=user` with no user defaults to the calling account.
+  Untrusted facts are excluded unless `--include-untrusted` is passed (no
+  Tool API or chat path passes it).
+- **Exact values** (`literals_finder` enabled, `aim.settings:recall_literals`
+  on; a missing key is off), for every tool call, scope-narrowed ones
+  included:
+  `literals.lookup` takes the query as a question, as the caller, and the
+  finder's chooser picks among the gists of the literals the caller may
+  read, with its own thresholds. A match, or each candidate of an
+  ambiguous result read by key, is listed beside the facts: key, value,
+  label, kind, gist, `match` or `ambiguous`. Messages: with the finder not
+  asked and no facts, "No relevant facts found."; with both empty, "No
+  relevant facts or exact values found."; when the lookup could not run,
+  the facts still return, a warning is logged and the message says exact
+  values could not be checked.
+- **`aim_brief`** (MCP, Site Agent) is not drawn: it has no search text and
+  calls `AimRecallService::recent()`, not `recall()`, which lists the
+  newest trusted facts per scope the caller can view (own user facts, own
+  roles' role facts) by created date, with no embedding call.
 
 ## Legend (plain English)
 
 - **Write path.** Everything funnels into one of two PHP methods in
   `AimRememberService`. `remember()` stores exactly what a caller hands
-  it (CLI, MCP tool, chat tool, the ingest form's lines and JSON modes);
-  no model decides what is worth keeping. Extraction (`aim:extract`, the
-  ingest form's prose mode) is the only path where a model reads source
-  text and proposes facts, and those candidates then go through the same
-  checks and save step. The aim-discovery skill ("the grill") is not a
-  separate path: it interviews, writes a notes file, and runs
-  `aim:extract` on it.
+  it (CLI, MCP tool, chat tool, Site Agent, the ingest form's lines and
+  JSON modes); no model decides what is worth keeping. Extraction
+  (`aim:extract`, the ingest form's prose mode) is the only path where a
+  model reads source text and proposes facts, and those candidates then go
+  through the same checks and save step. The aim-discovery skill ("the
+  grill") is not a separate path: it interviews, writes a notes file, and
+  runs `aim:extract` on it.
 - **Grounded check.** When the text a fact came from is supplied, a
   decision model is asked whether that text states the fact, and the
-  answer is stored as `grounding_score`. The source text is not kept.
+  answer is stored as `grounding_score`. The source text is not kept. A
+  call a person approved word for word skips it.
+- **Time check.** A fact with no end date is checked by the decision
+  model for being true only for a date or period. If it is, the caller is
+  asked for the date (`aim_remember`), or the fact waits for review
+  (`flag`) or is refused (`reject`).
 - **Trusted.** A new fact starts trusted when its writer may trust facts
   in its scope, untrusted otherwise (ADR-0065). In `demote` mode the
   grounded check sends a low-scoring fact to review; it never trusts one.
@@ -283,10 +442,11 @@ Notes on diagram 3:
   into an embedding and stored with a few filterable attributes in
   `aim_fact_vectors`. Retired facts are removed from that table.
 - **Consolidation.** Runs later, off the request path, one queue item per
-  new trusted fact (or a fact when it becomes trusted). Same-scope nearest neighbors with the same end date, by
-  cosine distance: identical text is retired without a model, anything
-  else close enough asks a model to choose ADD (keep both), NOOP
-  (restatement) or UPDATE (merge into a new fact). A merge must pass the guardrails, the verifier and, when it is
+  new trusted fact (or a fact when it becomes trusted). Same-scope nearest
+  neighbors with the same end date, by cosine distance: identical text is
+  retired without a model, anything else close enough asks a model to
+  choose ADD (keep both), NOOP (restatement) or UPDATE (merge into a new
+  fact). A merge must pass the guardrails, the verifier and, when it is
   on, the grounded check, or it falls back to keeping both.
 - **Retire.** Setting `retired` (and where there is a replacement,
   `superseded_by`) hides a fact from recall and the index without
@@ -303,32 +463,51 @@ Notes on diagram 3:
 Estimates from the code and one dry run (63 facts gave 94 consolidation
 decisions, about 1.5 per fact), not a measurement. "Frontier" is the
 frontier chat model (the site default chat model); "Jev" is whichever
-decision backend `activities.consolidation` and `activities.verifier`
-use; "embed" is the local embeddings model.
+decision backend `activities.consolidation`, `activities.verifier` and
+`activities.grounding` use; "embed" is the local embeddings model.
 
 ```mermaid
+%%{init: {"theme": "base", "flowchart": {"useMaxWidth": false}, "themeCSS": ".nodeLabel p{margin:0}", "themeVariables": {"fontSize": "16px", "lineColor": "#7c8798", "textColor": "#0f172a", "primaryTextColor": "#0f172a", "edgeLabelBackground": "#f8fafc"}}}%%
 flowchart LR
-  classDef llm fill:#cfe3ff,stroke:#2b6cb0,color:#102a43
-  classDef vec fill:#ffe2c2,stroke:#c05621,color:#3d1f00
-  classDef code fill:#eceff1,stroke:#607d8b,color:#1f2a30
+  accTitle: Calls per round
+  accDescr: For 100 new facts and 20 queries, extraction costs one frontier call per file, the grounded and time checks one Jev call per 16 questions, consolidation about 150 to 300 Jev decisions with a rare frontier merge, and each fact and query one embedding. Queries through the aim_recall tool add a Jev finder call, and chat turns add the gate and about two frontier calls each.
+  classDef llm fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#0b2545
+  classDef vec fill:#ffedd5,stroke:#c2410c,stroke-width:2px,color:#431407
+  classDef code fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#0f172a
 
   IN100["100 new facts"]:::code
   Q20["20 direct queries"]:::code
+  EX(["Frontier: 1 per file;<br/>Jev checks: 1 per<br/>16 questions"]):::llm
+  NOEX(["No extraction;<br/>Jev checks: 1 per<br/>16 questions"]):::llm
+  EMB1{{"embed: 100"}}:::vec
+  CONS["Up to 3 neighbors each,<br/>pairs within 0.45"]:::code
+  JEV(["Jev decisions:<br/>about 150 to 300"]):::llm
+  MERGE(["Per UPDATE: Frontier merge,<br/>Jev verify and grounding,<br/>embed 1"]):::llm
+  QR{{"embed: 20"}}:::vec
+  QT(["embed: 20,<br/>Jev finder: 20"]):::llm
+  QC(["Jev gate: 20, embed: 20,<br/>Jev finder: 20,<br/>Frontier: about 40"]):::llm
 
-  IN100 -->|"from text (aim:extract)"| EX["Frontier: 1 call per text blob<br/>whole file in one prompt, no chunking<br/>then Jev grounding: 1 per 16 facts (if on)"]:::llm
-  IN100 -->|"directly: remember, JSON,<br/>or the form's one-fact-per-line mode"| NOEX["no extraction call"]:::code
-  EX --> EMB1["embed: 100"]:::vec
+  IN100 -->|"from text"| EX
+  IN100 -->|"directly"| NOEX
+  EX --> EMB1
   NOEX --> EMB1
-  EMB1 --> CONS["consolidation: up to 3 neighbors each<br/>only pairs within 0.45 distance"]:::code
-  CONS --> JEV["Jev decision: about 150 to 300 calls<br/>0.4 s each, tiny inputs"]:::llm
-  JEV -->|"UPDATE, rare"| MERGE["Frontier merge writer: 1 per UPDATE<br/>then Jev verify: 1, Jev grounding: 1 (if on),<br/>embed: 1 (index the merged fact)"]:::llm
-
-  Q20 -->|"aim:recall, MCP, Tool API"| QR["embed: 20, no LLM"]:::vec
-  Q20 -->|"through the chat assistant"| QC["embed: 20<br/>Frontier: about 2 per turn, about 40"]:::llm
+  EMB1 --> CONS --> JEV
+  JEV -->|"UPDATE, rare"| MERGE
+  Q20 -->|"aim:recall"| QR
+  Q20 -->|"aim_recall tool"| QT
+  Q20 -->|"chat block"| QC
 ```
 
 Notes on diagram 4:
 
+- **From text** is `aim:extract` or the ingest form's prose mode;
+  **directly** is `aim:remember`, `aim_remember`, or the form's lines and
+  JSON modes. The Jev checks are the grounded check (only with source
+  text) and the time check, each when on.
+- **The aim_recall tool** covers MCP, Tool API and Site Agent; the Jev
+  finder call happens when exact values are on. **The chat block** adds
+  the gate and asks the finder again if the assistant recalls; the
+  frontier figure is about 2 calls per turn.
 - **Extraction is one call per input, not per fact.** `aim:extract` reads
   the whole file into one prompt (no chunking), so a file larger than the
   frontier model's context fails; split big files first.
@@ -336,95 +515,104 @@ Notes on diagram 4:
   verified against the live API): 64k context, 32k tokens for the state
   plus the longest question; 40 requests/s and 100k tokens/s. A pair of
   facts is about 100 tokens (a fact is capped at 2000 characters by the
-  write guardrail, about 500 tokens), far inside every limit.
+  write guardrail, about 500 tokens), far inside every limit. A Jev
+  decision takes about 0.4 s.
 - Cost: Jev is $0.042 per million input tokens, so 300 calls are well
   under a cent; the amazeeio frontier model is free.
 
-
 ## 5. Exact values: how a literal reaches an answer
 
-Memory recall and exact values are separate. Recall finds facts; the
-assistant calls a lookup tool when it needs an exact value. The value
-always comes from the `literals` store, read as the person asking.
+The value always comes from the `literals` store, read as the person
+asking. A model never chooses a separate tool for it: `aim_recall` returns
+it beside the facts (ADR-0061's addendum), a recalled fact carries it as a
+token, or the chat block's gate answers with it before any chat model runs.
 
 ```mermaid
+%%{init: {"theme": "base", "flowchart": {"useMaxWidth": false}, "themeCSS": ".nodeLabel p{margin:0}", "themeVariables": {"fontSize": "16px", "lineColor": "#7c8798", "textColor": "#0f172a", "primaryTextColor": "#0f172a", "edgeLabelBackground": "#f8fafc"}}}%%
 flowchart TD
-  classDef llm fill:#cfe3ff,stroke:#2b6cb0,color:#102a43
-  classDef vec fill:#ffe2c2,stroke:#c05621,color:#3d1f00
-  classDef code fill:#eceff1,stroke:#607d8b,color:#1f2a30
-  classDef bad fill:#fdd,stroke:#c53030,color:#4a0000
+  accTitle: Exact values
+  accDescr: The chat model calls aim_recall. Recall finds the nearest facts and fills in their literal tokens as the caller, withholding a fact with an unreadable token; with the finder on, it also asks the finder for a literal and returns its value beside the facts. An MCP client can also look a literal up by key with aim_literal. The reply gives a value exactly as returned when its gist fits.
+  classDef llm fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#0b2545
+  classDef vec fill:#ffedd5,stroke:#c2410c,stroke-width:2px,color:#431407
+  classDef code fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#0f172a
+  classDef bad fill:#fee2e2,stroke:#b91c1c,stroke-width:2px,stroke-dasharray:6 4,color:#450a0a
 
-  Q["Visitor question"]:::code
-  A["Chat model<br/>decides what it needs"]:::llm
-
-  subgraph MEM["Memory: aim_recall"]
-    R1["Embed the question,<br/>nearest facts by vector distance"]:::vec
-    R2["recall_gap trims the loose tail"]:::code
-    R3["replaceTokens() per fact,<br/>as the recalling account"]:::code
-    R4{"Every token<br/>readable?"}:::code
-    R5["Fact text, value in place"]:::code
-    R6["Fact withheld whole<br/>(debug: [redacted])"]:::bad
-  end
-
-  subgraph LIT["Exact value: aim_literal tool"]
-    L1["By key, search words,<br/>or question (finder, optional)"]:::code
-    L2["Resolve the value<br/>access checked for the viewer"]:::code
-    L3["Label and exact value<br/>(no value if not allowed)"]:::code
-  end
+  Q["Question"]:::code
+  A(["Chat model<br/>calls aim_recall"]):::llm
+  R1{{"Nearest facts"}}:::vec
+  R4{"Every token in<br/>the fact readable?"}:::code
+  R5["Fact, value<br/>in place"]:::code
+  R6["Fact withheld"]:::bad
+  L2(["Finder picks a<br/>literal from the gists"]):::llm
+  L4["Value resolved<br/>for the caller"]:::code
+  K["aim_literal:<br/>by key or question"]:::code
+  Z(["Reply: value exactly<br/>as returned"]):::llm
 
   Q --> A
-  A -->|"needs facts"| R1 --> R2 --> R3 --> R4
+  A -->|"facts"| R1 --> R4
   R4 -->|yes| R5 --> A
   R4 -->|no| R6
-  A -->|"needs a phone number,<br/>a URL"| L1 --> L2 --> L3 --> A
-  A --> Z["Reply, value given exactly as returned"]:::llm
+  A -->|"exact values,<br/>finder on"| L2 --> L4 --> A
+  A -.->|"MCP client<br/>with a key"| K --> A
+  A --> Z
 ```
 
 Read it this way:
 
-- **The chat model chooses.** It decides whether a question needs a
-  value lookup, so nothing calls a decision model on every recall. (The
-  separate finder-first gate, which can answer before the chat model runs,
-  is in diagram 6.)
+- **Who asks.** A chat visitor, a Site Agent staff member or an MCP
+  client; the chat block's gate (diagram 6) can answer first.
+- **The chat model does not choose.** A model given two memory tools
+  rarely picked the lookup one (ADR-0061 section 2; Site Agent,
+  2026-11-15), so one recall call returns both. It costs one decision-model
+  call per recall.
+- **Facts.** Embed the query, take the nearest facts, trim the loose tail
+  with `recall_gap`, then `replaceTokens()` per fact as the recalling
+  account. A fact with a token the caller may not read is withheld whole
+  (`show_redacted_facts` shows `[redacted]`).
+- **Exact values** (finder enabled, `recall_literals` on):
+  `literals.lookup` takes the query as a question; the finder's chooser
+  picks from the gists of literals the caller may view, and no value
+  reaches the model. The result is a `literals` list (key, value, label,
+  kind, gist, `match` or `ambiguous`).
+- **The reply** gives a value exactly as returned, and only when its gist
+  fits the question.
 - **Nothing is copied.** The value lives in the literal; a fact holds at most
   a token, so editing the literal changes every answer with no reindex.
-- **Who sees what is decided at read time**, by the person asking.
-- **The finder is optional.** It only maps a loose question to a literal for
-  the tool's `question` mode; key and search-word lookups need no model.
+- **Who sees what is decided at read time**, by the person asking: the
+  finder only offers literals the caller may view, and fact tokens are
+  replaced as the caller.
+- **The finder is optional.** Without it recall returns facts only, with
+  tokens still filled in; `aim_literal` (MCP, the same lookup service) then
+  looks up by key or lists search candidates.
 
-## 6. One chat turn, end to end
+## 6. One chat turn
 
 What happens between a visitor typing in the chat widget and the reply,
-with the demo recipe's settings. Each box says which module does it.
+with the demo recipe's settings.
 
 ```mermaid
+%%{init: {"theme": "base", "flowchart": {"useMaxWidth": false}, "themeCSS": ".nodeLabel p{margin:0}", "themeVariables": {"fontSize": "16px", "lineColor": "#7c8798", "textColor": "#0f172a", "primaryTextColor": "#0f172a", "edgeLabelBackground": "#f8fafc"}}}%%
 flowchart TD
-  classDef llm fill:#cfe3ff,stroke:#2b6cb0,color:#102a43
-  classDef vec fill:#ffe2c2,stroke:#c05621,color:#3d1f00
-  classDef code fill:#eceff1,stroke:#607d8b,color:#1f2a30
-  classDef bad fill:#fdd,stroke:#c53030,color:#4a0000
+  accTitle: One chat turn
+  accDescr: An allowed visitor's message first meets the optional gate, where the finder can answer a clear exact-value question from a template with no chat model. Otherwise the assistant's chat model loops up to 7 times, calling aim_recall or aim_remember, then replies.
+  classDef llm fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#0b2545
+  classDef vec fill:#ffedd5,stroke:#c2410c,stroke-width:2px,color:#431407
+  classDef code fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#0f172a
+  classDef bad fill:#fee2e2,stroke:#b91c1c,stroke-width:2px,stroke-dasharray:6 4,color:#450a0a
 
-  V["Visitor types a message<br/>in the chat block"]:::code
-  ACC{"Allowed?<br/>block shown + access deepchat api<br/>+ assistant roles"}:::code
-  NO["No widget / refused"]:::bad
-
-  subgraph GATE["1. Gate (aim_chatbot_gate processor, optional)"]
-    G1{"literals_finder<br/>installed?"}:::code
-    G2["Finder: decision model picks<br/>one literal from the gist menu<br/>(question + gists, no values)"]:::llm
-    G3{"Clear match?<br/>score 0.8+, lead 0.4+"}:::code
-    G4["Reply from a fixed template:<br/>label + exact value + gist<br/>no chat model"]:::code
-  end
-
-  subgraph AGENT["2. Assistant (ai_agents agent aim_chatbot, up to 7 loops)"]
-    P["Optional: recall in code<br/>(recall_context setting)<br/>facts added to this turn's prompt"]:::vec
-    M["Chat model reads persona,<br/>conversation so far, the message"]:::llm
-    T{"Calls a tool?"}:::code
-    R["aim_recall (aim_tool), 5 results<br/>embed, nearest trusted facts the visitor may view,<br/>cutoff, [literal:key] filled in"]:::vec
-    L["aim_literal<br/>one query: key first, then the finder<br/>(or search without it)"]:::code
-    W["aim_remember (aim_tool), as the visitor<br/>Guardrails, grounded check (if on),<br/>a member's fact waits for review"]:::code
-  end
-
-  OUT["Reply shown; visitor message and<br/>reply kept in session history<br/>(not the recalled facts)"]:::code
+  V["Visitor types<br/>in the chat block"]:::code
+  ACC{"Allowed?"}:::code
+  NO["No widget,<br/>or refused"]:::bad
+  G1{"Gate: finder<br/>installed?"}:::code
+  G2(["Finder picks<br/>a literal"]):::llm
+  G3{"Clear match?<br/>0.8+, lead 0.4+"}:::code
+  G4["Reply from a template:<br/>no chat model"]:::code
+  P{{"Optional:<br/>recall in code"}}:::vec
+  M(["Chat model:<br/>persona, history, message"]):::llm
+  T{"Calls a tool?"}:::code
+  R{{"aim_recall:<br/>5 results"}}:::vec
+  W["aim_remember,<br/>as the visitor"]:::code
+  OUT["Reply shown"]:::code
 
   V --> ACC
   ACC -->|no| NO
@@ -432,34 +620,129 @@ flowchart TD
   G1 -->|no| P
   G1 -->|yes| G2 --> G3
   G3 -->|yes| G4 --> OUT
-  G3 -->|"no, or finder error"| P
+  G3 -->|"no, or<br/>finder error"| P
   P --> M --> T
   T -->|recall| R --> M
-  T -->|exact value| L --> M
-  T -->|save a fact| W --> M
+  T -->|"save a fact"| W --> M
   T -->|"no, answer"| OUT
 ```
 
 Read it this way:
 
+- **Allowed?** The block is shown, the visitor has `access deepchat api`,
+  and the assistant's roles include theirs.
 - **Two stages, and the first is optional.** The gate only exists when the
   block's chat processor is `aim_chatbot_gate` and `literals_finder` is
   installed. It answers "what's your phone number?" questions on its own,
-  with one small decision call and no chat model, and hands anything it is
-  unsure of to the assistant. Without the finder it passes everything on.
-- **The assistant is a loop.** The chat model either answers or asks for a
-  tool; each tool result goes back to it, up to 7 rounds. Recall is not
-  forced (`require_usage` off): the persona asks it to recall first, and
-  forcing it made correct answers get thrown away.
-- **Three tools, three jobs.** Recall finds remembered facts (memory).
-  `aim_literal` fetches an exact value (the `literals` store). Remember
-  saves something the visitor said, as an untrusted fact a reviewer
-  approves.
+  with one small decision call (the question and the gists, no values)
+  and no chat model, and replies from a fixed template: label, exact
+  value, gist. It hands anything it is unsure of (score below 0.8, or a
+  lead under 0.4) to the assistant. Without the finder it passes
+  everything on.
+- **The assistant is a loop** (`ai_agents` agent `aim_chatbot`). The chat
+  model either answers or asks for a tool; each tool result goes back to
+  it, up to 7 rounds. Recall in code (`recall_context`) is optional and
+  adds facts to this turn's prompt. Recall is not forced (`require_usage`
+  off): the persona asks it to recall first, and forcing it made correct
+  answers get thrown away.
+- **Two tools, two jobs.** `aim_recall` (5 results) finds the nearest
+  trusted facts the visitor may view, with `[literal:key]` filled in, and
+  any exact value that answers the question (the `literals` store; the
+  finder is asked again, one more decision call). `aim_remember` saves
+  something the visitor said, through guardrails and the grounded and time
+  checks; a member's fact waits for a reviewer.
 - **Exact values never come from the model's memory.** They come from a
   literal: through the gate's template, a `[literal:key]` token in a
-  recalled fact, or `aim_literal`. All three read as the visitor, so a
-  restricted value stays hidden from someone not allowed to see it.
+  recalled fact, or recall's exact values. All three read as the visitor,
+  so a restricted value stays hidden from someone not allowed to see it.
+  A turn the gate passes on asks the finder a second time if the
+  assistant recalls (accepted, ADR-0061's addendum).
+- **History.** The visitor's message and the reply are kept in session
+  history; the recalled facts are not.
 - **Models involved:** the chat model (amazee here) for the assistant;
   Ollama embeddings for recall and for indexing a saved fact; the decision
-  model (Jev) for the finder and the grounded check. A remembered fact is
-  later queued for consolidation (diagram 2), off the request path.
+  model (Jev) for the finder (gate and recall) and the grounded and time
+  checks. A remembered fact is later queued for consolidation (diagram 2),
+  off the request path.
+
+## 7. One Site Agent turn
+
+What happens when a staff member uses Site Agent's chat (`site_agent`)
+with `aim_site_agent`'s Memory toolset, with this site's settings.
+
+```mermaid
+%%{init: {"theme": "base", "flowchart": {"useMaxWidth": false}, "themeCSS": ".nodeLabel p{margin:0}", "themeVariables": {"fontSize": "16px", "lineColor": "#7c8798", "textColor": "#0f172a", "primaryTextColor": "#0f172a", "edgeLabelBackground": "#f8fafc"}}}%%
+flowchart TD
+  accTitle: One Site Agent turn
+  accDescr: A staff member who may use the Memory toolset types in Site Agent's chat. The chat model calls aim_brief and aim_recall without asking; every aim_remember call shows an approval card listing the facts. A rejected call saves nothing; an approved one runs as the staff member, marked as person-approved, so the grounded check is skipped.
+  classDef llm fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#0b2545
+  classDef vec fill:#ffedd5,stroke:#c2410c,stroke-width:2px,color:#431407
+  classDef code fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#0f172a
+  classDef bad fill:#fee2e2,stroke:#b91c1c,stroke-width:2px,stroke-dasharray:6 4,color:#450a0a
+
+  S["Staff member types<br/>in Site Agent's chat"]:::code
+  ACC{"May use<br/>a toolset?"}:::code
+  NO["No chat"]:::bad
+  TS["Tools and prompt:<br/>the Memory toolset"]:::code
+  M(["Chat model:<br/>prompt and thread"]):::llm
+  T{"Calls a tool?"}:::code
+  B["aim_brief:<br/>newest facts"]:::code
+  R{{"aim_recall<br/>(diagram 3)"}}:::vec
+  CARD["Approval card:<br/>each fact listed"]:::code
+  DEC{"Person approves<br/>the whole call?"}:::code
+  RJ["Rejected:<br/>nothing saved"]:::bad
+  W["aim_remember as the user:<br/>no grounded check"]:::code
+  OUT["Reply streamed"]:::code
+
+  S --> ACC
+  ACC -->|no| NO
+  ACC -->|yes| TS --> M --> T
+  T -->|"orient,<br/>no approval"| B --> M
+  T -->|"search,<br/>no approval"| R --> M
+  T -->|"save facts"| CARD --> DEC
+  DEC -->|no| RJ --> M
+  DEC -->|yes| W --> M
+  T -->|"no, answer"| OUT
+```
+
+Read it this way:
+
+- **May use a toolset?** The account needs `use memory toolset` (here only
+  administrators hold it) and the toolset must be enabled. A chat offers
+  the tools and prompts of every toolset its account may use, worked out
+  again each turn; here Memory is the only enabled one.
+- **The model** is Site Agent's own setting (`site_agent.settings`, Haiku
+  on amazeeio here), with up to 100 rounds of tool calls per message
+  (`max_tool_rounds`).
+- **No gate, no recall in code.** Unlike the chat block (diagram 6), every
+  lookup is a tool call the model makes. The Memory prompt asks it to call
+  `aim_brief` once at the start of a chat and `aim_recall` before
+  answering anything a stored fact could change.
+- **Reads run, writes ask.** The Memory toolset pre-approves `aim_brief`
+  (`AimRecallService::recent()`, no embedding) and `aim_recall`, and puts
+  `aim_remember` on `always`. `aim_site_agent.site_agent_tools.yml`
+  classifies the reads as `read` and `aim_remember` as `content_write`;
+  Site Agent asks on every call of a content write that does not land as a
+  draft, whatever the entry says, and an unclassified tool counts as a
+  destructive config write. Every tool runs as the thread's user.
+- **The approval card** (`aim_site_agent`'s template) shows `source_text`
+  at the top, then each fact as a heading with one line of scope, subject,
+  scope fields and expiry. Approval covers the whole stored payload (by
+  its hash), so a person cannot approve some facts and not others: they
+  reject with a reason and the model offers the rest again.
+- **An approved call is the person's own text.** With this site's patch
+  (`patches/site_agent-person-approved-invoker.patch`, until upstream ships
+  it), a call that runs after its card was approved, or that the thread's
+  owner ran directly, carries `PersonApproved`. `aim_remember` then skips
+  the grounded check, as for text typed on a form (ADR-0067); the time
+  check, the writer's permissions and the guardrails still apply
+  (diagram 1). A pre-approved call never carries the mark. Without the
+  patch every call is grounded.
+- **Trust is still the writer's.** The fact starts trusted only when the
+  staff member may trust facts in its scope (ADR-0065); a flagged
+  time-bound fact waits for review. `source` is `site_agent:aim_remember`.
+- **The reply** is streamed, and the transcript is kept on the thread
+  (`site_agent_transcript`, 30 days here).
+- **Models involved:** Site Agent's chat model, Ollama embeddings for
+  recall and indexing, and the decision model (Jev) for recall's exact
+  values and the time check.

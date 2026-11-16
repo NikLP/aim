@@ -10,8 +10,8 @@ consolidation without any real data.
 
 - `recipe.yml`: site name and slogan, the chat assistant's persona
   (`aim_chatbot` agent and `aim_assistant`) and its tools
-  (`aim_tool`'s `aim_recall`, limited to 5 results, and `aim_remember`,
-  plus `aim_literal` for exact values), Olivero installed for the chat
+  (`aim_tool`'s `aim_recall`, limited to 5 results and returning exact
+  values too, and `aim_remember`), Olivero installed for the chat
   block,
   `access deepchat api`, `recall aim facts`, `remember aim facts`,
   `view`/`create site aim facts` and `view restricted literals` for
@@ -246,21 +246,23 @@ setup). A literal edited on stage is restored by the reinstall too.
 The recipe imports eight literals: five public (`main_phone`,
 `accounts_phone`, `reservations_phone`, `login`, `password_reset`) and
 three restricted to signed-in visitors through `view restricted literals`
-(`staff_line`, `my_account`, `site_name`). It also gives the assistant aim's lookup tool
-(`tool:aim_literal`), and its persona says to use it for phone numbers and
-web addresses.
+(`staff_line`, `my_account`, `site_name`). The assistant gets exact values
+from its recall tool, which asks the literals finder beside the facts
+(`aim.settings:recall_literals`), and its persona says to give them exactly
+as returned.
 
 1. **Live value.** In the widget ask "How do I ring the library?" The
-   assistant calls the lookup tool and gives the number exactly. Edit
+   finder-first gate answers it directly, or the assistant's recall
+   returns the number and it gives it exactly. Edit
    `main_phone` at `/admin/content/literals` and ask again: the new number,
    no reindex. A reset does not overwrite an edited literal; put it back
    by hand.
 2. **Different viewer.** The staff line is visible only when logged in. As
    anonymous it is not found; no fact names it.
-3. **Another agent.** Over MCP, ask Claude for the library phone number: the
-   `aim_literal` tool returns the same value, as the OAuth user.
+3. **Another agent.** Over MCP, ask Claude for the library phone number:
+   `aim_recall` returns the same value, as the OAuth user.
 
-Pre-flight covers the lookup tool and the restricted-literal boundary
+Pre-flight covers recall's exact values and the restricted-literal boundary
 (`literals:` check). Keep demo literals one exact value each ("the main phone number"),
 not topics like opening hours, which vary by day.
 

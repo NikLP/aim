@@ -80,7 +80,7 @@ inference can't (or, for `aim_remember`'s `facts`, a whole list-of-maps
 definition, which no PHP type describes), and `#[ToolOutput]` declares the outputs (the methods
 return an `ExecutableResult` to keep their own reply messages, so nothing is
 inferred from the return type). The tool ID is on the attribute, so the
-plugin IDs, MCP names and the recipe's `tool:aim_literal` are unchanged, and
+plugin IDs, MCP names and the agents' `tool:` IDs are unchanged, and
 `hook_tool_info_alter()` reaches method tools like plugin ones. A
 `#[ToolMethod]` tool and a `#[Tool]` class with the same ID cannot coexist:
 discovery skips the method one. `aim_remember`'s per-scope create check
@@ -105,6 +105,15 @@ instructions come from `aim_tool_oauth`, reading the same guide.
 return it until a reviewer trusts it." for an untrusted fact and "It retires
 after YYYY-MM-DD." when `expires` is set, per fact in a batch too (chat gets
 the same reply, through the same tool).
+
+`aim_recall`'s `literals` output (with `literals_finder` and
+`aim.settings:recall_literals`) is `AimRecall::lookupLiterals()`: one
+`literals.lookup` question call as the caller, then a by-key read per
+candidate of an ambiguous result (access-checked again, as the finder's
+pool already is). Detail and messages in the root
+[DEVELOPING.md](../../DEVELOPING.md)'s "Exact values from `literals`";
+covered by `tests/src/Kernel/AimRecallLiteralsTest.php` (stub finder, no
+model). The output schema changed with it: reconnect MCP clients.
 
 `mcp_server_tool_bridge` and `mcp_server_oauth`'s Composer package names
 were previously self-doubled on drupal.org (`drupal/x-x`, an empty

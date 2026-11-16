@@ -160,6 +160,21 @@ class AimSettings {
   }
 
   /**
+   * Whether the aim_recall tool also asks the literals finder.
+   *
+   * So a chat model asking for a phone number or a web address gets the
+   * exact value from the one recall tool, without having to choose a second
+   * lookup tool (ADR-0061's addendum). Has no effect without literals_finder.
+   *
+   * @return bool
+   *   aim.settings:recall_literals. Off when the key is missing (a site
+   *   installed before it existed): set it to turn the lookup on.
+   */
+  public function isRecallLiteralsOn(): bool {
+    return (bool) $this->configFactory->get('aim.settings')->get('recall_literals');
+  }
+
+  /**
    * Resolves the site-wide default chat provider and model.
    *
    * Mirrors `AiAssistantApiRunner::getProviderAndModel()`'s own

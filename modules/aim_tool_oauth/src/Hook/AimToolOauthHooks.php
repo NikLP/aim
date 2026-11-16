@@ -39,9 +39,9 @@ class AimToolOauthHooks {
     $aim = <<<TEXT
     This server is AIM, the site's long-term memory: short facts, not conversation transcripts. Recall returns only trusted facts: written by someone permitted to trust them, or accepted by a reviewer.
 
-    - At the start of work, call aim_brief once for the newest facts about the site, your roles and you.
-    - Call aim_recall before answering anything a stored fact could change, rather than relying on what is already in the conversation. Results are the nearest facts and may not answer the question: use only those that do. If none do, or the reply is "No relevant facts found", nothing is recorded; say so rather than guessing.
-    - Use aim_literal, not recall, for exact values such as phone numbers, web addresses and names, and give the value exactly as returned.
+    - At the start of work, call aim_brief once for the newest facts about the site, your roles and you, and today's date.
+    - Call aim_recall before answering anything a stored fact could change, rather than relying on what is already in the conversation. Results are the nearest facts and may not answer the question: use only those that do. If none do, or the reply says nothing relevant was found, nothing is recorded; say so rather than guessing.
+    - Recall also returns exact values such as phone numbers, web addresses and names in its literals list. Give a value exactly as returned, and only when its gist fits what was asked. aim_literal looks one up by its key.
     - Save with aim_remember only what is worth keeping long term, as short statements. Put a date in the text only when it differs from the save date or is the point of the fact, as a calendar date ("closed until 16 October 2026", not "until Friday"). Set expires (YYYY-MM-DD, the last day it is true) for a fact that holds only for a date or period, or "open-ended" if it has no end; a save can be refused until you do. Pass source_text with the words they came from. Put everything worth keeping from one exchange in one call's facts list.
     - A saved fact may wait for staff review before recall returns it; the reply says so. Tell the person it is noted for review, not that it is now known.
 

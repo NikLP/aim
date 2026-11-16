@@ -19,7 +19,9 @@ use Drupal\tool\Tool\ToolOperation;
  * A thin wrapper over the literals.lookup service, so an aim site exposes
  * one lookup under aim's name and need not enable literals_tool. Asking by
  * question uses literals_finder when it is enabled; aim does not depend on
- * it, and the finder stays out of recall. Use of the tool needs "view
+ * it. aim_recall asks the finder too (aim.settings:recall_literals), so a
+ * chat model need not choose this tool for an exact value; it stays for a
+ * lookup by key and for MCP clients. Use of the tool needs "view
  * literals", not "recall aim facts": a literal is not an aim fact, and each
  * value is access-checked for the caller anyway (a missing literal and one
  * the caller may not see give the same "none"). So a signed-in member can

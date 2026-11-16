@@ -11,7 +11,11 @@ with `mcp_server_tool_bridge` 1.0.0-beta3). `aim_recall` drops facts past
 `aim.settings:recall_max_distance` (not settable per call, so a remote
 model can't turn the cutoff off) and returns at most 25 facts (`limit`,
 default 10), each with its text, scope, subject (a case ID, role or user)
-and date (with whether it is "true since" or "recorded"). `aim_remember`
+and date (with whether it is "true since" or "recorded"). With the
+Literals finder enabled it also returns any exact value that answers the
+query (a phone number, a web address), so a model never has to pick a
+separate lookup tool; "Include exact values in recall" on the AIM settings
+form turns that off. `aim_remember`
 takes a list of one or more facts and reports each on its own line,
 including when a fact waits for review or has an end date. `aim_brief`
 takes no search text: it lists the newest trusted facts the caller can see

@@ -61,6 +61,9 @@ aim.settings:
         Range:
           min: 0
           max: 1
+    recall_literals:
+      type: boolean
+      label: 'The aim_recall tool also asks literals_finder for exact values (needs literals_finder)'
     show_redacted_facts:
       type: boolean
       label: 'Show a fact with [redacted] in place of a literal the viewer cannot read, instead of withholding it (debug)'

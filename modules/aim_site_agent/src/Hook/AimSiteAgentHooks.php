@@ -7,7 +7,9 @@ namespace Drupal\aim_site_agent\Hook;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Entity\AimScope;
+use Drupal\aim\Service\AimRememberService;
 use Drupal\site_agent\Entity\ToolCallInterface;
 use Drupal\user\UserInterface;
 
@@ -17,7 +19,9 @@ use Drupal\user\UserInterface;
  * Site Agent lists a call's arguments as they come, so a remember call's
  * facts would show as one raw value. An aim_remember card gets its own
  * template (a suggestion of site_agent_card) showing each fact's text as a
- * heading with one line of its scope, subject and end date under it. It
+ * heading with one line of its scope, subject and end date under it, an
+ * end date already past flagged so the person rejects a save that would
+ * fail (the model has no clock and can guess a year wrong). It
  * changes only how the card looks: the decision still covers the whole call
  * and the stored payload runs as is.
  */
@@ -35,9 +39,12 @@ class AimSiteAgentHooks {
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    *   The entity type manager, for the call record, scopes and accounts.
+   * @param \Drupal\aim\Service\AimRememberService $rememberService
+   *   The remember service, to read an end date as aim_remember will.
    */
   public function __construct(
     private readonly EntityTypeManagerInterface $entityTypeManager,
+    private readonly AimRememberService $rememberService,
   ) {}
 
   /**
@@ -144,9 +151,38 @@ class AimSiteAgentHooks {
 
     $expires = (string) ($fact['expires'] ?? '');
     if ($expires !== '') {
-      $details[] = $this->t('expires: @expires', ['@expires' => $expires === 'open-ended' ? $this->t('open-ended') : $expires]);
+      $details[] = $this->expiresDetail($fact);
     }
     return array_map('strval', $details);
+  }
+
+  /**
+   * Describes a fact's end date, flagging one aim_remember would refuse.
+   *
+   * @param array $fact
+   *   One entry of the call's facts, with an expires value.
+   *
+   * @return \Drupal\Core\StringTranslation\TranslatableMarkup
+   *   The "expires: ..." detail.
+   */
+  private function expiresDetail(array $fact): TranslatableMarkup {
+    if ($this->rememberService->isOpenEnded($fact)) {
+      return $this->t('expires: open-ended');
+    }
+    $expires = (string) $fact['expires'];
+    try {
+      $timestamp = $this->rememberService->parseExpires($fact);
+    }
+    catch (\InvalidArgumentException) {
+      return $this->t('expires: @expires (not a date, the save will fail)', ['@expires' => $expires]);
+    }
+    if ($timestamp !== NULL && $this->rememberService->isPast($timestamp)) {
+      return $this->t('expires: @expires (already past, today is @today; the save will fail)', [
+        '@expires' => $expires,
+        '@today' => $this->rememberService->today(),
+      ]);
+    }
+    return $this->t('expires: @expires', ['@expires' => $expires]);
   }
 
   /**

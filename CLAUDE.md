@@ -42,9 +42,10 @@ DDEV, `drupal11` type, PHP 8.4, MariaDB 11.8, docroot `web/`.
 generation).
 **Hard dependency:** `literals` (`drupal/literals` on drupal.org, working
 copy in `web/modules/contrib/literals/`, the exact-value store; `recall()` replaces `[literal:key]` tokens through
-it). `literals_finder` and `literals_tool` are optional: the assistant's
-lookup tool is `aim_tool`'s `aim_literal` (a wrapper over the
-`literals.lookup` service), through `tool_ai_connector`. See
+it). `literals_finder` and `literals_tool` are optional: with the finder,
+`aim_tool`'s `aim_recall` also returns exact values through the
+`literals.lookup` service (`aim.settings:recall_literals`), and
+`aim_literal` wraps the same service for a lookup by key. See
 [DEVELOPING.md](DEVELOPING.md)'s "Exact values from `literals`". Memory is
 aim's job; literals is the value store behind it, not a second recall path.
 **Composer-present but not enabled:** `eca` (no `aim` code uses it -

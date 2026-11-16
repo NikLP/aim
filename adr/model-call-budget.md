@@ -2,8 +2,7 @@
 
 Where aim calls a model, how many calls a sample round costs under three
 setups, and what moving work off the frontier model saves. Not a decision
-record: for the reasoning see [0000-index.md](0000-index.md),
-[ADR-0021](0021-jev-typed-decision-provider.md) and
+record: for the reasoning see [0000-index.md](0000-index.md) and
 [ADR-0021](0021-jev-typed-decision-provider.md). Companion to diagram 4
 in [workflow-diagram.md](workflow-diagram.md).
 
@@ -14,20 +13,21 @@ Jev here). "Small" is a small chat model, possibly local, which is
 
 ## Where the models are called
 
-The planned ingest form's second mode, one fact per line, makes no model
-call at all (scope and subject are set once on the form); only its prose
-mode extracts.
+The ingest form's lines and JSON modes make no extraction call (scope
+and subject are set on the form, or per entry in JSON); only its prose
+mode extracts. Every mode still gets the time check when it is on.
 
 | Place | What it does | Needs | Frontier today | Could move to |
 | --- | --- | --- | --- | --- |
 | Extraction (`aim:extract`, the ingest form's prose mode) | Text in, list of facts out | Generative, structured output | Yes | Small chat model (untested; see below) |
-| Pair classification (`classifyPair()`) | ADD/UPDATE/NOOP/DELETE for one pair | A typed choice | Only if backend is `chat` | Decision model (live: Jev) |
-| Merge verifier (`verifyMerge()`) | Does the merged text keep both facts | A yes/no probability | Only if backend is `chat` | Decision model (live: Jev, threshold 0.8) |
+| Pair classification (`classifyPair()`) | ADD/UPDATE/NOOP for one pair | A typed choice | Only if backend is `chat` | Decision model (live: Jev) |
+| Merge verifier (`verifyMerge()`) | Does the merged text keep both facts | A yes/no probability | Only if backend is `chat` | Decision model (live: Jev, threshold 0.9 on this site) |
 | Merge writer (`writeMerge()`) | Writes the merged text for an UPDATE | Generative | Yes | Small chat model (untested) |
-| Chat assistant (`aim_chatbot`, `aim_console`) | Answers a visitor, calls the recall tool | Reasoning, tool use | Yes | Stays frontier (or a strong local model) |
-| Grounded check (ADR-0037) | Does the source text state each new fact; one batched call per write operation | A typed probability | No (hosted Jev here, shadow mode) | Already a decision model; a local one for real data |
+| Chat assistant (`aim_chatbot`, Site Agent via `aim_site_agent`) | Answers a visitor or staff member, calls the recall tool | Reasoning, tool use | Yes | Stays frontier (or a strong local model) |
+| Grounded check (ADR-0037) | Does the source text state each new fact; one batched call per write operation | A typed probability | No (hosted Jev here, demote mode) | Already a decision model; a local one for real data |
+| Time check (ADR-0057's addendum, `time_check_mode`) | Is a fact with no `expires` true only for a date or period; one call per write | A typed probability | No (hosted Jev here, flag mode; shipped off) | Already a decision model; a local one for real data |
 | Recall, embeddings | Vectors only, no chat | Embeddings | No (local Ollama) | Already local |
-| Literal finder (`literals_finder`, optional: behind the lookup tool's question mode, `aim_literal` or `literals:lookup`, and the literals chat) | Picks the one literal a question asks for, from a menu of gists | A typed choice | No (hosted Jev here) | Decision model (live: Jev) |
+| Literal finder (`literals_finder`, optional: on every `aim_recall` tool call when `recall_literals` is on, ADR-0061's addendum; the chat block's gate; `aim_literal` or `literals:lookup` by question; the literals chat) | Picks the one literal a question asks for, from a menu of gists | A typed choice | No (hosted Jev here) | Decision model (live: Jev) |
 | Convert a fact to a literal | Splits an extracted fact into gist and value | Generative or typed | Not built | Small chat model or decision model |
 
 ## Sovereignty by call
@@ -45,10 +45,11 @@ goal. Scores are judgments from what each call sends, not measurements.
 | Guardrails (length, markup) | ⬜⬜⬜⬜⬜⬜⬜⬜⬜ | Nothing: code, no model | n/a |
 | Pair classification | 🟩🟩🟩🟨⬜⬜⬜⬜⬜ | Two short facts to Jev | Local decision model (parked, ADR-0021) |
 | Merge verifier | 🟩🟩🟩🟨⬜⬜⬜⬜⬜ | Two short facts and a merge to Jev | Local decision model |
-| Literal finder | 🟩🟩🟩🟨🟨⬜⬜⬜⬜ | The visitor's question and the gist menu to Jev; no values | Local decision model |
+| Literal finder | 🟩🟩🟩🟨🟨⬜⬜⬜⬜ | The question (or recall query) and the gist menu to Jev; no values | Local decision model |
+| Time check | 🟩🟩🟩🟨⬜⬜⬜⬜⬜ | One short new fact to Jev | Local decision model |
 | Merge writer | 🟩🟩🟩🟨🟨🟨⬜⬜⬜ | Two facts to the frontier model | Small local chat model (untested) |
 | Convert a fact (planned) | 🟩🟩🟩🟨🟨🟨⬜⬜⬜ | One fact, which may hold the value | Small local chat model |
-| Chat assistant | 🟩🟩🟩🟨🟨🟨🟥⬜⬜ | Visitor questions plus recalled facts to the frontier model | Strong local chat model |
+| Chat assistant, Site Agent | 🟩🟩🟩🟨🟨🟨🟥⬜⬜ | Visitor or staff questions plus recalled facts to the chat model | Strong local chat model |
 | Grounded check (ADR-0037) | 🟩🟩🟩🟨🟨🟨🟥⬜⬜ | New facts and their source text (a message, or the whole document) to Jev; nothing stored | Local decision model |
 | Extraction | 🟩🟩🟩🟨🟨🟨🟥🟥🟥 | Whole source documents to the frontier model | Small local chat model (untested) |
 
@@ -58,6 +59,9 @@ is cheap on exposure because literal values never reach it, and in answer
 mode 1 (literal only) never reach a chat model either.
 
 ## Measured per call (the former `aim_activity_metrics` table, dropped by ADR-0060; 2026-10-02)
+
+History: measured on 2026-10-02 and not updated since; model calls are
+now logged in `ai_log` (ADR-0060), which keeps no per-activity table.
 
 | Call | Model | Calls seen | Input tokens | Output tokens | Time |
 | --- | --- | --- | --- | --- | --- |
@@ -71,14 +75,16 @@ mode 1 (literal only) never reach a chat model either.
 
 Assumes about 2.25 pair decisions per new fact (a dry run gave 1.5, the
 design allows up to 3), so 225 decisions, 5 of them UPDATEs, and 2 chat
-turns per question (the recall tool call, then the answer). Chat turns
+turns per question (the recall tool call, then the answer); each recall
+also asks the literals finder once (Jev). Chat turns
 are not metered per call here, so token figures cover decisions and
-merges only.
+merges only. Grounding, the time check and the chat block's gate are left
+out.
 
 | | A: all frontier | B: Jev decisions (this site) | C: B plus small-model extraction and merge |
 | --- | --- | --- | --- |
 | Frontier calls | 275 | 50 | 40 |
-| Jev calls | 0 | 230 | 230 |
+| Jev calls | 20 (finder in recall) | 250 | 250 |
 | Small-model calls | 0 | 0 | 10 |
 | Frontier input tokens (decisions and merges) | about 239,000 | about 3,600 | 0 |
 | Time for the decisions, sequential | about 407 s | about 80 s | about 80 s |
@@ -162,15 +168,14 @@ command), then a comparison on the same labels. A frontier model is the
 better writer of a merge; a typed decision model is plausibly the better
 judge of whether to merge.
 
-
 ## Conclusion
 
 **The end state is a fully sovereign system, and it is achievable.**
 aim's model work is three kinds, and each has a local equivalent:
 embeddings (already local, Ollama), inference (extraction, merge writing
 and the chat assistant, on a local chat model) and decisions (pair
-classification, merge verification, later the grounded check, on a local
-decision model of the same kind as Jev). With all three running locally,
+classification, merge verification, the grounded check and the time
+check, on a local decision model of the same kind as Jev). With all three running locally,
 nothing leaves the building, and the system is sovereign.
 
 Jev is the hosted version of that third piece, and the reason to use it

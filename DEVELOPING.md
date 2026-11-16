@@ -611,19 +611,30 @@ literals is the value store behind it. They meet in two small places:
   tokens. Use a token for a sentence that says something the literal does
   not; a fact that only points at a literal duplicates the literal's
   description. Not enforced.
-- **A lookup tool the assistant calls.** An aim site uses `aim_tool`'s
-  `aim_literal` (decided 2026-10-10), exposed to the on-site assistant
-  through `tool_ai_connector` and over MCP; `literals_tool`'s
-  `literals:lookup` is for sites running `literals` without aim. Both are
-  thin wrappers over the one `literals.lookup` service, so they behave
-  identically. The demo recipe (`aim_demo_library`) gives its agent
-  `tool:aim_literal`. The large
-  model decides when it needs an exact value and calls it (by key, search
-  words or question); the model is the gate for "is this a one-shot lookup",
-  so recall does not call the literals finder and the two paths never
-  compete. The finder (`literals_finder`) is optional and only matters for
-  the `question` mode; `aim` does not depend on it. The demo persona
-  tells the assistant to use the tool for phone numbers and web addresses.
+- **Exact values in recall.** With `literals_finder` enabled and
+  `aim.settings:recall_literals` on (Recall section of the settings form;
+  `config/install` ships it on, but a site installed before 2026-11-16
+  has no key, which reads as off: set it with `drush cset aim.settings
+  recall_literals 1`, as aim ships no update hooks), the `aim_recall` tool also passes its query to
+  `literals.lookup` as a question, as the calling account and under the
+  finder's own thresholds, and returns a match (or each readable candidate
+  of an ambiguous one) in a `literals` list beside `results`: key, value,
+  label, kind, gist and `match` (`match` or `ambiguous`). So a chat model
+  asking for a phone number calls recall and never chooses a second tool
+  ([ADR-0061](adr/0061-how-aim-uses-literals.md)'s addendum: Site Agent's
+  model never did). One decision-model call per recall, narrowed calls
+  included: a literal is not always a site value (a per-user account
+  page). "No relevant facts found." only when the finder was not asked; both
+  asked and empty is "No relevant facts or exact values found."; a lookup
+  that could not run (finder error, no model) keeps the facts, logs a
+  warning (uid only) and says exact values could not be checked. The
+  recall service (`aim.recall`, Drush `aim:recall`) does not ask the
+  finder: only the tool does.
+- **A lookup tool by key.** `aim_tool`'s `aim_literal` (over MCP; Site
+  Agent and the demo chatbot no longer list it) and `literals_tool`'s
+  `literals:lookup` (for sites running `literals` without aim) are thin
+  wrappers over the one `literals.lookup` service, so they behave
+  identically. The finder is optional; `aim` does not depend on it.
 
 ### Recall gap
 

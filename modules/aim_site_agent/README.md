@@ -3,8 +3,9 @@
 Puts AIM memory in [Site Agent](https://www.drupal.org/project/site_agent)'s
 chat. Part of [AIM](../../README.md).
 
-- **A Memory toolset** for the chat: recall, brief and exact-value lookup
-  run without asking; every save waits for the person's approval.
+- **A Memory toolset** for the chat: recall (which also returns exact
+  values such as phone numbers, with the Literals finder) and brief run
+  without asking; every save waits for the person's approval.
 - **Approval cards that list the facts.** A save's card shows each fact as
   a heading, with one line under it naming its scope, who or what it is
   about and when it expires, and the words the facts came from at the top.

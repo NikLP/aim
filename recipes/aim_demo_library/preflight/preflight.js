@@ -259,16 +259,16 @@ async function askWidget(page, question) {
       });
     }
 
-    await check('literals: exact value by viewer, via the lookup tool', async () => {
+    await check('literals: exact value by viewer, via recall', async () => {
       const out = php(`
         $reader = \\Drupal::service("literals.reader");
         $anon = new \\Drupal\\Core\\Session\\AnonymousUserSession();
         $admin = \\Drupal\\user\\Entity\\User::load(1);
         \\Drupal::currentUser()->setAccount($admin);
-        $tool = \\Drupal::service("plugin.manager.tool")->createInstance("aim_literal");
-        $tool->setInputValue("query", "What is the library main phone number?");
+        $tool = \\Drupal::service("plugin.manager.tool")->createInstance("aim_recall");
+        $tool->setInputValue("text", "What is the library main phone number?");
         $v = $tool->execute()->getResult()->getContextValues();
-        echo json_encode(["phone" => $reader->read("main_phone", $anon), "staffAnon" => $reader->read("staff_line", $anon), "staffAdmin" => $reader->read("staff_line", $admin), "tool" => $v["value"] ?? ""]);`);
+        echo json_encode(["phone" => $reader->read("main_phone", $anon), "staffAnon" => $reader->read("staff_line", $anon), "staffAdmin" => $reader->read("staff_line", $admin), "tool" => $v["literals"][0]["value"] ?? ""]);`);
       const r = JSON.parse(out.split('\n').pop());
       if (!r.phone || r.tool !== r.phone) throw new Error('tool returned "' + r.tool + '", expected ' + r.phone);
       if (r.staffAnon !== null) throw new Error('anonymous can read the staff line: ' + r.staffAnon);

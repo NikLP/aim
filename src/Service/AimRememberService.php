@@ -260,8 +260,8 @@ class AimRememberService {
     }
 
     if ($expires !== NULL) {
-      if ($expires <= $this->time->getRequestTime()) {
-        throw new \InvalidArgumentException('Invalid expires ' . $this->formatDay($expires) . ', it is already past.');
+      if ($this->isPast($expires)) {
+        throw new \InvalidArgumentException('Invalid expires ' . $this->formatDay($expires) . ', it is already past (today is ' . $this->today() . ').');
       }
       $values['expires'] = $expires;
     }
@@ -670,6 +670,29 @@ class AimRememberService {
    */
   public function formatDay(int $timestamp): string {
     return (new \DateTimeImmutable('@' . $timestamp))->setTimezone($this->siteTimeZone())->format('Y-m-d');
+  }
+
+  /**
+   * Whether an expires timestamp has already passed.
+   *
+   * @param int $expires
+   *   The timestamp, as parseExpires() returns it.
+   *
+   * @return bool
+   *   TRUE when it is not after the request time.
+   */
+  public function isPast(int $expires): bool {
+    return $expires <= $this->time->getRequestTime();
+  }
+
+  /**
+   * Names today in the site timezone, for a model that cannot know it.
+   *
+   * @return string
+   *   The weekday and the day, e.g. "Monday 2026-11-16".
+   */
+  public function today(): string {
+    return (new \DateTimeImmutable('@' . $this->time->getRequestTime()))->setTimezone($this->siteTimeZone())->format('l Y-m-d');
   }
 
   /**

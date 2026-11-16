@@ -8,6 +8,7 @@ use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Tests\UnitTestCase;
 use Drupal\aim\Entity\AimScope;
+use Drupal\aim\Service\AimRememberService;
 use Drupal\aim_site_agent\Hook\AimSiteAgentHooks;
 use Drupal\site_agent\Entity\ToolCallInterface;
 use Drupal\user\UserInterface;
@@ -47,6 +48,8 @@ class AimSiteAgentCardTest extends UnitTestCase {
           'scope_fields' => ['target_type' => 'node', 'target_id' => '5'],
         ],
         ['text' => 'Unknown scope.', 'scope' => 'nope', 'subject' => '99'],
+        ['text' => 'Closed on Mondays.', 'scope' => 'case', 'expires' => '2024-06-30'],
+        ['text' => 'Closed soon.', 'scope' => 'case', 'expires' => 'unknown'],
       ],
       'source_text' => 'I like bullet points.',
     ]);
@@ -60,6 +63,8 @@ class AimSiteAgentCardTest extends UnitTestCase {
       'The launch is in January.' => 'scope: Case - subject: sci-fi',
       'The page needs a new photo.' => 'scope: Entity - target_type: node - target_id: 5',
       'Unknown scope.' => 'scope: nope - subject: 99',
+      'Closed on Mondays.' => 'scope: Case - expires: 2024-06-30 (already past, today is Monday 2026-11-16; the save will fail)',
+      'Closed soon.' => 'scope: Case - expires: unknown (not a date, the save will fail)',
     ], array_column($variables['facts'], 'details', 'text'));
   }
 
@@ -110,7 +115,17 @@ class AimSiteAgentCardTest extends UnitTestCase {
       return $storage;
     });
 
-    $hooks = new AimSiteAgentHooks($entity_type_manager);
+    // The real service's date handling, with today pinned to 2026-11-16.
+    $remember = $this->getMockBuilder(AimRememberService::class)
+      ->disableOriginalConstructor()
+      ->onlyMethods(['isPast', 'today', 'siteTimeZone'])
+      ->getMock();
+    $today = strtotime('2026-11-16 12:00:00 UTC');
+    $remember->method('isPast')->willReturnCallback(fn (int $expires) => $expires <= $today);
+    $remember->method('today')->willReturn('Monday 2026-11-16');
+    $remember->method('siteTimeZone')->willReturn(new \DateTimeZone('UTC'));
+
+    $hooks = new AimSiteAgentHooks($entity_type_manager, $remember);
     $hooks->setStringTranslation($this->getStringTranslationStub());
     return $hooks;
   }

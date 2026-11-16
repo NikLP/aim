@@ -1,7 +1,9 @@
 # ADR-0061: How aim uses literals
 
 **Status:** Sections 1 and 2 built 2026-10-08 to 10-15 (tokens at recall,
-`aim_literal`, the finder-first gate); sections 3 and 4 unbuilt. Split out
+`aim_literal`, the finder-first gate); section 3 item 2's live source
+built 2026-11-16 (see the addendum), the rest of sections 3 and 4
+unbuilt. Split out
 of `literals`' ADR-0040 (sections 6 and 7, the gate measurements and the
 aim-side deferred and rejected items) on 2026-10-23, when `literals` went
 to drupal.org as `drupal/literals` and stopped carrying aim's design.
@@ -42,7 +44,8 @@ but not on `literals_finder`, and stores nothing of a literal.
   a `ChatProcessor` in `aim_chatbot`, live 2026-10-15; open points in
   [TODO.md](../TODO.md)). A hit skips the hosted model only; the Jev call
   stays, as it is the fuzzy match.
-- `aim_recall` does **not** call the finder (section 3).
+- `aim_recall` does **not** call the finder (section 3). Reversed
+  2026-11-16: see the addendum.
 
 ### 2. The gate, end to end (measured 2026-10-12)
 
@@ -79,7 +82,8 @@ Pulled out one at a time when a site needs it.
    mention a literal in a longer sentence stay facts and carry
    `[literal:key]`, so the value is never stale.
 2. **Two ways to show a literal in recall.**
-   - *Finder as a live source:* `aim_recall` asks the finder as a second
+   - *Finder as a live source* (built 2026-11-16, addendum):
+     `aim_recall` asks the finder as a second
      source and returns the literal as a fact-shaped live result (value
      resolved for the viewer). Nothing stored in aim. The finder's failure
      mode is `none` (0 wrong-confident measured), not a wrong value.
@@ -134,3 +138,46 @@ Pulled out one at a time when a site needs it.
   literals' own `literals_demo_library`.
 - A site that adopts convert-a-fact takes on a review queue someone must
   staff.
+
+## Addendum (2026-11-16): the finder as a live source in recall
+
+**Before:** a chat model got exact values only by choosing `aim_literal`
+over `aim_recall`. Site Agent's model did not: asked "do you have any
+phone numbers" on habanero (2026-11-15), it called `aim_recall`, got "No
+relevant facts found." and answered that none were recorded, as aim's
+own MCP instructions told it to. It found `main_phone` only when the
+person pushed. Section 2 had already measured this (`tool` 20/51), and the
+gate that fixes it on the chat block is a `ChatProcessor`, which cannot
+apply to Site Agent's own loop or to an MCP client.
+
+**After:** the `aim_recall` tool also asks `literals.lookup` with the
+query as a question (the finder, as the calling account, under the
+finder's own thresholds), behind `aim.settings:recall_literals` (shipped
+on for new installs; a site installed earlier has no key, which reads as
+off until set, since aim ships no update hooks; nothing without
+`literals_finder`). A match, or each readable
+candidate of an ambiguous one, comes back in a `literals` list beside the
+facts, with value, label, kind, gist and `match`/`ambiguous`. "No relevant
+facts found." now appears only when the finder was not asked; when both
+come back empty the reply says neither was found, and a lookup that could
+not run says exact values could not be checked rather than that none are
+recorded. A call narrowed to a scope or account asks too: a literal is
+not always a site value (a per-user account page). The model never has to choose a second memory tool, so Site Agent's toolset
+and the demo chatbot dropped `aim_literal`; it stays for MCP, for a
+lookup by key.
+
+**Rejected:** a `site_agent.prompt_section` injecting finder hits into the
+system prompt (Site Agent only, and from the person's message rather than
+the query); replacing or decorating `SiteAgentProcessor` (a second local
+patch on `site_agent`); more tool-description wording (the `tool` path
+section 2 scored 20/51).
+
+**Costs, accepted:** one more decision-model call (the finder's chooser)
+per recall, for every client. On the chat block, a turn the gate passes to
+the assistant asks the finder a second time when the assistant recalls;
+skipping that needs the invoker in `AimRecall`'s method body (tool#3583125
+or a plugin-class tool), not built until a measurement calls for it.
+Section 2's `tool` row is now stale: `aim:chatbot-eval`'s `tool` mode means
+recall carrying values, and `prompt` and `gate` switch `recall_literals`
+off for their run. Re-run it.
+

@@ -29,6 +29,7 @@ dedup
 deepchat
 delegators
 demoable
+descr
 dotdev
 droost
 drupalbrain
