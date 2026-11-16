@@ -332,6 +332,11 @@ only work to do is listed here.
 
 ## Case scope (raised 2026-10-29)
 
+- [ ] **Decide [ADR-0068](adr/0068-case-entity-module.md)** (cases as
+      entities in an optional `aim_case` module: end date, closing,
+      typo refusal). With the module, its point 4 covers the subject
+      constraint below; the string-only form stays core's.
+
 - [ ] **Case subject constraint.** Since `AimScopeCase::resolveSubject()`
       took case names (2026-10-29), two callers naming a case the same
       silently join one case, and a mistyped ID silently starts a new one.

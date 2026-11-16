@@ -30,6 +30,8 @@ The Active table is one list; these are the threads running through it.
   [0016](0016-document-ingestion-ui.md), [0029](0029-context-carrying-turns.md),
   [0062](resolved/0062-chat-on-the-shared-tools.md) (chat on `aim_tool`'s tools),
   [0067](0067-person-approved-calls-skip-grounding.md) (a fact approved on a Site Agent card skips the grounded check).
+- **Scopes** - [0063](resolved/0063-scopes-as-config-on-core-plugins.md) (scopes as config on core plugins),
+  [0068](0068-case-entity-module.md) (cases as entities in `aim_case`, proposed).
 
 ## Active
 
@@ -55,6 +57,7 @@ Still carrying work, proposed, or deferred.
 | [0059](0059-single-valued-category-and-ingress-labelling.md) | Single-valued, indexed `category` that recall can filter on, set on every write route (labelled on ingress); free tagging becomes a scope-module concern | Accepted 2026-10-30 for single-valued `category`; the rest proposed (now including the generic `recall()` filter seam from 0030), nothing built |
 | [0066](0066-one-instance-one-recipe.md) | One instance, one recipe, one plugin: each use of AIM on its own site, its purpose in `server_instructions`, a plugin only for what a connector can't carry | Proposed 2026-11-07; `aim_personal` drafted and tested on a test site, no plugin built |
 | [0067](0067-person-approved-calls-skip-grounding.md) | A fact approved on a Site Agent card is the person's own words: Site Agent marks person-approved calls on the Tool API invoker (`SiteAgentInvokerCapability::PersonApproved`), aim skips the grounded check for them; trust stays the writer's permission | Built 2026-11-15 as a stopgap: Site Agent patch applied locally, aim side built; upstream issue drafted (in the ADR), not filed |
+| [0068](0068-case-entity-module.md) | Cases as entities in an optional `aim_case` module: same `case` plugin ID with a swapped class, an `aim_case` entity (open/closed, end day), closing retires the case's facts and reopening restores them, the end date closes a case through a `hook_aim_expire()` seam in core's sweep | Proposed 2026-11-16, nothing built |
 
 ## Resolved
 

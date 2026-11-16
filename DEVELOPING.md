@@ -790,7 +790,11 @@ literature and what was parked).
   relative dates against the document's date (ADR-0057 points 1, 2, 4).
 - **Expiry.** `aim:expire` retires every live fact past its `expires`
   (hourly crontab, `hook_cron` as the stopgap backup; see
-  "`aim:consolidate`" above).
+  "`aim:consolidate`" above). The fact form sets it as a plain date
+  (`AimFactForm`'s `expires_day`, through `AimRememberService::
+  parseExpires()`), not core's date-and-time widget, so a day means the
+  same as on every other write path; a past day is refused unless it is
+  the one already saved.
 - **Consolidation.** Facts with different `expires` are never compared,
   so a temporary fact is not merged into a lasting one; a merge carries
   `expires` and the candidate's `asserted` (see "`aim:consolidate`").
