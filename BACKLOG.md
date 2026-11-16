@@ -708,6 +708,18 @@ would bring each back. Nothing here is built.
 
 ## Backlog - explicitly "wait for a trigger" per the docs' own framing
 
+- [ ] **Exact values from `aim_recall` when the fact search fails (raised
+      2026-11-16).** With embeddings down (seen with Ollama stopped), the
+      whole `aim_recall` call fails before the finder is asked, though the
+      finder could still return the phone number. About 20 lines and a
+      test in `AimRecall`: on a fact-search failure, still ask the finder
+      and return any value as a success with "memory could not be
+      searched, do not say a fact is not recorded". Not built: it adds a
+      second partial state for models to read (values, no facts) and turns
+      an outage into a success visible only in the log. The chat block's
+      gate already answers clear lookups without embeddings. Trigger: an
+      embeddings outage costs a real answer.
+
 - [ ] **Eval: the `login` literal for signed-in viewers (parked
       2026-10-25).** `/user/login` is access-checked, so it is correctly
       empty for a signed-in visitor, and the three `login` questions in

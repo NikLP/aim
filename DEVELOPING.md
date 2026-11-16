@@ -1024,9 +1024,11 @@ on any embeddings swap. Anthropic has no embeddings API - never point
 literals finder does not - it reads the AI module's default for the
 `decision` operation type (`ai.settings:default_providers.decision`,
 `LiteralChooser`). Changing a model in one place leaves the other on the old
-ID; the finder then fails with the provider's "unknown model" error, which
-`aim_literal` reports as "no matching literal", so the assistant tells the
-visitor a value is not recorded when it is. After any decision-model swap,
+ID; the finder then fails with the provider's "unknown model" error on
+every lookup. `literals.lookup` reports that as `unavailable`, not "none"
+(checked 2026-11-16): `aim_literal` says the lookup could not run, and
+`aim_recall` returns the facts with "exact values could not be checked",
+so no value is ever found, though none is claimed missing. After any decision-model swap,
 update both, set `moderation` and `text_classification` defaults too so no
 default names a retired model, and check with `drush literals:eval`. (A
 finder-level provider/model setting would remove this trap; not built.)
