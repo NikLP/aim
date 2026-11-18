@@ -31,3 +31,33 @@ from the record's arguments.
 
 Tests: `tests/src/Unit/AimSiteAgentCardTest.php` (suggestion, the facts
 and their detail line, other cards left alone).
+
+## The memory section of the system prompt
+
+`MemorySection` (tagged `site_agent.prompt_section`) adds `## Memory:
+live values` (`MemorySection::HEADING`), a list of values that can't be
+written once: today, `- Today: Wednesday 2026-11-18 (site timezone)`, from
+`AimRememberService::today()`, the date saves check `expires` and the
+time check against. **Values only, no guidance**: how to use them is in
+the toolset prompt, which names the section by its heading, so a site
+rewords it there. A new live value is one more list line here; keep the
+heading stable, or update the toolset prompt with it.
+
+Site Agent builds the prompt before every model call, so the values are
+never stale in its own chat, unlike `aim_brief`'s "Today is" line, which
+arrives only if the model calls it and then stays in the history (the
+toolset prompt says an earlier date may be from a previous day). A tool
+definition can't carry them: Tool API caches definitions.
+
+- **Only with aim's tools.** The section is empty unless a toolset in the
+  thread holds a tool whose definition's provider is `aim_tool`, so a
+  thread with no memory tools gets nothing.
+- **Remote clients get it too**, in their instructions, read once when
+  they connect: a session that outlives midnight keeps the old date
+  until it reconnects (a past `expires` is still refused on save, naming
+  today). MCP has no message to resend instructions.
+- **Date only, no time of day**, so the prompt changes once a day.
+- **Nothing about the person** (roles, where their saves start trusted):
+  each call would send it to the model; the brief is the place, if any.
+
+Tests: `tests/src/Unit/MemorySectionTest.php`.

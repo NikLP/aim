@@ -709,6 +709,19 @@ would bring each back. Nothing here is built.
 
 ## Backlog - explicitly "wait for a trigger" per the docs' own framing
 
+- [ ] **Agent-assisted review in Site Agent (raised 2026-11-18).** A
+      reviewer asks Site Agent for the facts waiting for review; the agent
+      lists them with its view of each (likely duplicate, low grounding
+      score, conflicts with a trusted fact), and each trust or untrust
+      goes through an approval card, so the person still decides
+      (ADR-0065: model checks only withhold trust, never grant it). Needs
+      `aim_tool` tools to list untrusted facts and to trust/untrust them
+      (gated by `review aim facts` or the scope's trust permission, with a
+      Site Agent classification that always asks), plus a card listing
+      the facts as `aim_remember`'s does. Cost is a model turn per batch.
+      Trigger: a review queue long enough that a reviewer wants help
+      working through it.
+
 - [ ] **Exact values from `aim_recall` when the fact search fails (raised
       2026-11-16).** With embeddings down (seen with Ollama stopped), the
       whole `aim_recall` call fails before the finder is asked, though the

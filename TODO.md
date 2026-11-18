@@ -25,6 +25,15 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
       (the invoker for *access* callbacks, which CCC needs) at the
       maintainer's request. When it lands: add `?Invoker $invoker = NULL`
       to `aim_remember` and delete the subscriber.
+- [ ] **Today's date in `aim_chatbot`'s system prompt** (raised
+      2026-11-18). Writes depend on the date (`expires`, the time check),
+      and today it reaches the chat model only if it calls `aim_brief`. Add a
+      `BuildSystemPromptEvent` subscriber (`ai_agents`) that appends
+      `AimRememberService::today()`, so the chat and the save agree on
+      today; not core's `[current-date:html_date]` token, which follows
+      the visitor's timezone. Same idea as `aim_site_agent`'s prompt
+      section. MCP stays on `aim_brief` (instructions are read once per
+      connection).
 
 ## Chat quality and evals: open after the 2026-10-15/16 session
 

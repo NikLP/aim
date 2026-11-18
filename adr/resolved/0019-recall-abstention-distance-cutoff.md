@@ -216,6 +216,8 @@ supersede keeps an audit trail), so they take up result slots.
   `recall_max_distance`, float, range 0-1, default 0.45.
 - `AimMemoryManager::getRecallMaxDistance()` and
   `DEFAULT_RECALL_MAX_DISTANCE` (the docblock records the measurements).
+  Since 2026-11-18 there is no in-code default: the measurements are a
+  comment beside the key in `config/install/aim.settings.yml`.
 - `AimSettingsForm`: "Recall" details group.
 - `modules/aim_chatbot/src/Plugin/AiFunctionCall/AimRecall.php`: the filter.
 - Verified by calling the tool through the

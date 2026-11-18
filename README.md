@@ -119,6 +119,37 @@ Five memory categories, composable at retrieval the way Mem0 composes
   deployments where data can't leave the customer's infrastructure.
   Embedding generation is cheap enough to self-host regardless.
 
+## Which models it needs
+
+Any `drupal/ai` chat provider runs aim: extraction, consolidation and the
+merge check all work on it, and a fresh install uses the site's default
+chat model with no setup. A decision model (a provider with the Decision
+operation, which answers typed questions with a probability instead of
+writing text) is optional.
+
+| Job | Chat model only | With a decision model |
+| --- | --- | --- |
+| Extract facts from text, write a merged fact | Yes | Still a chat model: a decision model can't write |
+| Decide whether two facts are the same, check a merge | Yes | Can run on it instead: faster, with a threshold you can tune |
+| Grounded check (is a fact stated in the text it came from) | Not yet | Yes |
+| Time check (is a fact only true until a date) | Not yet | Yes |
+| `literals_finder` (exact value from a question) | No | Yes |
+
+On a site with chat models only, both checks are off, so the writer's
+permissions decide alone whether a fact starts trusted
+([ADR-0065](adr/resolved/0065-permissions-are-trust.md)): give writers
+`create` without `trust` in a scope and their facts wait for review. For
+staff, Site Agent (`aim_site_agent`) adds a person's check before the save:
+each `aim_remember` call shows a card listing every fact for approval.
+Leave `literals_finder` off too: without a decision model it finds
+nothing, while exact values still work through `[literal:key]` tokens in
+facts and lookup by key.
+
+Measured on this project's test sets (2026-11-18), a frontier chat model
+judged merges and pairs as well as a decision model, at about 4 to 5
+times the time per call; a small local chat model is untested. Detail in
+[adr/model-call-budget.md](adr/model-call-budget.md), "Accuracy".
+
 ## How accurate is the search, and what can you tune?
 
 Finding the facts closest in meaning to a question would mean comparing

@@ -29,6 +29,12 @@ to `aim_site_agent`.
   (flagged when already past or not a date, read by `aim.remember` as the
   save will read it), with `source_text` in place of the tool description written for the
   model. See [DEVELOPING.md](DEVELOPING.md).
+- `src/Prompt/MemorySection.php` (tagged `site_agent.prompt_section` in
+  `aim_site_agent.services.yml`) - a `## Memory: live values` section in
+  Site Agent's system prompt, only when a toolset holds an `aim_tool`
+  tool (today: the date). **Values only**: anything that can be written
+  once goes in the toolset prompt, which names this section by its
+  heading. See [DEVELOPING.md](DEVELOPING.md).
 
 What stays in `aim_tool`: `AimRemember::CALLERS` maps the `site_agent`
 invoker to the `site_agent:aim_remember` source by ID, with no dependency,

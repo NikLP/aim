@@ -11,6 +11,9 @@ chat. Part of [AIM](../../README.md).
   about and when it expires, and the words the facts came from at the top.
   Approve or reject covers the whole save: to drop a fact, reject with a
   reason saying which, and the assistant offers the rest again.
+- **Today's date in the chat's instructions**, kept current by the
+  module, so dates in saved facts and when they expire are worked out
+  from the right day.
 - **What each aim tool does**, so Site Agent knows which calls only read.
 
 ## Requirements

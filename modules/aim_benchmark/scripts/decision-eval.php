@@ -111,7 +111,7 @@ $times = [];
 if ($task === 'grounding') {
   $data = json_decode(file_get_contents($set("decision-eval-grounding.json")), TRUE);
   $items = $data['grounding'];
-  $cutoff = (float) ($activities['grounding']['threshold'] ?? 0.7);
+  $cutoff = \Drupal::service('aim.settings_reader')->getGroundingThreshold();
   $groups = [];
   foreach ($items as $i => $item) {
     $groups[$item['passage']][] = $i;
@@ -168,7 +168,7 @@ if ($task === 'grounding') {
 }
 elseif ($task === 'time') {
   $items = json_decode(file_get_contents($set('decision-eval-time.json')), TRUE)['time'];
-  $cutoff = (float) ($activities['grounding']['time_threshold'] ?? 0.3);
+  $cutoff = \Drupal::service('aim.settings_reader')->getTimeCheckThreshold();
   $scores = [];
   // Chunked so a call stays within 16 questions (subq's cap).
   foreach (array_chunk(array_keys($items), max(1, intdiv(16, count($time_qs)))) as $chunk) {
@@ -212,7 +212,7 @@ elseif ($task === 'time') {
 }
 elseif ($task === 'merges') {
   $sets = json_decode(file_get_contents($set("decision-eval-sets.json")), TRUE);
-  $cutoff = (float) ($extra[2] ?? $activities['verifier']['threshold'] ?? 0.5);
+  $cutoff = (float) ($extra[2] ?? \Drupal::service('aim.settings_reader')->getVerifierThreshold());
   $pos = $neg = [];
   foreach ($sets['merges'] as $m) {
     if ($chat) {

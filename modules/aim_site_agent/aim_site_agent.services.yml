@@ -1,0 +1,8 @@
+services:
+  # Gives Site Agent's model aim's live values (today's date) when aim's
+  # tools are offered.
+  aim_site_agent.memory_section:
+    class: Drupal\aim_site_agent\Prompt\MemorySection
+    arguments: ['@aim.remember', '@plugin.manager.tool']
+    tags:
+      - { name: site_agent.prompt_section, priority: 0 }
