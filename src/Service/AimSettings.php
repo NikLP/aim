@@ -9,7 +9,10 @@ use Drupal\ai\AiProviderPluginManager;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Reads aim's admin-editable settings, with shipped defaults as fallbacks.
+ * Reads aim's admin-editable settings.
+ *
+ * Config is the only source: a key in REQUIRED_KEYS that is missing is an
+ * error, not a silent default.
  *
  * Thresholds, the model chosen per activity, and the grounded check's mode
  * and cutoff. Split out of AimMemoryManager, which still delegates to it for
@@ -18,74 +21,21 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 class AimSettings {
 
   /**
-   * Shipped default for aim.settings' compare_distance, and a fallback.
+   * The aim.settings keys that have no default in code.
    *
-   * The live, admin-editable value is aim.settings:compare_distance
-   * (/admin/config/aim/settings), read via getCompareDistance(); this
-   * constant is the fallback if that config is missing, shared by the CLI
-   * sweep and the queue worker so the two can't drift. Pairs within it are
-   * compared: identical text is retired with no model call, any other pair
-   * gets one classification call, since embedding distance cannot tell a
-   * correction from a reworded duplicate (ADR-0036's 2026-10-27 addendum).
-   * Set to cover the observed distinct-but-topically-related band
-   * (0.29-0.41) under ollama__nomic-embed-text:latest, while excluding
-   * clearly unrelated pairs (0.67+).
+   * Each ships in config/install/aim.settings.yml, with where its value came
+   * from; a getter throws when one is missing, and aim:status lists any that
+   * are.
    */
-  public const DEFAULT_COMPARE_DISTANCE = 0.45;
-
-  /**
-   * Shipped default for aim.settings' neighbor_limit, and a fallback.
-   *
-   * How many nearest neighbors consolidation compares a fact against, read
-   * via getNeighborLimit(). Each neighbor within the comparison distance
-   * can cost one classification call, so this bounds the worst-case cost per
-   * fact. Measured 2026-10-02 on the live site: 1 found 40 decisions, 3
-   * found 86, including two merges 1 never saw.
-   */
-  public const DEFAULT_NEIGHBOR_LIMIT = 3;
-
-  /**
-   * Shipped default for aim.settings' recall_max_distance, and a fallback.
-   *
-   * See DEFAULT_COMPARE_DISTANCE - same relationship to the live config value,
-   * read via getRecallMaxDistance(). Measured 2026-09-19 against
-   * ollama__nomic-embed-text:latest on the live site-scope facts, question
-   * text against fact text (not fact against fact, so the consolidation
-   * thresholds above don't apply): answerable questions' best match
-   * 0.12-0.29 (full questions and terse keyword queries alike),
-   * near-topic-but-unanswerable 0.25-0.33, off-topic 0.51-0.64. A second
-   * corpus (the aim_demo_library facts, 2026-09-27) had its highest
-   * answerable match at 0.457 and lowest off-topic at 0.497, so the default
-   * is 0.48: the one value inside the empty band of both (ADR-0019).
-   * It cannot separate an answerable question from a near-topic
-   * unanswerable one (their ranges overlap) - that stays the model's call.
-   * The off-topic floor drifts down as the corpus grows and diversifies
-   * (more candidates, more coincidental near matches), so recheck it then,
-   * not only when the embeddings model changes.
-   */
-  public const DEFAULT_RECALL_MAX_DISTANCE = 0.48;
-
-  /**
-   * The grounding cutoff when activities.grounding.threshold is unset.
-   *
-   * Hosted Jev split supported from unsupported candidates at about 0.76 on
-   * the 44-item eval set (tuned on that set, so optimistic).
-   */
-  protected const GROUNDING_DEFAULT_THRESHOLD = 0.7;
-
-  /**
-   * The time check's cutoff when activities.grounding.time_threshold is unset.
-   *
-   * Set from decision-eval.php's time task (23 items, two runs 2026-11-12):
-   * time-bound facts scored 0.45 or more, everything else 0.11 or less;
-   * scores move between runs, so 0.3 sits in the middle of the gap.
-   */
-  protected const TIME_CHECK_DEFAULT_THRESHOLD = 0.3;
-
-  /**
-   * Candidates per grounded-check call when none is configured (subq's cap).
-   */
-  protected const GROUNDING_MAX_QUESTIONS = 16;
+  public const REQUIRED_KEYS = [
+    'compare_distance',
+    'neighbor_limit',
+    'recall_max_distance',
+    'activities.verifier.threshold',
+    'activities.grounding.threshold',
+    'activities.grounding.time_threshold',
+    'activities.grounding.max_questions',
+  ];
 
   /**
    * Constructs an AimSettings object.
@@ -104,46 +54,44 @@ class AimSettings {
   /**
    * Returns the live comparison distance from aim.settings.
    *
-   * Falls back to DEFAULT_COMPARE_DISTANCE only if the config value is
-   * missing (e.g. aim.settings was deleted outside of a normal uninstall) -
-   * config/install ships a real value, so this should not normally be hit.
+   * Shared by the CLI sweep and the queue worker so the two can't drift.
+   * Pairs within it are compared: identical text is retired with no model
+   * call, any other pair gets one classification call (ADR-0036's
+   * 2026-10-27 addendum).
    *
    * @return float
    *   Distance at or below which a neighbor is compared.
    */
   public function getCompareDistance(): float {
-    $value = $this->configFactory->get('aim.settings')->get('compare_distance');
-    return $value !== NULL ? (float) $value : self::DEFAULT_COMPARE_DISTANCE;
+    return (float) $this->required('compare_distance');
   }
 
   /**
    * Returns how many nearest neighbors consolidation compares a fact to.
    *
-   * See getCompareDistance() - same fallback behavior.
+   * Each neighbor within the comparison distance can cost one
+   * classification call, so this bounds the worst-case cost per fact.
    *
    * @return int
    *   At least 1.
    */
   public function getNeighborLimit(): int {
-    $value = $this->configFactory->get('aim.settings')->get('neighbor_limit');
-    return $value !== NULL ? max(1, (int) $value) : self::DEFAULT_NEIGHBOR_LIMIT;
+    return max(1, (int) $this->required('neighbor_limit'));
   }
 
   /**
    * Returns the live recall cutoff from aim.settings.
    *
-   * See getCompareDistance() - same fallback behavior. Applied by callers
-   * that must abstain on a poor match: aim_tool's aim_recall and
-   * aim_chatbot's recall-context subscriber pass it to recall() as
-   * $maxDistance; recall() itself does not apply it unless asked.
+   * Applied by callers that must abstain on a poor match: aim_tool's
+   * aim_recall and aim_chatbot's recall-context subscriber pass it to
+   * recall() as $maxDistance; recall() itself does not apply it unless asked.
    *
    * @return float
    *   Distance above which a recalled fact is too dissimilar to present as
    *   relevant.
    */
   public function getRecallMaxDistance(): float {
-    $value = $this->configFactory->get('aim.settings')->get('recall_max_distance');
-    return $value !== NULL ? (float) $value : self::DEFAULT_RECALL_MAX_DISTANCE;
+    return (float) $this->required('recall_max_distance');
   }
 
   /**
@@ -269,24 +217,31 @@ class AimSettings {
    * Returns the score at or above which a fact counts as grounded.
    *
    * @return float
-   *   aim.settings:activities.grounding.threshold, or the shipped default
-   *   when unset or 0.
+   *   aim.settings:activities.grounding.threshold.
    */
   public function getGroundingThreshold(): float {
-    $threshold = (float) ($this->configFactory->get('aim.settings')->get('activities.grounding.threshold') ?? 0);
-    return $threshold > 0 ? $threshold : self::GROUNDING_DEFAULT_THRESHOLD;
+    return (float) $this->required('activities.grounding.threshold');
+  }
+
+  /**
+   * Returns the probability a decision-model verifier must exceed.
+   *
+   * @return float
+   *   aim.settings:activities.verifier.threshold. Read only when the
+   *   verifier runs on a decision model.
+   */
+  public function getVerifierThreshold(): float {
+    return (float) $this->required('activities.verifier.threshold');
   }
 
   /**
    * Returns how many candidates one grounded-check call may carry.
    *
    * @return int
-   *   aim.settings:activities.grounding.max_questions, or the shipped
-   *   default (16, subq's limit) when unset or below 1.
+   *   aim.settings:activities.grounding.max_questions, at least 1.
    */
   public function getGroundingMaxQuestions(): int {
-    $max = (int) ($this->configFactory->get('aim.settings')->get('activities.grounding.max_questions') ?? 0);
-    return $max > 0 ? $max : self::GROUNDING_MAX_QUESTIONS;
+    return max(1, (int) $this->required('activities.grounding.max_questions'));
   }
 
   /**
@@ -323,12 +278,50 @@ class AimSettings {
    * Returns the score at or above which a fact counts as time-bound.
    *
    * @return float
-   *   aim.settings:activities.grounding.time_threshold, or the shipped
-   *   default when unset or 0.
+   *   aim.settings:activities.grounding.time_threshold.
    */
   public function getTimeCheckThreshold(): float {
-    $threshold = (float) ($this->configFactory->get('aim.settings')->get('activities.grounding.time_threshold') ?? 0);
-    return $threshold > 0 ? $threshold : self::TIME_CHECK_DEFAULT_THRESHOLD;
+    return (float) $this->required('activities.grounding.time_threshold');
+  }
+
+  /**
+   * Returns the REQUIRED_KEYS a getter reads with today's settings.
+   *
+   * A threshold for a check that is off is never read, so a chat-only site
+   * may leave the decision-model keys out without anything failing.
+   *
+   * @return string[]
+   *   The keys, in REQUIRED_KEYS order.
+   */
+  public function requiredKeysInUse(): array {
+    $checks = $this->isGroundingOn() || $this->isTimeCheckOn();
+    $in_use = [
+      'activities.verifier.threshold' => ($this->configFactory->get('aim.settings')->get('merge_verify') ?? TRUE) && $this->decisionModelFor('verifier') !== NULL,
+      'activities.grounding.threshold' => $this->isGroundingOn(),
+      'activities.grounding.time_threshold' => $this->isTimeCheckOn(),
+      'activities.grounding.max_questions' => $checks,
+    ];
+    return array_values(array_filter(self::REQUIRED_KEYS, fn (string $key): bool => $in_use[$key] ?? TRUE));
+  }
+
+  /**
+   * Returns a key from REQUIRED_KEYS, failing when it is missing.
+   *
+   * @param string $key
+   *   The aim.settings key, dotted for a nested value.
+   *
+   * @return mixed
+   *   The configured value.
+   *
+   * @throws \RuntimeException
+   *   When the key is not set.
+   */
+  protected function required(string $key): mixed {
+    $value = $this->configFactory->get('aim.settings')->get($key);
+    if ($value === NULL) {
+      throw new \RuntimeException(sprintf('aim.settings:%s is not set. aim ships it in config/install/aim.settings.yml; set it on /admin/config/aim/settings or with drush config:set.', $key));
+    }
+    return $value;
   }
 
 }

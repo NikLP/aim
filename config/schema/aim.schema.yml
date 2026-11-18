@@ -132,20 +132,20 @@ aim.activity_choice:
       label: 'Model ID'
     max_questions:
       type: integer
-      label: 'Grounding only: candidates per decision call, 0 or absent for the default (16, the smallest provider cap seen)'
+      label: 'Grounding only: candidates per decision call (16 shipped, the smallest provider cap seen)'
       constraints:
         Range:
-          min: 0
+          min: 1
     time_threshold:
       type: float
-      label: 'Grounding only: probability at which the time check counts a fact as time-bound, 0 or absent for the default (0.3)'
+      label: 'Grounding only: probability at which the time check counts a fact as time-bound'
       constraints:
         Range:
           min: 0
           max: 1
     threshold:
       type: float
-      label: 'Verifier and grounding only: probability a decision model must reach, 0 or absent for the default (0.5 verifier, 0.7 grounding)'
+      label: 'Verifier and grounding only: probability a decision model must reach'
       constraints:
         Range:
           min: 0

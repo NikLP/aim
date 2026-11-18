@@ -80,15 +80,19 @@ recall, median 3.9 s per turn.
 Pulled out one at a time when a site needs it.
 
 1. **Convert-a-fact retires the fact.** Promoting an extracted one-shot
-   fact (an exact value) to a literal supersedes the fact through the
-   existing non-destructive `superseded_by` edge, through a short form,
-   never one click: a model splits the fact into gist and value, a human
-   picks the type, the literal carries a `source_fact` back-reference, and
-   the fact is retired after a cool-off. Depends on the agreed
-   `retired`/`expires` split. The literal's gist is then the only
-   description of the thing; the value lives once. Facts that merely
-   mention a literal in a longer sentence stay facts and carry
-   `[literal:key]`, so the value is never stale.
+   fact (an exact value) to a literal goes through a short form, never one
+   click: a model splits the fact into gist and value (optional: a first
+   version can prefill the fact text for a person to edit), a human picks
+   the type and key, and the fact is retired after a cool-off. The link
+   lives on aim's side: `superseded_by` references `aim_fact` only, so the
+   literal key goes in the fact's `superseded_by_reason` JSON, and the
+   literal carries no `source_fact` field (literals must not depend on
+   aim). The cool-off is the fact's `expires` set N days ahead, retired by
+   `aim:expire` (ADR-0057), so nothing new is needed for it. The literal's
+   gist is then the only description of the thing; the value lives once.
+   Facts that merely mention a literal in a longer sentence stay facts and
+   carry `[literal:key]`, so the value is never stale. Likely first use:
+   ADR-0056's "the demo's raw email fact moved into a literal".
 2. **Two ways to show a literal in recall.**
    - *Finder as a live source* (built 2026-11-16, addendum):
      `aim_recall` asks the finder as a second

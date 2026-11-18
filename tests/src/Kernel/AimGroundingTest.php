@@ -55,7 +55,7 @@ class AimGroundingTest extends AimKernelTestBase {
       'provider' => 'fake',
       'model' => 'fake-model',
       'threshold' => 0.7,
-    ];
+    ] + $settings['activities']['grounding'];
     $this->config('aim.settings')->setData($settings)->save();
     AimScope::create(['id' => 'site', 'label' => 'Site'])->save();
 

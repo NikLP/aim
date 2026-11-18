@@ -50,7 +50,7 @@ class AimTimeCheckTest extends AimKernelTestBase {
       'provider' => 'fake',
       'model' => 'fake-model',
       'threshold' => 0.7,
-    ];
+    ] + $settings['activities']['grounding'];
     $settings['time_check_mode'] = 'flag';
     $this->config('aim.settings')->setData($settings)->save();
     $this->config('system.date')->set('timezone.default', 'Pacific/Auckland')->save();

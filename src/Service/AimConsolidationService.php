@@ -511,8 +511,7 @@ class AimConsolidationService {
         ['faithful' => new NoulQuestion('Every detail of fact_a and fact_b (names, numbers, dates, conditions, negations) survives in merged, and merged adds nothing the two facts do not say, except that a value in fact_b which differs from the value fact_a gives for the same attribute (a duration, day, price or place) supersedes it, so the old value should be absent. Judge faithfulness to the inputs, not whether they are true.')],
       );
       $response = $this->decisionBackend->run('verifier', $input, $decision_model[0], $decision_model[1]);
-      $threshold = (float) ($this->configFactory->get('aim.settings')->get('activities.verifier.threshold') ?? 0);
-      $cutoff = $threshold > 0 ? $threshold : 0.5;
+      $cutoff = $this->settings->getVerifierThreshold();
       $faithful = $response->getNoul('faithful');
       $this->manager->logVerbose('Merge verifier (kept @kept, candidate @candidate): faithful probability @score, cutoff @cutoff.', [
         '@kept' => $kept->id(),

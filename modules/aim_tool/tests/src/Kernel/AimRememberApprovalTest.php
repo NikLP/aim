@@ -82,7 +82,7 @@ class AimRememberApprovalTest extends KernelTestBase {
       'provider' => 'fake',
       'model' => 'fake-model',
       'threshold' => 0.7,
-    ];
+    ] + $settings['activities']['grounding'];
     $settings['grounding_mode'] = 'demote';
     $this->config('aim.settings')->setData($settings)->save();
     AimScope::create(['id' => 'site', 'label' => 'Site'])->save();

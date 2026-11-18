@@ -581,8 +581,9 @@ audit"), each aliased the same way. Key public methods:
   $account): AccessResultInterface` - wraps the access handler's
   `createAccess()`; `aim_tool` calls this before every Tool API/MCP write.
 - `AimSettings::getCompareDistance()`/`getRecallMaxDistance()`
-  - live `aim.settings` values, not the class constants (those are only
-  the shipped defaults and in-code fallback). `recall_max_distance` is
+  - live `aim.settings` values. No setting in `AimSettings::REQUIRED_KEYS`
+  has a default in code: a missing one throws, and `aim:status`'s
+  "Required settings present" names it. `recall_max_distance` is
   applied only when a caller passes it to `recall()` as `$maxDistance`:
   `aim_tool`'s `aim_recall` and `aim_chatbot`'s recall-context subscriber
   do; `drush aim:recall`

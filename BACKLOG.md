@@ -39,7 +39,8 @@ are recommendations.
 - [ ] Parked by Nik 2026-10-11, revisit later. Accept or amend ADR-0056 (no personal data stored unless
       authorized). Then: a `pii` eval set and task in `decision-eval.php`,
       the `aim_personal_data` guardrail set, the extraction prompt change,
-      and the demo's raw email fact moved into a literal.
+      and the demo's raw email fact moved into a literal (ADR-0061 section
+      3.1's convert-a-fact form, unbuilt, in TODO.md "Literals, aim's side").
       Revisit triggers (decide later, 2026-10-15): before real personal
       data goes in, or before the chat widget is reopened to anyone outside
       (an outside tester could type their own email, phone or IBAN into it,

@@ -129,7 +129,7 @@ final class AimSettingsForm extends ConfigFormBase {
         $form['models'][$activity]['threshold'] = [
           '#type' => 'number',
           '#title' => $this->t('Grounded threshold'),
-          '#description' => $this->t('A fact counts as grounded when the score is at or above this value. Empty or 0 uses 0.7. Model-specific: calibrate with the grounding task in the aim_benchmark eval script (hosted Jev split cleanly at about 0.76 on a 44-item set, tuned on that set).'),
+          '#description' => $this->t('A fact counts as grounded when the score is at or above this value. Model-specific: calibrate with the grounding task in the aim_benchmark eval script (hosted Jev split cleanly at about 0.76 on a 44-item set, tuned on that set).'),
           '#default_value' => $choice['threshold'] ?? NULL,
           '#min' => 0,
           '#max' => 1,
@@ -149,7 +149,7 @@ final class AimSettingsForm extends ConfigFormBase {
         $form['models'][$activity]['time_threshold'] = [
           '#type' => 'number',
           '#title' => $this->t('Time-bound threshold'),
-          '#description' => $this->t('A fact counts as time-bound when the score is at or above this value. Empty or 0 uses 0.3.'),
+          '#description' => $this->t('A fact counts as time-bound when the score is at or above this value.'),
           '#default_value' => $choice['time_threshold'] ?? NULL,
           '#min' => 0,
           '#max' => 1,
@@ -218,7 +218,7 @@ final class AimSettingsForm extends ConfigFormBase {
         $form['models'][$activity]['threshold'] = [
           '#type' => 'number',
           '#title' => $this->t('Verifier threshold'),
-          '#description' => $this->t('A decision model confirms a merge only when its probability is above this value. Empty or 0 uses 0.5. Model-specific: a model that scores faulty merges high needs a higher value, calibrate it with the aim_benchmark eval scripts (hosted Jev separated cleanly at about 0.8 on a small 20-merge set, not a proven value).'),
+          '#description' => $this->t('A decision model confirms a merge only when its probability is above this value. Model-specific: a model that scores faulty merges high needs a higher value, calibrate it with the aim_benchmark eval scripts (hosted Jev separated cleanly at about 0.8 on a small 20-merge set, not a proven value).'),
           '#default_value' => $choice['threshold'] ?? NULL,
           '#min' => 0,
           '#max' => 1,
@@ -393,13 +393,25 @@ final class AimSettingsForm extends ConfigFormBase {
         'provider' => $use_default ? '' : (string) ($picked['provider'] ?? ''),
         'model' => $use_default ? '' : (string) ($picked['model'] ?? ''),
       ];
-      if (in_array($activity, ['verifier', 'grounding'], TRUE) && !empty($value['threshold'])) {
-        $activities[$activity]['threshold'] = (float) $value['threshold'];
-      }
-      if ($activity === 'grounding' && !empty($value['time_threshold'])) {
-        $activities[$activity]['time_threshold'] = (float) $value['time_threshold'];
+      // A blank field (the verifier's is hidden with a chat backend) keeps
+      // the stored value; there is no default in code to fall back to.
+      $keys = match ($activity) {
+        'verifier' => ['threshold'],
+        'grounding' => ['threshold', 'time_threshold', 'max_questions'],
+        default => [],
+      };
+      foreach ($keys as $key) {
+        $submitted = $value[$key] ?? '';
+        $stored = $this->config('aim.settings')->get("activities.$activity.$key");
+        if ($submitted !== '' && $submitted !== NULL) {
+          $activities[$activity][$key] = $key === 'max_questions' ? (int) $submitted : (float) $submitted;
+        }
+        elseif ($stored !== NULL) {
+          $activities[$activity][$key] = $stored;
+        }
       }
     }
+
     $this->configFactory()->getEditable('aim.settings')
       ->set('activities', $activities)
       ->set('grounding_mode', $form_state->getValue(['models', 'grounding', 'grounding_mode']) ?: 'off')

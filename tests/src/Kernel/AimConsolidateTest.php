@@ -304,11 +304,11 @@ class AimConsolidateTest extends AimKernelTestBase {
    */
   protected function scriptMerge(string $mergedText, float $grounding): void {
     $model = ['backend' => 'decision', 'provider' => 'fake', 'model' => 'fake-model'];
-    $this->config('aim.settings')
-      ->set('activities.consolidation', $model)
-      ->set('activities.verifier', $model)
-      ->set('activities.grounding', $model + ['threshold' => 0.7])
-      ->save();
+    $config = $this->config('aim.settings');
+    foreach (['consolidation', 'verifier', 'grounding'] as $activity) {
+      $config->set("activities.$activity", $model + $config->get("activities.$activity"));
+    }
+    $config->set('activities.grounding.threshold', 0.7)->save();
     $this->backend()->answers = ['decision' => 'UPDATE', 'faithful' => 0.9];
     $this->backend()->scores = [$mergedText => $grounding];
     $this->container->get('aim.consolidation')->mergedText = $mergedText;

@@ -8,6 +8,7 @@ use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Queue\DatabaseQueue;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\ai\AiProviderPluginManager;
@@ -54,6 +55,12 @@ final class AimStatusChecker {
    * @param \Drupal\Core\Queue\QueueFactory $queueFactory
    *   The queue factory, used to count the consolidation queue on whatever
    *   backend the site runs it on.
+   * @param \Drupal\aim\Service\AimSettings $settings
+   *   The aim settings reader, for the required keys the enabled checks
+   *   read.
+   * @param \Drupal\Core\Extension\ModuleHandlerInterface $moduleHandler
+   *   The module handler, to tell whether literals_finder needs the default
+   *   decision model.
    */
   public function __construct(
     protected Connection $database,
@@ -65,6 +72,9 @@ final class AimStatusChecker {
     #[Autowire(service: 'ai.provider')]
     protected AiProviderPluginManager $aiProvider,
     protected QueueFactory $queueFactory,
+    #[Autowire(service: 'aim.settings_reader')]
+    protected AimSettings $settings,
+    protected ModuleHandlerInterface $moduleHandler,
   ) {}
 
   /**
@@ -82,7 +92,7 @@ final class AimStatusChecker {
       'orphan_vector_rows' => $this->checkOrphanVectorRows(),
       'provider_shim' => $this->checkProviderShim(),
       'hnsw_tuning' => $this->checkHnswTuning(),
-      'recall_cutoff' => $this->checkRecallCutoff(),
+      'required_settings' => $this->checkRequiredSettings(),
       'expiry_sweep' => $this->checkExpirySweep(),
       'consolidation_queue' => $this->checkConsolidationQueue(),
       'untrusted_facts' => $this->checkUntrustedFacts(),
@@ -326,26 +336,25 @@ final class AimStatusChecker {
   }
 
   /**
-   * Checks that recall_max_distance is a real per-site value, not a fallback.
+   * Checks that every key with no default in code that is read is set.
+   *
+   * A getter in AimSettings throws on a missing one, so this names them
+   * before recall or consolidation fails on it. A threshold for a check
+   * that is off is not read, so it is not asked for.
    *
    * @return array
    *   ['label' => string, 'ok' => bool, 'detail' => string].
    */
-  private function checkRecallCutoff(): array {
-    $value = $this->configFactory->get('aim.settings')->get('recall_max_distance');
-    $ok = $value !== NULL;
-
-    if ($ok) {
-      $detail = (string) $value;
-    }
-    else {
-      $detail = 'not set, silently using the in-code default ' . AimSettings::DEFAULT_RECALL_MAX_DISTANCE . ' - recalibrate for this site\'s dataset (ADR-0019)';
-    }
+  private function checkRequiredSettings(): array {
+    $config = $this->configFactory->get('aim.settings');
+    $missing = array_values(array_filter($this->settings->requiredKeysInUse(), fn (string $key): bool => $config->get($key) === NULL));
 
     return [
-      'label' => 'Recall cutoff configured',
-      'ok' => $ok,
-      'detail' => $detail,
+      'label' => 'Required settings present',
+      'ok' => empty($missing),
+      'detail' => empty($missing)
+        ? 'recall_max_distance ' . $config->get('recall_max_distance') . ' (recalibrate per dataset, ADR-0019)'
+        : 'missing: ' . implode(', ', $missing) . ' - each ships in config/install/aim.settings.yml',
     ];
   }
 
@@ -399,7 +408,13 @@ final class AimStatusChecker {
    */
   private function checkModels(): array {
     $targets = [];
-    foreach (['chat', 'decision', 'embeddings'] as $operation) {
+    // aim's activities name their decision models; the site default is only
+    // read by literals_finder's chooser.
+    $operations = ['chat', 'embeddings'];
+    if ($this->moduleHandler->moduleExists('literals_finder')) {
+      $operations[] = 'decision';
+    }
+    foreach ($operations as $operation) {
       $default = $this->aiProvider->getDefaultProviderForOperationType($operation) ?? [];
       $targets["default $operation model"] = [
         $operation,

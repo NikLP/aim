@@ -270,7 +270,7 @@ Notes on diagram 2:
   neighbor with a different end date (`expires`) are skipped. Each
   neighbor is decided in turn, stopping if this fact retires.
 - **Distance** is cosine distance, lower is closer.
-  `compare_distance` defaults to 0.45 (`AimSettings::DEFAULT_COMPARE_DISTANCE`).
+  `compare_distance` ships as 0.45 (`config/install/aim.settings.yml`).
   Identical text ignores case, spacing and a final full stop, and keeps the
   older fact. There is no distance below which pairs merge unchecked
   (removed 2026-10-27, ADR-0036's addendum).

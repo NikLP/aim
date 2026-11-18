@@ -1,13 +1,31 @@
+# No value below has a default in code (AimSettings::REQUIRED_KEYS for the
+# numbers); a missing key is an error, and aim:status lists it.
+#
+# compare_distance: covers the distinct-but-related band (0.29-0.41) under
+# ollama__nomic-embed-text:latest and excludes unrelated pairs (0.67+).
 compare_distance: 0.45
+# neighbor_limit: measured 2026-10-02 on the live site, 1 found 40
+# decisions and 3 found 86, including two merges 1 never saw.
 neighbor_limit: 3
 merge_verify: true
+# Thresholds are model-specific. verifier.threshold is read only with a
+# decision-model verifier. grounding.threshold: hosted Jev split supported
+# from unsupported at about 0.76 on a 44-item set (tuned on it, so
+# optimistic). grounding.time_threshold: decision-eval.php's time task
+# (23 items, two runs 2026-11-12) scored time-bound facts 0.45 or more and
+# the rest 0.11 or less; 0.3 sits in the gap. grounding.max_questions:
+# candidates per call, subq's cap.
 activities:
   extraction: { backend: chat, provider: '', model: '' }
   consolidation: { backend: chat, provider: '', model: '' }
-  verifier: { backend: chat, provider: '', model: '' }
-  grounding: { backend: decision, provider: '', model: '' }
+  verifier: { backend: chat, provider: '', model: '', threshold: 0.5 }
+  grounding: { backend: decision, provider: '', model: '', threshold: 0.7, time_threshold: 0.3, max_questions: 16 }
 grounding_mode: 'off'
 time_check_mode: 'off'
+# recall_max_distance: two corpora (2026-09-19 and 2026-09-27, question
+# against fact text) had an empty band between answerable and off-topic
+# matches; 0.48 is inside both. Recalibrate per site and embeddings model
+# (ADR-0019).
 recall_max_distance: 0.48
 recall_gap: 0.0
 recall_literals: true
