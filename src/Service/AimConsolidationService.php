@@ -357,8 +357,8 @@ class AimConsolidationService {
         foreach ([$kept, $candidate] as $input) {
           $input->set('retired', $this->time->getRequestTime());
           $input->set('superseded_by', $merged->id());
+          $input->set('superseded_by_reason', $reason);
         }
-        $candidate->set('superseded_by_reason', $reason);
         $kept->save();
         $candidate->save();
         break;
@@ -588,11 +588,10 @@ class AimConsolidationService {
    * both inputs share it. Metadata is reconciled deliberately: text is the
    * guardrail-checked merge; asserted is the candidate's only; source
    * prefers the candidate (the newer statement) and falls back to the
-   * kept fact;
-   * category is the union; trusted only if both inputs were (always, since
-   * only trusted facts are consolidated); the owner is
-   * the kept fact's; grounding_score is the merge's own check, not either
-   * input's.
+   * kept fact, and so does category (one per fact, ADR-0059); trusted only
+   * if both inputs were (always, since only trusted facts are
+   * consolidated); the owner is the kept fact's; grounding_score is the
+   * merge's own check, not either input's.
    *
    * @param \Drupal\aim\Entity\AimFact $kept
    *   The established fact.
@@ -631,20 +630,11 @@ class AimConsolidationService {
     if ($this->expiresOf($kept) !== NULL) {
       $values['expires'] = $this->expiresOf($kept);
     }
-    foreach (['source'] as $field) {
+    foreach (['source', 'category'] as $field) {
       $source = !$candidate->get($field)->isEmpty() ? $candidate : $kept;
       if (!$source->get($field)->isEmpty()) {
-        $values[$field] = $source->get($field)->value;
+        $values[$field] = $source->get($field)->getValue();
       }
-    }
-    $categories = [];
-    foreach ([$kept, $candidate] as $input) {
-      foreach ($input->get('category') as $item) {
-        $categories[(int) $item->target_id] = ['target_id' => (int) $item->target_id];
-      }
-    }
-    if ($categories) {
-      $values['category'] = array_values($categories);
     }
 
     /** @var \Drupal\aim\Entity\AimFact $merged */

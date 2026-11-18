@@ -124,6 +124,25 @@ class AimHooks {
   }
 
   /**
+   * Implements hook_gin_content_form_routes().
+   *
+   * Gives the fact forms Gin's node-style sidebar layout (AimFactForm puts
+   * status, dates and revision information in it). Gin is an undeclared
+   * optional dependency: without it this hook is never called.
+   *
+   * @return array
+   *   Route names.
+   */
+  #[Hook('gin_content_form_routes')]
+  public function ginContentFormRoutes(): array {
+    return [
+      'entity.aim_fact.add_form',
+      'entity.aim_fact.canonical',
+      'entity.aim_fact.edit_form',
+    ];
+  }
+
+  /**
    * Implements hook_ENTITY_TYPE_presave() for aim_fact.
    *
    * Lets the scope's plugin resolve a new fact's subject (or an edited
@@ -231,6 +250,19 @@ class AimHooks {
       return;
     }
     $this->memoryManager->enqueueForConsolidation((int) $entity->id());
+  }
+
+  /**
+   * Implements hook_ENTITY_TYPE_delete() for aim_fact.
+   *
+   * Writes the audit line and clears superseded_by on the retired facts
+   * that pointed at the deleted one (AimMemoryManager::factDeleted()).
+   * After the delete, not before, so a predecessor deleted in the same
+   * bulk delete is already gone and not saved again.
+   */
+  #[Hook('aim_fact_delete')]
+  public function factDelete(AimFact $entity): void {
+    $this->memoryManager->factDeleted($entity, (int) $this->currentUser->id());
   }
 
   /**

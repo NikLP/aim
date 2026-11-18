@@ -617,8 +617,9 @@ questions" section)
       idle window). Activity-based locking would need a small cron or event
       piece revoking tokens unused for N minutes. Search drupal.org for an
       existing module before building; not done yet.
-- [ ] **Single-valued, filterable category, labelled on ingress** - see
-      [ADR-0059](adr/0059-single-valued-category-and-ingress-labelling.md).
+- [ ] **Filterable category, labelled on ingress** - see
+      [ADR-0059](adr/0059-single-valued-category-and-ingress-labelling.md)
+      decisions 2-5 (single-valued, decision 1, is built).
 - [ ] `simple_oauth`'s signing keys are a plain file pair
       (`simple-oauth:generate-keys`) per `aim_tool_oauth`'s setup runbook -
       no Key module support today. Tried 2026-09-27: `key` module and

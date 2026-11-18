@@ -251,6 +251,9 @@ class AimConsolidateTest extends AimKernelTestBase {
     $this->assertCount(1, $grounding);
     $this->assertSame(['text' => self::KEPT . "\n" . self::CORRECTION, 'candidate_1' => self::CORRECTION], $grounding[0][1]);
     $merged = $this->reload($kept)->get('superseded_by')->entity;
+    foreach ([$kept, $correction] as $input) {
+      $this->assertSame('UPDATE', json_decode((string) $this->reload($input)->get('superseded_by_reason')->value, TRUE)['decision'] ?? NULL, 'both merge inputs record the reason');
+    }
     $this->assertEqualsWithDelta(0.95, (float) $merged->get('grounding_score')->value, 0.001);
     $this->assertTrue((bool) $merged->get('trusted')->value);
 

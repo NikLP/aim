@@ -180,9 +180,10 @@ class AimRememberService {
    *   one and stamps it onto the created fact.
    * @param string|null $source
    *   Provenance tag for this fact.
-   * @param string[] $category
-   *   Category term names to resolve against the aim_category vocabulary.
-   *   A name with no matching term is skipped, not created.
+   * @param string|null $category
+   *   A category term name to resolve against the aim_category vocabulary
+   *   (one per fact, ADR-0059). A name with no matching term is skipped,
+   *   not created.
    * @param int|null $asserted
    *   When this fact became true in reality, as a Unix timestamp, if known
    *   and different from now. NULL means "same as created".
@@ -217,7 +218,7 @@ class AimRememberService {
    *   account, the text fails a guardrail check, or (time check mode reject,
    *   or $askForDate) the fact is time-bound with no expires.
    */
-  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, array $category = [], ?int $asserted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL, ?int $expires = NULL, bool $openEnded = FALSE, bool $askForDate = FALSE): AimFact {
+  public function remember(string $text, string $scope, ?string $subject = NULL, ?string $source = NULL, ?string $category = NULL, ?int $asserted = NULL, ?string $targetType = NULL, ?string $targetId = NULL, ?string $sourceText = NULL, ?int $expires = NULL, bool $openEnded = FALSE, bool $askForDate = FALSE): AimFact {
     $allowed = $this->manager->allowedScopes();
     if (!in_array($scope, $allowed, TRUE)) {
       throw new \InvalidArgumentException('Invalid scope "' . $scope . '", expected one of: ' . implode(', ', $allowed));
@@ -251,8 +252,9 @@ class AimRememberService {
       $values['subject'] = $subject ?? '';
     }
 
-    if (!empty($category)) {
-      $values['category'] = $this->resolveCategoryTerms($category);
+    $tid = $category === NULL ? NULL : $this->resolveCategoryTerm($category);
+    if ($tid !== NULL) {
+      $values['category'] = $tid;
     }
 
     if ($asserted !== NULL) {
@@ -309,33 +311,29 @@ class AimRememberService {
   }
 
   /**
-   * Resolves category names against the aim_category vocabulary.
+   * Resolves a category name against the aim_category vocabulary.
    *
    * Admin-curated, not model-invented (CLAUDE.md's "Ideas raised" section):
    * a name with no matching term is silently skipped rather than creating
    * one on the fly, same posture as resolveAccount() not fabricating an
    * account.
    *
-   * @param string[] $names
-   *   Category term names to resolve.
+   * @param string $name
+   *   The category term name.
    *
-   * @return int[]
-   *   The matching term IDs. Names with no match are omitted.
+   * @return int|null
+   *   The matching term ID, or NULL when the name is empty or matches none.
    */
-  protected function resolveCategoryTerms(array $names): array {
-    $storage = $this->entityTypeManager->getStorage('taxonomy_term');
-    $tids = [];
-    foreach ($names as $name) {
-      $name = trim($name);
-      if ($name === '') {
-        continue;
-      }
-      $terms = $storage->loadByProperties(['vid' => 'aim_category', 'name' => $name]);
-      if ($terms) {
-        $tids[] = (int) reset($terms)->id();
-      }
+  protected function resolveCategoryTerm(string $name): ?int {
+    $name = trim($name);
+    if ($name === '') {
+      return NULL;
     }
-    return $tids;
+    $terms = $this->entityTypeManager->getStorage('taxonomy_term')->loadByProperties([
+      'vid' => 'aim_category',
+      'name' => $name,
+    ]);
+    return $terms ? (int) reset($terms)->id() : NULL;
   }
 
   /**
@@ -534,7 +532,7 @@ class AimRememberService {
    *
    * @param array $entries
    *   Fact objects with the keys text, scope, subject, source,
-   *   category (string or array), asserted, target_type, target_id. Unknown
+   *   category (one term name), asserted, target_type, target_id. Unknown
    *   keys are ignored.
    * @param string|null $defaultSource
    *   The source for entries that name none.
@@ -597,13 +595,15 @@ class AimRememberService {
    *   [$category, $asserted], typed as remember() expects them.
    *
    * @throws \InvalidArgumentException
-   *   If asserted cannot be parsed.
+   *   If category is not one name, or asserted cannot be parsed.
    */
   public function parseFactFields(array $fields): array {
-    $category = [];
+    $category = NULL;
     if (!empty($fields['category'])) {
-      $category = is_array($fields['category']) ? $fields['category'] : explode(',', $fields['category']);
-      $category = array_map('trim', $category);
+      if (!is_string($fields['category'])) {
+        throw new \InvalidArgumentException('A fact takes one category, given as a term name.');
+      }
+      $category = trim($fields['category']);
     }
 
     $asserted = NULL;
@@ -657,6 +657,32 @@ class AimRememberService {
   public function isOpenEnded(array $fields): bool {
     $value = strtolower(trim((string) ($fields['expires'] ?? '')));
     return in_array($value, ['open-ended', 'open ended', 'open_ended'], TRUE);
+  }
+
+  /**
+   * Parses a day as its first second in the site timezone.
+   *
+   * For a start date such as asserted, where parseExpires() gives the last
+   * second for an end date.
+   *
+   * @param string $day
+   *   A calendar date such as 2026-10-16, or an empty string.
+   *
+   * @return int|null
+   *   A Unix timestamp, or NULL when empty.
+   *
+   * @throws \InvalidArgumentException
+   *   If the day cannot be parsed.
+   */
+  public function parseDayStart(string $day): ?int {
+    if (trim($day) === '') {
+      return NULL;
+    }
+    $date = date_create(trim($day), $this->siteTimeZone());
+    if ($date === FALSE) {
+      throw new \InvalidArgumentException('Invalid day "' . $day . '", expected a calendar date such as 2026-10-16.');
+    }
+    return $date->setTime(0, 0)->getTimestamp();
   }
 
   /**

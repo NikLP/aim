@@ -172,7 +172,8 @@ duplicated here.
   by `AimHooks::entityBaseFieldInfo()` on every site -
   [ADR-0028](adr/resolved/0028-scope-type-plugin.md) piece 1),
   `text` (Guardrails-validated), `source`,
-  `category` (taxonomy, vocabulary `aim_category`), `asserted` (valid-time
+  `category` (one taxonomy term, vocabulary `aim_category`, a column on
+  the base table - [ADR-0059](adr/0059-single-valued-category-and-ingress-labelling.md)), `asserted` (valid-time
   start), `retired`/`superseded_by`/`superseded_by_reason`, plus `expires` (a nullable end date; `aim:expire` retires the fact once it passes, ADR-0057) (consolidation's
   non-destructive supersede edge and its JSON provenance), `uid`
   (who wrote it), `grounding_score` (float, empty when unchecked: how

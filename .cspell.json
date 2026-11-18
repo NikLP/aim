@@ -15,7 +15,8 @@
         "**/ai_assistant_api.ai_assistant.aim_assistant.yml",
         "**/preflight/preflight.js",
         "eval/REVIEW-QUEUE.md",
-        "adr/resolved/0037-transient-source-passages-for-grounding.md"
+        "adr/resolved/0037-transient-source-passages-for-grounding.md",
+        "TODO.md"
       ],
       "ignoreWords": ["please", "sorry"]
     }

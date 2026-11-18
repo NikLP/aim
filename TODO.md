@@ -35,6 +35,55 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
       section. MCP stays on `aim_brief` (instructions are read once per
       connection).
 
+## Briefing: background for the agent and the person (raised 2026-11-18)
+
+Three needs, three places. The agent needs background about the service
+and about the person; the person needs background about the service. Most
+memory products orient the agent with a prompt telling it to load memory
+at the start (aim's `aim_brief`), and the better ones load a map rather
+than a sample (Claude Code's memory index, Anthropic's memory tool
+listing, Memlo's `get_prime_directive`). The other way is a curated block
+always in the prompt (Letta, LangMem, ChatGPT), which aim doesn't keep;
+persona and purpose belong to `ai_context` (CCC). Today `aim_brief` lists
+the newest 5 facts in every scope alike, which suits neither need: it
+reads as everything there is, and a person's old preferences drop out
+behind newer facts. Nothing below is built; order is the suggested build
+order.
+
+- [ ] **`aim_brief` in two parts, still one call.** Models don't choose a
+      second tool (Site Agent never chose `aim_literal`, ADR-0061's
+      addendum), so one reply carries both:
+      - *Memory map* (agent <- service): a count per scope ("site: 5 of
+        20"), so the model knows to recall before saying nothing is
+        recorded, and the IDs of cases with live facts (there is no
+        closed state: "open" means trusted, unretired, unexpired facts).
+        Site, case and entity scopes become map entries, perhaps with a
+        few newest site facts. Check first that a count can apply the
+        same visibility as the listed facts without loading every fact
+        (`AimRecallService::recent()`'s conditions), or it tells the
+        model how much it can't see.
+      - *About you* (agent <- person): the caller's own user-scope facts
+        and their roles' facts, selected as a profile (everything
+        relevant up to a cap), not by date.
+      Stays pull, not pushed into the prompt: per-person data on every
+      call, the reason roles stayed out of `aim_site_agent`'s live
+      values section.
+- [ ] **"What the site remembers about you" page** (person <- service).
+      On the person's own account: their trusted facts and the ones
+      waiting for review, with "this is wrong" and "please forget this"
+      actions that go to review (ADR-0065: the person asking is not the
+      trust grant). Transparency for user-scope data (the parked PII
+      gate, ADR-0056) and self-maintaining upkeep: the people facts are
+      about keep them current, rather than another review gate.
+- [ ] **The chat's opening state** (person <- service). Site Agent's
+      greeting above the message field, and the chat block's, could add
+      "2 of your facts are waiting for review" or "3 new site facts since
+      your last chat". From data aim holds; "since your last chat" needs
+      a last-seen time per person, which aim doesn't keep yet.
+
+"Catch me up" in the chat needs nothing of its own: the model reads out
+the two-part brief.
+
 ## Chat quality and evals: open after the 2026-10-15/16 session
 
 State: recall not forced (`require_usage` off since 2026-10-22, see

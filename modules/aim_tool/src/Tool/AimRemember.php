@@ -355,7 +355,7 @@ final class AimRemember {
         $scope,
         $subject,
         $source,
-        [],
+        NULL,
         NULL,
         $scopeFields['target_type'] ?? NULL,
         $scopeFields['target_id'] ?? NULL,

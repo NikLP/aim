@@ -134,6 +134,85 @@ class AimMemoryManager {
   }
 
   /**
+   * Returns the facts consolidation retired in favor of the given facts.
+   *
+   * @param int[] $ids
+   *   Fact IDs.
+   *
+   * @return \Drupal\aim\Entity\AimFact[]
+   *   Facts whose superseded_by is one of $ids, other than those facts
+   *   themselves, keyed by ID.
+   */
+  public function supersededBy(array $ids): array {
+    if (!$ids) {
+      return [];
+    }
+    $storage = $this->entityTypeManager->getStorage('aim_fact');
+    $query = $storage->getQuery()
+      ->accessCheck(FALSE)
+      ->condition('superseded_by', $ids, 'IN')
+      ->condition('id', $ids, 'NOT IN');
+    return $storage->loadMultiple($query->execute());
+  }
+
+  /**
+   * Handles a fact's deletion: audit line, and its predecessors let go.
+   *
+   * A retired fact pointing at the deleted one keeps its retirement (the
+   * deleted fact may have been removed for being wrong, and what it
+   * replaced may be wrong too), but its superseded_by is cleared, so a
+   * later form save does not fail on a missing reference, and its reason
+   * records the deleted ID.
+   *
+   * @param \Drupal\aim\Entity\AimFact $fact
+   *   The deleted fact.
+   * @param int $uid
+   *   The account that deleted it.
+   */
+  public function factDeleted(AimFact $fact, int $uid): void {
+    $released = [];
+    foreach ($this->supersededBy([(int) $fact->id()]) as $predecessor) {
+      $reason = json_decode((string) $predecessor->get('superseded_by_reason')->value, TRUE);
+      $reason = is_array($reason) ? $reason : [];
+      $reason['successor_deleted'] = (int) $fact->id();
+      $predecessor->set('superseded_by', NULL);
+      $predecessor->set('superseded_by_reason', json_encode($reason, JSON_THROW_ON_ERROR));
+      $predecessor->save();
+      $released[] = $predecessor->id();
+    }
+
+    $this->logAudit('Fact @id deleted (scope @scope, subject @subject, uid @uid); retired facts released from it: @released.', [
+      '@id' => $fact->id(),
+      '@scope' => $fact->bundle(),
+      '@subject' => $this->subjectOf($fact),
+      '@uid' => $uid,
+      '@released' => $released ? implode(', ', $released) : 'none',
+    ]);
+  }
+
+  /**
+   * Returns who or what a fact is about, as an ID for the log.
+   *
+   * @param \Drupal\aim\Entity\AimFact $fact
+   *   The fact.
+   *
+   * @return string
+   *   The user ID, subject, or target type and ID; empty for none.
+   */
+  protected function subjectOf(AimFact $fact): string {
+    if ($fact->hasField('user') && !$fact->get('user')->isEmpty()) {
+      return (string) $fact->get('user')->target_id;
+    }
+    if ($fact->hasField('subject') && !$fact->get('subject')->isEmpty()) {
+      return (string) $fact->get('subject')->value;
+    }
+    if ($fact->hasField('target_type') && !$fact->get('target_type')->isEmpty()) {
+      return $fact->get('target_type')->value . ':' . $fact->get('target_id')->value;
+    }
+    return '';
+  }
+
+  /**
    * Returns the enabled scopes, the ones a new fact may use.
    *
    * @return string[]

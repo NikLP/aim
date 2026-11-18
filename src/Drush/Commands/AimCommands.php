@@ -194,7 +194,7 @@ final class AimCommands extends DrushCommands {
   #[CLI\Option(name: 'scope', description: 'One of user, role, site, case.')]
   #[CLI\Option(name: 'subject', description: 'Who or what the fact is about. For scope=user, a uid of a real account.')]
   #[CLI\Option(name: 'source', description: 'Provenance tag for this fact.')]
-  #[CLI\Option(name: 'category', description: 'Comma-separated term name(s) from the aim_category vocabulary.')]
+  #[CLI\Option(name: 'category', description: 'A term name from the aim_category vocabulary (one per fact).')]
   #[CLI\Option(name: 'asserted', description: 'When this fact became true in reality, if different from now.')]
   #[CLI\Option(name: 'expires', description: 'The last day the fact is true, inclusive, in the site timezone (YYYY-MM-DD); it is retired after that day. "open-ended" states there is no end.')]
   #[CLI\Option(name: 'target-type', description: 'The referenced entity type ID, for scope=entity (e.g. node). Ignored for every other scope.')]
@@ -281,8 +281,7 @@ final class AimCommands extends DrushCommands {
    *   Path to a JSON file containing an array of fact objects. Each object
    *   uses the same field names as aim:remember's own options (text,
    *   scope, subject, source, category, asserted, target_type,
-   *   target_id); category may be a JSON array instead of a
-   *   comma-separated string.
+   *   target_id); category is one term name.
    * @param \Drupal\Core\Session\AccountInterface $writer
    *   The --uid account the facts are written as.
    *

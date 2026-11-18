@@ -35,8 +35,8 @@ drush aim:remember <text> --uid=<uid> [--scope] [--subject] [--source] [--catego
 - Validates scope, creates the fact directly, prints its ID. A single
   fact goes through `rememberBatch()` like `--file`, so both share the
   create check.
-- `--category` resolves comma-separated term names against the
-  `aim_category` vocabulary (admin-curated - a name with no matching term
+- `--category` resolves one term name (one category per fact,
+  ADR-0059) against the `aim_category` vocabulary (admin-curated - a name with no matching term
   is skipped, never auto-created).
 - `--asserted` sets when the fact became true in reality if different
   from today (any `strtotime()`-parseable string); empty means "same as
@@ -187,11 +187,24 @@ is auditable and reversible with the Un-retire action (which also clears
   pointing at it. The old wording survives on the retired rows. Metadata
   carried over: scope, subject/user, target and owner from the kept fact;
   `asserted` from the candidate only; `source` from the candidate
-  else the kept fact; `category` the union; `trusted` only if both inputs
+  else the kept fact, `category` the same way; `trusted` only if both inputs
   were (always, as only trusted facts are compared); `expires` (equal on both, see below); `grounding_score` from the
   merge's own grounded check (see "Merge verification"), empty when
   grounding is off. The merged fact is queued for consolidation like any
   new fact.
+
+**Deleting a fact** (`administer aim` only) is the one hard delete: the
+row and its revisions go, and the index drops its vector row. Both
+confirmation forms (`AimFactDeleteForm`, `AimFactDeleteMultipleForm`,
+through `AimFactDeleteNotice`) point to Retire and list the retired facts
+whose `superseded_by` is a fact being deleted: once it is gone, nothing in
+recall says what they said. After the delete, `AimHooks::factDelete()` ->
+`AimMemoryManager::factDeleted()` writes an audit line and, on those
+predecessors, clears `superseded_by` (a dangling reference fails
+validation on their next form save) and adds `successor_deleted: <id>` to
+`superseded_by_reason`. They stay retired: the deleted fact may have been
+wrong, and so may they. Un-retire them first if their content should
+stay.
 
 Facts with different `expires` (one dated, one not, or two different
 dates) are never compared, so a temporary fact cannot be merged into a
@@ -795,7 +808,11 @@ literature and what was parked).
   (`AimFactForm`'s `expires_day`, through `AimRememberService::
   parseExpires()`), not core's date-and-time widget, so a day means the
   same as on every other write path; a past day is refused unless it is
-  the one already saved.
+  the one already saved. `asserted` is the same kind of day ("True
+  since", `asserted_day`, the first second of the day through
+  `parseDayStart()`), refused after today or after Expires, and written
+  only when changed, so a time of day a tool set survives an untouched
+  save.
 - **Consolidation.** Facts with different `expires` are never compared,
   so a temporary fact is not merged into a lasting one; a merge carries
   `expires` and the candidate's `asserted` (see "`aim:consolidate`").
@@ -1310,7 +1327,7 @@ via the container, so only a hand-constructed instance is affected).
 
 - `/admin/content/aim-facts` (View `views.view.aim_facts`, gated
   `administer aim`) - table of every fact, "still live" for an
-  empty `retired`, `uid` ("Extracted by") and `subject`/`user`
+  empty `retired`, `uid` ("Authored by") and `subject`/`user`
   ("about") both shown, `trusted` shown with a Trusted filter - this is
   the review queue (ADR-0065), not a bespoke UI. Per-row
   View/Edit/Delete dropbutton; bulk Trust/Untrust, Retire/Un-retire and
@@ -1321,7 +1338,11 @@ via the container, so only a hand-constructed instance is affected).
   `administer aim`) - no "Create new revision" checkbox: a text change is
   always a new revision (see "Fact revisions"). The text field says when
   to correct the wording and when to add a new fact instead; the log
-  message field is saved only with a text change. The Revisions tab
+  message field is saved only with a text change. Laid out like the node
+  form: subject, text, source and category (a select from
+  `aim_category`) on the left; status (scope, author, created, last saved,
+  grounding score, trusted, asserted, expires) and the revision log in Gin's sidebar
+  (`AimHooks::ginContentFormRoutes()`; vertical tabs without Gin). The Revisions tab
   (`/admin/content/aim-facts/{aim_fact}/revisions`, core's
   `VersionHistoryController`) lists the edits, with view, revert and
   delete per old revision, all on `administer aim`.

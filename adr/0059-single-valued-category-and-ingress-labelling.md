@@ -2,7 +2,11 @@
 
 **Status:** Accepted 2026-10-30 for decision 1 (Nik: if `category` stays,
 it is single-valued for the foreseeable future); decisions 2-5 proposed.
-Nothing built. Takes over the category capture and filter parts of
+Decision 1 built 2026-11-18: cardinality 1, a select on the fact form,
+`remember()`/Drush/fact entries take one name and consolidation keeps the
+candidate's category, else the kept fact's. No update hook: no fact had a
+category, so the field storage was updated in place (PoC rule, CLAUDE.md);
+the rest is not built. Takes over the category capture and filter parts of
 [ADR-0032](0032-dated-category-listing-for-quick-notes.md).
 **Date:** 2026-10-14
 
