@@ -13,6 +13,7 @@ use Drupal\Core\Session\AnonymousUserSession;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\ai\Event\PostGenerateResponseEvent;
 use Drupal\ai\Event\PreGenerateResponseEvent;
+use Drupal\ai_agents\Event\AgentFinishedExecutionEvent;
 use Drupal\ai_agents\Event\AgentToolPreExecuteEvent;
 use Drupal\ai_assistant_api\AiAssistantApiRunner;
 use Drupal\ai_assistant_api\Data\UserMessage;
@@ -40,7 +41,9 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  * seconds per question, split by whether the provider is listed in
  * --inhouse (the models that could run inside the perimeter, e.g. Jev), so
  * hosted usage is separate from usage that would be free once local. Needs a
- * live provider; goes through Drupal's provider layer only.
+ * live provider; goes through Drupal's provider layer only. A model call that
+ * fails is an error row: ai_agents swallows it and the runner returns the
+ * question as the reply, so the commands read the agent's getLastError().
  */
 final class AimChatbotEvalCommands extends DrushCommands {
 
@@ -57,6 +60,16 @@ final class AimChatbotEvalCommands extends DrushCommands {
    * @var list<string>
    */
   protected array $inhouse = [];
+
+  /**
+   * The assistant's agent ID, whose failures count.
+   */
+  protected string $agentId = '';
+
+  /**
+   * The error the assistant's agent finished with, for the turn in flight.
+   */
+  protected ?string $agentError = NULL;
 
   /**
    * Constructs the commands.
@@ -144,6 +157,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
       throw new \InvalidArgumentException('No such assistant: ' . $options['assistant']);
     }
     $agentId = (string) $assistant->get('ai_agent');
+    $this->agentId = $agentId;
     $live = array_map('strval', array_keys($this->entityTypeManager->getStorage('literal')->loadMultiple()));
 
     // Keep questions whose expected keys exist now.
@@ -164,6 +178,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
     $this->dispatcher->addListener(PreGenerateResponseEvent::EVENT_NAME, $pre = $this->onPre(...));
     $this->dispatcher->addListener(PostGenerateResponseEvent::EVENT_NAME, $post = $this->onPost(...));
     $this->dispatcher->addListener(AgentToolPreExecuteEvent::EVENT_NAME, $tool = $this->onTool(...));
+    $this->dispatcher->addListener(AgentFinishedExecutionEvent::EVENT_NAME, $finished = $this->onAgentFinished(...));
 
     $this->inhouse = array_map('trim', explode(',', $options['inhouse']));
     $summary = [];
@@ -190,6 +205,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
           $start = microtime(TRUE);
           $reply = '';
           $error = FALSE;
+          $this->agentError = NULL;
           $this->accountSwitcher->switchTo($account);
           try {
             $reply = $mode === 'gate' ? $this->gate($item['q'], $account) : NULL;
@@ -201,6 +217,10 @@ final class AimChatbotEvalCommands extends DrushCommands {
           }
           finally {
             $this->accountSwitcher->switchBack();
+          }
+          if (!$error && $this->agentError !== NULL) {
+            $error = TRUE;
+            $reply = 'ERROR ' . $this->agentError;
           }
           $took = microtime(TRUE) - $start;
           $verdict = $error ? 'error' : $this->judge($item, $reply, $account);
@@ -261,6 +281,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
       $this->dispatcher->removeListener(PreGenerateResponseEvent::EVENT_NAME, $pre);
       $this->dispatcher->removeListener(PostGenerateResponseEvent::EVENT_NAME, $post);
       $this->dispatcher->removeListener(AgentToolPreExecuteEvent::EVENT_NAME, $tool);
+      $this->dispatcher->removeListener(AgentFinishedExecutionEvent::EVENT_NAME, $finished);
       unset($GLOBALS['config']['ai_agents.ai_agent.' . $agentId], $GLOBALS['config']['aim.settings']['recall_literals']);
       $this->configFactory->reset('ai_agents.ai_agent.' . $agentId);
       $this->configFactory->reset('aim.settings');
@@ -328,12 +349,14 @@ final class AimChatbotEvalCommands extends DrushCommands {
       throw new \InvalidArgumentException('No such assistant: ' . $options['assistant']);
     }
     $agentId = (string) $assistant->get('ai_agent');
+    $this->agentId = $agentId;
     $account = $this->visitor($data['as'] ?? 1);
     $repeat = max(1, (int) $options['repeat']);
 
     $this->dispatcher->addListener(PreGenerateResponseEvent::EVENT_NAME, $pre = $this->onPre(...));
     $this->dispatcher->addListener(PostGenerateResponseEvent::EVENT_NAME, $post = $this->onPost(...));
     $this->dispatcher->addListener(AgentToolPreExecuteEvent::EVENT_NAME, $tool = $this->onTool(...));
+    $this->dispatcher->addListener(AgentFinishedExecutionEvent::EVENT_NAME, $finished = $this->onAgentFinished(...));
     $summary = [];
     $dump = [];
     try {
@@ -364,6 +387,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
                 $this->run = ['calls' => 0, 'in' => 0, 'out' => 0, 'tools' => [], 'prov' => [], 'gate' => '-'];
                 $start = microtime(TRUE);
                 $error = FALSE;
+                $this->agentError = NULL;
                 try {
                   $this->runner->setUserMessage(new UserMessage($turn['q']));
                   $reply = trim($this->runner->process()->getNormalized()->getText());
@@ -372,6 +396,10 @@ final class AimChatbotEvalCommands extends DrushCommands {
                 catch (\Throwable $e) {
                   $error = TRUE;
                   $reply = 'ERROR ' . $e->getMessage();
+                }
+                if (!$error && $this->agentError !== NULL) {
+                  $error = TRUE;
+                  $reply = 'ERROR ' . $this->agentError;
                 }
                 $took = microtime(TRUE) - $start;
                 $looped = !$error && stripos($reply, 'processing steps') !== FALSE;
@@ -430,6 +458,7 @@ final class AimChatbotEvalCommands extends DrushCommands {
       $this->dispatcher->removeListener(PreGenerateResponseEvent::EVENT_NAME, $pre);
       $this->dispatcher->removeListener(PostGenerateResponseEvent::EVENT_NAME, $post);
       $this->dispatcher->removeListener(AgentToolPreExecuteEvent::EVENT_NAME, $tool);
+      $this->dispatcher->removeListener(AgentFinishedExecutionEvent::EVENT_NAME, $finished);
       unset($GLOBALS['config']['ai_agents.ai_agent.' . $agentId], $GLOBALS['config']['aim.settings']['recall_literals']);
       $this->configFactory->reset('ai_agents.ai_agent.' . $agentId);
       $this->configFactory->reset('aim.settings');
@@ -719,6 +748,26 @@ final class AimChatbotEvalCommands extends DrushCommands {
    */
   public function onTool(AgentToolPreExecuteEvent $event): void {
     $this->run['tools'][] = $event->getTool()->getPluginId();
+  }
+
+  /**
+   * Records a failed model call of the assistant's own agent.
+   *
+   * Only that agent, as AimGateProcessor does: a failed sub-agent can be
+   * recovered from, and then the assistant still answers.
+   *
+   * @param \Drupal\ai_agents\Event\AgentFinishedExecutionEvent $event
+   *   The event.
+   */
+  public function onAgentFinished(AgentFinishedExecutionEvent $event): void {
+    if ($event->getAgentId() !== $this->agentId) {
+      return;
+    }
+    $agent = $event->getAgent();
+    $message = method_exists($agent, 'getLastError') ? $agent->getLastError() : NULL;
+    if ($message !== NULL && $message !== '') {
+      $this->agentError = mb_substr((string) $message, 0, 300);
+    }
   }
 
 }

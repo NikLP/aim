@@ -15,7 +15,7 @@ Before: how aim uses literals was written up inside literals' own decision
 record, so a drupal.org reader of literals met aim's internals throughout.
 
 After: literals' record
-([ADR-0040](../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md))
+([ADR-0040](../../../contrib/literals/DESIGN.md))
 says only what any consumer can use (tokens, the `literals.lookup` service,
 the finder as a gate). This record holds aim's side: what aim built on
 those seams, what it could build next, and what it rejected.
@@ -50,7 +50,7 @@ but not on `literals_finder`, and stores nothing of a literal.
 ### 2. The gate, end to end (measured 2026-10-12)
 
 `drush aim:chatbot-eval`, 39 agent-written questions. `tool`: the chat
-model calls `aim_literal`; `prompt`: every readable value in the system
+model calls `aim_literal` (the mode's meaning then, see below); `prompt`: every readable value in the system
 prompt; `gate`: the finder first, the chat model only on `none` or
 `ambiguous`.
 
@@ -66,6 +66,14 @@ the pool and cannot serve two audiences (restricted values: `tool` and
 `gate` 5/5 for the signed-in user, `prompt` 1/5, none leaked to
 anonymous). "Correct" means the stored value appears in the reply, so
 chat-model rephrasing counts as wrong.
+
+The `tool` row is the path the addendum replaced. Since 2026-11-16 the
+eval's `tool` mode means `aim_recall` returning exact values
+(`recall_literals` on), not measured on these sets; `prompt` and `gate`
+switch `recall_literals` off for their run. The current end-to-end figure
+is the site's multi-turn chat scenarios (2026-11-17, recall carrying
+values): 23/24 turns, every literal turn right, one decision call more per
+recall, median 3.9 s per turn.
 
 ### 3. How aim could use literals further (unbuilt)
 
@@ -177,7 +185,5 @@ per recall, for every client. On the chat block, a turn the gate passes to
 the assistant asks the finder a second time when the assistant recalls;
 skipping that needs the invoker in `AimRecall`'s method body (tool#3583125
 or a plugin-class tool), not built until a measurement calls for it.
-Section 2's `tool` row is now stale: `aim:chatbot-eval`'s `tool` mode means
-recall carrying values, and `prompt` and `gate` switch `recall_literals`
-off for their run. Re-run it.
+Section 2 notes what its `tool` row measured and gives the current figure.
 

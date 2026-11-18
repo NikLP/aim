@@ -9,9 +9,10 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
 
 ## Tools (raised 2026-10-25)
 
-- [ ] **Upstream: Site Agent marks person-approved calls** (ADR-0067). File
-      the issue drafted in [ADR-0067](adr/0067-person-approved-calls-skip-grounding.md)
-      on `site_agent`; this site carries it as
+- [ ] **Upstream: Site Agent marks person-approved calls** (ADR-0067).
+      Filed as [site_agent#3638825](https://www.drupal.org/project/site_agent/issues/3638825)
+      (2026-11-17); a Tool API issue for the case's home only if the
+      maintainer favors it. This site carries it as
       `patches/site_agent-person-approved-invoker.patch` (site root), and
       aim's side is built against it (`AimRemember::PERSON_APPROVED`).
       Drop the patch once a release ships it; follow upstream's name.
@@ -91,15 +92,12 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
       carry `[literal:key]` tokens (resolved by `recall()` for the viewer)
       where a fact names a value, so the widget needs no lookup call - a
       data-model choice for the recipe, not tuning to pass the eval.
-- [ ] **`aim:chatbot-eval` hides provider failures (found 2026-10-22).** When
-      the provider cannot be reached `ai_agents` swallows the error
-      (`getLastError()`), so the eval reports 0 calls and the question
-      echoed back, not an error. The gate processor now catches this for
-      visitors (2026-11-08); the evals call the runner directly and still
-      need the same check (`AgentFinishedExecutionEvent`, agent's
-      `getLastError()`), as does `aim:chatbot-converse`. Upstream:
-      `ai_assistant_api` never surfaces it, so the plain processor shows
-      the visitor their own question; file an issue.
+- [ ] **Upstream: a failed model call comes back as the question.**
+      `ai_agents` swallows the error (`getLastError()`) and
+      `ai_assistant_api` never surfaces it, so the plain processor shows the
+      visitor their own question. aim works around it in the gate processor
+      and both eval commands (`AgentFinishedExecutionEvent`); search the
+      queue, then file.
 - [ ] **`aim:chatbot-eval` can't run anonymous questions.** With the demo
       assistant closed to anonymous, every gold question without `as:`
       errors "User does not have the required role to run the assistant"
@@ -143,10 +141,13 @@ addendum) are built. Work on the literals modules themselves is in
       (front-end only). Pull one out when a site needs it. Optional
       pre-gate ("is this a lookup?" ahead of the finder) only if measured
       to pay.
-- [ ] **After the finder went into recall (2026-11-16).** Re-run
-      `drush aim:chatbot-eval` (ADR-0061 section 2's `tool` row is stale:
-      `tool` mode now means recall carrying values). Measure the second
-      finder call when the gate passes a turn to the assistant; skip it
+- [ ] **After the finder went into recall (2026-11-16).** Chat scenarios
+      re-run 2026-11-17 (site's `demo/chat-eval/`): 23/24, all literal turns
+      right, one decision call more per recall, median 3.9 s (now
+      ADR-0061 section 2's current figure); re-run `aim:chatbot-eval` only
+      if a gold-set comparison is wanted again (its anonymous questions
+      need `as:` set, see above). Measure the second finder call when the
+      gate passes a turn to the assistant; skip it
       only if that calls for it (needs the invoker in `AimRecall`,
       tool#3583125). On habanero (after the code settles): set
       `recall_literals` (it predates the key, so it reads as off), update
@@ -159,13 +160,6 @@ addendum) are built. Work on the literals modules themselves is in
       stored history; a friendlier reply than the bare template (our own
       wording: a decision model cannot write text); latency on a local decision model unmeasured; a gate-hit line in the
       review queue (design in `modules/aim_chatbot/CLAUDE.md`).
-- [ ] **literals tests: `@group` doc-comments to `#[Group]` attributes**
-      (raised 2026-11-03). All 14 test classes in literals and its
-      submodules use `@group`, which PHPUnit 12 drops; only
-      `LiteralChooserTest` (unit) warns so far. Use
-      `PHPUnit\Framework\Attributes\Group`, as core does. Not urgent: it
-      only breaks with Drupal 12. Suites and phpstan were all green against
-      the 2026-10-28 `ai` security update.
 
 ## Plugin and skills (raised 2026-10-09, important)
 

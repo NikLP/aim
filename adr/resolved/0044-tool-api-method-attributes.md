@@ -6,7 +6,7 @@ are `#[ToolMethod]` services in `aim_tool/src/Tool/`, same IDs, schema and
 MCP names; `aim_literal` stays a wrapper over `literals.lookup`. Retired
 2026-10-12 as a watching brief before that. Was: Proposed 2026-10-04, nothing built and no
 change to `aim_tool`. Touches [ADR-0013](0013-mcp-tool-exposure.md)
-(Tool API/MCP exposure) and [ADR-0040](../../../../contrib/literals/adr/0040-literals-probabilistic-lookup-of-exact-values.md)
+(Tool API/MCP exposure) and [ADR-0040](../../../../contrib/literals/DESIGN.md)
 "The parts, settled" (the literal agent tools).
 **Date:** 2026-10-04
 

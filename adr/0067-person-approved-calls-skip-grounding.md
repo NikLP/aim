@@ -2,7 +2,9 @@
 
 **Status:** Accepted, built 2026-11-15 as a stopgap. The Site Agent change
 is a local Composer patch on this site; aim's side is built; the upstream
-issue is not filed.
+issue is filed as
+[site_agent#3638825](https://www.drupal.org/project/site_agent/issues/3638825)
+(2026-11-17), with the maintainer's go-ahead.
 **Date:** 2026-11-15
 
 ## In plain terms
@@ -109,59 +111,34 @@ Neither depends on the other: `AimRememberInvokerSubscriber` already delivers
 the invoker, and the approval rides on it. #3583125 landing would only let
 the subscribers go.
 
-## Upstream issue (Site Agent), ready to file
+## Upstream issue (Site Agent)
 
-**Title:** Tell a tool when a person approved its call
+Filed 2026-11-17 as
+[site_agent#3638825](https://www.drupal.org/project/site_agent/issues/3638825),
+"Tell a tool when a person approved its call", after the maintainer agreed
+to the change. Issue fork branch `3638825-tell-a-tool`, cut from `1.0.x` at
+`a3d3a84` (one commit past 1.0.4). The patch is the appendix's, rerolled for
+1.0.4 with unchanged hunks; `PersonApprovedInvokerTest` passes on 1.0.4 (all
+four cases).
 
-**Problem.** When a call runs after someone approves its card, or the thread
-owner runs it themselves, the tool can't tell that apart from a pre-approved
-call: both get the same `SiteAgentInvoker`. Tools that treat a person's
-approved input differently from a model's need to know.
+The earlier side note about the `write_note` fixture counting as destructive
+under newer Tool API is dropped: Site Agent fixed it upstream ("Test against
+Tool API beta12, which counts an undeclared write as destructive").
 
-**Our case.** aim's `aim_remember` runs a model check that a fact's text is
-supported by the words it came from, and holds a low scorer for review. On a
-Site Agent card the person has already approved the exact text (bound by the
-payload hash), so the check is redundant, and a model's harmless rewording
-sends approved facts back to review.
-
-**Proposal.** Add an invoker capability, `SiteAgentInvokerCapability::PersonApproved`,
-set when the call runs after approval (`CallHandler::runApproved()`) or as
-the owner's own call (`CallHandler::runAsOwner()`), not on a pre-approved
-call, including a "once" call after the first approval. Tool API's
-`Invoker` already accepts any module's enum cases, so this needs no Tool API
-change. `CallHandler::prepare()` and `ToolCallExecutor::prepare()` gain a
-trailing `bool $person_approved = FALSE`, passed to
-`SiteAgentInvoker::create()`. The payload hash is unchanged (it covers tool
-ID and arguments only). Dry runs and the tool list builder keep the plain
-invoker.
-
-**Alternative home.** If it fits better generically, the case could live in
-Tool API's `InvokerCapability` (one line), so any approval flow can set it
-and a tool can read it without depending on Site Agent. Happy to file that
-side too.
-
-**Tests.** A kernel test, `PersonApprovedInvokerTest`: pre-approved (absent),
-approved (present), "once" (present on the approved call, absent on the
-next), owner-run (present). The `site_agent_test:write_note` fixture records
-`$this->invoker?->has(...)` in state.
-
-**Side note for the maintainer.** With Tool API newer than beta11 (we run
-`1.0.x-dev`), a `Write` tool that doesn't declare `destructive` counts as
-destructive, so `site_agent_test:write_note` always prompts. Site Agent's
-own `ApprovalContractTest::testPreApprovedCallRuns` fails there, and so do
-the pre-approved and "once" cases above; with `destructive: FALSE` on the
-fixture all four pass. Against the pinned beta11 (`require-dev`) they should
-pass as they are. Declaring `destructive: FALSE` on the note fixtures would
-keep them working past beta11.
-
-The patch applies cleanly to 1.0.3 and to `1.0.x` at `4bff0c7` (checked
-2026-11-15).
+**Tool API as the case's home** was offered as a follow-up comment on the
+issue, not filed on Tool API: `InvokerCapability::PersonApproved` in Tool
+API, so any approval flow could set it and tools read it without depending
+on Site Agent. Its catch is that `InvokerCapability` is documented as
+behaviors Tool API applies at its boundary, and this case is information for
+the tool. A Tool API issue follows only if the Site Agent maintainer favors
+it; step 3's string reference then changes to the Tool API case.
 
 ## Local patch on this site
 
 `patches/site_agent-person-approved-invoker.patch` in the site root (not
 this repo), listed under `extra.patches` for `drupal/site_agent` in the
-site's `composer.json`, `patches.lock.json` relocked. Applied to 1.0.3.
+site's `composer.json`, `patches.lock.json` relocked. Applies to 1.0.4 as
+is.
 phpcs (Drupal, DrupalPractice) is clean on the changed files. Remove it
 when a Site Agent release ships the change; if upstream picks a different
 name or home for the case, follow theirs in step 3.

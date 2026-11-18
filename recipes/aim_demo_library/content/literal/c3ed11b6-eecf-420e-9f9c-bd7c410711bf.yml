@@ -16,7 +16,7 @@ default:
       value: 'Site name'
   restricted:
     -
-      value: true
+      value: false
   value:
     -
       value: '[site:name]'

@@ -19,7 +19,7 @@ default:
       value: false
   value:
     -
-      value: '+1 555 0102'
+      value: '+44 1223 000222'
   gist:
     -
       value: 'The phone number for booking a meeting room or a study space, ALSO room reservations'
