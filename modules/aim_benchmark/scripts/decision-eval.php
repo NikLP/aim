@@ -17,8 +17,16 @@
  *
  * Provider and model come from aim.settings activities (grounding, verifier,
  * consolidation).
+ *
+ * AIM_EVAL_BACKEND=chat (set it inside the container: ddev exec
+ * "AIM_EVAL_BACKEND=chat drush php:script ...") runs a chat-only site
+ * instead, on the site's default chat model or AIM_EVAL_CHAT=provider/model:
+ * pairs and merges through the live chat classifier and verifier (their own
+ * prompts; the verifier answers yes or no, so no AUC), grounding and time
+ * through ChatBackend, which has no live caller yet.
  */
 
+use Drupal\aim\Entity\AimFact;
 use Drupal\ai\OperationType\Decision\DecisionInput;
 use Drupal\ai\OperationType\Decision\Value\ChoiceQuestion;
 use Drupal\ai\OperationType\Decision\Value\NoulQuestion;
@@ -53,8 +61,32 @@ $pair_options = [
   'NOOP' => 'The candidate restates the existing fact with no new information.',
 ];
 
+$chat = getenv('AIM_EVAL_BACKEND') === 'chat';
+if ($chat) {
+  $default = \Drupal::service('aim.settings_reader')->getDefaultChatProvider() ?? [];
+  $chat_provider = $default['provider_id'] ?? '';
+  $chat_model = $default['model_id'] ?? '';
+  if (getenv('AIM_EVAL_CHAT')) {
+    [$chat_provider, $chat_model] = explode('/', getenv('AIM_EVAL_CHAT'), 2);
+  }
+  // In memory only: the live classifier and verifier read their backend
+  // from config.
+  foreach (['consolidation', 'verifier', 'grounding'] as $activity) {
+    $GLOBALS['config']['aim.settings']['activities'][$activity]['backend'] = 'chat';
+    $GLOBALS['config']['aim.settings']['activities'][$activity]['provider'] = $chat_provider;
+    $GLOBALS['config']['aim.settings']['activities'][$activity]['model'] = $chat_model;
+  }
+  \Drupal::configFactory()->reset('aim.settings');
+  printf("chat-only: %s/%s\n", $chat_provider, $chat_model);
+}
 $activities = \Drupal::config('aim.settings')->get('activities');
-$backend = \Drupal::service('aim.backend.decision');
+$backend = \Drupal::service($chat ? 'aim.backend.chat' : 'aim.backend.decision');
+// The live chat-path methods, for pairs and merges in chat mode.
+$live = function (string $method, ...$args) {
+  $service = \Drupal::service('aim.consolidation');
+  return (new \ReflectionMethod($service, $method))->invoke($service, ...$args);
+};
+$fact = fn (string $text): AimFact => AimFact::create(['scope' => 'site', 'text' => $text]);
 $ask = function (string $activity, DecisionInput $input) use ($activities, $backend) {
   $start = microtime(TRUE);
   $response = $backend->run($activity, $input, $activities[$activity]['provider'], $activities[$activity]['model']);
@@ -183,12 +215,19 @@ elseif ($task === 'merges') {
   $cutoff = (float) ($extra[2] ?? $activities['verifier']['threshold'] ?? 0.5);
   $pos = $neg = [];
   foreach ($sets['merges'] as $m) {
-    [$response, $t] = $ask('verifier', new DecisionInput(
-      ['fact_a' => $m['kept'], 'fact_b' => $m['candidate'], 'merged' => $m['merged']],
-      ['faithful' => new NoulQuestion($merge_q)],
-    ));
-    $times[] = $t;
-    $s = $response->getNoul('faithful')->getProbability();
+    if ($chat) {
+      $start = microtime(TRUE);
+      $s = $live('modelConfirmsMerge', $fact($m['kept']), $fact($m['candidate']), $m['merged'], $chat_provider, $chat_model) ? 1.0 : 0.0;
+      $times[] = microtime(TRUE) - $start;
+    }
+    else {
+      [$response, $t] = $ask('verifier', new DecisionInput(
+        ['fact_a' => $m['kept'], 'fact_b' => $m['candidate'], 'merged' => $m['merged']],
+        ['faithful' => new NoulQuestion($merge_q)],
+      ));
+      $times[] = $t;
+      $s = $response->getNoul('faithful')->getProbability();
+    }
     $m['label'] === 'good' ? $pos[] = $s : $neg[] = $s;
     if (($m['label'] === 'good') !== ($s >= $cutoff) || str_starts_with($m['note'], 'supersede') || str_contains($m['note'], 'supersede')) {
       printf("  %s %.2f %-4s %s\n", ($m['label'] === 'good') !== ($s >= $cutoff) ? 'MISS' : 'ok  ', $s, $m['label'], $m['note']);
@@ -204,12 +243,19 @@ elseif ($task === 'pairs') {
   $conf = [];
   $hits = $unsafe = 0;
   foreach ($sets['pairs'] as $p) {
-    [$response, $t] = $ask('consolidation', new DecisionInput(
-      ['existing' => $p['existing'], 'candidate' => $p['candidate']],
-      ['decision' => new ChoiceQuestion($pair_q, $pair_options)],
-    ));
-    $times[] = $t;
-    $got = $response->getChoice('decision')->getChoice();
+    if ($chat) {
+      $start = microtime(TRUE);
+      [$got] = $live('classifyPair', $fact($p['existing']), $fact($p['candidate']), $chat_provider, $chat_model);
+      $times[] = microtime(TRUE) - $start;
+    }
+    else {
+      [$response, $t] = $ask('consolidation', new DecisionInput(
+        ['existing' => $p['existing'], 'candidate' => $p['candidate']],
+        ['decision' => new ChoiceQuestion($pair_q, $pair_options)],
+      ));
+      $times[] = $t;
+      $got = $response->getChoice('decision')->getChoice();
+    }
     $conf[$p['label']][$got] = ($conf[$p['label']][$got] ?? 0) + 1;
     $hits += $got === $p['label'];
     if ($got === 'UPDATE' && in_array($p['label'], ['ADD', 'NOOP'], TRUE)) {

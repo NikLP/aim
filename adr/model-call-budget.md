@@ -154,19 +154,32 @@ optional extra. A local decision model costs 10-14 s per call on the dev
 laptop plus heavy memory use ([ADR-0021](0021-jev-typed-decision-provider.md));
 the chat backend stays selectable per activity as the fallback.
 
-**Accuracy.** Setup B may be more accurate than setup A, not just
-cheaper, but this is not measured. The evidence so far: on the same 94
-neighbor pairs the frontier chat backend returned 3 UPDATEs and Jev
+**Accuracy.** Not shown to differ. Until 2026-11-18 the only chat-versus-
+decision evidence was one dry-run consolidation sweep (2026-10-02): on the
+same 94 neighbor pairs the frontier chat backend returned 3 UPDATEs and Jev
 returned all ADD, and on reading all three, Jev's ADD was the safer call
 (the chat model would have merged the Hyperslop codename into the target
-audience, for example). Jev scored 23/24 on the hand-written pairs and
-25/25 on real pairs, and its merge verifier separated faulty merges at
-AUC 1.00. The frontier chat backend has never been scored on those same
-sets, so "more accurate" is a hypothesis. A fair test is a replay of
-`decision-eval-sets.json` through `ChatBackend` (the TODO's PHP replay
-command), then a comparison on the same labels. A frontier model is the
-better writer of a merge; a typed decision model is plausibly the better
-judge of whether to merge.
+audience, for example). Every scored comparison was between decision
+models (ADR-0021's table). On 2026-11-18 the same sets were run both ways
+(`decision-eval.php` with `AIM_EVAL_BACKEND=chat`: pairs and merges
+through the live chat classifier and verifier prompts, grounding and time
+through `ChatBackend`, on amazeeio `chat`; decision is `subq-snap-1.2`):
+
+| Set | Chat | Decision |
+| --- | --- | --- |
+| Pairs, hand-written (18) / real (25) | 18/18, 25/25, 0 unsafe | 18/18, 25/25, 0 unsafe |
+| Merges (19) / hard merges (20), at 0.9 | no bad passed, no good held | no bad passed, 1 good held in each |
+| Grounding, live wording (52), at 0.7 | AUC 0.99, 0 false trust, 4 false holds | AUC 0.99, 1 false trust, 1 false hold |
+| Time, live wording (23), at 0.3 | AUC 1.00, no errors | AUC 1.00, no errors |
+| Median per call | 1.0-1.6 s | about 0.3 s |
+
+Both paths nearly saturate these sets, so they cannot rank the two; harder
+sets can (TODO.md, "Grow the hard merge set"). What a decision model is
+shown to bring is speed, cost and a calibrated probability to set a
+threshold on (the chat verifier answers yes or no; a chat model's stated
+probability is its own). The chat result is for a frontier model; a small
+local chat model is untested. A frontier model is the better writer of a
+merge; which is the better judge of whether to merge is open.
 
 ## Conclusion
 

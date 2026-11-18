@@ -251,7 +251,19 @@ only work to do is listed here.
       by default; trust then comes from the writer's permission alone) and needs a
       provider with the `decision` operation (no chat path, ADR-0037).
       Consolidation and the verifier keep their chat option: it is the
-      baseline any chat provider can run; a decision model is the upgrade.
+      baseline any chat provider can run. A decision model is faster and
+      gives a calibrated probability; on the 2026-11-18 sets it was not
+      more accurate than a frontier chat model (adr/model-call-budget.md,
+      "Accuracy").
+- [ ] **Grounded and time checks on the chat backend (raised
+      2026-11-18).** Both run on a decision model only, so a chat-only site
+      has neither. Through `ChatBackend` on amazeeio `chat` they scored
+      about as well as the decision model (adr/model-call-budget.md,
+      "Accuracy"), chat leaning to false holds. Wire
+      `AimGroundingChecker` to the backend `activities.grounding.backend`
+      names, offer chat on the form, and calibrate the threshold per chat
+      model (its probability is self-reported). Measure a small local chat
+      model before calling it a sovereign option.
 - [ ] **Grounded check follow-ups.** Per-model question text;
       `ingest_max_chars` and a passage limit for the decision call (untested
       above ~1,000 words); MCP `source_text` is only as verbatim as the
@@ -262,8 +274,8 @@ only work to do is listed here.
       merges; `decision-eval.php` gaining the `gate`, `drift` and
       `merges-split` tasks, a confusion matrix by confidence bucket and a
       cost-weighted threshold sweep (a wrong UPDATE loses data, a missed
-      merge is cheap); a PHP replay command in `aim_benchmark` through
-      `ChatBackend` and `DecisionBackend`, grouped by `setRunId()`.
+      merge is cheap); runs grouped by `setRunId()`. `decision-eval.php`
+      runs either backend since 2026-11-18 (`AIM_EVAL_BACKEND=chat`).
 - [ ] **Grow the hard merge set (raised 2026-11-01).** The verifier's two
       misses on `decision-eval-merges-hard.json` were a dropped limit ("up
       to 4 hours" to "4 hours", 0.84) and an invented link ("because",
