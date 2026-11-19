@@ -347,7 +347,28 @@ class AimRecallService {
       'trusted' => (bool) $fact->get('trusted')->value,
       'created' => (int) $fact->get('created')->value,
       'asserted' => $fact->get('asserted')->isEmpty() ? NULL : (int) $fact->get('asserted')->value,
+      'expires' => $expires !== NULL ? (int) $expires : NULL,
+      'expires_day' => $expires !== NULL ? $this->formatDay((int) $expires) : NULL,
+      'uid' => (int) $fact->get('uid')->target_id,
     ];
+  }
+
+  /**
+   * Formats a timestamp as its day in the site timezone.
+   *
+   * An expires timestamp is the last second of its day there, so the UTC
+   * day can be the next one (AimRememberService::formatDay() does the
+   * same).
+   *
+   * @param int $timestamp
+   *   The timestamp.
+   *
+   * @return string
+   *   The day, YYYY-MM-DD.
+   */
+  protected function formatDay(int $timestamp): string {
+    $zone = new \DateTimeZone($this->configFactory->get('system.date')->get('timezone.default') ?: 'UTC');
+    return (new \DateTimeImmutable('@' . $timestamp))->setTimezone($zone)->format('Y-m-d');
   }
 
 }

@@ -25,6 +25,26 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
       (the invoker for *access* callbacks, which CCC needs) at the
       maintainer's request. When it lands: add `?Invoker $invoker = NULL`
       to `aim_remember` and delete the subscriber.
+- [ ] **Upstream: Site Agent's written-items card lists log rows and says
+      "Published"** (raised 2026-11-18, not filed yet). Its
+      `EntityWriteCollector` ignores only Site Agent's own records, so a
+      call that runs a model on a site with `ai_logging` lists the
+      `ai_log` rows as written content; an entity with no published state
+      is labelled "Published". Ask for a way to extend the ignore list
+      (an alter hook) and "Saved" for an entity with no published state.
+      `aim_site_agent` trims its own card meanwhile
+      (`preprocessSiteAgentItemsResultCard()`); keep that for the
+      trusted/waiting labels once upstream changes.
+- [ ] **A correction path: `replaces` on `aim_remember`** (raised
+      2026-11-18, ADR first). A corrected detail ("closed until January,
+      not December") leaves the old fact live: consolidation never
+      compares facts with different `expires` (temporary overwriting),
+      and no tool can retire one, so Site Agent asked the person to fix
+      it. An optional per-entry `replaces` (a fact ID, now in recall and
+      brief results) would retire that fact as superseded by the new one
+      on save, if the writer may trust facts in its scope (otherwise it
+      waits with the new fact for review). Open: whether an untrusted
+      correction holds the old fact back or leaves it live until review.
 - [ ] **Today's date in `aim_chatbot`'s system prompt** (raised
       2026-11-18). Writes depend on the date (`expires`, the time check),
       and today it reaches the chat model only if it calls `aim_brief`. Add a

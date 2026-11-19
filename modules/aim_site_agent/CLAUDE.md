@@ -28,7 +28,11 @@ to `aim_site_agent`.
   subject (or the account a user fact is about), scope fields and expiry
   (flagged when already past or not a date, read by `aim.remember` as the
   save will read it), with `source_text` in place of the tool description written for the
-  model. See [DEVELOPING.md](DEVELOPING.md).
+  model. The same class's `hook_preprocess_site_agent_items_result_card()`
+  trims an `aim_remember` result card to its facts (Site Agent also lists
+  the `ai_log` rows written during the call) and labels each trusted or
+  waiting for review instead of "Published". See
+  [DEVELOPING.md](DEVELOPING.md).
 - `src/Prompt/MemorySection.php` (tagged `site_agent.prompt_section` in
   `aim_site_agent.services.yml`) - a `## Memory: live values` section in
   Site Agent's system prompt, only when a toolset holds an `aim_tool`

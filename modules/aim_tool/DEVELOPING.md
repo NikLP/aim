@@ -55,12 +55,24 @@ turned the cutoff off; `drush aim:recall --max-distance` stays for
 tuning). `limit` is capped at `AimRecall::MAX_LIMIT` (25) by a `Range`
 constraint, which the MCP schema advertises as `minimum`/`maximum` and the
 server enforces before the method runs. An empty result reads "No
-relevant facts found."
+relevant facts found." The one search takes in waiting facts too (twice
+the limit) and `AimRecall::splitWaiting()` splits them out: only trusted
+facts are results, and the message counts the matching waiting facts that
+rank before the last result kept, only those the caller wrote (not
+anonymous, a shared account) or may review in their scope
+(`AimFactAccessControlHandler::canApprove()`), saying when the closest
+match is one. A model that said "noted for review" then doesn't say
+nothing is recorded. A count, never the text. Not only on an empty
+result: the cutoff nearly always lets loosely related trusted facts
+through, so an empty-only count was hardly ever given.
 
 **Recall results are structured** (decided 2026-10-25 over a prefix per
-line): `results` is a list of `{text, scope, subject, date, date_kind}`
-(subject empty for site; `date` is `asserted` with `date_kind: true_since`,
-else `created` with `date_kind: recorded`), declared with
+line): `results` is a list of `{text, scope, subject, date, date_kind,
+expires, id}` (subject empty for site; `date` is `asserted` with
+`date_kind: true_since`, else `created` with `date_kind: recorded`;
+`expires` the last day it is true in the site timezone, empty when it has
+none, so a temporary fact reads as one even when its text doesn't say so;
+`id` for naming a fact, not for the person), declared with
 `#[ToolOutput(definition: ListOutputDefinition)]`, which the MCP bridge
 publishes as `outputSchema` and returns as `structuredContent`. Scope and
 subject are there for the caller to act on, such as adding to a case by its
@@ -102,7 +114,9 @@ falls back to the tool definition only when it is empty). The MCP server
 instructions come from `aim_tool_oauth`, reading the same guide.
 
 `aim_remember`'s reply adds "Waiting for staff review: recall will not
-return it until a reviewer trusts it." for an untrusted fact and "It retires
+return it until a reviewer trusts it." for an untrusted fact, "Trusted:
+recall returns it now." for a trusted one (said either way, so a model
+told to expect review doesn't report a trusted save as held), and "It retires
 after YYYY-MM-DD." when `expires` is set, per fact in a batch too (chat gets
 the same reply, through the same tool).
 

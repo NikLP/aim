@@ -818,7 +818,9 @@ literature and what was parked).
   `expires` and the candidate's `asserted` (see "`aim:consolidate`").
 - **Recall.** `aim_recall` returns each fact's `date` and `date_kind`:
   `true_since` (from `asserted`) or `recorded` (from `created`), so the
-  reading model can word an old fact as "as of" rather than as current.
+  reading model can word an old fact as "as of" rather than as current,
+  and its `expires` (the last day, site timezone), so a temporary fact
+  reads as temporary.
   No `since`/`until` filters yet
   ([ADR-0046](adr/0046-core-cutoff-time-axis-and-shared-gist-finder.md)
   piece 2, parked); a non-vector listing by date is

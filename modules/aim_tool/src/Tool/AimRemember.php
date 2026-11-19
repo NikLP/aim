@@ -183,7 +183,7 @@ final class AimRemember {
     definition: new OutputDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Results'),
-      description: new TranslatableMarkup('Per-fact outcome, one line each: the new fact ID, the case ID for scope=case (pass it as subject to add to the same case), and whether the fact waits for review or has an end date.'),
+      description: new TranslatableMarkup('Per-fact outcome, one line each: the new fact ID, the case ID for scope=case (pass it as subject to add to the same case), whether the fact is trusted or waits for review, and its end date if any.'),
       required: FALSE,
     ),
   )]
@@ -289,22 +289,23 @@ final class AimRemember {
   }
 
   /**
-   * What happens to a saved fact next, when that is not "recall finds it".
+   * What happens to a saved fact next: trusted, or waiting for review.
    *
    * An untrusted fact waits for review and recall skips it until then, so a
-   * caller told only "Created" would report it as known.
+   * caller told only "Created" would report it as known; a trusted one says
+   * so too, or a caller told to expect review reports every save as held.
    *
    * @param array $fact
    *   A successful rememberOne() result.
    *
    * @return string
-   *   Sentences starting with a space, or an empty string.
+   *   Sentences, each starting with a space.
    */
   private function statusNote(array $fact): string {
     $note = '';
-    if (!$fact['trusted']) {
-      $note .= ' Waiting for staff review: recall will not return it until a reviewer trusts it.';
-    }
+    $note .= $fact['trusted']
+      ? ' Trusted: recall returns it now.'
+      : ' Waiting for staff review: recall will not return it until a reviewer trusts it.';
     if ($fact['expires']) {
       $note .= ' It retires after ' . $this->rememberService->formatDay($fact['expires']) . '.';
     }

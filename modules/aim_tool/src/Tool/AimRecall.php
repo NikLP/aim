@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\aim_tool\Tool;
 
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\aim\AimFactAccessControlHandler;
 use Drupal\aim\Service\AimMemoryManager;
 use Drupal\aim\Service\AimRecallService;
 use Drupal\aim\Service\AimSettings;
@@ -55,8 +57,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * builds the inputs from recall()'s parameters and @param text, and
  * AimToolHooks::toolInfoAlter() replaces scope's with the installed scopes.
  *
- * Results are structured, one {text, scope, subject, date, date_kind}
- * object per fact, which the MCP bridge publishes as
+ * Results are structured, one {text, scope, subject, date, date_kind,
+ * expires, id} object per fact, which the MCP bridge publishes as
  * outputSchema/structuredContent: the scope and subject are there for the
  * caller to act on (add to a case by its ID, aim a role fact), and typed
  * fields can't be misread the way a formatted line can. date_kind says
@@ -70,6 +72,15 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * a second tool, which it does poorly (ADR-0061 section 2). The finder's
  * own thresholds apply. A lookup that cannot run leaves the facts alone and
  * changes the message, so "nothing found" never stands for "not checked".
+ *
+ * One search takes in facts waiting for review too, and splits them out
+ * (splitWaiting()): only trusted facts are results, and the message counts
+ * the matching waiting facts the caller wrote or may review, saying when
+ * the closest match is one, so a model that just said "noted for review"
+ * doesn't then say nothing is recorded. Loosely related trusted facts
+ * nearly always come back too, so a count only for an empty result would
+ * rarely be given. A count, never the text: an unreviewed fact may be
+ * wrong, and another person's waiting facts are not counted at all.
  */
 final class AimRecall {
 
@@ -95,6 +106,8 @@ final class AimRecall {
    *   The module handler, to tell whether the finder is enabled.
    * @param \Psr\Log\LoggerInterface $logger
    *   The aim logger channel.
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   The entity type manager, for the fact access handler's trust check.
    */
   public function __construct(
     private readonly AimRecallService $recallService,
@@ -106,6 +119,7 @@ final class AimRecall {
     private readonly ModuleHandlerInterface $moduleHandler,
     #[Autowire(service: 'logger.channel.aim')]
     private readonly LoggerInterface $logger,
+    private readonly EntityTypeManagerInterface $entityTypeManager,
   ) {}
 
   /**
@@ -151,6 +165,8 @@ final class AimRecall {
           'subject' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Subject'), description: new TranslatableMarkup('Who or what it is about, as the scope says: the role machine name, the user uid, the case ID (pass it as subject to aim_remember to add to the same case). Empty for site.'), required: FALSE),
           'date' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Date'), description: new TranslatableMarkup('YYYY-MM-DD, the date date_kind names.')),
           'date_kind' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Date kind'), description: new TranslatableMarkup('true_since: the fact has been true since date. recorded: when it became true is not known; date is when it was recorded.')),
+          'expires' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Expires'), description: new TranslatableMarkup('YYYY-MM-DD, the last day the fact is true. Empty when it has no end date.'), required: FALSE),
+          'id' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('ID'), description: new TranslatableMarkup("The fact's ID, for naming this fact. Not for the person.")),
         ],
       ),
     ),
@@ -190,16 +206,17 @@ final class AimRecall {
     }
 
     try {
-      $rows = $this->recallService->recall(
+      // Twice the limit, so waiting facts don't crowd out trusted ones.
+      [$rows, $waiting, $closest] = $this->splitWaiting($this->recallService->recall(
         $text,
         $scope,
         $subject,
         $user,
-        $limit,
+        $limit * 2,
         $this->settings->getRecallMaxDistance(),
-        FALSE,
+        TRUE,
         $this->settings->getRecallGap(),
-      );
+      ), $limit);
     }
     catch (\InvalidArgumentException | \RuntimeException $e) {
       return ExecutableResult::failure(
@@ -231,6 +248,13 @@ final class AimRecall {
     }
     else {
       $message = new TranslatableMarkup('No relevant facts found.');
+    }
+    if ($waiting > 0) {
+      $message = new TranslatableMarkup('@message @count matching fact(s) are waiting for staff review, so they cannot be used yet@closest. If the results do not answer the question, say it is noted and waiting for review, not that nothing is recorded.', [
+        '@message' => $message,
+        '@count' => $waiting,
+        '@closest' => $closest ? '; the closest match is one of them' : '',
+      ]);
     }
     // A lookup that could not run is never a "none": the caller must not say
     // an exact value is not recorded.
@@ -314,13 +338,54 @@ final class AimRecall {
   }
 
   /**
+   * Splits a search that took in waiting facts into results and a count.
+   *
+   * Trusted rows are the results, up to the limit. A waiting row is counted
+   * when the caller wrote it (not anonymous, whose account every visitor
+   * shares) or may review it in its scope, and it ranks before the last
+   * result kept; others are dropped unmentioned.
+   *
+   * @param array $rows
+   *   Rows from AimRecallService::recall(), untrusted included, nearest
+   *   first.
+   * @param int $limit
+   *   The most trusted rows to keep.
+   *
+   * @return array
+   *   The trusted rows, the waiting count, and whether the nearest row is a
+   *   counted waiting one.
+   */
+  private function splitWaiting(array $rows, int $limit): array {
+    $handler = $this->entityTypeManager->getAccessControlHandler('aim_fact');
+    $uid = (int) $this->currentUser->id();
+    $trusted = [];
+    $waiting = 0;
+    $closest = FALSE;
+    foreach ($rows as $delta => $row) {
+      if (count($trusted) >= $limit) {
+        break;
+      }
+      if ($row['trusted']) {
+        $trusted[] = $row;
+        continue;
+      }
+      $own = $uid !== 0 && (int) $row['uid'] === $uid;
+      if ($own || ($handler instanceof AimFactAccessControlHandler && $handler->canApprove($this->currentUser, $row['scope']))) {
+        $waiting++;
+        $closest = $closest || $delta === 0;
+      }
+    }
+    return [$trusted, $waiting, $closest];
+  }
+
+  /**
    * Turns a recall row into one structured result, as aim_brief's too.
    *
    * @param array $row
    *   A row from AimRecallService::recall() or recent().
    *
    * @return array
-   *   The text, scope, subject, date and date_kind of the fact.
+   *   The text, scope, subject, date, date_kind, expires and id of the fact.
    */
   public static function toResult(array $row): array {
     return [
@@ -329,6 +394,8 @@ final class AimRecall {
       'subject' => $row['subject'] !== NULL ? (string) $row['subject'] : '',
       'date' => gmdate('Y-m-d', (int) (!empty($row['asserted']) ? $row['asserted'] : $row['created'])),
       'date_kind' => !empty($row['asserted']) ? 'true_since' : 'recorded',
+      'expires' => (string) ($row['expires_day'] ?? ''),
+      'id' => (string) $row['id'],
     ];
   }
 

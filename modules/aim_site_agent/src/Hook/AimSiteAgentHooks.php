@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Drupal\aim_site_agent\Hook;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\aim\Entity\AimScope;
@@ -23,7 +25,8 @@ use Drupal\user\UserInterface;
  * end date already past flagged so the person rejects a save that would
  * fail (the model has no clock and can guess a year wrong). It
  * changes only how the card looks: the decision still covers the whole call
- * and the stored payload runs as is.
+ * and the stored payload runs as is. Its result card lists only the facts
+ * saved, as trusted or waiting for review.
  */
 class AimSiteAgentHooks {
 
@@ -41,10 +44,13 @@ class AimSiteAgentHooks {
    *   The entity type manager, for the call record, scopes and accounts.
    * @param \Drupal\aim\Service\AimRememberService $rememberService
    *   The remember service, to read an end date as aim_remember will.
+   * @param \Drupal\Core\Session\AccountInterface $currentUser
+   *   The account viewing a card, for the facts' View links.
    */
   public function __construct(
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly AimRememberService $rememberService,
+    private readonly AccountInterface $currentUser,
   ) {}
 
   /**
@@ -115,6 +121,55 @@ class AimSiteAgentHooks {
     if (is_string($source) && $source !== '') {
       $variables['description'] = $this->t('From: "@source"', ['@source' => $source]);
     }
+  }
+
+  /**
+   * Implements hook_preprocess_HOOK() for site_agent_items_result_card.
+   *
+   * Site Agent lists every content entity saved while a call runs, which
+   * for aim_remember includes the ai_log rows ai_logging writes for the
+   * grounding and time checks, and it calls an entity with no published
+   * state "Published". An aim_remember card lists only its facts, each as
+   * trusted or waiting for review, with nothing to publish. A fact's View
+   * link (its page is its edit form) stays only for an aim administrator.
+   *
+   * @param array $variables
+   *   The card's template variables.
+   */
+  #[Hook('preprocess_site_agent_items_result_card')]
+  public function preprocessSiteAgentItemsResultCard(array &$variables): void {
+    if (empty($variables['record'])) {
+      return;
+    }
+    $record = $this->entityTypeManager->getStorage('site_agent_tool_call')->load($variables['record']);
+    if (!$record instanceof ToolCallInterface || $record->getToolId() !== 'aim_remember') {
+      return;
+    }
+    $storage = $this->entityTypeManager->getStorage('aim_fact');
+    $admin = $this->currentUser->hasPermission('administer aim');
+    $items = [];
+    $waiting = 0;
+    foreach ($variables['items'] ?? [] as $item) {
+      [$entity_type_id, $id] = explode(':', (string) ($item['target'] ?? ''), 2) + [1 => ''];
+      $fact = $entity_type_id === 'aim_fact' ? $storage->load($id) : NULL;
+      if (!$fact instanceof FieldableEntityInterface) {
+        continue;
+      }
+      $trusted = (bool) $fact->get('trusted')->getString();
+      $waiting += $trusted ? 0 : 1;
+      $item['status'] = $trusted ? $this->t('Trusted') : $this->t('Waiting for review');
+      $item['rows'] = [];
+      $item['version'] = '';
+      if (!$admin) {
+        $item['view_url'] = NULL;
+      }
+      $items[] = $item;
+    }
+    $variables['items'] = $items;
+    $variables['heading'] = $items === [] ? $this->t('No facts saved') : $this->formatPlural(count($items), 'One fact saved', '@count facts saved');
+    $variables['status'] = $waiting > 0 ? $this->t('Recall finds a fact waiting for review only once a reviewer trusts it.') : '';
+    $variables['more'] = '';
+    $variables['publish_url'] = NULL;
   }
 
   /**

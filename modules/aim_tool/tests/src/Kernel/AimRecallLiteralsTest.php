@@ -22,6 +22,7 @@ use Drupal\literals\LiteralLookup;
 use Drupal\search_api\Backend\BackendInterface;
 use Drupal\search_api\Entity\Index;
 use Drupal\search_api\Entity\Server;
+use Drupal\search_api\Query\ConditionInterface;
 use Drupal\search_api\Query\QueryInterface;
 use Drupal\tool\ExecutableResult;
 use Drupal\user\Entity\Role;
@@ -145,6 +146,9 @@ class AimRecallLiteralsTest extends KernelTestBase {
   /**
    * Search backend override: every fact matches, in ID order.
    *
+   * Only the trusted condition is honored, so a search that leaves out
+   * facts waiting for review does.
+   *
    * @param \Drupal\search_api\Backend\BackendInterface $backend
    *   The test backend.
    * @param \Drupal\search_api\Query\QueryInterface $query
@@ -153,8 +157,17 @@ class AimRecallLiteralsTest extends KernelTestBase {
   public static function searchAllFacts(BackendInterface $backend, QueryInterface $query): void {
     $index = $query->getIndex();
     $fieldsHelper = \Drupal::service('search_api.fields_helper');
+    $trustedOnly = FALSE;
+    foreach ($query->getConditionGroup()->getConditions() as $condition) {
+      if ($condition instanceof ConditionInterface && $condition->getField() === 'trusted' && $condition->getValue()) {
+        $trustedOnly = TRUE;
+      }
+    }
     $items = [];
     foreach (AimFact::loadMultiple() as $fact) {
+      if ($trustedOnly && !$fact->get('trusted')->value) {
+        continue;
+      }
       $item = $fieldsHelper->createItemFromObject($index, EntityAdapter::createFromEntity($fact), NULL, $index->getDatasource('entity:aim_fact'));
       $item->setScore(0.1);
       $items[$item->getId()] = $item;
@@ -237,6 +250,7 @@ class AimRecallLiteralsTest extends KernelTestBase {
       ),
       $moduleHandler,
       $this->container->get('logger.channel.aim'),
+      $this->container->get('entity_type.manager'),
     );
   }
 
@@ -359,6 +373,54 @@ class AimRecallLiteralsTest extends KernelTestBase {
       $this->assertSame([], $result->getContextValues()['literals']);
       $this->assertStringContainsString('could not be checked', (string) $result->getMessage());
     }
+  }
+
+  /**
+   * Each result names its fact and its end date.
+   */
+  public function testResultFields(): void {
+    $this->setCurrentUser($this->member);
+    $this->found = new LiteralFindResult('none', [], 'chooser', 'chose_none');
+    AimFact::load(1)->set('expires', strtotime('2030-01-31 23:59:59 UTC'))->save();
+    AimFact::create(['scope' => 'site', 'text' => 'Open late on Thursdays.', 'trusted' => TRUE, 'uid' => 1])->save();
+    $results = $this->tool()->recall('opening')->getContextValues()['results'];
+    $this->assertSame(['1', '2'], array_column($results, 'id'));
+    $this->assertSame(['2030-01-31', ''], array_column($results, 'expires'));
+  }
+
+  /**
+   * The message counts the caller's waiting facts; results stay trusted.
+   */
+  public function testWaitingForReview(): void {
+    $this->found = new LiteralFindResult('none', [], 'chooser', 'chose_none');
+    AimFact::load(1)->delete();
+    $reviewer = $this->createUser(['review aim facts'], 'reviewer');
+    $waiting = fn (UserInterface $writer) => AimFact::create([
+      'scope' => 'site',
+      'text' => 'Closed in January.',
+      'trusted' => FALSE,
+      'uid' => $writer->id(),
+    ])->save();
+
+    // Another person's waiting fact is not mentioned to the member.
+    $waiting($this->staff);
+    $this->setCurrentUser($this->member);
+    $this->assertSame('No relevant facts or exact values found.', (string) $this->tool()->recall('january')->getMessage());
+
+    // Their own is, and a reviewer hears of every one.
+    $waiting($this->member);
+    $this->assertStringContainsString(' 1 matching fact(s) are waiting for staff review', (string) $this->tool()->recall('january')->getMessage());
+    $this->setCurrentUser($reviewer);
+    $this->assertStringContainsString(' 2 matching fact(s) are waiting for staff review', (string) $this->tool()->recall('january')->getMessage());
+
+    // A waiting fact stays out of the results, and is still counted beside
+    // trusted ones, noting when it is the closest match.
+    $this->assertStringContainsString('the closest match is one of them', (string) $this->tool()->recall('january')->getMessage());
+    AimFact::create(['scope' => 'site', 'text' => 'Closed on Sundays.', 'trusted' => TRUE, 'uid' => 1])->save();
+    $result = $this->tool()->recall('january');
+    $this->assertSame(['Closed on Sundays.'], array_column($result->getContextValues()['results'], 'text'));
+    $this->assertStringStartsWith('Found 1 relevant fact(s). 2 matching fact(s) are waiting', (string) $result->getMessage());
+    $this->assertStringContainsString('the closest match is one of them', (string) $result->getMessage());
   }
 
   /**

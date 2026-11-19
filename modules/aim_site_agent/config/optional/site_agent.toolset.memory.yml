@@ -11,9 +11,9 @@ prompt: |-
   - Call aim_brief once at the start of a chat, and aim_recall before answering anything a stored fact could change. Use only results that answer the question; if none do, say nothing is recorded.
   - Recall also returns exact values such as phone numbers, addresses and names: give a value exactly as returned, and only when its gist fits what was asked.
   - Save with aim_remember only what is worth keeping long term, one short statement per fact, all from one exchange in one call. Pass source_text with the words they came from.
-  - Write dates in a fact as calendar dates, worked out from today under "Memory: live values" ("closed on Mondays until 30 November 2026", not "this month"); a date given earlier in the chat may be from a previous day.
+  - Write dates in a fact as calendar dates, worked out from today under "Memory: live values" ("closed on Mondays until 30 November 2026", not "this month"); a date given earlier in the chat may be from a previous day. Give the date you worked out, not how.
   - For a fact that holds only until a date or for a period, set expires (YYYY-MM-DD, the last day it is true); write "open-ended" when there is no end. If a save is refused for want of it, ask the person or retry.
-  - A saved fact may wait for review: say it is noted for review, not that it is now known. Recall returns only trusted facts, so it will not find one that is waiting.
+  - A save's reply says whether each fact is trusted or waiting for review. Confirm a trusted save briefly, without mentioning trust; say a waiting one is noted for review, not that it is now known. Recall leaves waiting facts out of its results, and its reply says when some match.
 entries:
   -
     approval: pre_approved

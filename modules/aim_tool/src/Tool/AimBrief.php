@@ -110,6 +110,8 @@ final class AimBrief {
           'subject' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Subject'), description: new TranslatableMarkup('Who or what it is about, as the scope says: the role machine name, the user uid, the case ID (pass it as subject to aim_remember to add to the same case). Empty for site.'), required: FALSE),
           'date' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Date'), description: new TranslatableMarkup('YYYY-MM-DD, the date date_kind names.')),
           'date_kind' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Date kind'), description: new TranslatableMarkup('true_since: the fact has been true since date. recorded: when it became true is not known; date is when it was recorded.')),
+          'expires' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('Expires'), description: new TranslatableMarkup('YYYY-MM-DD, the last day the fact is true. Empty when it has no end date.'), required: FALSE),
+          'id' => new OutputDefinition(data_type: 'string', label: new TranslatableMarkup('ID'), description: new TranslatableMarkup("The fact's ID, for naming this fact. Not for the person.")),
         ],
       ),
     ),

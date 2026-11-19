@@ -29,8 +29,24 @@ from the record's arguments.
 - The same template draws a decided card in a reopened chat ("Approved."
   or "Rejected." in place of the buttons).
 
+## The `aim_remember` result card
+
+`aim_remember`'s classification names no `changes` (Site Agent's
+`changes` needs an `entity_type` input, which the tool has none of), so
+Site Agent's `EntityWriteCollector` records every content entity saved
+while the call runs. That includes the `ai_log` rows `ai_logging` writes
+for the grounding and time checks (`ai_log` is not an internal entity
+type), and the items card calls an entity with no published state
+"Published". `hook_preprocess_site_agent_items_result_card()` fixes both
+for an `aim_remember` record: only `aim_fact` items stay, each with status
+"Trusted" or "Waiting for review", the heading counts facts, and the
+draft rows, versions and Publish are dropped (a fact has nothing to
+publish). The View links (a fact's page is its edit form) stay only for
+an account with `administer aim`. Site Agent has no hook for either yet;
+upstream ask in TODO.md.
+
 Tests: `tests/src/Unit/AimSiteAgentCardTest.php` (suggestion, the facts
-and their detail line, other cards left alone).
+and their detail line, other cards left alone, the result card).
 
 ## The memory section of the system prompt
 

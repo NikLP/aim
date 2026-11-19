@@ -273,10 +273,11 @@ class AimToolPermissionsTest extends KernelTestBase {
     $this->assertStringContainsString('Waiting for staff review', $held);
     $this->assertStringContainsString('It retires after 2030-01-31.', $held);
 
-    // A writer who may trust it starts it trusted: no note.
+    // A writer who may trust it starts it trusted, and the reply says so.
     $this->actAs($this->createUser(['remember aim facts', 'administer aim']));
     $trusted = $this->remember(['text' => 'Open at ten.', 'scope' => 'site'])->getResult()->getContextValues()['results'];
     $this->assertStringNotContainsString('Waiting for staff review', $trusted);
+    $this->assertStringContainsString('Trusted: recall returns it now.', $trusted);
     $this->assertStringNotContainsString('retires', $trusted);
   }
 
@@ -299,7 +300,7 @@ class AimToolPermissionsTest extends KernelTestBase {
     // Results are structured, so a caller can act on scope and subject.
     $results = $recall->getOutputDefinitions()['results'];
     $this->assertInstanceOf(ListOutputDefinition::class, $results);
-    $this->assertSame(['text', 'scope', 'subject', 'date', 'date_kind'], array_keys($results->getItemDefinition()->getPropertyDefinitions()));
+    $this->assertSame(['text', 'scope', 'subject', 'date', 'date_kind', 'expires', 'id'], array_keys($results->getItemDefinition()->getPropertyDefinitions()));
 
     // A scope added later (the scope admin form) shows up without a rebuild.
     AimScope::create(['id' => 'case', 'label' => 'Case', 'weight' => 3])->save();
@@ -343,7 +344,7 @@ class AimToolPermissionsTest extends KernelTestBase {
     $results = $this->brief(['limit' => 2])->getResult()->getContextValues()['results'];
     $this->assertSame(['Newest.', 'Middle.', 'My role.', 'About me.'], array_column($results, 'text'));
     $this->assertSame(['site', 'site', 'role', 'user'], array_column($results, 'scope'));
-    $this->assertSame(['text', 'scope', 'subject', 'date', 'date_kind'], array_keys($results[0]));
+    $this->assertSame(['text', 'scope', 'subject', 'date', 'date_kind', 'expires', 'id'], array_keys($results[0]));
 
     $site = $this->brief(['scope' => 'site'])->getResult()->getContextValues()['results'];
     $this->assertSame(['Newest.', 'Middle.', 'Oldest.'], array_column($site, 'text'));

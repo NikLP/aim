@@ -102,9 +102,9 @@ an undeclared Write tool counts as destructive, which MCP clients read as
 (an off-topic query returns "No relevant facts found." instead of the
 nearest unrelated facts, [ADR-0019](../../adr/resolved/0019-recall-abstention-distance-cutoff.md));
 there is no per-call `max_distance`, so a remote caller can't switch the
-cutoff off. `limit` is capped at 25. `AimRemember`'s reply says when a
-fact waits for review or has an expiry, so a caller doesn't report a held
-fact as known.
+cutoff off. `limit` is capped at 25. `AimRemember`'s reply says whether
+each fact is trusted or waits for review, and its expiry, so a caller
+neither reports a held fact as known nor a trusted one as held.
 
 `AimRecall` also asks the literals finder (`literals.lookup` as a
 question, as the caller) when `literals_finder` is enabled and
@@ -116,8 +116,11 @@ that can't run never fails recall: facts return, a warning is logged and
 the message says exact values could not be checked. "No relevant facts
 found." only when the finder was not asked.
 
-`AimRecall` results carry `date_kind` (`true_since`/`recorded`) beside
-`date`. An MCP client caches the output schema on connect: after an output
+`AimRecall` results (and `aim_brief`'s, through `toResult()`) carry
+`date_kind` (`true_since`/`recorded`) beside `date`, plus `expires` and
+the fact `id`; recall's message counts the matching waiting facts the
+caller wrote or may review, from the same search (see
+[DEVELOPING.md](DEVELOPING.md)). An MCP client caches the output schema on connect: after an output
 change, reconnect it. History: [ADR-0013](../../adr/resolved/0013-mcp-tool-exposure.md)
 kept chat's tools separate; [ADR-0062](../../adr/resolved/0062-chat-on-the-shared-tools.md)
 merged them.

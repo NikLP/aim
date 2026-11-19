@@ -6,6 +6,9 @@ namespace Drupal\Tests\aim_site_agent\Unit;
 
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Tests\UnitTestCase;
 use Drupal\aim\Entity\AimScope;
 use Drupal\aim\Service\AimRememberService;
@@ -81,17 +84,69 @@ class AimSiteAgentCardTest extends UnitTestCase {
   }
 
   /**
+   * An aim_remember result card lists only its facts, trusted or waiting.
+   */
+  public function testResultCard(): void {
+    $items = [
+      ['target' => 'ai_log:788', 'status' => 'Published', 'version' => '', 'rows' => []],
+      [
+        'target' => 'aim_fact:3',
+        'status' => 'Published',
+        'version' => '9',
+        'rows' => [['label' => 'Text']],
+        'view_url' => '/f/3',
+      ],
+      ['target' => 'aim_fact:4', 'status' => 'Published', 'version' => '', 'rows' => [], 'view_url' => '/f/4'],
+    ];
+    $variables = [
+      'record' => 1,
+      'heading' => '3 items written',
+      'status' => 'None of these is a draft.',
+      'items' => $items,
+      'more' => '',
+      'publish_url' => '/publish',
+    ];
+    $this->hooks([], 'aim_remember', [3 => TRUE, 4 => FALSE])->preprocessSiteAgentItemsResultCard($variables);
+    $this->assertSame(['aim_fact:3', 'aim_fact:4'], array_column($variables['items'], 'target'));
+    $this->assertSame(['Trusted', 'Waiting for review'], array_map('strval', array_column($variables['items'], 'status')));
+    $this->assertSame(['', ''], array_column($variables['items'], 'version'));
+    $this->assertSame([[], []], array_column($variables['items'], 'rows'));
+    $this->assertSame([NULL, NULL], array_column($variables['items'], 'view_url'));
+
+    // An aim administrator keeps the View links.
+    $admin = ['record' => 1, 'items' => $items];
+    $this->hooks([], 'aim_remember', [3 => TRUE, 4 => FALSE], TRUE)->preprocessSiteAgentItemsResultCard($admin);
+    $this->assertSame(['/f/3', '/f/4'], array_column($admin['items'], 'view_url'));
+    $this->assertSame('2 facts saved', (string) $variables['heading']);
+    $this->assertStringContainsString('waiting for review', (string) $variables['status']);
+    $this->assertNull($variables['publish_url']);
+
+    // Another tool's card is left alone.
+    $other = ['record' => 1, 'heading' => '3 items written', 'items' => $items];
+    $copy = $other;
+    $this->hooks([], 'entity_save')->preprocessSiteAgentItemsResultCard($other);
+    $this->assertSame($copy, $other);
+  }
+
+  /**
    * Builds the hooks over a call with the given arguments.
    *
    * @param array $arguments
    *   The call's arguments.
+   * @param string $tool_id
+   *   The call's tool.
+   * @param array<int, bool> $facts
+   *   The facts saved, as whether each is trusted, keyed by id.
+   * @param bool $admin
+   *   Whether the viewing account may administer aim.
    *
    * @return \Drupal\aim_site_agent\Hook\AimSiteAgentHooks
    *   The hooks, with the user, case and entity scopes and account 7.
    */
-  private function hooks(array $arguments): AimSiteAgentHooks {
+  private function hooks(array $arguments, string $tool_id = 'aim_remember', array $facts = [], bool $admin = FALSE): AimSiteAgentHooks {
     $record = $this->createMock(ToolCallInterface::class);
     $record->method('getArguments')->willReturn($arguments);
+    $record->method('getToolId')->willReturn($tool_id);
 
     $scopes = [];
     foreach (['user' => 'User', 'case' => 'Case', 'entity' => 'Entity'] as $id => $label) {
@@ -107,6 +162,13 @@ class AimSiteAgentCardTest extends UnitTestCase {
       'site_agent_tool_call' => [1 => $record],
       'aim_scope' => $scopes,
       'user' => [7 => $account],
+      'aim_fact' => array_map(function (bool $trusted): FieldableEntityInterface {
+        $field = $this->createMock(FieldItemListInterface::class);
+        $field->method('getString')->willReturn($trusted ? '1' : '0');
+        $fact = $this->createMock(FieldableEntityInterface::class);
+        $fact->method('get')->willReturnMap([['trusted', $field]]);
+        return $fact;
+      }, $facts),
     ];
     $entity_type_manager = $this->createMock(EntityTypeManagerInterface::class);
     $entity_type_manager->method('getStorage')->willReturnCallback(function (string $entity_type_id) use ($storages) {
@@ -125,7 +187,10 @@ class AimSiteAgentCardTest extends UnitTestCase {
     $remember->method('today')->willReturn('Monday 2026-11-16');
     $remember->method('siteTimeZone')->willReturn(new \DateTimeZone('UTC'));
 
-    $hooks = new AimSiteAgentHooks($entity_type_manager, $remember);
+    $viewer = $this->createMock(AccountInterface::class);
+    $viewer->method('hasPermission')->willReturnCallback(fn (string $permission): bool => $admin && $permission === 'administer aim');
+
+    $hooks = new AimSiteAgentHooks($entity_type_manager, $remember, $viewer);
     $hooks->setStringTranslation($this->getStringTranslationStub());
     return $hooks;
   }
