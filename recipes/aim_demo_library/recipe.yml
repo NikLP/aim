@@ -34,6 +34,11 @@ config:
       simpleConfigUpdate:
         name: "Harbourside Community Library"
         slogan: "A fictional library, used to demonstrate AIM: agent memory built in Drupal"
+    # aim ships the vector server with no models: use the site's Embeddings
+    # and Chat defaults (set them before applying). Ahead of the index
+    # action, so the vector table is made at this model's size.
+    search_api.server.aim_vector:
+      aimUseDefaultModels: []
     # So a fact told to the chat is searchable on the next question. Suits
     # local embeddings (ADR-0015 addendum); with hosted embeddings each save
     # ties up a worker for seconds, so drop this action.

@@ -12,17 +12,17 @@ name: 'AIM Vector Search'
 description: ''
 backend: search_api_ai_search
 backend_config:
-  chat_model: amazeeio__claude-5-sonnet
+  chat_model: ''
   database: mariadb
   database_settings:
     database_name: ''
     collection: aim_fact_vectors
     metric: cosine_similarity
     mhnsw_ef_search: 100
-  embeddings_engine: ollama__nomic_embed_text_latest
+  embeddings_engine: ''
   embeddings_engine_configuration:
-    set_dimensions: true
-    dimensions: 768
+    set_dimensions: false
+    dimensions: 0
   embedding_strategy: contextual_chunks
   embedding_strategy_configuration:
     chunk_size: '500'

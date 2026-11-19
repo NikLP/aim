@@ -93,6 +93,20 @@ are recommendations.
       consolidation model, and downgrades to ADD with no default. Not
       documented.
 
+## Recall cutoff per embeddings model (raised 2026-11-19)
+
+The vector server now takes the site's default embeddings model
+(`aimUseDefaultModels`), but `recall_max_distance` (and the recipes' 0.6)
+was measured on `nomic-embed-text`: distances are not comparable across
+models, so another model gets a cutoff that may be too tight or too loose.
+Found applying `aim_demo_library` on habanero (no Ollama).
+
+- [ ] Options, cheapest first: ship cutoffs for measured models and have
+  `aim:status`/the pre-flight flag an untuned engine; lean on top-N plus the
+  calling model's judgement with a loose cutoff; calibrate on apply from a
+  few known related/unrelated pairs. Same applies to the verifier threshold
+  and grounded check (see "Operating language" below).
+
 ## Operating language (raised 2026-11-11)
 
 Goal: a site runs aim in one language of its choice (Spanish, say), not

@@ -36,18 +36,39 @@ class AimPersonalRecipeTest extends BrowserTestBase {
    *
    * The provider's schema for this object is a plain mapping with no _core,
    * which the installer adds. Unrelated to this recipe, and only the strict
-   * checker minds.
+   * checker minds. The index's tracker, ai_search_tracker, has no schema in
+   * ai_search, so every save of the index fails the checker the same way.
    */
   protected static $configSchemaCheckerExclusions = [
     'ai_vdb_provider_mariadb.settings',
+    'search_api.index.aim_vector_index',
   ];
+
+  /**
+   * {@inheritdoc}
+   *
+   * The AI module's echo provider, as the site's default models: the recipe
+   * points the vector server at them and stops without an embeddings one.
+   */
+  protected static $modules = ['ai_test'];
 
   /**
    * Tests what the recipe makes of a fresh site.
    */
   public function testApply(): void {
+    $this->config('ai.settings')
+      ->set('default_providers.embeddings', ['provider_id' => 'echoai', 'model_id' => 'gpt-test'])
+      ->set('default_providers.chat', ['provider_id' => 'echoai', 'model_id' => 'gpt-test'])
+      ->save();
+
     $path = $this->container->get('extension.list.module')->getPath('aim') . '/recipes/aim_personal';
     $this->applyRecipe($path, options: ['--input=aim_personal.owner_name=Sam']);
+
+    // The vector server names the site's models, at the model's own size.
+    $backend = $this->config('search_api.server.aim_vector')->get('backend_config');
+    $this->assertSame('echoai__gpt-test', $backend['embeddings_engine']);
+    $this->assertSame(1, $backend['embeddings_engine_configuration']['dimensions']);
+    $this->assertSame('echoai__gpt-test', $backend['chat_model']);
 
     // The purpose statement reaches the setting a client reads on connecting.
     $instructions = $this->config('mcp_server.settings')->get('server_instructions');

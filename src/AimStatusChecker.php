@@ -414,6 +414,7 @@ final class AimStatusChecker {
     if ($this->moduleHandler->moduleExists('literals_finder')) {
       $operations[] = 'decision';
     }
+
     foreach ($operations as $operation) {
       $default = $this->aiProvider->getDefaultProviderForOperationType($operation) ?? [];
       $targets["default $operation model"] = [
@@ -423,6 +424,7 @@ final class AimStatusChecker {
         'set it at /admin/config/ai/settings',
       ];
     }
+
     $activities = $this->configFactory->get('aim.settings')->get('activities') ?? [];
     foreach ($activities as $name => $activity) {
       if (!empty($activity['provider']) && !empty($activity['model'])) {
@@ -439,9 +441,11 @@ final class AimStatusChecker {
     $problems = [];
     $problems = [];
     // The vector server's own two model IDs are per-site (DEVELOPING.md,
-    // "Setting up vector search"): the shipped values name this site's
-    // providers, so a fresh site has to repoint them. chat_model is checked
-    // the way the backend's own status page does (against the option list);
+    // "Setting up vector search"): aim ships them empty and the
+    // aimUseDefaultModels config action fills them from the site's defaults,
+    // so a site that had none set at install time has to set them.
+    // chat_model is checked the way the backend's own status page does
+    // (against the option list);
     // embeddings_engine only for being set with a usable provider, since the
     // stored model name is the provider's own (Ollama's has a ":latest" the
     // option key lacks) and indexing works with it.
@@ -453,12 +457,14 @@ final class AimStatusChecker {
         : "The vector server's chat model $chatModel is not an available chat model (Search API > server aim_vector).";
     }
     [$engineProvider, $engineModel] = array_pad(explode('__', (string) ($server['embeddings_engine'] ?? ''), 2), 2, '');
+
     try {
       $engineOk = $engineProvider !== '' && $engineModel !== '' && $this->aiProvider->createInstance($engineProvider)->isUsable('embeddings');
     }
     catch (\Throwable) {
       $engineOk = FALSE;
     }
+
     if (!$engineOk) {
       $problems[] = "The vector server's embeddings engine is not set, or its provider is not usable (Search API > server aim_vector).";
     }

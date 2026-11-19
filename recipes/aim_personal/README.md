@@ -35,8 +35,10 @@ uid 1 (see "Be upfront about").
 - Composer packages for the OAuth stack, including the site-level `provide`
   block in `aim_tool_oauth`'s
   [DEVELOPING.md](../../modules/aim_tool_oauth/DEVELOPING.md).
-- An embeddings provider. Facts can't be saved without one while
-  `index_directly` is on.
+- An embeddings provider, set as the default Embeddings model at
+  `/admin/config/ai/settings` (and the Chat default if consolidation will
+  run) before applying: the recipe points aim's vector server at them
+  (`aimUseDefaultModels`) and stops if there is no Embeddings default.
 
 ## Apply
 
@@ -48,14 +50,12 @@ ddev drush recipe /var/www/html/web/modules/custom/aim/recipes/aim_personal --in
 
 Then the parts a recipe can't do, which are site-specific:
 
-1. Set the default embeddings model at `/admin/config/ai/settings`, and the
-   Chat default if consolidation will run.
-2. Generate OAuth keys outside the docroot and point
+1. Generate OAuth keys outside the docroot and point
    `simple_oauth.settings` at them.
-3. Expose the site over real HTTPS and confirm the discovery URLs. Steps 2
-   and 3 are in `aim_tool_oauth`'s
+2. Expose the site over real HTTPS and confirm the discovery URLs. Steps 1
+   and 2 are in `aim_tool_oauth`'s
    [DEVELOPING.md](../../modules/aim_tool_oauth/DEVELOPING.md) "Setup".
-4. Add the site's `/mcp` URL as a connector in your MCP client, and sign in
+3. Add the site's `/mcp` URL as a connector in your MCP client, and sign in
    as uid 1 when it asks.
 
 ## Be upfront about

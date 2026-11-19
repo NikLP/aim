@@ -91,11 +91,14 @@ On a reinstall of this dev site skip steps 1-2: the code is already there.
 2. `composer require drupal/aim:dev-main drupal/literals:^1.0@alpha
    drupal/ai_provider_ollama` plus a chat provider (`literals` has only an
    alpha so far, which aim's `*` constraint does not pull on its own).
-3. Run Ollama with `nomic-embed-text`. Enable `ai` and the providers, then at
-   `/admin/config/ai/settings` set Embeddings (`ollama` /
-   `nomic_embed_text_latest`), a Chat default and a Decision default (for the
-   finder). Do this before the recipe, and do not touch anything else yet:
-   the recipe is strict.
+3. Enable `ai` and the providers, then at `/admin/config/ai/settings` set an
+   Embeddings default, a Chat default and a Decision default (for the
+   finder). The recipe points aim's vector server at the Embeddings and Chat
+   defaults (`aimUseDefaultModels`) and stops if there is no Embeddings one.
+   Original site uses Ollama with `nomic-embed-text` (`ollama` /
+   `nomic_embed_text_latest`), which the recall cutoff below was tuned on;
+   another model works but its cutoff is untuned. Do this before the recipe,
+   and do not touch anything else yet: the recipe is strict.
 4. Apply the recipe (above). Do not change `ai_logging` settings before this
    step: the recipe imports `ai_logging.settings` and, being strict, refuses
    to apply over a changed one.

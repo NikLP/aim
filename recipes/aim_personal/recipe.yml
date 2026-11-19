@@ -85,6 +85,11 @@ config:
     aim.aim_scope.user:
       setProperties:
         description: "about the owner of this memory: who they are, how they like to work, the people and things in their life, and anything else worth keeping that belongs to no one project. Omit the subject."
+    # aim ships the vector server with no models: use the site's Embeddings
+    # and Chat defaults (set them before applying). Ahead of the index
+    # action, so the vector table is made at this model's size.
+    search_api.server.aim_vector:
+      aimUseDefaultModels: []
     # So a fact told to the model is searchable on the next question. Suits
     # local embeddings (ADR-0015 addendum); with hosted embeddings each save
     # ties up a worker for seconds, so drop this action.

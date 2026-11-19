@@ -7,19 +7,27 @@
 
 declare(strict_types=1);
 
-use Drupal\search_api\IndexInterface;
+use Drupal\Core\Config\Action\ConfigActionException;
 
 /**
  * Implements hook_install().
  */
-function aim_install(): void {
-  // ai_vdb_provider_mariadb only creates the collection table from
-  // hook_search_api_index_update(), which does not fire for the insert that
-  // config/install triggers. Re-save the index once to force that path.
-  $index = \Drupal::entityTypeManager()->getStorage('search_api_index')->load('aim_vector_index');
+function aim_install(bool $is_syncing): void {
+  // A config sync, or a recipe (which installs in syncing mode and imports
+  // config/install afterwards, then runs aimUseDefaultModels itself), brings
+  // its own server config.
+  if ($is_syncing) {
+    return;
+  }
 
-  if ($index instanceof IndexInterface) {
-    $index->save();
+  // The shipped server names no models: take the site's defaults. The action
+  // also re-saves the index, which creates the collection table.
+  try {
+    \Drupal::service('plugin.manager.config_action')
+      ->applyAction('aimUseDefaultModels', 'search_api.server.aim_vector', []);
+  }
+  catch (ConfigActionException $e) {
+    \Drupal::logger('aim')->warning('Vector search is not set up: @message Then follow DEVELOPING.md, "Setting up vector search".', ['@message' => $e->getMessage()]);
   }
 }
 

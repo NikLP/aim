@@ -1158,12 +1158,31 @@ from config and the shim.
 ## Setting up vector search (fresh install, or after a provider change)
 
 `config/install` ships the *structure* of the vector search server/index
-- field mappings, backend wiring, collection-table schema - but not a
-working AI provider. The shipped `chat_model`/`embeddings_engine` are
-this site's working choice at last export time, referencing a specific
-provider/model/key a fresh site won't have. Run this after enabling
-`aim`, or whenever `drush aim:recall` starts erroring on the embeddings
-call:
+(field mappings, backend wiring, collection-table schema) but names no
+model: `chat_model` and `embeddings_engine` ship empty (dimensions 0).
+The `aimUseDefaultModels` config action fills them from the AI module's
+defaults (`/admin/config/ai/settings`): the embeddings engine at the
+model's real vector size (`embeddingsVectorSize()`, a real call), and the
+chat model. It fills empty values only, then re-saves the index so the
+collection table is made at that size. Two callers:
+
+- A recipe that imports aim's config
+  (`search_api.server.aim_vector: { aimUseDefaultModels: [] }`). List it
+  ahead of any action that saves the index, and set the defaults before
+  applying: with no embeddings default the recipe stops with a message
+  saying so.
+- `aim_install()` on a plain `drush en aim` (not in a config sync or
+  recipe), through the config action manager. With no embeddings default
+  set it logs a warning and leaves the server empty; set the default, then
+  run this runbook.
+
+drupal/ai's own `setupVdbServerWithDefaults` only
+  creates a server, and refuses one that exists with other values, which
+  aim's import always has.
+
+Run the steps below to change provider later, or after an install that had
+no default set, or whenever `drush aim:recall` starts erroring on the
+embeddings call:
 
 1. **Enable and configure a real AI provider module** for chat and
    embeddings (`ai_provider_anthropic`/`amazeeio`/`ollama` - Ollama is

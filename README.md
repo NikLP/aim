@@ -221,12 +221,13 @@ each with its own requirements and setup:
 
 ## Getting started
 
-1. Enable `aim`, and `aim_chatbot`/`aim_tool` as needed. Disable any
+1. Set up an AI provider and choose default Embeddings and Chat models at
+   `/admin/config/ai/settings`: aim's vector search names no model of its
+   own and takes these when it is installed. To set them later, or change
+   them, see [DEVELOPING.md](DEVELOPING.md)'s "Setting up vector search"
+   runbook.
+2. Enable `aim`, and `aim_chatbot`/`aim_tool` as needed. Disable any
    scope you don't want at `/admin/config/aim/scopes`.
-2. Configure a real AI provider and point vector search at it - see
-   [DEVELOPING.md](DEVELOPING.md)'s "Setting up vector search" runbook.
-   `config/install` ships the search server/index *structure*, not a
-   working provider - this step is required on every fresh install.
 3. Try it: `drush aim:remember "some fact" --scope=site --uid=1` (Drush
    writes need the account they run as), then
    `drush aim:recall "some fact"`. For an unattended pipeline,
