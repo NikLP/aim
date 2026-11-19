@@ -2,6 +2,7 @@ name: 'AIM: console'
 description: "Site Agent's chat as the staff console for an AIM site's memory: the Memory toolset only, with every save approved on a card that lists its facts. Apply on top of an AIM instance recipe."
 type: 'AIM instance'
 install:
+  - site_agent
   - aim_site_agent
 config:
   # Not strict: this goes on top of an instance recipe (aim_demo_library,
