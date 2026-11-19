@@ -25,3 +25,6 @@ first: aim's own composer.json only suggests it).
 
 `drush en aim_site_agent`. The Memory toolset is installed if no toolset
 named `memory` exists yet; edit it at Configuration > AI > Site Agent.
+For a memory-only console (Site Agent's own toolsets off, its settings
+set), apply the [`aim_console`](../../recipes/aim_console/README.md)
+recipe instead.

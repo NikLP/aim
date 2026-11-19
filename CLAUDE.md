@@ -122,7 +122,7 @@ aim/                    ← root module (always required), ships the five scopes
 │   ├── aim_tool_oauth/  ← OAuth2 scopes for remote MCP callers
 │   ├── aim_site_agent/  ← aim_tool's tools in Site Agent's chat, fact-list approval card
 │   └── aim_benchmark/   ← synthetic fact generation, aim:benchmark commands
-├── recipes/             ← Drupal Recipes, one dir each (aim_demo_library, aim_personal)
+├── recipes/             ← Drupal Recipes, one dir each (aim_demo_library, aim_personal, aim_console)
 └── adr/                 ← decision records, see 0000-index.md
 ```
 

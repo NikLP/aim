@@ -1,0 +1,34 @@
+name: 'AIM: console'
+description: "Site Agent's chat as the staff console for an AIM site's memory: the Memory toolset only, with every save approved on a card that lists its facts. Apply on top of an AIM instance recipe."
+type: 'AIM instance'
+install:
+  - aim_site_agent
+config:
+  # Not strict: this goes on top of an instance recipe (aim_demo_library,
+  # aim_personal), so config that already exists is kept and the actions
+  # below still apply.
+  strict: false
+  # Core installs a recipe's modules in config-syncing mode: simple config
+  # (site_agent.settings) is installed, config entities (the toolsets) are
+  # not, so import them. Site Agent's own two by name: its optional chat
+  # search index needs search_api_db. They are imported to be disabled
+  # below, so a site can still turn one on from the toolset list.
+  import:
+    site_agent:
+      - site_agent.toolset.editor
+      - site_agent.toolset.site_builder
+    aim_site_agent: '*'
+  actions:
+    # The chat is for memory and nothing else. Its model stays on Site
+    # Agent's default (the site's Chat default): no provider is named here.
+    site_agent.settings:
+      simpleConfigUpdate:
+        agent_name: Memory
+        open_after_login: false
+        show_greeting: false
+        # Site Agent's tool-call audit log, kept a few days for debugging.
+        audit_retention_days: 3
+    site_agent.toolset.editor:
+      disable: []
+    site_agent.toolset.site_builder:
+      disable: []

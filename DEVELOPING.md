@@ -1406,6 +1406,14 @@ ddev drush recipe /var/www/html/web/modules/custom/aim/recipes/<name>  # contain
   `server_instructions`, no widget, closed registration
   ([ADR-0066](adr/0066-one-instance-one-recipe.md),
   [README](recipes/aim_personal/README.md)).
+- **`aim_console`**: a layer over either of the above, putting Site Agent's
+  chat in as the staff console (`aim_site_agent`, the Memory toolset only,
+  Site Agent's own toolsets disabled, model left on the default). Not
+  strict, so it applies over an existing Site Agent
+  ([README](recipes/aim_console/README.md)).
+- **A recipe can't import all of `site_agent`'s config**: `'*'` includes
+  its optional chat search index, which needs `search_api_db`, and the
+  import fails. `aim_console` lists the toolsets by name.
 - **A recipe installing `aim_tool_oauth` must set the tools' OAuth scopes.**
   Modules install in config-syncing mode, so `aim_tool_oauth_install()` runs
   before the tool configs are imported, finds none and stays silent.
