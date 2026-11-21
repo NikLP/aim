@@ -91,6 +91,13 @@ class AimMariaDBProvider extends MariaDBProvider {
     VdbSimilarityMetrics $metric_type = VdbSimilarityMetrics::CosineSimilarity,
     ?string $database = NULL,
   ): void {
+    // The shipped server has no dimensions until its embeddings model is
+    // known, and search_api creates the index once before that, so a
+    // VECTOR(0) column would fail. The real create follows when the server
+    // is saved with its model's size.
+    if ($dimension <= 0) {
+      return;
+    }
     // The connection is opened here, not inside the parent, so the session
     // default for M applies to the connection that runs the CREATE TABLE.
     $connection = $this->getConnection($database);

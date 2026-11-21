@@ -90,6 +90,7 @@ provider it extends. The rule:
 | In `AimMariaDBProvider` | Generic or aim-specific | Upstream |
 | --- | --- | --- |
 | `createCollection()` swallows "table exists" | Generic bug fix | Reported as #3609961 (RTBC), but its MR 8 makes `createCollection()` drop the collection first, and the index-update hook calls it on every save, so it would wipe the vectors on every index save. Comment there: `CREATE TABLE IF NOT EXISTS`, or tolerate error 1050, is the safe fix. Do not upgrade to a release with MR 8 as written |
+| `createCollection()` skips a 0 dimension | Generic bug fix | Raise with the maintainer (BACKLOG.md item 6): a server saved before its embeddings model is known (aim's shipped `dimensions: 0`) runs `VECTOR(0)`, which fails and logs a SQL error on every fresh install |
 | `getVdbIds()` pages instead of `LIMIT 10` | Generic bug fix | #3626257, MR up; unfixed in 1.0.x head (2026-10-23) |
 | Empty numeric value inserted as `NULL` | Generic bug fix | #3626262, MR up; unfixed in 1.0.x head (2026-10-23) |
 | M applied to new collections | Generic feature | In 1.0.x head, unreleased |

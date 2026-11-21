@@ -492,7 +492,10 @@ questions" section)
       which strict mode rejects (`ERROR 1366`) - filed as
       [#3626262](https://www.drupal.org/i/3626262) 2026-09-27, MR up; (4)
       optionally a BTREE index for filterable attribute columns, a feature
-      request, held until the bugs land; (5) string attributes stored Markdown-escaped (`_` as `\_`,
+      request, held until the bugs land; (6) `createCollection()` runs
+      `VECTOR(0)` for a server with no dimensions yet, logging a SQL error
+      on every fresh install - the shim returns early, to raise with him
+      (reported by an outside tester 2026-11-21); (5) string attributes stored Markdown-escaped (`_` as `\_`,
       so `subject` filters miss) - **DONE 2026-09-27**: fixed upstream by
       [#3572801](https://www.drupal.org/i/3572801) in ai_search 1.3.0-alpha5
       / 2.0.0-alpha2 and `drupal/ai`'s 1.x head, not in the code bundled
