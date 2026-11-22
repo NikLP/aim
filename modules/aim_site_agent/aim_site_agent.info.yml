@@ -2,7 +2,7 @@ name: 'AIM Site Agent'
 type: module
 description: "Puts AIM memory in Site Agent's chat: tool classifications, a Memory toolset and approval cards that list the facts a save makes."
 package: AIM
-core_version_requirement: ^11.4
+core_version_requirement: ^11.4 || ^12
 dependencies:
   - aim_tool:aim_tool
   - site_agent:site_agent

@@ -2,7 +2,7 @@ name: 'AIM Tool OAuth'
 type: module
 description: 'Requires an OAuth2 access token with aim-specific scopes for remote MCP callers of aim_remember/aim_recall.'
 package: AIM
-core_version_requirement: ^11.4
+core_version_requirement: ^11.4 || ^12
 dependencies:
   - aim_tool:aim_tool
   - mcp_server:mcp_server
