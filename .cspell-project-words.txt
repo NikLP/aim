@@ -69,6 +69,7 @@ kenkeep
 laya
 letta
 linkit
+localgov
 lowid
 luhn
 makerspace
@@ -78,6 +79,8 @@ memoire
 memori
 mgmt
 mhnsw
+microsite
+microsites
 minja
 misattributed
 misattributing
