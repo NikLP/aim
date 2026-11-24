@@ -14,7 +14,7 @@ use Drupal\ai\AiVdbProviderPluginManager;
 use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
-use Drupal\aim\Vdb\AimMariaDBProvider;
+use Drupal\ai_vdb_provider_mariadb\Plugin\VdbProvider\MariaDBProvider;
 use Drupal\search_api\IndexInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -280,22 +280,6 @@ class AimHooks {
   }
 
   /**
-   * Implements hook_ai_vdb_provider_info_alter().
-   *
-   * Swaps in AimMariaDBProvider, which works around two
-   * ai_vdb_provider_mariadb bugs (see its docblock).
-   *
-   * @param array $definitions
-   *   The VDB provider plugin definitions, keyed by plugin ID.
-   */
-  #[Hook('ai_vdb_provider_info_alter')]
-  public function vdbProviderInfoAlter(array &$definitions): void {
-    if (isset($definitions['mariadb'])) {
-      $definitions['mariadb']['class'] = AimMariaDBProvider::class;
-    }
-  }
-
-  /**
    * Columns that need a BTREE index once they exist on the collection table.
    *
    * `user`: ADR-0018 (renamed from subject_uid 2026-09-28,
@@ -329,39 +313,50 @@ class AimHooks {
     }
 
     $provider = $this->vdbProviders->createInstance('mariadb');
-    if (!$provider instanceof AimMariaDBProvider) {
+    if (!$provider instanceof MariaDBProvider) {
       return;
     }
 
     foreach (self::BTREE_INDEXED_COLUMNS as $column) {
       if ($index->getField($column)) {
-        $provider->ensureColumnIndex($settings['collection'], $column, $settings['database_name'] ?? NULL);
+        $this->ensureColumnIndex($provider, $settings['collection'], $column, $settings['database_name'] ?? NULL);
       }
     }
   }
 
   /**
-   * Implements hook_config_schema_info_alter().
+   * Adds a BTREE index on a collection column, if the column exists.
    *
-   * Declares the `mhnsw_ef_search` server setting aim ships
-   * (search_api.server.aim_vector), so config validation accepts it.
-   * ai_vdb_provider_mariadb 1.0.1 has no such key in its schema, its 1.0.x
-   * head does, under the same name.
+   * MariaDB's HNSW index post-filters, so a selective condition on an
+   * attribute column returns short results until the column has a BTREE
+   * index, which makes the optimizer pre-filter (ADR-0018, finding 4). The
+   * provider adds plain columns and never a secondary index. Idempotent.
    *
-   * @param array $definitions
-   *   The config schema definitions, keyed by type.
+   * @param \Drupal\ai_vdb_provider_mariadb\Plugin\VdbProvider\MariaDBProvider $provider
+   *   The MariaDB VDB provider.
+   * @param string $collection_name
+   *   The collection (table) name.
+   * @param string $column
+   *   The attribute column to index.
+   * @param string|null $database
+   *   The database name, or NULL for the default connection.
+   *
+   * @return bool
+   *   TRUE if the index exists afterward, FALSE if the column does not.
    */
-  #[Hook('config_schema_info_alter')]
-  public function configSchemaInfoAlter(array &$definitions): void {
-    $type = 'plugin.plugin_configuration.search_api_backend.search_api_ai_search';
-    if (isset($definitions[$type]['mapping']['database_settings']['mapping'])) {
-      $definitions[$type]['mapping']['database_settings']['mapping'] += [
-        'mhnsw_ef_search' => [
-          'type' => 'integer',
-          'label' => 'HNSW query candidates (ef_search)',
-        ],
-      ];
+  protected function ensureColumnIndex(MariaDBProvider $provider, string $collection_name, string $column, ?string $database = NULL): bool {
+    $connection = $provider->getConnection($database);
+    $client = $provider->getClient();
+    $table = $client->escapeIdentifierForSql(identifier_to_escape: $collection_name, connection: $connection);
+    $column_literal = $client->escapeStringForSql(string_to_escape: $column, connection: $connection);
+    $result = $connection->query("SHOW COLUMNS FROM {$table} LIKE {$column_literal}");
+    if (!$result || $result->num_rows === 0) {
+      return FALSE;
     }
+    $column_id = $client->escapeIdentifierForSql(identifier_to_escape: $column, connection: $connection);
+    $index_id = $client->escapeIdentifierForSql(identifier_to_escape: 'idx_' . $column, connection: $connection);
+    $connection->query("ALTER TABLE {$table} ADD INDEX IF NOT EXISTS {$index_id} ({$column_id})");
+    return TRUE;
   }
 
 }

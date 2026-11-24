@@ -23,6 +23,7 @@ use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Entity\AimScope;
 use Drupal\aim\EventSubscriber\AimEmbeddingCacheSubscriber;
 use Drupal\search_api\IndexInterface;
+use Drupal\search_api\Item\ItemInterface;
 use Drupal\search_api\Query\QueryInterface as SearchApiQueryInterface;
 use Drupal\search_api\Query\ResultSetInterface;
 use Drupal\search_api\Utility\PostRequestIndexingInterface;
@@ -541,6 +542,25 @@ class AimMemoryManager {
     finally {
       $this->embeddingCache->setActive(FALSE);
     }
+  }
+
+  /**
+   * Returns a search result's cosine distance, the unit aim's thresholds use.
+   *
+   * Search API scores are relevance, higher is closer: since
+   * ai_vdb_provider_mariadb 1.0.2 a cosine similarity floored at 0 (1.0.1
+   * passed the raw distance through). aim's settings and tool output stay in
+   * cosine distance (0 identical, larger farther), so this converts back. The
+   * floor caps the distance at 1, past every threshold aim uses.
+   *
+   * @param \Drupal\search_api\Item\ItemInterface $result
+   *   A result item from executeSearchQuery().
+   *
+   * @return float
+   *   The cosine distance.
+   */
+  public static function distance(ItemInterface $result): float {
+    return 1.0 - (float) $result->getScore();
   }
 
   /**

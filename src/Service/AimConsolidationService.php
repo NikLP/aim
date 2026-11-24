@@ -731,7 +731,8 @@ class AimConsolidationService {
     foreach ($results as $result) {
       // Rows arrive nearest-first, so the first one past the cutoff ends
       // the useful part of the list.
-      if ((float) $result->getScore() > $maxScore) {
+      $distance = AimMemoryManager::distance($result);
+      if ($distance > $maxScore) {
         break;
       }
 
@@ -773,7 +774,7 @@ class AimConsolidationService {
         continue;
       }
 
-      $neighbors[] = [$candidate, (float) $result->getScore()];
+      $neighbors[] = [$candidate, $distance];
       if (count($neighbors) >= $limit) {
         break;
       }

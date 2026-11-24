@@ -229,9 +229,10 @@ duplicated here.
   ([ADR-0018](adr/resolved/0018-index-subject-uid-with-btree.md), named
   for the field's old `subject_uid` name), HNSW is tuned to
   `M=16` and `ef_search=100` ([ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)),
-  and the
-  provider plugin is swapped for `AimMariaDBProvider` to work around three
-  upstream bugs. Detail in [DEVELOPING.md](DEVELOPING.md).
+  and the provider (`ai_vdb_provider_mariadb` 1.0.2+) runs unmodified.
+  Search API scores are similarity; aim's thresholds and output are cosine
+  distance, read through `AimMemoryManager::distance()`. Detail in
+  [DEVELOPING.md](DEVELOPING.md).
 
 ## Permissions
 
@@ -280,12 +281,13 @@ look at other roles when a permission check unexpectedly fails.
   Revisit once real data exists that reinstalling would destroy. aim
   ships no update hooks (there is no `aim_update_last_removed()`; the
   first one added would be 10001 or later).
-- **`AimMariaDBProvider` stays a thin shim** over `ai_vdb_provider_mariadb`.
-  A workaround lives there only with an upstream issue in TODO.md/BACKLOG.md and is
-  deleted when the provider ships the fix; generic features go upstream
-  first; aim ships values under the provider's own config key names, never
-  its own. Rule and per-override table in
-  [ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md).
+- **No provider subclass.** A workaround for an upstream bug lives in aim
+  only with an upstream issue in TODO.md/BACKLOG.md and is deleted when the
+  provider ships the fix; generic features go upstream first; aim ships
+  values under the provider's own config key names, never its own
+  ([ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md);
+  its `AimMariaDBProvider` shim went 2026-11-23 when provider 1.0.2 fixed
+  everything in it).
 - **Logging** goes through `logger.channel.aim`: warnings and errors
   always, info/debug only via `AimMemoryManager::logAudit()` /
   `logVerbose()` (gated by `aim.settings` `log_audit` / `log_verbose`).

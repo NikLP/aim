@@ -13,8 +13,10 @@ use Drupal\search_api\Query\QueryInterface;
  * A search backend callback standing in for the vector store.
  *
  * Applies the query's equality conditions (scope, subject, user, trusted) to
- * the stored facts and ranks them by a score each test sets per fact, nearest
- * first. It cannot say whether real vectors rank well; that is what the live
+ * the stored facts and ranks them by a cosine distance each test sets per
+ * fact, nearest first. Each item's score is the similarity the provider
+ * reports (1 - distance), so AimMemoryManager::distance() is exercised. It
+ * cannot say whether real vectors rank well; that is what the live
  * benchmarks are for.
  */
 final class FakeVectorSearch {
@@ -46,10 +48,10 @@ final class FakeVectorSearch {
       }
 
       $item = $fieldsHelper->createItemFromObject($index, $fact->getTypedData(), NULL, $index->getDatasource('entity:aim_fact'));
-      $item->setScore($scores[$fact->id()] ?? 0.1);
+      $item->setScore(1.0 - ($scores[$fact->id()] ?? 0.1));
       $items[$item->getId()] = $item;
     }
-    uasort($items, fn ($a, $b) => $a->getScore() <=> $b->getScore());
+    uasort($items, fn ($a, $b) => $b->getScore() <=> $a->getScore());
 
     $limit = $query->getOption('limit');
     if ($limit !== NULL) {

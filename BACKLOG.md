@@ -291,7 +291,7 @@ OpenBrain, an in-house second brain. His points, and where each landed:
 - [ ] **Packaging.** Not a one-line installer. `recipes/aim_demo_library/preflight/preflight.js` lives in
       the recipe, not the module proper; consider a module-level check (a
       Drush command or status report) so installs are verifiable. Heavy
-      parts already swappable (`DecisionBackend`, provider shim, Ollama
+      parts already swappable (`DecisionBackend`, Ollama
       embeddings); document the swap points. George suggested a site
       template after the module exists. Unresearched here: check what
       Drupal CMS site templates require against `aim_demo_library`.
@@ -327,6 +327,23 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       "starts untrusted" mitigation does not hold for a writer with a trust
       permission.)
       [ADR-0007](adr/resolved/0007-user-scope-requires-real-account.md)
+- [ ] **Derived facts can widen their source's audience** (raised
+      2026-11-23). A fact's scope is checked against the writer's create
+      permission only, never against what it was drawn from: an editor
+      reading an unpublished node, or another user's user-scope facts, can
+      write a `site` fact from it, and anonymous recall returns it.
+      Proposed, as taint tracking on aim's own tools: record during a
+      request the narrowest scope `aim_recall` returned (another user's
+      user facts, a role's facts); an `aim_remember` in the same request
+      into a wider scope saves untrusted, so it goes to review (a model
+      check withholds trust, ADR-0065). Person-approved calls keep their
+      trust (ADR-0067: the person made the call). Limits: only sees aim's
+      tools, so page search of unpublished nodes needs that tool to report
+      it too (and search_api's content access processor, "Larger demo"
+      below); a person retyping restricted text is not caught, which
+      stays a policy line (the writer answers for what they publish, as
+      with content). Belongs with the privacy review under "Outside
+      advice".
 
 ## Larger demo: page search + aim + FlowDrop (raised 2026-10-30)
 
@@ -469,117 +486,49 @@ questions" section)
       whether a Cache API layer (keyed scope+subject, invalidated on save)
       is still wanted. The boolean `state` field this was originally
       motivated by was removed 2026-10-12 (nothing read it).
-- [ ] Upstream work for `AimMariaDBProvider`'s overrides (status checked
-      against drupal.org and the git history 2026-09-27, re-checked
-      2026-10-23: no provider commit since #3605665 on 2026-06-23, no
-      release since 1.0.1; the maintainer knows the fixes are available
-      (Nik, direct conversation) and will cut a point release once
-      convinced - so don't add issues to the queue for now, raise new
-      items with him directly):
-      (1) index save throws "table exists" - already
-      [#3609961](https://www.drupal.org/i/3609961) (now Needs work; our
-      patch offered there, approach still under debate), but its MR 8
-      makes `createCollection()` drop the collection first, and the
-      index-update hook calls it on every save, so it would wipe the vectors
-      on every index save. **Commented** on 2026-09-27 that `CREATE TABLE IF
-      NOT EXISTS`, or tolerating MariaDB error 1050 as the shim does, is the
-      safe fix, and not to take a provider release containing MR 8 as
-      written;
-      (2) `getVdbIds()` uses `querySearch()`'s default `limit = 10`, so
-      deletes remove at most 10 rows - filed as
-      [#3626257](https://www.drupal.org/i/3626257) 2026-09-27, MR up; (3) an
-      empty integer/decimal/date/boolean attribute is inserted as `''`,
-      which strict mode rejects (`ERROR 1366`) - filed as
-      [#3626262](https://www.drupal.org/i/3626262) 2026-09-27, MR up; (4)
-      optionally a BTREE index for filterable attribute columns, a feature
-      request, held until the bugs land; (6) `createCollection()` runs
-      `VECTOR(0)` for a server with no dimensions yet, logging a SQL error
-      on every fresh install - the shim returns early, to raise with him
-      (reported by an outside tester 2026-11-21); (5) string attributes stored Markdown-escaped (`_` as `\_`,
-      so `subject` filters miss) - **DONE 2026-09-27**: fixed upstream by
-      [#3572801](https://www.drupal.org/i/3572801) in ai_search 1.3.0-alpha5
-      / 2.0.0-alpha2 and `drupal/ai`'s 1.x head, not in the code bundled
-      with `drupal/ai` 1.4.9 or 1.5.0 - the site moved from that bundled
-      copy to the standalone `drupal/ai_search:^1.3@alpha` package
-      (DEVELOPING.md, "Upgrading to standalone `ai_search`") and removed
-      the shim override; (6) missing dependency: the module declares only
-      `ai:ai`, but its plugin extends `ai`'s `AiVdbProviderClientBase`,
-      which implements `ai_search`'s `AiVdbProviderSearchApiInterface`, and
-      `ai_vdb_provider_mariadb_requirements()` loads `search_api_server`
-      storage unconditionally. Enabled without `ai_search`, the status
-      report fatals (`PluginNotFoundException: The "search_api_server"
-      entity type does not exist`), and applying `aim_demo_library` failed
-      with `The "mariadb" plugin does not exist` (empty valid-ID list),
-      rolled back (2026-10-23). Mechanism: without `ai_search`'s namespace,
-      `AiVdbProviderClientBase` cannot load, so attribute discovery skips
-      every VDB plugin on it (`mariadb` and `amazeeio_vector_db`) and the
-      manager caches the empty list; installing `ai_search` later does not
-      clear it (the cache bug in (7)). Still on the 1.0.x head (checked
-      2026-10-23, queue has no such issue). Fix: add
-      `ai_search:ai_search` to the dependencies (raise with the maintainer
-      directly, not yet filed). The same requirements hook also loads only
-      the server with ID `mariadb`, so its debug-logging warning never
-      checks another server (e.g. `aim_vector`) - minor, same
-      conversation. Partly `drupal/ai`'s too:
-      [#3535939](https://www.drupal.org/i/3535939) ("AiVdbProviderClientBase
-      depends on classes in the ai_search submodule") is fixed only on
-      `drupal/ai`'s own 2.0.x/2.x branches (the base class there implements
-      no `ai_search` interface); the 1.x head, which this site's 1.6.x-dev
-      tracks, still implements
-      `Drupal\ai_search\AiVdbProviderSearchApiInterface`;
-      (7) `drupal/ai`'s `ai.vdb_provider` manager is not tagged
-      `plugin_manager_cache_clear` (core's `PluginManagerPass` only tags
-      `plugin.manager.*` ids), so no module install clears
-      `ai_vdb_provider_info_plugins` (the `ai_modules_installed()` hook
-      clears `ai_provider_plugins` only, and runs after config install
-      anyway). Measured live 2026-10-23: the entry survived
-      `plugin.cache_clearer->clearCachedDefinitions()`, the call
-      `ModuleInstaller::install()` makes before installing config. So a
-      provider enabled before aim kept definitions cached without
-      `AimHooks::vdbProviderInfoAlter()`, and aim's `config/install` index
-      save plus the recipe's `setProperties` re-save ran the stock
-      provider: `Table 'aim_fact_vectors' already exists`, bug (1), and on
-      a site without that second save, a silent run without the shim. Not
-      a provider override: fixed in aim by `AimServiceProvider`, which adds
-      the tag (verified the manager is now registered and the entry is
-      cleared; not yet re-run on a fresh install with the provider
-      pre-enabled, so the recipe README's "don't pre-enable" note stays
-      until it is). Upstream: [#3547139](https://www.drupal.org/i/3547139)
-      ("Cache flush on VDB installation does not work") was closed
-      2025-09 with MR !900, which only added test dependencies; the 1.x
-      head still has no tag or flush (nor do 2.x/2.0.x). It was closed as
-      fixed by #3535939, which only removes the discovery skip, not the
-      stale cache. **Commented** on #3547139 (tag as the fix) and
-      #3535939 (1.x backport) 2026-10-23; delete `AimServiceProvider`
-      when the tag lands. Both
-      failures needed the provider enabled before the recipe; with
-      `ai_vdb_provider_mariadb`, `ai_search` and `search_api` uninstalled
-      the recipe applied cleanly (31/31), since then the definitions are
-      first built after aim is installed.
-      The two tuning overrides (M, ef_search) go as soon as a provider
-      release includes [#3605665](https://www.drupal.org/i/3605665) (merged
-      on the 1.0.x head, one commit past 1.0.1, not yet released);
-      `mhnsw_ef_search` in the shipped server config carries over unchanged.
-      When the last override goes, delete the class and
-      `AimHooks::vdbProviderInfoAlter()`. See
-      [ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md).
-- [ ] `ai_vdb_provider_mariadb`'s `MariaDBProvider` does not implement
-      `getRawEmbeddingFieldName()` (inherits `AiVdbProviderClientBase`'s
-      default, which returns `NULL`; checked 2026-09-27) - a feature
-      request to file. Standalone `ai_search` 1.3.0-alpha5 added a real
-      `vector_input` query option (`$query->setOption('vector_input',
-      $vector)`, read by `SearchApiAiSearchBackend::getSearchVectorInput()`)
-      that skips the provider's embed call when the caller already has a
-      vector - explored 2026-09-27 as a way to stop
-      `findNearestNeighbor()` re-embedding each fact's own text on every
-      consolidation sweep (see [ADR-0017](adr/resolved/0017-query-embedding-cache.md)),
-      by feeding it the fact's own already-indexed vector. Blocked: with
-      `getRawEmbeddingFieldName()` unimplemented for MariaDB, there is no
-      way to read a fact's already-stored vector back out of `aim_fact_vectors`
-      through the supported provider API, so `vector_input` has nothing
-      to be given except a freshly embedded vector - no cheaper than
-      `->keys()`. ADR-0017's embedding cache remains the correct near-term
-      fix; revisit `vector_input` once this is filed and fixed.
+- [ ] Upstream leftovers for `ai_vdb_provider_mariadb` after 1.0.2
+      (2026-11-23), which fixed every override `AimMariaDBProvider` carried
+      (#3609961 with `CREATE TABLE IF NOT EXISTS`, not MR 8's drop;
+      #3626257; #3626262; #3605665's `m`/`mhnsw_ef_search`) and made
+      `ai_search` optional, so the shim was deleted (ADR-0023's addendum).
+      Raise with the maintainer directly, not the queue:
+      (a) 1.0.2 changed Search API scores from cosine distance to
+      similarity (#3635830, deliberate: `ai_search` reads scores as
+      higher-is-better). Its README says positive `min_score` thresholds
+      "keep their existing meaning", true only against `ai_search`'s
+      intent: a threshold tuned on 1.0.1 inverts silently. Ask for a BC
+      note on the release. It also added `$server_id` to `getVdbIds()`,
+      fatal for any subclass overriding it (aim's did);
+      (b) `createCollection()` with `dimensions: 0` (aim's shipped server
+      before its model is known): the index-save hook now skips it, but
+      `drupal/ai`'s `AiVdbProviderPluginManager` still calls it (and
+      swallows the error). Check a fresh install's log before closing;
+      (c) the requirements hook and config page still load only the
+      server with ID `mariadb`, so the debug-logging warning never checks
+      `aim_vector` - minor;
+      (d) optionally a BTREE index for filterable attribute columns
+      (aim does it in `AimHooks::ensureColumnIndex()`), a feature request.
+      Separately `drupal/ai`'s: (7) the `ai.vdb_provider` manager is not
+      tagged `plugin_manager_cache_clear` (core's `PluginManagerPass` only
+      tags `plugin.manager.*` ids), so no module install clears
+      `ai_vdb_provider_info_plugins` (measured 2026-10-23: it survived
+      `plugin.cache_clearer->clearCachedDefinitions()`); a provider
+      installed after the list was built stays missing. aim's
+      `AimServiceProvider` adds the tag. Upstream
+      [#3547139](https://www.drupal.org/i/3547139) was closed as fixed by
+      #3535939, which only removes the discovery skip; **commented** on
+      both 2026-10-23. Delete `AimServiceProvider` when the tag lands.
+- [ ] Read a fact's stored vector instead of re-embedding it:
+      `ai_vdb_provider_mariadb` 1.0.2 implements
+      `getRawEmbeddingFieldName()` (#3626352), so with the server's
+      `include_raw_embedding_vector` on, a result's
+      `getExtraData('raw_vector')` can feed
+      `$query->setOption('vector_input', $vector)`
+      (`SearchApiAiSearchBackend::getSearchVectorInput()`). That would stop
+      `findNeighbors()` re-embedding each fact's own text on every
+      consolidation sweep ([ADR-0017](adr/resolved/0017-query-embedding-cache.md)'s
+      cache covers repeats only). Unblocked 2026-11-23, not built; measure
+      the embed cost first (local Ollama is fast).
 - [ ] Recheck the HNSW tuning (M=16, ef_search=100) when the table grows
       about tenfold, the embeddings model or dimensions change, or the
       provider is upgraded. Method in DEVELOPING.md, "Rechecking accuracy".
@@ -893,6 +842,19 @@ would bring each back. Nothing here is built.
       do not depend on it.
 
 ## Scope architecture follow-ups (from ADR-0025 to 0028, all built)
+
+- [ ] **Entity-scope facts outlive their target** (raised 2026-11-23).
+      Nothing acts when a fact's `target_type`/`target_id` entity is
+      deleted or unpublished: the facts stay in recall, and
+      `validateSubject()` deliberately lets them save (DEVELOPING.md).
+      Proposed, on the entity plugin: on delete, retire the target's live
+      facts with `superseded_by_reason`
+      `{"decision":"target_deleted","target":"<type>:<id>"}`; on
+      unpublish, retire them with `target_unpublished` and un-retire
+      those carrying that reason on republish, the same pattern as
+      ADR-0068's case close and reopen. Entity types without a published
+      status get the delete half only. The opposite direction (content
+      drifting from facts) is ADR-0043.
 
 - [ ] `checkViewAccess()`'s "allowed or neutral, never forbidden" contract
       (`AimScopeTypeInterface`) is a deliberate design choice, not a

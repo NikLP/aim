@@ -280,16 +280,31 @@ addendum) are built. Work on the literals modules themselves is in
       that `pmu aim_tool` leaves no `mcp_tool_config.aim_*` behind; refresh
       the "observed with beta3" notes in aim_tool's README/DEVELOPING.md.
 - [ ] **Note: recall is tied to MariaDB and `nomic-embed-text` today**
-      (checked 2026-10-23). `aim.info.yml` hard-depends on
-      `ai_vdb_provider_mariadb` (so the recipe needn't list it), and
-      `search_api.server.aim_vector` hardcodes
-      `ollama__nomic-embed-text:latest` at 768 dimensions.
-      `recall_max_distance` and `recall_gap` are tuned to that
-      model's distances on MariaDB's `VEC_DISTANCE_COSINE`, so a different
-      embeddings model or backend needs them re-tuned. Other MariaDB-only
-      code: `AimMariaDBProvider`, the raw SQL in `AimStatusChecker`,
-      `aim_uninstall()`'s table drop. Recall and consolidation themselves go
-      through Search API, so they're portable.
+      (checked 2026-11-23). `aim.info.yml` and `composer.json` hard-depend
+      on `ai_vdb_provider_mariadb` (so the recipe needn't list it), and
+      `search_api.server.aim_vector` names the `mariadb` provider and
+      hardcodes `ollama__nomic-embed-text:latest` at 768 dimensions.
+      `compare_distance`, `recall_max_distance` and `recall_gap` are tuned
+      to that model's distances on MariaDB's `VEC_DISTANCE_COSINE`, so a
+      different embeddings model or backend needs them re-tuned.
+      Recall and consolidation go through Search API and are portable
+      since the provider subclass went (2026-11-23), on one condition:
+      `AimMemoryManager::distance()` assumes `ai_search`'s score contract
+      with a cosine metric (score = similarity, distance = 1 - score).
+      Provider 1.0.2 returns 1/(1+d) for Euclidean, so a Euclidean server
+      would need the conversion to follow the metric; other providers'
+      (pgvector, Milvus) scores unchecked.
+      MariaDB-specific code: raw MariaDB SQL in
+      `AimHooks::ensureColumnIndex()` (no-op off `MariaDBProvider`, so
+      another backend loses ADR-0018's BTREE pre-filtering) and
+      `AimStatusChecker::checkHnswTuning()` (`SHOW CREATE TABLE`). The
+      parity and orphan checks and `aim_uninstall()`'s drop use Drupal's
+      query builder / schema API, not raw SQL, but assume the collection is
+      the `aim_fact_vectors` table in Drupal's own database (MariaDB's
+      in-database mode). A second backend: make the provider optional or
+      move those pieces behind a provider check or into a submodule, make
+      the status checks per backend, confirm its score semantics,
+      recalibrate, ADR, ship its server config.
 
 ## Ingestion
 

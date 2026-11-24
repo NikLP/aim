@@ -152,3 +152,27 @@ entity and site subjects.
   about what a field means could ride on that tool's output. Not built,
   and the tool is not enabled on this site; instance-level notes would
   still go through `scope=entity` facts.
+
+## Addendum (2026-11-23): aim writes annotations; facts wait on a case
+
+Direction from Nik: aim will write annotations itself in time (through
+`annotations_write`, under Annotations' own `edit {type} annotations`
+check), and retire the facts it wrote them from. That narrows decision 3:
+promotion is not only a reviewer's button, and a promoted fact does not
+stay in recall next to its annotation.
+
+- **Precedence between the two layers only matters in the interim**, while
+  a fact waits to be promoted. Once written, the annotation is the source
+  and the fact is retired with `superseded_by_reason` naming it, so the
+  two never answer side by side.
+- **Interim facts live on a case.** The work of annotating a target is the
+  case; its facts are what has been learned so far. Writing the annotation
+  is the point the case closes, and
+  [ADR-0068](0068-case-entity-module.md)'s close already takes a case's
+  remaining facts out of recall (`case_closed`). Promoted facts carry
+  their own reason (the annotation), not `case_closed`, so reopening the
+  case does not bring them back.
+- **Open:** how a case fact names the `annotation_target` it is for, since
+  the case scope has only `subject` (decision 2 assumed a field on the
+  `site`/`role` scopes). Likely on the case entity rather than per fact:
+  one case per target. Decide when the bridge is built.

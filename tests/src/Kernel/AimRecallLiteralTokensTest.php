@@ -104,7 +104,8 @@ class AimRecallLiteralTokensTest extends AimKernelTestBase {
     $items = [];
     foreach (AimFact::loadMultiple() as $fact) {
       $item = $fieldsHelper->createItemFromObject($index, EntityAdapter::createFromEntity($fact), NULL, $index->getDatasource('entity:aim_fact'));
-      $item->setScore(0.1);
+      // Similarity, as the provider reports it: a distance of 0.1.
+      $item->setScore(0.9);
       $items[$item->getId()] = $item;
     }
     $query->getResults()->setResultItems($items)->setResultCount(count($items));

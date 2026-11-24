@@ -110,13 +110,11 @@ class AimRecallService {
    *   A list of rows, each with keys id, score, scope, subject, text,
    *   source, trusted, created, asserted (a timestamp, or NULL when
    *   never set; see formatFactLine()). Retired facts are never returned, so
-   *   there is no retired key. score is what search_api reports for the
-   *   match, which for ai_vdb_provider_mariadb is MariaDB's
-   *   VEC_DISTANCE_COSINE value: a cosine distance, 0.0 for an identical
-   *   embedding and larger the less similar the fact is, so lower is a
-   *   better match - the opposite of what "score" usually implies.
-   *   Consolidation's thresholds are expressed in the same unit ("at or
-   *   below").
+   *   there is no retired key. score is the match's cosine distance
+   *   (AimMemoryManager::distance()), 0.0 for an identical embedding and
+   *   larger the less similar the fact is, so lower is a better match - the
+   *   opposite of what "score" usually implies. Consolidation's thresholds
+   *   are expressed in the same unit ("at or below").
    *
    * @throws \RuntimeException
    *   If the vector index does not exist.
@@ -169,7 +167,8 @@ class AimRecallService {
       // Checked first: a far match costs no entity load. Rows arrive
       // nearest-first, but the cutoff is applied before the limit so a
       // uid-filter over-fetch pool is spent on matches that qualify.
-      if ($maxDistance !== NULL && (float) $result->getScore() > $maxDistance) {
+      $distance = AimMemoryManager::distance($result);
+      if ($maxDistance !== NULL && $distance > $maxDistance) {
         continue;
       }
 
@@ -188,7 +187,7 @@ class AimRecallService {
         continue;
       }
 
-      $row = $this->row($original->getValue(), $result->getScore());
+      $row = $this->row($original->getValue(), $distance);
       if ($row === NULL) {
         continue;
       }

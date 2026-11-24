@@ -340,7 +340,7 @@ title and file name still say `subject_uid`, the field itself does not):
 `recall()` (with `--subject-uid`) and user-scope `findNeighbors()`
 filter by a `user` query condition, not in PHP. The column's BTREE index
 (`idx_user`, added by `AimHooks::vectorIndexUpdate()` through
-`AimMariaDBProvider::ensureColumnIndex()` on every index save) is what
+`AimHooks::ensureColumnIndex()` on every index save) is what
 makes this exact: MariaDB's HNSW index post-filters, so without it a
 selective filter returns short or wrong results. A user holding a large
 share of the table (measured at 20% and 77%) is served by HNSW instead and
@@ -348,49 +348,30 @@ stays approximate (82 to 97% of the exact top-k), which is why `recall()`
 still over-fetches 5x for a uid filter. Measurements and the limits of
 the test in [ADR-0018](adr/resolved/0018-index-subject-uid-with-btree.md).
 
-**`ai_vdb_provider_mariadb` is swapped for a thin subclass:**
-`Drupal\aim\Vdb\AimMariaDBProvider`, via `AimHooks::vdbProviderInfoAlter()`,
-works around three bugs in provider 1.0.1 and the 1.0.x head (checked
-2026-09-26/27) and applies HNSW tuning. Upstream status: the table-exists
-throw is #3609961 (its RTBC MR drops the whole collection on every index
-save, so do not take a provider release with that as written); the
-10-row delete cap is #3626257 and the empty numeric value #3626262
-(both with an MR, neither released; see BACKLOG.md). Saving
-the index threw `Table 'aim_fact_vectors' already exists` (an unhandled
-`mysqli_sql_exception` from `createCollection()`, before `updateFields()`
-ran); `deleteItems()`/`deleteIndexItems()` removed at most 10 rows per
-call (`getVdbIds()` used `querySearch()`'s default limit); and an empty
-integer/decimal/date/boolean attribute reached the insert as `''`, which
-strict mode rejects in a numeric column (`ERROR 1366`), so it is set to
-`NULL` there. The class also has `ensureColumnIndex()`, aim's own BTREE
-helper (below). **It is a shim:** each override needs an upstream issue in
-TODO.md/BACKLOG.md and goes when the provider releases the fix, and aim ships tuned
-values under the provider's own config key names rather than inventing
-its own (rule and per-override table in
-[ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)). If a symptom
-returns, check the alter hook still applies
-(`ddev drush php:eval 'echo get_class(\Drupal::service("ai.vdb_provider")->createInstance("mariadb"));'`
-should print the aim class; `drush aim:status`'s "Provider shim" line checks
-the same). Bug details in
-[ADR-0022](adr/resolved/0022-exclude-retired-facts-from-vector-index.md).
+**`ai_vdb_provider_mariadb` runs unmodified, at 1.0.2 or later.** Until
+2026-11-23 aim swapped in a subclass (`AimMariaDBProvider`) for three
+provider bugs and the HNSW settings; 1.0.2 fixed all of them (#3609961
+table exists, #3626257 the 10-row delete cap, #3626262 empty numeric
+values, #3605665 `m`/`mhnsw_ef_search`), so the class and its alter hook
+were deleted ([ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)'s
+addendum). aim's `composer.json` requires `^1.0.2`. The one piece that
+was aim's own, the BTREE helper, is `AimHooks::ensureColumnIndex()`.
 
-**The swap needs the definitions rebuilt at aim's install.** `drupal/ai`
-names the VDB manager `ai.vdb_provider` without the
-`plugin_manager_cache_clear` tag, and core's `PluginManagerPass` only tags
-`plugin.manager.*` services, so a module install never clears its cached
-definitions. A provider enabled before aim then kept definitions cached
-without the alter, and aim's own `config/install` index save ran the stock
-provider (`Table 'aim_fact_vectors' already exists` on the second save,
-and silently without the shim's fixes otherwise). `AimServiceProvider`
-adds the tag; delete it once `drupal/ai` does.
+**Scores are similarity, aim's settings are distance.** Since 1.0.2 a
+Search API result's score is the cosine similarity floored at 0 (higher is
+closer), as `ai_search` expects; 1.0.1 passed MariaDB's raw distance
+through. aim's thresholds (`compare_distance`, `recall_max_distance`,
+`recall_gap`), recall rows' `score` and `aim:recall`'s Distance column stay
+in cosine distance: every read goes through `AimMemoryManager::distance()`
+(`1 - score`). Read a new score through it too, never `getScore()` raw.
+The test fakes set similarity the same way (`FakeVectorSearch`).
 
-**A fourth override (string attributes written Markdown-escaped) was
-removed 2026-09-27**, after the site moved from `ai_search` as bundled
-inside `drupal/ai` 1.4.9 to the standalone `drupal/ai_search:^1.3@alpha`
-package (1.3.0-alpha5), which carries the upstream fix (#3572801). See
-"Upgrading to standalone `ai_search`" below for that migration; the
-removed override is documented for provenance in
-[ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md).
+**`AimServiceProvider` tags the VDB manager for cache clears.** `drupal/ai`
+names it `ai.vdb_provider` without the `plugin_manager_cache_clear` tag,
+and core's `PluginManagerPass` only tags `plugin.manager.*` services, so a
+module install never clears its cached definitions and a provider
+installed after the list was built stays missing. Delete it once
+`drupal/ai` tags the service (#3547139, BACKLOG.md).
 
 ### Upgrading to standalone `ai_search`
 
@@ -443,7 +424,7 @@ on every test question at 1-6 ms. Plain-English version in
 | Setting | Where | Applies |
 | --- | --- | --- |
 | `mhnsw_ef_search` (100) | `search_api.server.aim_vector`, `backend_config.database_settings.mhnsw_ef_search` (the key the provider's 1.0.x head also uses) | Every query, set with `SET SESSION` on the connection that runs it. Change it any time. |
-| `M` (16) | `AimMariaDBProvider::HNSW_M` | A new collection only. Build-time. |
+| `M` (16) | `search_api.server.aim_vector`, `backend_config.database_settings.m` (unset: the provider's default, 16) | A new collection only. Build-time. |
 
 An existing table keeps the M it was built with. Check it, and rebuild
 once if it is not 16 (seconds for thousands of rows, longer for millions,
@@ -526,9 +507,8 @@ drush aim:status
 
 Checks `config:status` can't do, because they're runtime DB state,
 not config: vector index parity (live fact count vs. `aim_fact_vectors` row
-count), orphan vector rows, the `mariadb` VDB provider plugin still
-resolving to `AimMariaDBProvider`, the collection table's build-time HNSW
-`M` and the server's `mhnsw_ef_search`, and `aim.settings:recall_max_distance`
+count), orphan vector rows, the collection table's build-time HNSW
+`M` against the server's `m` and its `mhnsw_ef_search`, and `aim.settings:recall_max_distance`
 actually being set rather than silently using the in-code fallback, no
 fact overdue for the expiry sweep, the `aim_consolidate` queue being drained
 (oldest item under two hours, measured on the database queue only; other
@@ -956,10 +936,9 @@ then export the index config.
 - The collection table only gets its attribute columns on index
   *update*, not *create* - a freshly created index entity needs a second
   `->save()` (`aim.install`'s `hook_install()` does this automatically).
-  Re-saving an index whose table already exists is safe:
-  `AimMariaDBProvider` swallows the provider's "Table already exists"
-  throw (see "`ai_vdb_provider_mariadb` is swapped for a subclass" above),
-  so a stale table no longer needs a `DROP TABLE`.
+  Re-saving an index whose table already exists is safe: the provider
+  creates the collection with `CREATE TABLE IF NOT EXISTS` (1.0.2), so a
+  stale table no longer needs a `DROP TABLE`.
 - `drush search-api:clear aim_vector_index` can drop and reprovision
   `aim_fact_vectors` down to just the base columns, silently losing `scope`/
   `source`/`subject`/`text` - the next `search-api:index` then fails
@@ -1125,14 +1104,13 @@ from config and the shim.
    field `user` (datasource `entity:aim_fact`, property path
    `user`) to `search_api.index.aim_vector_index`, and
    `indexing_options.user: attributes` to
-   `ai_search.index.aim_vector_index`. Saving the index makes the shim add
-   the column and its BTREE index. Then `ddev drush sapi-r aim_vector_index
+   `ai_search.index.aim_vector_index`. Saving the index adds the column
+   (the provider) and its BTREE index (`AimHooks::vectorIndexUpdate()`). Then `ddev drush sapi-r aim_vector_index
    && ddev drush sapi-i aim_vector_index`. This must happen before the code
    that filters on it runs: old rows have `NULL` until reindexed.
-3. **The provider shim** needs nothing: it is swapped in by
-   `hook_ai_vdb_provider_info_alter()` after `drush cr`. Check with the
-   `get_class(...)` one-liner under "`ai_vdb_provider_mariadb` is swapped
-   for a thin subclass".
+3. **Provider 1.0.2 or later**: scores became similarity there, and aim
+   reads them as such (see "Scores are similarity, aim's settings are
+   distance"). On 1.0.1 every threshold would be inverted.
 4. **HNSW tuning** ([ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)):
    add `mhnsw_ef_search: 100` to the server's `database_settings`, and
    rebuild the vector index once at `M=16` (the `ALTER TABLE` under "Tuning
@@ -1149,7 +1127,7 @@ from config and the shim.
 6. **Per-site choices, not defaults:** `index_directly` on if embeddings are
    local; `recall_max_distance` recalibrated to your dataset (ADR-0019).
 7. Run `drush aim:status` to confirm steps 1-4 above actually took (it
-   checks index parity, orphan rows, the provider shim, and HNSW tuning
+   checks index parity, orphan rows and HNSW tuning
    directly against the DB), then export the config and confirm `ddev
    drush config:status` reports no differences.
 
@@ -1218,10 +1196,8 @@ embeddings call:
    drush php:eval "\Drupal::entityTypeManager()->getStorage('search_api_index')->load('aim_vector_index')->save();"
    ```
 
-   Re-saving is safe on an existing table too: `AimMariaDBProvider`
-   swallows the provider's "Table already exists" throw (see "`ai_vdb_provider_mariadb`
-   is swapped for a subclass" above). If that message still appears, the
-   alter hook is not applying - check the class it prints there.
+   Re-saving is safe on an existing table too: the provider creates the
+   collection with `CREATE TABLE IF NOT EXISTS` (1.0.2 or later).
 7. **Reindex every fact, not incrementally** - a provider/model change
    means every existing vector is in the old embedding space. If step 5
    dropped/rebuilt `aim_fact_vectors`, the table is already empty - reindex
@@ -1258,7 +1234,6 @@ or look (a real candidate, not yet decided). Only read, nothing replaced.
 | `AimMemoryManager` remember/recall/consolidate | keep | The memory rules; split planned (TODO.md/BACKLOG.md), no contrib equivalent |
 | `AimCallLogSubscriber` | thin | Adds run ID and duration to `ai_logging` rows; `ai_logging` has neither |
 | `AimEmbeddingCacheSubscriber` | keep | No query-embedding cache found in `ai` or `ai_search` (ADR-0017) |
-| `AimMariaDBProvider` | thin | Shim over `ai_vdb_provider_mariadb`, deleted as upstream fixes land (ADR-0023) |
 | `ExcludeRetired` processor | keep | Aim-specific Search API rule |
 | `AimStatusChecker`, status page | keep | Checks aim's DB state; `ai_observability` is OTel traces, not this |
 | Grounded check, merge verifier (`checkGrounding`, `verifyMerge`) | keep | Read the runner: Decision guardrails filter the input or output of a Decision call (stop with a score). Our checks are Decision calls whose answers aim acts on, so they are not guardrails. Guardrails could instead be attached to those calls |

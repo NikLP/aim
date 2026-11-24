@@ -12,17 +12,15 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Queue\DatabaseQueue;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\ai\AiProviderPluginManager;
-use Drupal\ai\AiVdbProviderPluginManager;
 use Drupal\aim\Service\AimSettings;
-use Drupal\aim\Vdb\AimMariaDBProvider;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Reports on the database-side state the vector search feature depends on.
  *
  * `config:status` only diffs config, not runtime DB state - a fact can fall
- * out of the vector index, the provider shim can stop being swapped in, an
- * existing collection table keeps whatever HNSW M it was built with
+ * out of the vector index, an existing collection table keeps whatever
+ * HNSW M it was built with
  * regardless of what the code now ships. This checks those directly
  * instead of walking them by hand, replacing step 6 of DEVELOPING.md's
  * "Upgrading an existing site". Shared between `aim:status` (Drush) and
@@ -41,9 +39,6 @@ final class AimStatusChecker {
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory, used to read the live HNSW and recall cutoff
    *   settings.
-   * @param \Drupal\ai\AiVdbProviderPluginManager $vdbProviders
-   *   The VDB provider plugin manager, used to confirm AimMariaDBProvider
-   *   is still swapped in.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    *   The entity type manager, used to query aim_fact - a real content
    *   entity - via the entity query API rather than raw SQL.
@@ -65,8 +60,6 @@ final class AimStatusChecker {
   public function __construct(
     protected Connection $database,
     protected ConfigFactoryInterface $configFactory,
-    #[Autowire(service: 'ai.vdb_provider')]
-    protected AiVdbProviderPluginManager $vdbProviders,
     protected EntityTypeManagerInterface $entityTypeManager,
     protected TimeInterface $time,
     #[Autowire(service: 'ai.provider')]
@@ -90,7 +83,6 @@ final class AimStatusChecker {
     return [
       'index_parity' => $this->checkIndexParity(),
       'orphan_vector_rows' => $this->checkOrphanVectorRows(),
-      'provider_shim' => $this->checkProviderShim(),
       'hnsw_tuning' => $this->checkHnswTuning(),
       'required_settings' => $this->checkRequiredSettings(),
       'expiry_sweep' => $this->checkExpirySweep(),
@@ -270,23 +262,6 @@ final class AimStatusChecker {
   }
 
   /**
-   * Checks that the mariadb VDB provider plugin still resolves to the shim.
-   *
-   * @return array
-   *   ['label' => string, 'ok' => bool, 'detail' => string].
-   */
-  private function checkProviderShim(): array {
-    $class = get_class($this->vdbProviders->createInstance('mariadb'));
-    $ok = $class === AimMariaDBProvider::class;
-
-    return [
-      'label' => 'Provider shim',
-      'ok' => $ok,
-      'detail' => $ok ? $class : "expected " . AimMariaDBProvider::class . ", got $class - check AimHooks::vdbProviderInfoAlter() ran (drush cr)",
-    ];
-  }
-
-  /**
    * Checks the collection table's build-time M and the server's ef_search.
    *
    * @return array
@@ -314,14 +289,17 @@ final class AimStatusChecker {
     }
 
     $m = preg_match('/VECTOR KEY[^\n]*["`]M["`]=\'?(\d+)/i', $createTable, $matches) ? (int) $matches[1] : NULL;
-    $efSearch = $this->configFactory->get('search_api.server.aim_vector')->get('backend_config.database_settings.mhnsw_ef_search');
+    $databaseSettings = $this->configFactory->get('search_api.server.aim_vector')->get('backend_config.database_settings') ?? [];
+    $efSearch = $databaseSettings['mhnsw_ef_search'] ?? NULL;
+    // The provider builds new collections with the server's `m`, 16 unset.
+    $expectedM = (int) ($databaseSettings['m'] ?? 16);
 
     $problems = [];
     if ($m === NULL) {
       $problems[] = "M not found in aim_fact_vectors' VECTOR KEY";
     }
-    elseif ($m !== AimMariaDBProvider::HNSW_M) {
-      $problems[] = "M=$m, expected " . AimMariaDBProvider::HNSW_M . ' - rebuild the index (DEVELOPING.md "Tuning vector search accuracy")';
+    elseif ($m !== $expectedM) {
+      $problems[] = "M=$m, expected $expectedM - rebuild the index (DEVELOPING.md \"Tuning vector search accuracy\")";
     }
 
     if ($efSearch === NULL) {

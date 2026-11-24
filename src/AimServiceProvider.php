@@ -12,11 +12,9 @@ use Drupal\Core\DependencyInjection\ServiceModifierInterface;
  *
  * Core's PluginManagerPass only tags services named plugin.manager.*, and
  * drupal/ai names it ai.vdb_provider without the tag, so a module install
- * never clears its cached definitions. Without this, a provider enabled
- * before aim keeps definitions cached without AimHooks::vdbProviderInfoAlter()
- * (aim's own config/install index save then runs the stock provider), and
- * a provider enabled before ai_search keeps an empty list. Delete once
- * drupal/ai tags the service (BACKLOG.md, AimMariaDBProvider upstream item).
+ * never clears its cached definitions: a provider installed after the list
+ * was first built stays missing ("The "mariadb" plugin does not exist").
+ * Delete once drupal/ai tags the service (drupal.org #3547139, BACKLOG.md).
  */
 class AimServiceProvider implements ServiceModifierInterface {
 

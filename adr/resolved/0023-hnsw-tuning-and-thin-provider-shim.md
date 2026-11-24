@@ -130,3 +130,28 @@ Alternatives considered:
 - ADR-0018 recorded that `mhnsw_ef_search = 200` "made no difference".
   That was for a sparse-filter case (one row ranked 88th). For dense users
   it matters a lot, and M mattered as much. ADR-0018 is amended.
+
+## Addendum (2026-11-23): the shim is gone
+
+`ai_vdb_provider_mariadb` 1.0.2 shipped every fix the table above waited
+for: #3609961 as `CREATE TABLE IF NOT EXISTS` (not MR 8's drop), #3626257,
+#3626262, and #3605665's `m` and `mhnsw_ef_search` under the same keys aim
+already shipped, with a schema for both. Per this ADR's rule,
+`AimMariaDBProvider`, `AimHooks::vdbProviderInfoAlter()` and
+`AimHooks::configSchemaInfoAlter()` were deleted; aim requires `^1.0.2`.
+`ensureColumnIndex()`, aim's own, moved to `AimHooks`. The live table kept
+`M=16`; no config changed.
+
+1.0.2 also made Search API scores cosine similarity floored at 0 instead of
+the raw distance (#3635830, deliberate: `ai_search` reads scores as
+higher-is-better). aim's settings stay in cosine distance, so its two
+score reads (recall's cutoff and row score, consolidation's neighbor
+cutoff) go through `AimMemoryManager::distance()` (`1 - score`); the tuned
+values and every form label are unchanged. Verified live: same distances
+and order as before for a known query, `aim:status` green.
+
+The upgrade itself broke the site until this landed: 1.0.2 added a
+`$server_id` parameter to `getVdbIds()`, and the shim's override no longer
+matched (fatal on any provider load). A subclass of a contrib plugin is
+exposed to that on every release, one more reason to keep none.
+

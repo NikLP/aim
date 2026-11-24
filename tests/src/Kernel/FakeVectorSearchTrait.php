@@ -42,10 +42,10 @@ trait FakeVectorSearchTrait {
   }
 
   /**
-   * Sets the score the fake search gives each fact.
+   * Sets the cosine distance the fake search gives each fact.
    *
    * @param array $scores
-   *   Scores keyed by fact ID. Unlisted facts score 0.1.
+   *   Distances keyed by fact ID. Unlisted facts are at 0.1.
    */
   protected function setScores(array $scores): void {
     $this->container->get('state')->set('aim_recall_test.scores', $scores);
