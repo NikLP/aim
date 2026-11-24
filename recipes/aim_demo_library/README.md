@@ -146,13 +146,18 @@ failed recipe prints a long stack trace after the real error; the first
 
 ## Before you rely on it
 
-- **Applies to a fresh install in one go** (verified 2026-11-24 on Drupal
-  11.4, Minimal profile): the recipe installs AIM's modules and imports their config itself,
+- **Applies to a fresh install in one go** (verified 2026-10-19 on Drupal
+  11.4): the recipe installs AIM's modules and imports their config itself,
   so there is no `drush en` step. It still overwrites the settings above,
   so use a scratch site.
-- **`index_directly` suits local embeddings.** With hosted embeddings each
-  save ties up a worker for seconds ([ADR-0015](../../adr/resolved/0015-immediate-consolidation-considered-deferred.md)
-  addendum); remove that action.
+- **`index_directly` costs one embedding call per save.** Search API makes
+  it after the response, so the visitor does not wait, but the PHP worker
+  does: about 70 ms with local Ollama, about 0.7 s with OpenAI
+  `text-embedding-3-small` (measured 2026-11-24). That is fine for a demo
+  or a chat that saves a fact now and then; for bulk writes on hosted
+  embeddings, or a busy site with few workers, remove that action
+  ([ADR-0015](../../adr/resolved/0015-immediate-consolidation-considered-deferred.md)
+  addendum).
 - **Thresholds are tuned to particular models.** The distance settings
   (Recall maximum distance `recall_max_distance`, Recall gap
   `recall_gap`, Comparison distance `compare_distance`) were measured on this dataset with

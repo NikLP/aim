@@ -520,13 +520,11 @@ questions" section)
       post-filters, so every MariaDB user who filters returns short
       results without one (ADR-0018). aim does it in
       `AimHooks::ensureColumnIndex()` for `user` and `trusted`, the last
-      raw MariaDB SQL in aim's hooks; delete it when this lands;
-      (e) a status-report warning when a collection's built M differs
-      from the server's `m`: M is build-time, so changing the setting on
-      an existing server does nothing until the index is rebuilt, and
-      nothing says so. aim checks it in `AimStatusChecker::checkHnswTuning()`
-      (`SHOW CREATE TABLE` under a swapped `sql_mode`); delete that when
-      this lands.
+      raw MariaDB SQL in aim's hooks; delete it when this lands.
+      (A built-M-vs-configured-`m` warning was dropped from this list
+      2026-11-24: since 1.0.2 the provider writes M from `m` at create, so
+      it only matters after a later edit of `m`; aim keeps its own
+      `AimStatusChecker::checkHnswTuning()`.)
       Separately `drupal/ai`'s: (7) the `ai.vdb_provider` manager is not
       tagged `plugin_manager_cache_clear` (core's `PluginManagerPass` only
       tags `plugin.manager.*` ids), so no module install clears

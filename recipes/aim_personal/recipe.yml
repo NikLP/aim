@@ -90,9 +90,10 @@ config:
     # action, so the vector table is made at this model's size.
     search_api.server.aim_vector:
       aimUseDefaultModels: []
-    # So a fact told to the model is searchable on the next question. Suits
-    # local embeddings (ADR-0015 addendum); with hosted embeddings each save
-    # ties up a worker for seconds, so drop this action.
+    # So a fact told to the model is searchable on the next question. One
+    # embedding call per save, after the response (ADR-0015 addendum): about
+    # 70 ms local, 0.7 s hosted. Drop this action for bulk writes on hosted
+    # embeddings.
     search_api.index.aim_vector_index:
       setProperties:
         options.index_directly: true

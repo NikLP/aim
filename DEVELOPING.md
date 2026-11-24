@@ -925,10 +925,12 @@ in the request either way, and turning it on adds about 70 ms per fact of
 indexing at shutdown (a fact saved in one request is recalled in the next,
 verified through the demo assistant). Search API does that work after the
 request, so a web visitor should not wait on it (verified in a drush
-process, not over HTTP). With **hosted** embeddings (roughly 500 ms per
-fact) a batch would tie up a PHP worker for seconds, which is why the
-module ships it off ([ADR-0015](adr/resolved/0015-immediate-consolidation-considered-deferred.md));
-turn it on only where embeddings are local. To change it:
+process, not over HTTP). With **hosted** embeddings (about 0.7 s per
+fact on OpenAI `text-embedding-3-small`, measured 2026-11-24) a single
+save is fine, but a batch would tie up a PHP worker for seconds, which is
+why the module ships it off ([ADR-0015](adr/resolved/0015-immediate-consolidation-considered-deferred.md));
+on hosted embeddings turn it on only where writes come one at a time
+(chat), not in bulk (ingest, extraction). To change it:
 `$index->setOptions([...$index->getOptions(), 'index_directly' => TRUE])->save()`,
 then export the index config.
 
