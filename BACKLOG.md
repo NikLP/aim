@@ -506,8 +506,18 @@ questions" section)
       (c) the requirements hook and config page still load only the
       server with ID `mariadb`, so the debug-logging warning never checks
       `aim_vector` - minor;
-      (d) optionally a BTREE index for filterable attribute columns
-      (aim does it in `AimHooks::ensureColumnIndex()`), a feature request.
+      (d) a BTREE index on each filter column (`ai_search`'s
+      "attributes" fields) when the provider creates it: the HNSW index
+      post-filters, so every MariaDB user who filters returns short
+      results without one (ADR-0018). aim does it in
+      `AimHooks::ensureColumnIndex()` for `user` and `trusted`, the last
+      raw MariaDB SQL in aim's hooks; delete it when this lands;
+      (e) a status-report warning when a collection's built M differs
+      from the server's `m`: M is build-time, so changing the setting on
+      an existing server does nothing until the index is rebuilt, and
+      nothing says so. aim checks it in `AimStatusChecker::checkHnswTuning()`
+      (`SHOW CREATE TABLE` under a swapped `sql_mode`); delete that when
+      this lands.
       Separately `drupal/ai`'s: (7) the `ai.vdb_provider` manager is not
       tagged `plugin_manager_cache_clear` (core's `PluginManagerPass` only
       tags `plugin.manager.*` ids), so no module install clears

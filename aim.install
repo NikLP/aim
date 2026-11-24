@@ -36,11 +36,14 @@ function aim_install(bool $is_syncing): void {
  *
  * Config entities that depend on this module are removed by Drupal's own
  * dependency cascade. What it can't see: ai_search's simple config for the
- * index (no uuid) and the collection table, which is a real database table.
+ * index (no uuid) and the vector collection, which lives in the provider's
+ * store. This runs before that cascade, so the index and server are still
+ * there to name the provider and collection.
  */
 function aim_uninstall(): void {
-  \Drupal::configFactory()->getEditable('ai_search.index.aim_vector_index')->delete();
+  // Drop the collection so a reinstall starts from an empty one rather than
+  // vectors for facts that no longer exist.
+  \Drupal::service('aim.vector_store')->dropCollection();
 
-  // createCollection() is not idempotent, so don't leave a stray table behind.
-  \Drupal::database()->schema()->dropTable('aim_fact_vectors');
+  \Drupal::configFactory()->getEditable('ai_search.index.aim_vector_index')->delete();
 }

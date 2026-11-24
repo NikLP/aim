@@ -294,19 +294,28 @@ class AimHooks {
    * Implements hook_search_api_index_update().
    *
    * Gives aim_vector_index's indexed attribute columns listed in
-   * BTREE_INDEXED_COLUMNS a BTREE index. Runs last so the provider's own
-   * hook has already created the columns.
+   * BTREE_INDEXED_COLUMNS a BTREE index, when its server uses the mariadb
+   * provider. Runs last so the provider's own hook has already created the
+   * columns.
    *
    * @param \Drupal\search_api\IndexInterface $index
    *   The index that was saved.
    */
   #[Hook('search_api_index_update', order: Order::Last)]
   public function vectorIndexUpdate(IndexInterface $index): void {
-    if ($index->id() !== 'aim_vector_index') {
+    if ($index->id() !== 'aim_vector_index' || !$index->hasValidServer()) {
       return;
     }
 
-    $settings = $index->getServerInstance()->getBackendConfig()['database_settings'] ?? [];
+    // MariaDB's HNSW index post-filters, so the BTREE fix is MariaDB's
+    // alone; on another provider its SQL would hit a table that is not
+    // there.
+    $config = $index->getServerInstance()->getBackendConfig();
+    if (($config['database'] ?? NULL) !== 'mariadb') {
+      return;
+    }
+
+    $settings = $config['database_settings'] ?? [];
 
     if (empty($settings['collection'])) {
       return;

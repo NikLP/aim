@@ -294,17 +294,17 @@ addendum) are built. Work on the literals modules themselves is in
       Provider 1.0.2 returns 1/(1+d) for Euclidean, so a Euclidean server
       would need the conversion to follow the metric; other providers'
       (pgvector, Milvus) scores unchecked.
-      MariaDB-specific code: raw MariaDB SQL in
-      `AimHooks::ensureColumnIndex()` (no-op off `MariaDBProvider`, so
-      another backend loses ADR-0018's BTREE pre-filtering) and
-      `AimStatusChecker::checkHnswTuning()` (`SHOW CREATE TABLE`). The
-      parity and orphan checks and `aim_uninstall()`'s drop use Drupal's
-      query builder / schema API, not raw SQL, but assume the collection is
-      the `aim_fact_vectors` table in Drupal's own database (MariaDB's
-      in-database mode). A second backend: make the provider optional or
-      move those pieces behind a provider check or into a submodule, make
-      the status checks per backend, confirm its score semantics,
-      recalibrate, ADR, ship its server config.
+      Since 2026-11-24 nothing assumes the collection is a table: the
+      parity and orphan checks list it and `aim_uninstall()` drops it
+      through the server's VDB provider (`AimVectorStore`). The only
+      MariaDB SQL left is MariaDB tuning, run only when the server's
+      provider is `mariadb`: `AimHooks::ensureColumnIndex()` (another
+      backend loses ADR-0018's BTREE pre-filtering, if it needs it) and
+      `AimStatusChecker::checkHnswTuning()` (reports "not checked"
+      elsewhere); both are upstream asks (BACKLOG.md, items d and e). A
+      second backend still needs: the hard dependency made optional,
+      its score semantics confirmed, recalibration, an ADR and its server
+      config.
 
 ## Ingestion
 

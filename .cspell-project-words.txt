@@ -81,6 +81,7 @@ mgmt
 mhnsw
 microsite
 microsites
+milvus
 minja
 misattributed
 misattributing

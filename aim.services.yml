@@ -26,6 +26,15 @@ services:
     class: Drupal\aim\Service\AimMemoryManager
     autowire: true
 
+  # The vector collection through its VDB provider, not as a table: the
+  # status checks and uninstall (AimVectorStore's docblock).
+  aim.vector_store:
+    class: Drupal\aim\Service\AimVectorStore
+    autowire: true
+
+  Drupal\aim\Service\AimVectorStore:
+    alias: aim.vector_store
+
   aim.consolidation:
     class: Drupal\aim\Service\AimConsolidationService
     autowire: true

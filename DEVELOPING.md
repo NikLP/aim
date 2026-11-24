@@ -340,7 +340,8 @@ title and file name still say `subject_uid`, the field itself does not):
 `recall()` (with `--subject-uid`) and user-scope `findNeighbors()`
 filter by a `user` query condition, not in PHP. The column's BTREE index
 (`idx_user`, added by `AimHooks::vectorIndexUpdate()` through
-`AimHooks::ensureColumnIndex()` on every index save) is what
+`AimHooks::ensureColumnIndex()` on every index save, MariaDB servers
+only) is what
 makes this exact: MariaDB's HNSW index post-filters, so without it a
 selective filter returns short or wrong results. A user holding a large
 share of the table (measured at 20% and 77%) is served by HNSW instead and
@@ -506,9 +507,12 @@ drush aim:status
 ```
 
 Checks `config:status` can't do, because they're runtime DB state,
-not config: vector index parity (live fact count vs. `aim_fact_vectors` row
-count), orphan vector rows, the collection table's build-time HNSW
-`M` against the server's `m` and its `mhnsw_ef_search`, and `aim.settings:recall_max_distance`
+not config: vector index parity (live fact count vs. the collection's row
+count), orphan vector rows (both read through the server's VDB provider,
+`AimVectorStore::listItemIds()`, not the table, so they work on any
+provider with Search API support), the collection table's build-time HNSW
+`M` against the server's `m` and its `mhnsw_ef_search` (MariaDB only,
+reported as not checked on another provider), and `aim.settings:recall_max_distance`
 actually being set rather than silently using the in-code fallback, no
 fact overdue for the expiry sweep, the `aim_consolidate` queue being drained
 (oldest item under two hours, measured on the database queue only; other

@@ -13,6 +13,7 @@ use Drupal\Core\Queue\DatabaseQueue;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\ai\AiProviderPluginManager;
 use Drupal\aim\Service\AimSettings;
+use Drupal\aim\Service\AimVectorStore;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
@@ -33,9 +34,8 @@ final class AimStatusChecker {
    * Constructs an AimStatusChecker object.
    *
    * @param \Drupal\Core\Database\Connection $database
-   *   The default database connection, used to query aim_fact_vectors
-   *   directly - it's a plain table the ai_vdb_provider_mariadb backend
-   *   owns, not a Drupal entity, so there's no query API for it.
+   *   The default database connection, for the fact IDs behind the orphan
+   *   check and, on MariaDB only, the collection table's HNSW M.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory, used to read the live HNSW and recall cutoff
    *   settings.
@@ -56,6 +56,9 @@ final class AimStatusChecker {
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $moduleHandler
    *   The module handler, to tell whether literals_finder needs the default
    *   decision model.
+   * @param \Drupal\aim\Service\AimVectorStore $vectorStore
+   *   The vector collection, read through its provider for the parity and
+   *   orphan checks.
    */
   public function __construct(
     protected Connection $database,
@@ -68,7 +71,16 @@ final class AimStatusChecker {
     #[Autowire(service: 'aim.settings_reader')]
     protected AimSettings $settings,
     protected ModuleHandlerInterface $moduleHandler,
+    #[Autowire(service: 'aim.vector_store')]
+    protected AimVectorStore $vectorStore,
   ) {}
+
+  /**
+   * The collection's item IDs for this run, FALSE until listed.
+   *
+   * @var string[]|null|false
+   */
+  private array|null|false $vectorItemIds = FALSE;
 
   /**
    * Runs every check.
@@ -80,6 +92,7 @@ final class AimStatusChecker {
    *   render array (AimStatusController) has a key to key by.
    */
   public function checkAll(): array {
+    $this->vectorItemIds = FALSE;
     return [
       'index_parity' => $this->checkIndexParity(),
       'orphan_vector_rows' => $this->checkOrphanVectorRows(),
@@ -199,10 +212,11 @@ final class AimStatusChecker {
       ->exists('text')
       ->count()
       ->execute();
-    $vectorRows = (int) $this->database->select('aim_fact_vectors', 'v')
-      ->countQuery()
-      ->execute()
-      ->fetchField();
+    $itemIds = $this->vectorItemIds();
+    if ($itemIds === NULL) {
+      return $this->vectorStoreUnreadable('Index parity');
+    }
+    $vectorRows = count($itemIds);
 
     $ok = $live === $vectorRows;
 
@@ -227,13 +241,10 @@ final class AimStatusChecker {
    *   ['label' => string, 'ok' => bool, 'detail' => string].
    */
   private function checkOrphanVectorRows(): array {
-    // Built in PHP and matched with a NOT IN rather than joined with a
-    // driver-specific CONCAT() - MariaDB, PostgreSQL and SQLite each spell
-    // string concatenation differently, and building the comparison value
-    // here avoids the divergence entirely. (aim's vector storage is
-    // MariaDB-only per ADR-0001, so this isn't reachable on another
-    // driver today, but nothing about the query itself should assume
-    // that.)
+    $itemIds = $this->vectorItemIds();
+    if ($itemIds === NULL) {
+      return $this->vectorStoreUnreadable('Orphan vector rows');
+    }
     // The item ID ends in the fact's own langcode (the site's single
     // operating language, not necessarily "en"), so read it with the ID.
     $entityType = $this->entityTypeManager->getDefinition('aim_fact');
@@ -243,21 +254,52 @@ final class AimStatusChecker {
       ->fields('f', [$idKey, $langKey])
       ->execute()
       ->fetchAll(\PDO::FETCH_NUM);
-
-    $query = $this->database->select('aim_fact_vectors', 'v');
-    if ($facts) {
-      $entityIds = array_map(static fn (array $row): string => "entity:aim_fact/$row[0]:$row[1]", $facts);
-      $query->condition('v.drupal_entity_id', $entityIds, 'NOT IN');
+    $known = [];
+    foreach ($facts as $row) {
+      $known["entity:aim_fact/$row[0]:$row[1]"] = TRUE;
     }
 
-    $orphans = (int) $query->countQuery()
-      ->execute()
-      ->fetchField();
+    $orphans = 0;
+    foreach ($itemIds as $itemId) {
+      if (!isset($known[$itemId])) {
+        $orphans++;
+      }
+    }
 
     return [
       'label' => 'Orphan vector rows',
       'ok' => $orphans === 0,
       'detail' => $orphans === 0 ? 'none' : "$orphans orphan row(s) - search_api self-heals these on the next query that returns one, or reindex now: drush search-api:index aim_vector_index",
+    ];
+  }
+
+  /**
+   * Returns the collection's item IDs, listed once per checkAll() run.
+   *
+   * @return string[]|null
+   *   One item ID per row, or NULL when the provider can't list them.
+   */
+  private function vectorItemIds(): ?array {
+    if ($this->vectorItemIds === FALSE) {
+      $this->vectorItemIds = $this->vectorStore->listItemIds();
+    }
+    return $this->vectorItemIds;
+  }
+
+  /**
+   * Builds the result for a check that needs the collection's rows.
+   *
+   * @param string $label
+   *   The check's label.
+   *
+   * @return array
+   *   ['label' => string, 'ok' => bool, 'detail' => string].
+   */
+  private function vectorStoreUnreadable(string $label): array {
+    return [
+      'label' => $label,
+      'ok' => FALSE,
+      'detail' => 'the vector collection could not be listed through provider "' . ($this->vectorStore->getProviderId() ?? 'none') . '" - check search_api.server.aim_vector is set up (DEVELOPING.md, "Setting up vector search")',
     ];
   }
 
@@ -268,6 +310,16 @@ final class AimStatusChecker {
    *   ['label' => string, 'ok' => bool, 'detail' => string].
    */
   private function checkHnswTuning(): array {
+    // M and the table it is read from are MariaDB's; another provider has
+    // its own tuning, not checked here.
+    $providerId = $this->vectorStore->getProviderId();
+    if ($providerId !== 'mariadb') {
+      return [
+        'label' => 'HNSW tuning',
+        'ok' => TRUE,
+        'detail' => 'not checked: the vector server uses provider "' . ($providerId ?? 'none') . '", not mariadb',
+      ];
+    }
     // MariaDB drops the VECTOR KEY's M=/DISTANCE= suffix from SHOW CREATE
     // TABLE under this connection's own sql_mode ('ANSI,TRADITIONAL', set
     // by Drupal's mysql driver) - present under ANSI or TRADITIONAL alone,
@@ -275,9 +327,10 @@ final class AimStatusChecker {
     // data). ANSI_QUOTES alone keeps it and still double-quotes
     // identifiers, matching what {aim_fact_vectors} substitutes to here, so
     // swap to that for this one query and restore afterward. The M
-    // attribute's case also varies (`M` in DDL written explicitly, `m` when
-    // MariaDB applies createCollection()'s SET SESSION mhnsw_default_m and
-    // re-serializes it) - the match below is case-insensitive.
+    // attribute's case also varies (`M` in DDL written explicitly, as the
+    // provider does since 1.0.2, `m` when MariaDB applied a session
+    // mhnsw_default_m, as aim's former shim did) - the match below is
+    // case-insensitive.
     $originalMode = (string) $this->database->query('SELECT @@SESSION.sql_mode')->fetchField();
     $this->database->query('SET SESSION sql_mode = :mode', [':mode' => 'ANSI_QUOTES']);
 
