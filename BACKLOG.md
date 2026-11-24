@@ -499,10 +499,19 @@ questions" section)
       intent: a threshold tuned on 1.0.1 inverts silently. Ask for a BC
       note on the release. It also added `$server_id` to `getVdbIds()`,
       fatal for any subclass overriding it (aim's did);
-      (b) `createCollection()` with `dimensions: 0` (aim's shipped server
-      before its model is known): the index-save hook now skips it, but
-      `drupal/ai`'s `AiVdbProviderPluginManager` still calls it (and
-      swallows the error). Check a fresh install's log before closing;
+      (b) one `Incorrect column specifier for column 'embedding'` error
+      logged on every fresh install. Cause (reproduced 2026-11-24 by saving
+      a size-0 server config): `ai_search`'s `NewServerEventSubscriber`
+      runs on every `search_api.server.*` config save, raw data, enabled or
+      not, and calls `ensureCollectionExists()`, which creates the table at
+      the server's `dimensions`. aim ships `aim_vector` at 0 (the model is
+      per site; the recipe's `aimUseDefaultModels` sets it), so the import
+      asks MariaDB for `VECTOR(0)`. Harmless (the real table follows once
+      the model is set), but it reads as a failure to anyone checking the
+      log. Ask: `MariaDBProvider::createCollection()` returns early on
+      `dimension <= 0`, which covers every path (1.0.2 guards only its own
+      index-save hook). No clean aim-side fix: a shipped guess would build
+      the table at the wrong size for another model;
       (c) the requirements hook and config page still load only the
       server with ID `mariadb`, so the debug-logging warning never checks
       `aim_vector` - minor;

@@ -30,8 +30,9 @@ uid 1 (see "Be upfront about").
 
 - A fresh Drupal 11.4 (or newer) site on MariaDB 11.7 or newer, separate from any other
   AIM instance. A recipe sets up an instance but doesn't separate its data.
-- `ai_vdb_provider_mariadb`, `ai_search` and `search_api` **not** enabled
-  yet, as for [`aim_demo_library`](../aim_demo_library/README.md).
+- `ai_vdb_provider_mariadb` 1.0.2 or newer, as for
+  [`aim_demo_library`](../aim_demo_library/README.md) (it, `ai_search` and
+  `search_api` may already be enabled).
 - Composer packages for the OAuth stack, including the site-level `provide`
   block in `aim_tool_oauth`'s
   [DEVELOPING.md](../../modules/aim_tool_oauth/DEVELOPING.md).

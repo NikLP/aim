@@ -4,15 +4,17 @@
 //
 //   cd <site root> && node <path to>/preflight.js
 //
-// Needs DDEV up, a public URL that reaches the site (a tunnel or similar),
-// Ollama running, and Playwright with a Chromium (set PLAYWRIGHT_PATH to the
-// playwright package directory if it is not resolvable from here).
+// Needs DDEV up, Ollama running, and Playwright with a Chromium (set
+// PLAYWRIGHT_PATH to the playwright package directory if it is not
+// resolvable from here).
 //
-// Site-specific values (publicUrl, localUrl) are not in this file. Put them
-// in <site root>/demo/preflight.local.json or the PREFLIGHT_PUBLIC_URL and
-// PREFLIGHT_LOCAL_URL environment variables. The questions and expected
-// answers are in preflight.config.json beside this file; the local file may
-// override them too. AIM_SITE_ROOT overrides the site root (default: the
+// The site's URL comes from DDEV (`ddev describe`). Pass --public-url=<url>
+// (or PREFLIGHT_PUBLIC_URL) to also prove the site is reachable from outside,
+// as a remote MCP client needs: the OAuth, MCP and chat widget checks then
+// run against that URL instead of the local one. PREFLIGHT_LOCAL_URL
+// overrides the DDEV URL. The questions and expected answers are in
+// preflight.config.json beside this file; <site root>/demo/preflight.local.json
+// may override them. AIM_SITE_ROOT overrides the site root (default: the
 // current directory).
 const { execFileSync } = require('child_process');
 const crypto = require('crypto');
@@ -33,10 +35,21 @@ const cfg = Object.assign({
 readJson(path.join(root, 'demo', 'preflight.local.json')),
 process.env.PREFLIGHT_PUBLIC_URL ? { publicUrl: process.env.PREFLIGHT_PUBLIC_URL } : {},
 process.env.PREFLIGHT_LOCAL_URL ? { localUrl: process.env.PREFLIGHT_LOCAL_URL } : {});
-if (!cfg.publicUrl || !cfg.localUrl) {
-  console.error('Set publicUrl and localUrl in demo/preflight.local.json (or PREFLIGHT_PUBLIC_URL / PREFLIGHT_LOCAL_URL).');
-  process.exit(2);
+const publicArg = process.argv.find((a) => a.startsWith('--public-url='));
+if (publicArg) cfg.publicUrl = publicArg.slice('--public-url='.length);
+if (!cfg.localUrl) {
+  try {
+    cfg.localUrl = JSON.parse(execFileSync('ddev', ['describe', '-j'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })).raw.primary_url;
+  }
+  catch (e) {
+    console.error('Could not read the site URL from DDEV (is it running?). Set PREFLIGHT_LOCAL_URL instead.');
+    process.exit(2);
+  }
 }
+cfg.publicUrl = (cfg.publicUrl || '').replace(/\/+$/, '');
+cfg.localUrl = cfg.localUrl.replace(/\/+$/, '');
+// The URL the OAuth, MCP and widget checks use.
+const siteUrl = cfg.publicUrl || cfg.localUrl;
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 
 const CANARY = 'ZZPREFLIGHT';
@@ -65,7 +78,7 @@ async function getStatus(url) {
   return r.status;
 }
 
-// One MCP session over the public URL, JSON-RPC over Streamable HTTP.
+// One MCP session over the site URL, JSON-RPC over Streamable HTTP.
 function mcpClient(token) {
   let sid = null; let id = 0;
   return async function rpc(method, params, notify) {
@@ -73,7 +86,7 @@ function mcpClient(token) {
     if (sid) headers['Mcp-Session-Id'] = sid;
     const body = { jsonrpc: '2.0', method, params };
     if (!notify) body.id = ++id;
-    const r = await fetch(cfg.publicUrl + '/mcp', { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(60000) });
+    const r = await fetch(siteUrl + '/mcp', { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(60000) });
     if (r.headers.get('mcp-session-id')) sid = r.headers.get('mcp-session-id');
     const text = await r.text();
     if (notify) return {};
@@ -92,7 +105,7 @@ const toolText = (j) => {
 };
 
 async function oauthToken(browser) {
-  const reg = await (await fetch(cfg.publicUrl + '/oauth/register', {
+  const reg = await (await fetch(siteUrl + '/oauth/register', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ client_name: 'preflight', redirect_uris: [CALLBACK], grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], token_endpoint_auth_method: 'client_secret_post', scope: 'aim:recall aim:remember' }),
   })).json();
@@ -101,16 +114,16 @@ async function oauthToken(browser) {
   const challenge = b64(crypto.createHash('sha256').update(verifier).digest());
   let redirected = null;
   const srv = http.createServer((req, res) => { redirected = 'http://127.0.0.1:8765' + req.url; res.end('ok'); }).listen(8765, '127.0.0.1');
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext({ ignoreHTTPSErrors: !cfg.publicUrl });
   try {
     const page = await ctx.newPage();
-    const link = drush('uli', '--uri=' + cfg.publicUrl, '--no-browser').split('\n').pop();
+    const link = drush('uli', '--uri=' + siteUrl, '--no-browser').split('\n').pop();
     await page.goto(link);
     const login = page.locator('input#edit-submit');
     if (await login.count()) { await login.first().click(); await page.waitForLoadState('networkidle'); }
-    await page.goto(cfg.publicUrl + '/oauth/authorize?' + new URLSearchParams({
+    await page.goto(siteUrl + '/oauth/authorize?' + new URLSearchParams({
       response_type: 'code', client_id: reg.client_id, redirect_uri: CALLBACK, scope: 'aim:recall aim:remember', state: 'pf',
-      code_challenge: challenge, code_challenge_method: 'S256', resource: cfg.publicUrl + '/',
+      code_challenge: challenge, code_challenge_method: 'S256', resource: siteUrl + '/',
     }).toString()).catch(() => {});
     const allow = page.getByRole('button', { name: 'Allow' });
     if (await allow.count()) { await allow.click(); }
@@ -120,7 +133,7 @@ async function oauthToken(browser) {
   if (!redirected) throw new Error('no OAuth redirect captured (consent screen missing?)');
   const code = new URL(redirected).searchParams.get('code');
   if (!code) throw new Error('no authorization code in redirect: ' + redirected.slice(0, 120));
-  const tok = await (await fetch(cfg.publicUrl + '/oauth/token', {
+  const tok = await (await fetch(siteUrl + '/oauth/token', {
     method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: CALLBACK, client_id: reg.client_id, client_secret: reg.client_secret, code_verifier: verifier }),
   })).json();
@@ -158,11 +171,16 @@ async function askWidget(page, question) {
       const s = execFileSync('curl', ['-sk', '-m', '20', '-o', '/dev/null', '-w', '%{http_code}', cfg.localUrl + '/'], { encoding: 'utf8' });
       if (s !== '200') throw new Error('HTTP ' + s);
     });
-    await check('site up (public funnel URL)', async () => {
-      const s = await getStatus(cfg.publicUrl + '/');
-      if (s !== 200) throw new Error('HTTP ' + s);
-      return cfg.publicUrl;
-    });
+    if (cfg.publicUrl) {
+      await check('site up (public URL)', async () => {
+        const s = await getStatus(cfg.publicUrl + '/');
+        if (s !== 200) throw new Error('HTTP ' + s);
+        return cfg.publicUrl;
+      });
+    }
+    else {
+      console.log('SKIP  site up (public URL) - none given; pass --public-url=<url> to check outside access');
+    }
     await check('Ollama embeddings model present', async () => {
       const j = await (await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(5000) })).json();
       if (!(j.models || []).some((m) => /nomic-embed-text/.test(m.name))) throw new Error('nomic-embed-text not found');
@@ -277,22 +295,22 @@ async function askWidget(page, question) {
     });
 
     await check('chat widget: hidden and API closed for anonymous', async () => {
-      const home = await (await fetch(cfg.publicUrl + '/')).text();
+      const home = await (await fetch(siteUrl + '/')).text();
       if (home.includes('block-olivero-aimdemochat')) throw new Error('widget block still renders for anonymous visitors');
-      const r = await fetch(cfg.publicUrl + '/api/deepchat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+      const r = await fetch(siteUrl + '/api/deepchat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
       if (r.status !== 403) throw new Error(`/api/deepchat returned ${r.status} for anonymous, expected 403`);
       return 'block hidden, API 403';
     });
 
     await check('chat widget: answers from memory', async () => {
-      const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, ignoreHTTPSErrors: !cfg.publicUrl });
       try {
         const page = await ctx.newPage();
         // The widget is for logged-in users only, so sign in first.
-        await page.goto(drush('uli', '--uri=' + cfg.publicUrl, '--no-browser').split('\n').pop());
+        await page.goto(drush('uli', '--uri=' + siteUrl, '--no-browser').split('\n').pop());
         const login = page.locator('input#edit-submit');
         if (await login.count()) { await login.first().click(); await page.waitForLoadState('networkidle'); }
-        await page.goto(cfg.publicUrl + '/', { waitUntil: 'networkidle' });
+        await page.goto(siteUrl + '/', { waitUntil: 'networkidle' });
         await page.locator('.ai-deepchat--header').first().click();
         await sleep(1200);
         const a = await askWidget(page, cfg.chatQuestion);
@@ -324,7 +342,7 @@ async function askWidget(page, question) {
         $fs = $m->getStorage("aim_fact"); $ids = $fs->getQuery()->accessCheck(FALSE)->condition("id", ${startMax}, ">")->execute(); $fs->delete($fs->loadMultiple($ids));
         $cs = $m->getStorage("consumer"); $ts = $m->getStorage("oauth2_token"); $n = 0;
         foreach ($cs->loadByProperties(["label" => "preflight"]) as $c) { $t = $ts->getQuery()->accessCheck(FALSE)->condition("client", $c->id())->execute(); $ts->delete($ts->loadMultiple($t)); $c->delete(); $n++; }
-        \\Drupal::database()->query("DELETE FROM {queue} WHERE name = 'aim_consolidate'");
+        \\Drupal::queue("aim_consolidate")->deleteQueue();
         echo count($ids) . " canary facts and " . $n . " OAuth clients removed";`);
       console.log('cleanup: ' + out.split('\n').pop());
       drush('sapi-i', 'aim_vector_index');

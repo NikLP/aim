@@ -48,11 +48,10 @@ provider.
 - `drupal/ai` plus a chat provider and an embeddings provider: Ollama with
   `nomic-embed-text` (the shipped index uses it), or a hosted one, in which
   case also remove the `index_directly` action.
-- `ai_vdb_provider_mariadb`, `ai_search` and `search_api` **not** enabled
-  yet: let the recipe install them. With the provider already enabled the
-  apply fails (`The "mariadb" plugin does not exist`, or `Table
-  'aim_fact_vectors' already exists`) and rolls back; `drush pmu` the
-  three and apply again (2026-10-23).
+- `ai_vdb_provider_mariadb` 1.0.2 or newer. It, `ai_search` and
+  `search_api` may already be enabled (verified 2026-11-24); before
+  provider 1.0.2 an apply over them failed with `Table 'aim_fact_vectors'
+  already exists`.
 - Olivero as the front-end theme, if you want the chat block.
 - `aim_chatbot`'s chat block only exists if Olivero was the front-end
   theme when the module was enabled. Without it the persona still applies
@@ -137,14 +136,18 @@ Expected: "Applied AIM demo: community library", 30 facts, and
 `drush search-api:status` shows 30/30. Smoke test:
 `drush aim:recall "When are you open on Sundays?" --scope=site`.
 
-Known noise: `[warning] Schema errors...` lines on enable are harmless. A
+Known noise: `[warning] Schema errors...` lines on enable are harmless, as
+are the provider's `Cannot ensure collection "aim_fact_vectors" exists`
+warning and one `Incorrect column specifier for column 'embedding'` error
+in the log (the vector server is created before its model is known;
+BACKLOG.md). A
 failed recipe prints a long stack trace after the real error; the first
 `In ...php line N: message` is the useful one.
 
 ## Before you rely on it
 
-- **Applies to a fresh install in one go** (verified 2026-10-19 on Drupal
-  11.4): the recipe installs AIM's modules and imports their config itself,
+- **Applies to a fresh install in one go** (verified 2026-11-24 on Drupal
+  11.4, Minimal profile): the recipe installs AIM's modules and imports their config itself,
   so there is no `drush en` step. It still overwrites the settings above,
   so use a scratch site.
 - **`index_directly` suits local embeddings.** With hosted embeddings each
@@ -187,12 +190,12 @@ registration, consent, PKCE), that the MCP server instructions carry aim's
 scope guide, the site, role, user and case scopes over MCP, save-then-search, and the chat
 widget in a real browser (answer, write-then-read, then "nothing recorded"
 for a question with no fact), plus that anonymous visitors can't see or
-call the widget. It needs DDEV up, a public URL that reaches the site (a
-tunnel such as Tailscale Funnel), Ollama running, and Playwright (set
+call the widget. It needs DDEV up, Ollama running, and Playwright (set
 `PLAYWRIGHT_PATH`). The script is [preflight/preflight.js](preflight/preflight.js);
-run it from the site root. Site-specific values (`publicUrl`, `localUrl`)
-go in `<site root>/demo/preflight.local.json` or the
-`PREFLIGHT_PUBLIC_URL`/`PREFLIGHT_LOCAL_URL` environment variables; the
+run it from the site root. It reads the site's URL from DDEV and runs every
+check there. Add `--public-url=<url>` (or `PREFLIGHT_PUBLIC_URL`) to also
+check the site is reachable from outside, as a remote MCP client such as
+claude.ai needs: the OAuth, MCP and widget checks then use that URL. The
 questions and expected answers are in
 [preflight/preflight.config.json](preflight/preflight.config.json). Any FAIL line says what to check.
 
