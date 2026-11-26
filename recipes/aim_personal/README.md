@@ -19,8 +19,7 @@ registration. Why it is a recipe on its own site:
 - Each tool's OAuth scope. `aim_tool_oauth_install()` normally sets these,
   but in a recipe it runs before the tool configs are imported and finds
   none.
-- `index_directly` on and `recall_max_distance` 0.6, as in
-  `aim_demo_library`. The cutoff is for `nomic-embed-text`, and has not been
+- `recall_max_distance` 0.6, as in `aim_demo_library`. The cutoff is for `nomic-embed-text`, and has not been
   tuned on personal data.
 
 It grants no permissions and creates no role, because the owner signs in as

@@ -1,8 +1,8 @@
 # ADR-0015: Immediate post-write consolidation via kernel.terminate - considered, deferred
 
 **Status:** Deferred (re-evaluated 2026-10-02) - the problem is closed on
-this site by `index_directly` (see the 2026-09-26 addendum); the design is
-retained as the reference for hosted-embedding sites and for
+`index_directly`, shipped on since 2026-11-26 (see the addenda); the design is
+retained as the reference and for
 [ADR-0037](0037-transient-source-passages-for-grounding.md)'s post-response
 mode. Designed and prototyped 2026-09-14, then deliberately reverted the
 same session. Not built. The design below is complete enough
@@ -159,3 +159,13 @@ PHP worker for seconds, and the design in this ADR (post-request
 consolidation) is still the answer for that case. Not a reversal of the
 deferral, only of the first rejected mechanism where embeddings are local.
 
+## Addendum (2026-11-26): `index_directly` ships on
+
+Measured 2026-11-24 on hosted embeddings (OpenAI `text-embedding-3-small`):
+about 0.7 s per fact, run by Search API after the response, so a visitor
+waits on none of it. The only cost is a bulk write keeping one PHP worker
+busy for a few seconds, which is accepted. The fact text goes to the
+embeddings provider whether the option is on or off, so it is not a
+privacy setting either. aim's `config/install` now ships it on, the
+recipes no longer set it, and `aim:status` no longer checks it. A site with
+heavy bulk writes on hosted embeddings can turn it off on the index form.

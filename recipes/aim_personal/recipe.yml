@@ -90,13 +90,6 @@ config:
     # action, so the vector table is made at this model's size.
     search_api.server.aim_vector:
       aimUseDefaultModels: []
-    # So a fact told to the model is searchable on the next question. One
-    # embedding call per save, after the response (ADR-0015 addendum): about
-    # 70 ms local, 0.7 s hosted. Drop this action for bulk writes on hosted
-    # embeddings.
-    search_api.index.aim_vector_index:
-      setProperties:
-        options.index_directly: true
     # For nomic-embed-text, as in aim_demo_library: loose enough that the
     # calling model judges relevance. Not tuned on personal data.
     aim.settings:

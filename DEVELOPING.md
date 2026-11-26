@@ -303,9 +303,9 @@ retired after that day, and a date already past is refused).
 model call, so it stays clear of ADR-0003's no-`hook_cron` rule for
 LLM-bound queue work); the crontab line just makes it prompt.
 
-`processItem()` reindexes before consolidating (`index_directly` is off
-in the shipped config, so a just-written fact isn't searchable yet without
-this; see the `index_directly` note under "Vector search").
+`processItem()` reindexes before consolidating, so a just-written fact is
+searchable even on a site that turns `index_directly` off (see the
+`index_directly` note under "Vector search").
 Throws `SuspendQueueException` if no default chat provider is configured
 - the runner releases the item and stops draining rather than failing
 every remaining item one by one.
@@ -318,7 +318,7 @@ not a `cron` key, see [ADR-0003](adr/resolved/0003-async-processing-dedicated-cr
 Search API processor (`src/Plugin/search_api/processor/ExcludeRetired.php`)
 rejects any fact with `retired` set, and Search API deletes a rejected
 item from the server. Retiring a fact is a plain `save()` that re-tracks
-it, so its row goes on the next `sapi-i` (`index_directly` is off), and
+it, so its row goes when it is next indexed (at once, with `index_directly`), and
 clearing `retired` brings it back. `recall()`/`findNeighbors()` keep
 their PHP `retired` (and expiry) checks as a safety net for that gap. Retired facts stay
 `aim_fact` entities (audit trail, `superseded_by` edges, admin views) but are not
@@ -513,8 +513,7 @@ backends report the count alone), an
 informational count of untrusted facts, and every configured model still existing
 with its provider (the AI module's chat, decision and embeddings defaults,
 the vector server's `chat_model` and `embeddings_engine`, plus any activity that names its own: a retired model is otherwise found by
-a failed call), and `index_directly` not being on with a hosted embeddings
-provider (each write would wait on it and send it the fact text), and
+a failed call), and
 model-call logging (passes when off, a site's choice; when on, fails if an
 aim tag would not be recorded, replies are off or entries are kept under 90
 days - see "Model-call logging"). Exits
@@ -920,24 +919,17 @@ keeps an unused `source` column and `idx_source` index; new rows leave it
 `NULL`, and it can be dropped by hand. `AimVectorIndexSourceTest` covers
 it on the real provider.
 
-**`index_directly`:** off in the shipped config, so a saved fact is not
-searchable until an index run (`drush search-api:index aim_vector_index`,
-or the consolidation queue worker's `reindex()`, up to a minute away on the
-crontab). That breaks the obvious chat beat "tell it something, then ask
-about it", so **this site turns it on** in its own config. Measured
-2026-09-26 with local Ollama embeddings: ten writes take the same ~165 ms
-in the request either way, and turning it on adds about 70 ms per fact of
-indexing at shutdown (a fact saved in one request is recalled in the next,
-verified through the demo assistant). Search API does that work after the
-request, so a web visitor should not wait on it (verified in a drush
-process, not over HTTP). With **hosted** embeddings (about 0.7 s per
-fact on OpenAI `text-embedding-3-small`, measured 2026-11-24) a single
-save is fine, but a batch would tie up a PHP worker for seconds, which is
-why the module ships it off ([ADR-0015](adr/resolved/0015-immediate-consolidation-considered-deferred.md));
-on hosted embeddings turn it on only where writes come one at a time
-(chat), not in bulk (ingest, extraction). To change it:
-`$index->setOptions([...$index->getOptions(), 'index_directly' => TRUE])->save()`,
-then export the index config.
+**`index_directly`:** on in the shipped config, so a saved fact is
+searchable on the next question ("tell it something, then ask about it").
+Search API embeds the request's facts after the response, so a visitor
+does not wait: about 70 ms per fact with local Ollama (measured
+2026-09-26), about 0.7 s on OpenAI `text-embedding-3-small` (2026-11-24).
+A bulk ingest only keeps that PHP worker busy for longer. A site with
+heavy bulk writes on hosted embeddings can clear "Index items
+immediately" on the index form; the tracker, cron, `drush sapi-i` and the
+consolidation worker's `reindex()` then do the indexing
+([ADR-0015](adr/resolved/0015-immediate-consolidation-considered-deferred.md)'s
+addenda).
 
 **Gotchas:**
 
@@ -957,8 +949,8 @@ then export the index config.
   above, not running `search-api:clear` again. After a `DROP TABLE`-and-
   reindex cycle, reindex directly and skip `search-api:clear` entirely.
 
-- `AimMemoryManager::reindex()` (used by `aim:extract --index`, the ingest
-  form and the consolidation worker) clears the items it indexes from
+- `AimMemoryManager::reindex()` (used by `aim:extract --index` and
+  the consolidation worker) clears the items it indexes from
   Search API's post-request queue. With `index_directly` on, a fact saved
   earlier in the same request is also queued for indexing at the end of it;
   that second pass used to delete the fact's vector row and insert nothing
@@ -1135,8 +1127,8 @@ from config and the shim.
    ddev drush php:eval '$d = \Drupal::service("entity_field.manager")->getFieldStorageDefinitions("aim_fact")["grounding_score"]; \Drupal::entityDefinitionUpdateManager()->installFieldStorageDefinition("grounding_score", "aim_fact", "aim", $d);'
    ```
 
-6. **Per-site choices, not defaults:** `index_directly` on if embeddings are
-   local; `recall_max_distance` recalibrated to your dataset (ADR-0019).
+6. **Per-site choice, not a default:** `recall_max_distance` recalibrated
+   to your dataset (ADR-0019).
 7. Run `drush aim:status` to confirm steps 1-4 above actually took (it
    checks index parity, orphan rows and HNSW tuning
    directly against the DB), then export the config and confirm `ddev
@@ -1382,7 +1374,7 @@ ddev drush recipe /var/www/html/web/modules/custom/aim/recipes/<name>  # contain
 ```
 
 - **`aim_demo_library`**: a fictional community library (site identity,
-  chat persona, recall cutoff, `index_directly`) plus its 30 facts and
+  chat persona, recall cutoff) plus its 30 facts and
   eight literals as default content in `content/`. This site's demo kit
   (its pre-flight and reset steps are in the recipe README) is reset with it. The first archetype
   starter kit ([ADR-0014](adr/resolved/0014-usecase-archetype-starter-kits.md)).
@@ -1413,8 +1405,8 @@ ddev drush recipe /var/www/html/web/modules/custom/aim/recipes/<name>  # contain
 - **Facts as recipe content skip `remember()`.** Core's importer saves
   entities directly, but calls `validate()` first, so the Guardrails
   constraint on `text` still runs (a violation aborts the apply). With
-  `index_directly` on they are embedded and indexed as they are imported
-  (verified 2026-10-10, 31 facts); without it, run
+  `index_directly` on (the default) they are embedded and indexed as they
+  are imported (verified 2026-10-10, 31 facts); with it off, run
   `drush search-api:index aim_vector_index` after applying.
   `aim:remember --file` goes through `remember()` and always indexes.
 - **No `aim_mcp` recipe, deliberately.** The remote-MCP stack is already

@@ -83,7 +83,7 @@ remains binding, it just has nothing left to build.
 | [0012](resolved/0012-fact-relation-graph.md) | Fact-to-fact relation graph and multi-hop retrieval | Retired 2026-10-11 (parked 2026-10-08) - no consumer; revisit trigger in BACKLOG.md |
 | [0013](resolved/0013-mcp-tool-exposure.md) | MCP tool exposure via Tool API (`tool`/`mcp_server`/`mcp_server_tool_bridge`) | Accepted - built and OAuth-authenticated, 2026-09-12/13 |
 | [0014](resolved/0014-usecase-archetype-starter-kits.md) | Use-case archetype starter kits via Recipes | Retired 2026-10-11 (parked 2026-10-08) - two Recipes exist; revisit trigger in BACKLOG.md |
-| [0015](resolved/0015-immediate-consolidation-considered-deferred.md) | Immediate post-write consolidation via kernel.terminate | Deferred - closed on this site by `index_directly`; design kept for hosted embeddings |
+| [0015](resolved/0015-immediate-consolidation-considered-deferred.md) | Immediate post-write consolidation via kernel.terminate | Deferred - closed by `index_directly`, shipped on since 2026-11-26 |
 | [0017](resolved/0017-query-embedding-cache.md) | Query-embedding cache via a drupal/ai event subscriber | Accepted - built and verified 2026-09-27 |
 | [0018](resolved/0018-index-subject-uid-with-btree.md) | Index `subject_uid` as a Search API attribute, with a BTREE index on its column | Accepted - built and verified 2026-09-26 |
 | [0019](resolved/0019-recall-abstention-distance-cutoff.md) | Recall abstention via a distance cutoff, and what bounds recall quality | Accepted - built 2026-09-19/27; `aim:calibrate` follow-up in BACKLOG.md |

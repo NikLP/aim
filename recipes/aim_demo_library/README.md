@@ -16,9 +16,7 @@ consolidation without any real data.
   `access deepchat api`, `recall aim facts`, `remember aim facts`,
   `view`/`create site aim facts` and `view restricted literals` for
   signed-in users,
-  `view literals` for everyone, and
-  `index_directly` on so a fact told to the chat is searchable on the next
-  question.
+  and `view literals` for everyone.
 - `config/block.block.olivero_aimdemochat.yml`: the chat block in Olivero,
   on `aim_assistant`, with the library's wording, signed-in-only
   visibility and the finder-first gate (`aim_chatbot_gate`, with
@@ -31,9 +29,9 @@ consolidation without any real data.
   restricted), exported
   from the demo site with `drush content:export`. Core's importer
   validates each entity, so aim's Guardrails constraint runs. With
-  `index_directly` on (this recipe sets it) the facts are embedded and
+  `index_directly` on (aim's default) the facts are embedded and
   indexed as they are imported; the index step below catches anything
-  left over, and is needed if you drop that action. An entity whose UUID already exists is skipped, so
+  left over. An entity whose UUID already exists is skipped, so
   re-applying does not overwrite a literal edited on the site.
 
 It does not set a front page, place the chat block, or configure a
@@ -46,8 +44,7 @@ provider.
   the finder; without one the gate passes every question to the
   assistant.
 - `drupal/ai` plus a chat provider and an embeddings provider: Ollama with
-  `nomic-embed-text` (the shipped index uses it), or a hosted one, in which
-  case also remove the `index_directly` action.
+  `nomic-embed-text` (the shipped index uses it), or a hosted one.
 - `ai_vdb_provider_mariadb` 1.0.2 or newer. It, `ai_search` and
   `search_api` may already be enabled (verified 2026-11-24); before
   provider 1.0.2 an apply over them failed with `Table 'aim_fact_vectors'
@@ -150,14 +147,6 @@ failed recipe prints a long stack trace after the real error; the first
   11.4): the recipe installs AIM's modules and imports their config itself,
   so there is no `drush en` step. It still overwrites the settings above,
   so use a scratch site.
-- **`index_directly` costs one embedding call per save.** Search API makes
-  it after the response, so the visitor does not wait, but the PHP worker
-  does: about 70 ms with local Ollama, about 0.7 s with OpenAI
-  `text-embedding-3-small` (measured 2026-11-24). That is fine for a demo
-  or a chat that saves a fact now and then; for bulk writes on hosted
-  embeddings, or a busy site with few workers, remove that action
-  ([ADR-0015](../../adr/resolved/0015-immediate-consolidation-considered-deferred.md)
-  addendum).
 - **Thresholds are tuned to particular models.** The distance settings
   (Recall maximum distance `recall_max_distance`, Recall gap
   `recall_gap`, Comparison distance `compare_distance`) were measured on this dataset with

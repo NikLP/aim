@@ -76,17 +76,12 @@ final class AimConsolidateQueueWorker extends QueueWorkerBase implements Contain
       return;
     }
 
-    // index_directly is deliberately off (CLAUDE.md, "Vector search is
-    // working end to end") - a fact is not searchable the moment it is
-    // saved. Without this, two facts written close together would each be
-    // asked to consolidate before the other is indexed, and would never
-    // find each other as neighbors - confirmed live 2026-09-09 with a
-    // genuinely near-duplicate test pair that missed each other entirely
-    // for exactly this reason. Indexing here, inline, is the specific
-    // queue-worker-driven exception CLAUDE.md's vector search notes already
-    // anticipated for index_directly - this runs off the live request path
-    // like any other queue item, so the embedding-call cost belongs here,
-    // not on a web request.
+    // Index anything still pending before looking for neighbors. With
+    // index_directly on (the shipped default) the fact is normally indexed
+    // already and this finds nothing to do; with it off, two facts written
+    // close together would otherwise each consolidate before the other is
+    // indexed and never find each other (confirmed live 2026-09-09). Runs
+    // off the request path, so the embedding cost belongs here.
     $this->memoryManager->reindex();
 
     $provider = $this->settings->getModelFor('consolidation');

@@ -174,8 +174,8 @@ Notes on diagram 1:
   score, cutoff, mode; no text). `hook_aim_fact_insert` queues a trusted
   fact on `aim_consolidate`, and `hook_aim_fact_update` queues one when it
   becomes trusted; neither runs during a config sync.
-- **Indexed.** Search API tracks the fact; `index_directly` (shipped off,
-  on here) indexes it at once, otherwise cron (50 per run), `drush sapi-i`
+- **Indexed.** Search API tracks the fact; `index_directly` (shipped on)
+  indexes it at once, otherwise cron (50 per run), `drush sapi-i`
   or the queue worker's `reindex()` does. The `aim_exclude_retired`
   processor drops retired facts. Only `text` is embedded; `scope`,
   `subject`, `source`, `user` and `trusted` are stored beside the vector
