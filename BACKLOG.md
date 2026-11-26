@@ -491,7 +491,14 @@ questions" section)
       (#3609961 with `CREATE TABLE IF NOT EXISTS`, not MR 8's drop;
       #3626257; #3626262; #3605665's `m`/`mhnsw_ef_search`) and made
       `ai_search` optional, so the shim was deleted (ADR-0023's addendum).
-      Raise with the maintainer directly, not the queue:
+      The maintainer agreed to all four asks below; they are built on the
+      issue fork branch `3641260-index-filter-columns`
+      ([#3641260](https://www.drupal.org/i/3641260)). Once a release ships
+      them: delete `AimHooks::ensureColumnIndex()`, `vectorIndexUpdate()` and
+      `BTREE_INDEXED_COLUMNS` (the provider then indexes every "attributes"
+      field, under the same `idx_<column>` names), update TODO.md's "recall
+      is tied to MariaDB" note, and drop the `scope`/`subject` half of the
+      BTREE measuring item below. The asks:
       (a) 1.0.2 changed Search API scores from cosine distance to
       similarity (#3635830, deliberate: `ai_search` reads scores as
       higher-is-better). Its README says positive `min_score` thresholds
@@ -520,7 +527,7 @@ questions" section)
       post-filters, so every MariaDB user who filters returns short
       results without one (ADR-0018). aim does it in
       `AimHooks::ensureColumnIndex()` for `user` and `trusted`, the last
-      raw MariaDB SQL in aim's hooks; delete it when this lands.
+      raw MariaDB SQL in aim's hooks.
       (A built-M-vs-configured-`m` warning was dropped from this list
       2026-11-24: since 1.0.2 the provider writes M from `m` at create, so
       it only matters after a later edit of `m`; aim keeps its own
@@ -544,7 +551,8 @@ questions" section)
       matters at larger sizes.
 - [ ] Measure whether `scope`, `subject`, `target_type` and `target_id` need
       BTREE indexes on `aim_fact_vectors` (only `user` and `trusted` have
-      one, `AimHooks::BTREE_INDEXED_COLUMNS`). Matters when one scope is a
+      one, `AimHooks::BTREE_INDEXED_COLUMNS`; the provider fix above indexes
+      `scope` and `subject` too, as "attributes"). Matters when one scope is a
       large share of the table, and for entity-scope lookups by target.
       Same method as ADR-0018. `target_type`/`target_id` are not even
       indexed attributes yet, check that first.
