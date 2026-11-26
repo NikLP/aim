@@ -164,6 +164,10 @@ could not connect (403); a user with no role permissions got a token but
 
 ## Gotchas
 
+- `"You need to set the OAuth2 private key."` (a `server_error` from the
+  OAuth endpoints) means the modules are enabled but Setup step 2 was
+  skipped: `simple_oauth.settings` has no key paths. Generate and set
+  them; nothing else is wrong.
 - The OAuth admin form's "Required scopes" selector only offers scopes an
   already-enabled `mcp_tool_config` carries - empty with no free-text
   fallback on a fresh site. `aim_tool_oauth_install()` seeds this in code.

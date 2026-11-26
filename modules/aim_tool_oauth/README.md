@@ -36,6 +36,8 @@ appended to `mcp_server.handle`'s `_auth`, not swapped in.
 Full setup runbook (dependency chain, composer gotcha, key generation,
 HTTPS exposure, client registration) is in
 [DEVELOPING.md](DEVELOPING.md#setup) - follow it in order, it's fiddly.
+Enabling the modules is only step 1: until the keys are set, every OAuth
+request fails with "You need to set the OAuth2 private key".
 
 Non-admin users need a role-granularity scope (one per role, added by the
 site) alongside `aim:recall`/`aim:remember`, and that role needs `access mcp server` and `grant simple_oauth codes`; see

@@ -380,6 +380,41 @@ and the assistant answers with the fact.
 - [ ] At least one demo question where the page is silent or stale, so
       page search alone does not make aim look redundant.
 
+## ECA: `eca_tool` and `ai_integration_eca` (raised 2026-11-26, nothing built)
+
+Neither is installed and `eca` is not enabled. `eca_tool` (1.0.0-beta3,
+2026-10-21) works both ways: Tool API tools as ECA actions, and an ECA
+model's "Tool" event as a Tool API tool. `ai_integration_eca` (1.0.1,
+stable) turns `drupal/ai` operations into ECA actions; its Interceptor
+submodule fires ECA events around any provider call. No aim code either
+way (`aim_eca` stays deleted).
+
+- [ ] **No-code tools for the assistant** (`eca_tool`, ECA model as a
+      tool; best demo): a site builder adds "escalate to a librarian",
+      "open a case" or "notify the reviewer of this fact" as a tool the
+      chat agent can call, no PHP. Access is checked per tool (`execute eca
+      tools` or the event's own permission).
+- [ ] **Event-driven memory** (`eca_tool`, aim's tools as ECA actions):
+      on node publish or webform submit, `aim_remember` an entity-scope
+      or case-scope fact (ECA tokens supply the subject); on a support
+      request, `aim_recall` related facts into the staff email. ADR-0065
+      covers trust: give the acting account create but not trust, so
+      these land untrusted. To check: ECA runs as the current user or
+      anonymous on cron, and ADR-0065 needs a real writer (ECA's switch
+      account action); the grounded check needs the triggering text
+      passed in as the source.
+- [ ] **Rules around aim's model calls** (Interceptor): fail over from
+      the hosted decision endpoint to local Ollama when it is down, and a
+      token budget per `aim_*` tag (what ADR-0060's dropped metrics table
+      did). Check first that the Interceptor sees aim's decision calls
+      (`DecisionBackend`'s path to the provider).
+- [ ] Maybe: a reviewer nag (email when untrusted facts pass N days),
+      cheap upkeep against the neglect risk, but it is another cron job,
+      so weigh it against ADR-0003.
+
+Not useful: the plain AI actions (embeddings, moderation) duplicate aim,
+and the modeler agent is not about aim.
+
 ## ADR-0035 - Standing constraints (design only, nothing built)
 
 - [ ] Spike FlowDrop in a scratch site (approval/release flows, and as
