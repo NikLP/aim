@@ -525,16 +525,6 @@ questions" section)
       2026-11-24: since 1.0.2 the provider writes M from `m` at create, so
       it only matters after a later edit of `m`; aim keeps its own
       `AimStatusChecker::checkHnswTuning()`.)
-      Separately `drupal/ai`'s: (7) the `ai.vdb_provider` manager is not
-      tagged `plugin_manager_cache_clear` (core's `PluginManagerPass` only
-      tags `plugin.manager.*` ids), so no module install clears
-      `ai_vdb_provider_info_plugins` (measured 2026-10-23: it survived
-      `plugin.cache_clearer->clearCachedDefinitions()`); a provider
-      installed after the list was built stays missing. aim's
-      `AimServiceProvider` adds the tag. Upstream
-      [#3547139](https://www.drupal.org/i/3547139) was closed as fixed by
-      #3535939, which only removes the discovery skip; **commented** on
-      both 2026-10-23. Delete `AimServiceProvider` when the tag lands.
 - [ ] Read a fact's stored vector instead of re-embedding it:
       `ai_vdb_provider_mariadb` 1.0.2 implements
       `getRawEmbeddingFieldName()` (#3626352), so with the server's

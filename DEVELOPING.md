@@ -367,13 +367,6 @@ in cosine distance: every read goes through `AimMemoryManager::distance()`
 (`1 - score`). Read a new score through it too, never `getScore()` raw.
 The test fakes set similarity the same way (`FakeVectorSearch`).
 
-**`AimServiceProvider` tags the VDB manager for cache clears.** `drupal/ai`
-names it `ai.vdb_provider` without the `plugin_manager_cache_clear` tag,
-and core's `PluginManagerPass` only tags `plugin.manager.*` services, so a
-module install never clears its cached definitions and a provider
-installed after the list was built stays missing. Delete it once
-`drupal/ai` tags the service (#3547139, BACKLOG.md).
-
 ### Upgrading to standalone `ai_search`
 
 `ai_search` split out of `drupal/ai` into its own drupal.org project;
