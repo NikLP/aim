@@ -143,11 +143,9 @@ queued. Test data: `tests/ingest-test/`.
 
 **Skill:** `skills/aim-discovery/` ("the grill") - a structured
 discovery interview that distills each topic into a summary and runs it
-through `aim:extract`, mostly `scope: site`.
-
-**Skill:** `skills/aim-memory/` - reach for `aim:remember`/
-`aim:recall` continuously through a session, framed as one capability
-with two directions.
+through `aim:extract`, mostly `scope: site`. An agent reaches memory
+through the MCP connector's `aim_brief`/`aim_recall`/`aim_remember` and
+their server instructions, not a skill.
 
 ### `aim:consolidate` - dedup/merge sweep
 
@@ -284,8 +282,9 @@ by hand. Identical text keeps the *older* fact and retires the newer one
 with no model check.
 
 **Automated path:** `AimConsolidateQueueWorker` (plugin ID
-`aim_consolidate`) - `remember()`/`createFactsFromCandidates()` enqueue
-each new fact right after save. Carries no `cron` key, so
+`aim_consolidate`) - `AimHooks::factInsert()` enqueues every new fact on
+insert (any write path; skipped while syncing config), and a merged fact
+queues itself the same way. Carries no `cron` key, so
 `hook_cron`/`drush cron` never touches it - drain via:
 
 ```crontab
@@ -896,13 +895,11 @@ by `AimHooks::entityBaseFieldInfo()`.
 
 Server `aim_vector` (backend `search_api_ai_search`, VDB provider
 `mariadb`), index `aim_vector_index` over `entity:aim_fact`, collection
-table `aim_fact_vectors` (renamed from `aim_facts` 2026-09-28 - too close
-to the `aim_fact` entity table for a raw SQL query to tell apart at a
-glance; real MariaDB 11.7+ HNSW `VECTOR INDEX`, not a
-brute-force scan). `text` indexed as `main_content`; `scope`/`subject`/
+table `aim_fact_vectors` (older ADRs: `aim_facts`; a real MariaDB 11.7+
+HNSW `VECTOR INDEX`, not a brute-force scan). `text` indexed as `main_content`; `scope`/`subject`/
 `user`/`trusted` as `attributes` (`user` as an
-`integer`, `NULL` for every scope but user, renamed from `subject_uid`
-2026-09-28; `trusted` as a `boolean`,
+`integer`, `NULL` for every scope but user; older ADRs: `subject_uid`;
+`trusted` as a `boolean`,
 BTREE-indexed on the collection table same as `user`, since
 `recall()` filters on it by default - see ADR-0065 and
 `AimHooks::BTREE_INDEXED_COLUMNS`).
@@ -930,6 +927,26 @@ immediately" on the index form; the tracker, cron, `drush sapi-i` and the
 consolidation worker's `reindex()` then do the indexing
 ([ADR-0015](adr/resolved/0015-immediate-consolidation-considered-deferred.md)'s
 addenda).
+
+**What ties recall to MariaDB and one embeddings model:** `aim.info.yml`
+and `composer.json` hard-depend on `ai_vdb_provider_mariadb`, and
+`search_api.server.aim_vector` names the `mariadb` provider (its model is
+left empty, at 0 dimensions, for the site to set; the demo recipe's
+`aimUseDefaultModels` does it). `compare_distance`, `recall_max_distance`
+and `recall_gap` are tuned to `nomic-embed-text`'s distances on MariaDB's
+cosine metric, so another embeddings model or backend needs them
+re-tuned. Recall and consolidation otherwise go through Search API, on
+one condition: `AimMemoryManager::distance()` assumes `ai_search`'s score
+contract with a cosine metric (score = similarity, distance = 1 - score).
+Provider 1.0.2 returns 1/(1+d) for Euclidean, so a Euclidean server would
+need the conversion to follow the metric; other providers' (pgvector,
+Milvus) scores are unchecked. Nothing assumes the collection is a table:
+the parity and orphan checks list it and `aim_uninstall()` drops it
+through the server's VDB provider (`AimVectorStore`). The only MariaDB SQL
+left is tuning, run only when the server's provider is `mariadb`:
+`AimHooks::ensureColumnIndex()` (another backend loses ADR-0018's BTREE
+pre-filtering, if it needs it) and `AimStatusChecker::checkHnswTuning()`
+(reports "not checked" elsewhere). A second backend is in BACKLOG.md.
 
 **Gotchas:**
 
@@ -1245,7 +1262,7 @@ or look (a real candidate, not yet decided). Only read, nothing replaced.
 | `aim_benchmark` decision-eval scripts and JSON sets | look, partial | `ai_eval` has dataset sources, a binary groundedness judge, judge validation, agreement stats and confidence intervals. Its graders judge agent responses through chat, not typed Decision calls, so the runner stays; the stats and judge validation are worth borrowing |
 | `AimIngestForm` | keep | Extraction into facts; contrib chunking is for indexing, not extraction |
 | `AimSettingsForm` (450 lines) | look | Mostly `ai_provider_configuration` elements and thresholds; not read line by line |
-| `aim_tool_oauth` | keep, fix gap | Tried `agent_access` 1.0.0-alpha2 on a scratch DDEV copy (2026-10-15, scripted OAuth 2.1 PKCE client, not Claude itself). It does not replace our scopes: it ships only `drupal:mcp:connect` and `drupal:content:read` plus two read-only entity tools, nothing for aim. A permission-granularity scope puts exactly its one permission on the token, so with connect-only `aim_recall` is denied and `aim:recall`/`aim:remember` are still needed. Two findings hit our scopes too: (1) `aim:remember` carries only `remember aim facts`, so a non-admin's `aim_remember` fails with "No permission to create user-scope facts" (the per-scope `create {scope} aim facts` is not on the token); (2) permission-granularity scopes drop the user's real roles from the token, so the user-scope role-visibility matrix returns nothing for every non-admin. A role-granularity scope (token roles = that role) fixed both in the test: alice saw her own and a peer's fact, a manager saw staff facts via the matrix, `remember` worked, and users outside the role could not get a session. Also seen: a permission scope appeared to grant `access mcp server` to a user whose role lacks it; re-tested on the live site 2026-10-15 with `aim_tool_oauth` scopes and it does not: the effective permission is the scope's permission AND the user's own, so scopes narrow and never escalate; `entity_list` returns per-entity-checked rows but leaks total counts for `aim_fact`, `ai_log`, `consumer`, `oauth2_token`. `agent_access` is pre-release and not under the security advisory policy; accepted as fine for now. The per-tool scope requirement we set on `aim_recall`/`aim_remember` was not enforced under 1.0.0-alpha1: `mcp_server_oauth` matched tools as `<base>.<id>` but the bridge names them `tool_api__<id>`. Fixed upstream (#3604047); this site runs `1.x-dev#fb92204` until a release (TODO.md). Role-granularity scopes are documented, not shipped (role ids are site-specific), and verified live 2026-10-15: the role needs `access mcp server`, the aim permissions and `grant simple_oauth codes`, and clients request the role scope plus the aim scope. See `aim_tool_oauth`'s DEVELOPING.md "Role scopes for non-admin users". |
+| `aim_tool_oauth` | keep, fix gap | Tried `agent_access` 1.0.0-alpha2 on a scratch DDEV copy (2026-10-15, scripted OAuth 2.1 PKCE client, not Claude itself). It does not replace our scopes: it ships only `drupal:mcp:connect` and `drupal:content:read` plus two read-only entity tools, nothing for aim. A permission-granularity scope puts exactly its one permission on the token, so with connect-only `aim_recall` is denied and `aim:recall`/`aim:remember` are still needed. Two findings hit our scopes too: (1) `aim:remember` carries only `remember aim facts`, so a non-admin's `aim_remember` fails with "No permission to create user-scope facts" (the per-scope `create {scope} aim facts` is not on the token); (2) permission-granularity scopes drop the user's real roles from the token, so the user-scope role-visibility matrix returns nothing for every non-admin. A role-granularity scope (token roles = that role) fixed both in the test: alice saw her own and a peer's fact, a manager saw staff facts via the matrix, `remember` worked, and users outside the role could not get a session. Also seen: a permission scope appeared to grant `access mcp server` to a user whose role lacks it; re-tested on the live site 2026-10-15 with `aim_tool_oauth` scopes and it does not: the effective permission is the scope's permission AND the user's own, so scopes narrow and never escalate; `entity_list` returns per-entity-checked rows but leaks total counts for `aim_fact`, `ai_log`, `consumer`, `oauth2_token`. `agent_access` is pre-release and not under the security advisory policy; accepted as fine for now. The per-tool scope requirement we set on `aim_recall`/`aim_remember` was not enforced under 1.0.0-alpha1: `mcp_server_oauth` matched tools as `<base>.<id>` but the bridge names them `tool_api__<id>`. Fixed upstream (#3604047), released in 1.0.0-alpha2. Role-granularity scopes are documented, not shipped (role ids are site-specific), and verified live 2026-10-15: the role needs `access mcp server`, the aim permissions and `grant simple_oauth codes`, and clients request the role scope plus the aim scope. See `aim_tool_oauth`'s DEVELOPING.md "Role scopes for non-admin users". |
 | `aim_tool` / `aim_chatbot` | not audited | Next: Tool API permission declarations (TODO.md/BACKLOG.md "aim_tool: declare permissions") |
 
 Result so far: the Decision-API rows turned out to be keep, so the real

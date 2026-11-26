@@ -86,7 +86,7 @@ remains binding, it just has nothing left to build.
 | [0015](resolved/0015-immediate-consolidation-considered-deferred.md) | Immediate post-write consolidation via kernel.terminate | Deferred - closed by `index_directly`, shipped on since 2026-11-26 |
 | [0017](resolved/0017-query-embedding-cache.md) | Query-embedding cache via a drupal/ai event subscriber | Accepted - built and verified 2026-09-27 |
 | [0018](resolved/0018-index-subject-uid-with-btree.md) | Index `subject_uid` as a Search API attribute, with a BTREE index on its column | Accepted - built and verified 2026-09-26 |
-| [0019](resolved/0019-recall-abstention-distance-cutoff.md) | Recall abstention via a distance cutoff, and what bounds recall quality | Accepted - built 2026-09-19/27; `aim:calibrate` follow-up in BACKLOG.md |
+| [0019](resolved/0019-recall-abstention-distance-cutoff.md) | Recall abstention via a distance cutoff, and what bounds recall quality | Accepted - built 2026-09-19/27; `aim:calibrate` follow-up in TODO.md |
 | [0020](resolved/0020-verbatim-facts-consolidation-opt-out.md) | Verbatim facts: an explicit opt-out from consolidation | Retired 2026-10-30, never built: non-destructive consolidation removed its premise (no text is rewritten in place) |
 | [0022](resolved/0022-exclude-retired-facts-from-vector-index.md) | Retired facts stay out of the vector index (Search API processor) | Accepted - built and rolled out 2026-09-26 |
 | [0023](resolved/0023-hnsw-tuning-and-thin-provider-shim.md) | HNSW tuning (M=16, ef_search=100), and keeping the provider shim thin | Accepted - built and verified 2026-09-26; shim deleted 2026-11-23 (addendum) |

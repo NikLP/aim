@@ -5,10 +5,6 @@ Parked, upstream-dependent and wait-for-a-trigger items, moved out of
 entries. Pull an item back into TODO.md when work starts. Design reasoning
 belongs in the [ADRs](adr/0000-index.md).
 
-## Literals
-
-Moved to [literals/BACKLOG.md](../../contrib/literals/BACKLOG.md) 2026-10-22.
-
 ## Case picker widget (raised 2026-10-14, pinned)
 
 - [ ] Pinned: a widget to pick from existing in-scope cases when writing a
@@ -78,20 +74,6 @@ are recommendations.
 
 - [ ] Open question: could Guardrails and the Decision API do the same
       job (see "Decision models")? Not yet written down elsewhere.
-
-**Doc and code discrepancies found**
-
-- [ ] DEVELOPING.md says `remember()`/`createFactsFromCandidates()`
-      enqueue consolidation; the code enqueues in
-      `AimHooks::factInsert()` for every non-syncing insert (merged facts
-      re-enqueue themselves).
-- [ ] Comments in `createFactsFromCandidates()` and `AimGuardrails` still
-      say Guardrails run in `hook_aim_fact_presave()`; they run in
-      `saveFact()` via `validate()`.
-- [ ] Decision-backend UPDATE writes its merged text with a separate
-      `writeMerge()` chat call on the site default provider, not the
-      consolidation model, and downgrades to ADD with no default. Not
-      documented.
 
 ## Recall cutoff per embeddings model (raised 2026-11-19)
 
@@ -191,47 +173,6 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       `ai_logging`, and the Guardrails rewrite mechanism. Less code also
       answers the neglect risk. Output: a table in DEVELOPING.md, then
       deletions.
-- [ ] **Agent Access recipe trial (done 2026-10-15; follow-ups open).**
-      Result: not a replacement for `aim_tool_oauth`; see DEVELOPING.md
-      "Plumbing audit". It adds no aim scopes or tools, and permission-
-      granularity scopes (ours and its) lose the user's roles, so the
-      role-visibility matrix returns nothing for non-admin tokens and
-      `aim:remember` lacks `create {scope} aim facts`. Follow-ups: (a)
-      add role-granularity scope(s) to `aim_tool_oauth` and re-test on
-      the live site; (b) DONE 2026-10-15: a permission scope does not
-      grant a permission the user's roles lack (tested live: effective =
-      scope AND user), so no upstream issue; (c) note
-      for any recommendation: `agent_access` is pre-release and not under
-      the security advisory policy; accepted as fine for now. Scratch
-      copy removed.
-- [ ] **`aim_tool_oauth` per-tool scope gate is inert (found 2026-10-15).**
-      `mcp_server_oauth` 1.0.0-alpha1 finds a tool's config by matching
-      the wire name against `<base>.<config_id>` (its tests use
-      `tool_api.protected_tool`), but `mcp_server_tool_bridge` 1.0.0-beta3
-      names tools `tool_api__<config_id>`. No config matches, so the
-      scopes we set on `aim_recall`/`aim_remember` are never checked: a
-      token without them still calls the tools (seen in the trial; only
-      the Drupal permission was enforced). The scopes still matter for
-      the permission they carry. To do: file or find an upstream issue
-      (name-format mismatch between the two modules), confirm on the live
-      site, and until fixed do not rely on the per-tool scopes for
-      anything. Update: upstream fixed this (#3604047, in 1.x-dev
-      fb92204; no release yet). Installed on this site 2026-10-15 pinned
-      as `1.x-dev#fb92204`; the subscriber now resolves `tool_api__aim_recall`/
-      `aim_remember` to their configs. Verified live 2026-10-15 with a throwaway
-      non-admin user (since deleted): a token without `aim:recall`/
-      `aim:remember` is refused (logged `insufficient_scope`, but the
-      client sees JSON-RPC -32603 "Internal server error", not a 403);
-      with the scope it works. Same test found: no aim scope carries
-      `access mcp server`, so a non-admin cannot connect at all (403 on
-      initialize); and `aim_remember` with `aim:remember` still fails
-      "No permission to create site-scope facts" for a role that holds
-      it. Both are fixed by the role-scope change (documented 2026-10-15 in aim_tool_oauth's DEVELOPING.md; live re-test done 2026-10-15, see that file). Still to do: swap the
-      pin for the first release containing the fix. No upstream issue needed from us. Once enforced, a role scope alone is
-      rejected (403 insufficient_scope) by tools requiring `aim:recall`/
-      `aim:remember`, so clients must request the role scope plus the
-      aim scope; design the role-scope change (trial item above) for
-      that and test after the upgrade.
 - [ ] **Redacting guardrail.** Drupal AI's PII guardrails only block; none
       removes the PII, yet the rewrite mechanism exists
       (`runGuardrails()` already handles `RewriteInputResult`). Sketch:
@@ -254,16 +195,11 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       prompts and replies in clear (ADR-0060); a hosted model sees every
       candidate fact (CLAUDE.md scope note); embeddings leak meaning.
       George's rule: when unsure, make it private.
-      First pass BUILT 2026-10-15: `tests/src/Kernel/AimPrivacyTest.php`
-      runs `recall()` through entity access (the fake search backend now
-      applies it like the real one). Findings: a viewer with only the site
-      permission, or no permissions, sees no user-scope fact; the shared-role
-      fallback and the role-visibility matrix show it as designed; an
-      administrator role sees every user's facts (the gap George named, pinned
-      as today's behavior); `accessCheck: FALSE` (Drush) shows everything.
-      Not covered: the subject seeing their own fact with no shared role (no
-      rule gives it), `ai_log` prompt text, and the real AI Search per-hit
-      check (the fake stands in for it).
+      `AimPrivacyTest` covers user-scope visibility through `recall()`
+      (administrators see every user's facts: pinned as today's behavior).
+      Not covered yet: the subject seeing their own fact with no shared
+      role (no rule gives it), `ai_log` prompt text, and the real AI Search
+      per-hit check (the test's fake backend stands in for it).
 - [ ] **PINNED (2026-10-15, Nik: parked until we regroup). Subject / user / uid audit.** The identity-ish fields have drifted:
       `uid` (author), `user` (who a `scope=user` fact is about, was
       `subject_uid`), `subject` (generic per-scope key, minted case IDs),
@@ -281,17 +217,15 @@ OpenBrain, an in-house second brain. His points, and where each landed:
       one importer feeding the existing ingest path (see "Ingestion"),
       to learn whether extraction copes with structured exhaust. Imports
       make the redaction item above urgent.
-- [ ] **Human curation of the trust gate.** Policy, `review aim facts` and
-      the `aim:status` count BUILT 2026-10-19 (ADR-0037 addendum); still no
-      one holds the permission and no reason column on the facts list. None
-      yet: nobody holds
-      `trust {scope} aim facts` (the grounded check is in demote mode since
-      2026-11-01). Decide
-      the reviewer workflow before claiming draft-to-trusted is a feature.
-- [ ] **Packaging.** Not a one-line installer. `recipes/aim_demo_library/preflight/preflight.js` lives in
-      the recipe, not the module proper; consider a module-level check (a
-      Drush command or status report) so installs are verifiable. Heavy
-      parts already swappable (`DecisionBackend`, Ollama
+- [ ] **Human curation of the trust gate.** The policy, `review aim
+      facts` and the `aim:status` count are built (ADR-0037 addendum), but
+      on this site no role holds `review aim facts` or any `trust {scope}
+      aim facts`. Decide the reviewer workflow before claiming
+      draft-to-trusted is a feature (the reason column is in TODO.md's
+      "Trust follow-ups").
+- [ ] **Packaging.** Not a one-line installer. `drush aim:status` is the
+      module-level health check; the recipe's `preflight/preflight.js`
+      adds the demo's end-to-end checks. Heavy parts already swappable (`DecisionBackend`, Ollama
       embeddings); document the swap points. George suggested a site
       template after the module exists. Unresearched here: check what
       Drupal CMS site templates require against `aim_demo_library`.
@@ -464,17 +398,14 @@ questions" section)
       snapshot copy; a disclosed LongMemEval slice (50-100 questions) for
       recall precision, knowledge-update correctness and abstention (parity
       targets 1, 4, 5); recall payload size vs. full-history tokens
-      (target 3); duplicate rate; then tune `recall_max_distance` (0.48),
-      `compare_distance` against
+      (target 3); duplicate rate; then tune `recall_max_distance`
+      (shipped 0.48, this site 0.60) and `compare_distance` against
       them; `aim:benchmark` at thousands of facts (open question #5).
       Count hosted calls while doing it: the verifier adds one call only
       per UPDATE (1 of 23 pairs on the live set, 2026-10-01), but it
       compounds with every compared pair going to the model (since
       2026-10-27), which sends more pairs to the
       model and so yields more UPDATEs. Measure the two together.
-      Retention (the item further down) also needs the `getVdbIds()`
-      limit-10 shim (#3626257) re-verified before relying on deletes, and
-      its own ADR plus sign-off first.
 - [ ] Extraction-input guardrailing, distinct from the existing output-side
       candidate-fact guardrails.
 - [ ] Tests still missing (harness: DEVELOPING.md, "Running the tests"):
@@ -531,8 +462,8 @@ questions" section)
       ([#3641260](https://www.drupal.org/i/3641260)). Once a release ships
       them: delete `AimHooks::ensureColumnIndex()`, `vectorIndexUpdate()` and
       `BTREE_INDEXED_COLUMNS` (the provider then indexes every "attributes"
-      field, under the same `idx_<column>` names), update TODO.md's "recall
-      is tied to MariaDB" note, and drop the `scope`/`subject` half of the
+      field, under the same `idx_<column>` names), update DEVELOPING.md's
+      "What ties recall to MariaDB" paragraph, and drop the `scope`/`subject` half of the
       BTREE measuring item below. The asks:
       (a) 1.0.2 changed Search API scores from cosine distance to
       similarity (#3635830, deliberate: `ai_search` reads scores as
@@ -655,17 +586,6 @@ questions" section)
       a working reroll exists upstream, or write one properly with time
       to test it.
 
-## aim_tool: MCP input errors lost the input name (raised 2026-10-21, tool 1.0.0-beta12)
-
-- [ ] Wait for an `mcp_server_tool_bridge` release that runs calls through
-      Tool API's `tool.runner` (or `ToolMessages`). Bridge 1.0.0-beta4 still
-      builds its invalid-input reply from `$violation->getMessage()` alone,
-      and tool beta12 moved the input name out of that text onto the
-      property path, so an MCP client now reads "This value should be of
-      the correct primitive type." without being told which input. The
-      chat path (`tool_ai_connector`, which uses the runner) is not
-      affected. Nothing to change in aim: upgrade the bridge when it ships.
-
 ## aim_tool: schema discoverability and typed output (raised 2026-10-05, from Matt Glaman's "Define the capability once, call it anywhere")
 
 Source: https://mglaman.dev/blog/define-capability-once-call-it-anywhere.
@@ -683,6 +603,38 @@ Installed 2026-10-05: tool 1.0.0-beta11, bridge 1.0.0-beta3, mcp_server
       discovery channel.
 - [ ] Optional: use `drush tool:run aim_recall` / `aim_remember` as a
       smoke test of the tool layer without an MCP client.
+
+## Waiting on upstream
+
+Filed; aim carries a stopgap until a release ships the fix.
+
+- [ ] **Site Agent marks person-approved calls** (ADR-0067). Filed as
+      [site_agent#3638825](https://www.drupal.org/project/site_agent/issues/3638825)
+      (2026-11-17); a Tool API issue for the case's home only if the
+      maintainer favors it. This site carries it as
+      `patches/site_agent-person-approved-invoker.patch` (site root), and
+      aim's side is built against it (`AimRemember::PERSON_APPROVED`).
+      Drop the patch once a release ships it; follow upstream's name.
+- [ ] **Hand a `#[ToolMethod]` its invoker** (ADR-0062 decision 2).
+      `aim_remember` picks its source from the Tool API invoker, which a
+      method service never receives; `AimRememberInvokerSubscriber`
+      catches it from `ToolInputTransformEvent` meanwhile.
+      [tool#3583125](https://git.drupalcode.org/project/tool/-/work_items/3583125)
+      (filed 2026-10-28) asks for a runner-filled `?Invoker` method
+      parameter, split out of
+      [tool#3583116](https://git.drupalcode.org/project/tool/-/work_items/3583116)
+      (the invoker for *access* callbacks, which CCC needs) at the
+      maintainer's request. When it lands: add `?Invoker $invoker = NULL`
+      to `aim_remember` and delete the subscriber.
+
+## A second vector backend
+
+- [ ] Recall runs on MariaDB and one tuned embeddings model today
+      (DEVELOPING.md "Vector search", "What ties recall to MariaDB").
+      A second backend needs: the hard dependency on
+      `ai_vdb_provider_mariadb` made optional, its score semantics
+      confirmed, recalibration of the distance settings, an ADR and its
+      server config.
 
 ## Write-path cuts, ADR-0065 (raised 2026-11-01)
 

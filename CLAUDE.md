@@ -158,9 +158,8 @@ duplicated here.
   `aim_scope` config entities (`bundle_entity_type`), not code-defined.
   Fields: `subject`/`user` (an entity reference to a real Drupal account,
   required for `scope=user` per
-  [ADR-0007](adr/resolved/0007-user-scope-requires-real-account.md); renamed from
-  `subject_uid` 2026-09-28, to stop colliding in
-  spirit with the unrelated `uid` field below),
+  [ADR-0007](adr/resolved/0007-user-scope-requires-real-account.md); older
+  ADRs call it `subject_uid`; not the author, that is `uid` below),
   `target_type`/`target_id` (plain strings naming an arbitrary referenced
   entity, required for `scope=entity` and checked on write by the entity
   plugin's `validateSubject()` - see
@@ -220,9 +219,8 @@ duplicated here.
   `field_ui_base_route` - deliberately, see
   [DEVELOPING.md](DEVELOPING.md) for why.
 - Vector search: server `aim_vector`, index `aim_vector_index`, collection
-  table `aim_fact_vectors` (MariaDB HNSW `VECTOR INDEX`; renamed from
-  `aim_facts` 2026-09-28 - too easy to confuse with the `aim_fact` entity
-  table in a raw SQL query). Retired facts (`retired`
+  table `aim_fact_vectors` (MariaDB HNSW `VECTOR INDEX`; older ADRs call
+  it `aim_facts`). Retired facts (`retired`
   set) are excluded from the index by the `aim_exclude_retired` processor
   ([ADR-0022](adr/resolved/0022-exclude-retired-facts-from-vector-index.md)),
   `user` is an indexed attribute with a BTREE index
@@ -285,9 +283,8 @@ look at other roles when a permission check unexpectedly fails.
   only with an upstream issue in TODO.md/BACKLOG.md and is deleted when the
   provider ships the fix; generic features go upstream first; aim ships
   values under the provider's own config key names, never its own
-  ([ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md);
-  its `AimMariaDBProvider` shim went 2026-11-23 when provider 1.0.2 fixed
-  everything in it).
+  ([ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)'s
+  addendum).
 - **Logging** goes through `logger.channel.aim`: warnings and errors
   always, info/debug only via `AimMemoryManager::logAudit()` /
   `logVerbose()` (gated by `aim.settings` `log_audit` / `log_verbose`).

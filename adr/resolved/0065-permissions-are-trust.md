@@ -85,8 +85,9 @@ output.
    trusted fact authored by an account without trust permission), a
    refused write for a scope the account cannot write, and a way for a
    shell caller to send a fact to review by writing as a non-reviewer.
-   The human check for an agent on the shell (Claude Code's `aim-memory`
-   and `aim-discovery` skills, which gain `--uid`) is the agent's own tool
+   The human check for an agent on the shell (Claude Code's `aim-discovery`
+   skill, which gains `--uid`; the `aim-memory` skill named here was
+   deleted 2026-11-26) is the agent's own tool
    permission prompt, where the person sees the command and its text. The
    grounded check still applies to `aim:extract`, since a model wrote
    those facts.

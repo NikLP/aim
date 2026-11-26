@@ -9,22 +9,9 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
 
 ## Tools (raised 2026-10-25)
 
-- [ ] **Upstream: Site Agent marks person-approved calls** (ADR-0067).
-      Filed as [site_agent#3638825](https://www.drupal.org/project/site_agent/issues/3638825)
-      (2026-11-17); a Tool API issue for the case's home only if the
-      maintainer favors it. This site carries it as
-      `patches/site_agent-person-approved-invoker.patch` (site root), and
-      aim's side is built against it (`AimRemember::PERSON_APPROVED`).
-      Drop the patch once a release ships it; follow upstream's name.
-- [ ] **Upstream: hand a `#[ToolMethod]` its invoker** (ADR-0062 decision
-      2). `aim_remember` picks its source from the Tool API invoker, which a method service never receives;
-      `AimRememberInvokerSubscriber` catches it from `ToolInputTransformEvent`
-      meanwhile. Upstream: [tool#3583125](https://git.drupalcode.org/project/tool/-/work_items/3583125)
-      (filed 2026-10-28) asks for a runner-filled `?Invoker` method
-      parameter, split out of [tool#3583116](https://git.drupalcode.org/project/tool/-/work_items/3583116)
-      (the invoker for *access* callbacks, which CCC needs) at the
-      maintainer's request. When it lands: add `?Invoker $invoker = NULL`
-      to `aim_remember` and delete the subscriber.
+Filed upstream and waiting on a release (Site Agent's person-approved
+marker, the `#[ToolMethod]` invoker): BACKLOG.md "Waiting on upstream".
+
 - [ ] **Upstream: Site Agent's written-items card lists log rows and says
       "Published"** (raised 2026-11-18, not filed yet). Its
       `EntityWriteCollector` ignores only Site Agent's own records, so a
@@ -54,6 +41,17 @@ ideas and open design questions live in [BACKLOG.md](BACKLOG.md).
       the visitor's timezone. Same idea as `aim_site_agent`'s prompt
       section. MCP stays on `aim_brief` (instructions are read once per
       connection).
+- [ ] **`aim:consolidate --dry-run` prints every compared pair** (2026-10-22
+      test report: 32 rows, 31 unrelated ADDs at 0.33-0.44, the one useful
+      NOOP lost on stage). Add `--changes-only`, or make it the dry-run
+      default with a flag for all rows.
+- [ ] **MCP checks for `mcp_server_tool_bridge` beta5.** When
+      `aim_tool_oauth` is next enabled: check the four tools list without a
+      cache rebuild, that `pmu aim_tool` leaves no `mcp_tool_config.aim_*`
+      behind, and that an invalid input's error names the input again
+      (beta5 runs calls through `tool.runner`; this closes BACKLOG.md's
+      "MCP input errors lost the input name"); refresh the "observed with
+      beta3" notes in aim_tool's README/DEVELOPING.md.
 
 ## Briefing: background for the agent and the person (raised 2026-11-18)
 
@@ -106,11 +104,8 @@ the two-part brief.
 
 ## Chat quality and evals: open after the 2026-10-15/16 session
 
-State: recall not forced (`require_usage` off since 2026-10-22, see
-`modules/aim_chatbot/CLAUDE.md`), persona says "recall first", the demo
-recipe installs `literals_finder` and puts its block on the gate, chat writes permission-checked (a member's wait for review: no trust permission),
-turns about 4.7 s with 2 hosted calls (details in the Literals entry below
-and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
+Current chat setup and figures: `modules/aim_chatbot/CLAUDE.md`. Open, in
+the order I would take them:
 
 - [ ] **Shared ai_logging settings (decided, deferred 2026-10-19).** The
       settings are site-wide and aim no longer writes them (tag list:
@@ -141,10 +136,7 @@ and `modules/aim_chatbot/CLAUDE.md`). Open, in the order I would take them:
 - [ ] **Move the chat eval commands out of `aim_chatbot`.**
       `aim:chatbot-eval` and `aim:chatbot-converse` are dev tooling; move
       them to `aim_benchmark` (which exists so production sites don't ship
-      dev-only tools), offered only when the chat modules are present. Facts could
-      carry `[literal:key]` tokens (resolved by `recall()` for the viewer)
-      where a fact names a value, so the widget needs no lookup call - a
-      data-model choice for the recipe, not tuning to pass the eval.
+      dev-only tools), offered only when the chat modules are present.
 - [ ] **Upstream: a failed model call comes back as the question.**
       `ai_agents` swallows the error (`getLastError()`) and
       `ai_assistant_api` never surfaces it, so the plain processor shows the
@@ -194,7 +186,10 @@ addendum) are built. Work on the literals modules themselves is in
       wired up later); copy controls
       (front-end only). Pull one out when a site needs it. Optional
       pre-gate ("is this a lookup?" ahead of the finder) only if measured
-      to pay.
+      to pay. In the demo recipe, facts that name a value could carry
+      `[literal:key]` tokens (resolved by `recall()` for the viewer), so
+      the widget needs no lookup call - a data-model choice, not tuning to
+      pass the eval.
 - [ ] **After the finder went into recall (2026-11-16).** Chat scenarios
       re-run 2026-11-17 (site's `demo/chat-eval/`): 23/24, all literal turns
       right, one decision call more per recall, median 3.9 s (now
@@ -228,16 +223,6 @@ addendum) are built. Work on the literals modules themselves is in
       site, with no model call or real sign-in. Decide where a second site
       runs, then check a connector connects as uid 1, a fact saves and
       recalls, and what `aim:extract` does with the disabled scopes.
-- [ ] **Delete the `aim-memory` skill (raised 2026-11-13, after the
-      `time-check` branch lands).** Never used; the MCP connector's
-      `aim_recall`/`aim_remember`/`aim_brief` and server instructions cover
-      it from anywhere, while the skill only runs `ddev drush` in this dev
-      checkout, and its text is stale (says `site` is the default scope,
-      omits `entity`, links a CLAUDE.md section that does not exist). Remove
-      `skills/aim-memory/`, the site's `.claude/skills/aim-memory` symlink,
-      and the mentions in DEVELOPING.md ("**Skill:**"),
-      `adr/workflow-diagram.md` and the ADR-0006/0065 references (history,
-      reword or leave). Keep `aim-discovery`.
 - [ ] **Move `skills/` to `.agents/skills/` (raised 2026-10-25).** The
       convention `ai`, `tool` and `mcp_server` already use (Marcus
       Johansson's talk: drupal.org's knowledge base detects
@@ -253,12 +238,6 @@ addendum) are built. Work on the literals modules themselves is in
 - [ ] **Skill chain: grill, then recipe.** The grill writes site memory; a
       recipe-building skill reads it and proposes a Recipe. ADR-0035's gate
       applies (dry-run and human review before any apply). Own ADR.
-- [ ] **Fresh install docs.** The recipe README's "Fresh install" should
-      say to set the Ollama host and embeddings default before this
-      recipe, since facts are embedded on
-      import, and add a stop after it for manual model setup (chat
-      provider, decision models and thresholds on the Models tab,
-      `grounding_mode`), then `node demo/preflight.js`.
 - [ ] **Re-check what the personas assume the assistant can see** (a
       signed-in member only gets facts through `view site aim facts`;
       `aim_literal` needs only `view literals` since 2026-10-10), and
@@ -271,40 +250,6 @@ addendum) are built. Work on the literals modules themselves is in
       client), backed by literals, plus what literals does on its own
       (finder, token replacement). The recipe README's "Running the demo"
       questions and whether the site needs a front page fold into this.
-- [ ] **`aim:consolidate --dry-run` prints every compared pair** (2026-10-22
-      test report: 32 rows, 31 unrelated ADDs at 0.33-0.44, the one useful
-      NOOP lost on stage). Add `--changes-only`, or make it the dry-run
-      default with a flag for all rows.
-- [ ] **MCP checks for `mcp_server_tool_bridge` beta5.** When
-      `aim_tool_oauth` is next enabled: check the four tools list without a cache rebuild and
-      that `pmu aim_tool` leaves no `mcp_tool_config.aim_*` behind; refresh
-      the "observed with beta3" notes in aim_tool's README/DEVELOPING.md.
-- [ ] **Note: recall is tied to MariaDB and `nomic-embed-text` today**
-      (checked 2026-11-23). `aim.info.yml` and `composer.json` hard-depend
-      on `ai_vdb_provider_mariadb` (so the recipe needn't list it), and
-      `search_api.server.aim_vector` names the `mariadb` provider and
-      hardcodes `ollama__nomic-embed-text:latest` at 768 dimensions.
-      `compare_distance`, `recall_max_distance` and `recall_gap` are tuned
-      to that model's distances on MariaDB's `VEC_DISTANCE_COSINE`, so a
-      different embeddings model or backend needs them re-tuned.
-      Recall and consolidation go through Search API and are portable
-      since the provider subclass went (2026-11-23), on one condition:
-      `AimMemoryManager::distance()` assumes `ai_search`'s score contract
-      with a cosine metric (score = similarity, distance = 1 - score).
-      Provider 1.0.2 returns 1/(1+d) for Euclidean, so a Euclidean server
-      would need the conversion to follow the metric; other providers'
-      (pgvector, Milvus) scores unchecked.
-      Since 2026-11-24 nothing assumes the collection is a table: the
-      parity and orphan checks list it and `aim_uninstall()` drops it
-      through the server's VDB provider (`AimVectorStore`). The only
-      MariaDB SQL left is MariaDB tuning, run only when the server's
-      provider is `mariadb`: `AimHooks::ensureColumnIndex()` (another
-      backend loses ADR-0018's BTREE pre-filtering, if it needs it) and
-      `AimStatusChecker::checkHnswTuning()` (reports "not checked"
-      elsewhere); both are upstream asks (BACKLOG.md, items d and e). A
-      second backend still needs: the hard dependency made optional,
-      its score semantics confirmed, recalibration, an ADR and its server
-      config.
 
 ## Ingestion
 
@@ -329,7 +274,7 @@ only work to do is listed here.
       built-in length/regex plugins run for it (then a separate set, not
       `aim_write_guardrails`). aim's `composer.json` requires `drupal/ai`
       `^1.6` since 2026-10-30 (the Decision API); until 1.6.0 is tagged a
-      site needs `1.6.x-dev`.
+      site needs `1.6.x-dev` (still untagged 2026-11-26).
 - [ ] **Per-model thresholds and editable question text** for the decision
       backend (ADR-0021 decision 5; text hardcoded in `AimConsolidationService` and
       `AimGroundingChecker`).
@@ -357,8 +302,8 @@ only work to do is listed here.
       names, offer chat on the form, and calibrate the threshold per chat
       model (its probability is self-reported). Measure a small local chat
       model before calling it a sovereign option.
-- [ ] **Grounded check follow-ups.** Per-model question text;
-      `ingest_max_chars` and a passage limit for the decision call (untested
+- [ ] **Grounded check follow-ups** (per-model question text is in the
+      item above): `ingest_max_chars` and a passage limit for the decision call (untested
       above ~1,000 words); MCP `source_text` is only as verbatim as the
       calling agent.
 - [ ] **Eval work** (none built beyond the sets in `aim_benchmark/scripts/`):

@@ -158,9 +158,9 @@ could not connect (403); a user with no role permissions got a token but
   visibility.
 - A blocked call reaches the client as JSON-RPC -32603 "Internal server
   error" (logged `insufficient_scope`), not a 403.
-- Per-tool scope enforcement needs `mcp_server_oauth` with upstream fix
-  #3604047 (this site pins `1.x-dev#fb92204`; swap for the first release
-  containing it).
+- Per-tool scope enforcement needs `mcp_server_oauth` 1.0.0-alpha2 or
+  later (upstream fix #3604047, which matches the bridge's `tool_api__`
+  tool names).
 
 ## Gotchas
 

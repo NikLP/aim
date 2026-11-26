@@ -103,7 +103,7 @@ The ways in:
 
 | Path | Runs as | Source text | `source` recorded |
 | --- | --- | --- | --- |
-| `drush aim:remember --uid` (one fact, or `--file`), used by agents such as Claude Code through the aim-memory skill | the `--uid` account | none | `--source`, or the entry's own |
+| `drush aim:remember --uid` (one fact, or `--file`), used by shell agents and the `aim-discovery` skill | the `--uid` account | none | `--source`, or the entry's own |
 | Ingest form, one fact per line or JSON (`ingest aim facts`) | the form's user | none | the form's |
 | `aim_remember` over MCP or Tool API (`remember aim facts`) | the token's user | optional `source_text` | `tool:aim_remember` |
 | `aim_remember` in the chat block, through `tool_ai_connector` | the visitor | from the assistant | `chat:aim_remember` |
