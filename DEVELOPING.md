@@ -908,12 +908,24 @@ table `aim_fact_vectors` (renamed from `aim_facts` 2026-09-28 - too close
 to the `aim_fact` entity table for a raw SQL query to tell apart at a
 glance; real MariaDB 11.7+ HNSW `VECTOR INDEX`, not a
 brute-force scan). `text` indexed as `main_content`; `scope`/`subject`/
-`user`/`source`/`trusted` as `attributes` (`user` as an
+`user`/`trusted` as `attributes` (`user` as an
 `integer`, `NULL` for every scope but user, renamed from `subject_uid`
 2026-09-28; `trusted` as a `boolean`,
 BTREE-indexed on the collection table same as `user`, since
 `recall()` filters on it by default - see ADR-0065 and
 `AimHooks::BTREE_INDEXED_COLUMNS`).
+
+**Only fields recall filters on are attributes.** ai_search writes each
+attribute into its own column of the collection table, and the MariaDB
+provider maps every Search API string to `VARCHAR(255)`, so a longer value
+fails the row under strict mode: the fact saves but never indexes, and
+never comes back from recall (the only sign is a Search API indexing
+error). `source` (free text up to 2048 characters) stays a Search API
+field but is `ignore` in `ai_search.index.aim_vector_index`: recall reads
+it from the entity, not the vector row. A site installed before this
+keeps an unused `source` column and `idx_source` index; new rows leave it
+`NULL`, and it can be dropped by hand. `AimVectorIndexSourceTest` covers
+it on the real provider.
 
 **`index_directly`:** off in the shipped config, so a saved fact is not
 searchable until an index run (`drush search-api:index aim_vector_index`,
@@ -947,7 +959,7 @@ then export the index config.
   stale table no longer needs a `DROP TABLE`.
 - `drush search-api:clear aim_vector_index` can drop and reprovision
   `aim_fact_vectors` down to just the base columns, silently losing `scope`/
-  `source`/`subject`/`text` - the next `search-api:index` then fails
+  `subject`/`text` - the next `search-api:index` then fails
   `Unknown column 'scope'`. Fix is the same index entity `->save()`
   above, not running `search-api:clear` again. After a `DROP TABLE`-and-
   reindex cycle, reindex directly and skip `search-api:clear` entirely.

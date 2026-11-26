@@ -13,7 +13,7 @@ indexing_options:
     indexing_option: attributes
   source:
     field_name: source
-    indexing_option: attributes
+    indexing_option: ignore
   user:
     field_name: user
     indexing_option: attributes
