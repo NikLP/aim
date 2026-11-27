@@ -338,9 +338,8 @@ named `subject_uid` until 2026-09-28 - ADR-0018's
 title and file name still say `subject_uid`, the field itself does not):
 `recall()` (with `--subject-uid`) and user-scope `findNeighbors()`
 filter by a `user` query condition, not in PHP. The column's BTREE index
-(`idx_user`, added by `AimHooks::vectorIndexUpdate()` through
-`AimHooks::ensureColumnIndex()` on every index save, MariaDB servers
-only) is what
+(`idx_user`, which the provider adds to every filterable attribute
+since 1.0.3, #3641260) is what
 makes this exact: MariaDB's HNSW index post-filters, so without it a
 selective filter returns short or wrong results. A user holding a large
 share of the table (measured at 20% and 77%) is served by HNSW instead and
@@ -348,14 +347,17 @@ stays approximate (82 to 97% of the exact top-k), which is why `recall()`
 still over-fetches 5x for a uid filter. Measurements and the limits of
 the test in [ADR-0018](adr/resolved/0018-index-subject-uid-with-btree.md).
 
-**`ai_vdb_provider_mariadb` runs unmodified, at 1.0.2 or later.** Until
+**`ai_vdb_provider_mariadb` runs unmodified, at 1.0.3 or later.** Until
 2026-11-23 aim swapped in a subclass (`AimMariaDBProvider`) for three
 provider bugs and the HNSW settings; 1.0.2 fixed all of them (#3609961
 table exists, #3626257 the 10-row delete cap, #3626262 empty numeric
 values, #3605665 `m`/`mhnsw_ef_search`), so the class and its alter hook
 were deleted ([ADR-0023](adr/resolved/0023-hnsw-tuning-and-thin-provider-shim.md)'s
-addendum). aim's `composer.json` requires `^1.0.2`. The one piece that
-was aim's own, the BTREE helper, is `AimHooks::ensureColumnIndex()`.
+addendum). 1.0.3 (#3641260) gives every filterable attribute column a
+BTREE index, which retired aim's own helper (`AimHooks::ensureColumnIndex()`);
+aim's `composer.json` requires `^1.0.3`. Filtering on a field that is not
+an attribute throws in 1.0.3 rather than being skipped, so a new recall
+condition needs its field set to `attributes` first.
 
 **Scores are similarity, aim's settings are distance.** Since 1.0.2 a
 Search API result's score is the cosine similarity floored at 0 (higher is
@@ -901,8 +903,8 @@ HNSW `VECTOR INDEX`, not a brute-force scan). `text` indexed as `main_content`; 
 `integer`, `NULL` for every scope but user; older ADRs: `subject_uid`;
 `trusted` as a `boolean`,
 BTREE-indexed on the collection table same as `user`, since
-`recall()` filters on it by default - see ADR-0065 and
-`AimHooks::BTREE_INDEXED_COLUMNS`).
+`recall()` filters on it by default - see ADR-0065; the provider indexes
+every attribute column).
 
 **Only fields recall filters on are attributes.** ai_search writes each
 attribute into its own column of the collection table, and the MariaDB
@@ -944,9 +946,9 @@ Milvus) scores are unchecked. Nothing assumes the collection is a table:
 the parity and orphan checks list it and `aim_uninstall()` drops it
 through the server's VDB provider (`AimVectorStore`). The only MariaDB SQL
 left is tuning, run only when the server's provider is `mariadb`:
-`AimHooks::ensureColumnIndex()` (another backend loses ADR-0018's BTREE
-pre-filtering, if it needs it) and `AimStatusChecker::checkHnswTuning()`
-(reports "not checked" elsewhere). A second backend is in BACKLOG.md.
+`AimStatusChecker::checkHnswTuning()` (reports "not checked" elsewhere).
+The BTREE pre-filtering of ADR-0018 is the MariaDB provider's own since
+1.0.3; another backend needs its own answer, if it post-filters. A second backend is in BACKLOG.md.
 
 **Gotchas:**
 
@@ -1125,7 +1127,7 @@ from config and the shim.
    `user`) to `search_api.index.aim_vector_index`, and
    `indexing_options.user: attributes` to
    `ai_search.index.aim_vector_index`. Saving the index adds the column
-   (the provider) and its BTREE index (`AimHooks::vectorIndexUpdate()`). Then `ddev drush sapi-r aim_vector_index
+   and its BTREE index (both the provider's). Then `ddev drush sapi-r aim_vector_index
    && ddev drush sapi-i aim_vector_index`. This must happen before the code
    that filters on it runs: old rows have `NULL` until reindexed.
 3. **Provider 1.0.2 or later**: scores became similarity there, and aim

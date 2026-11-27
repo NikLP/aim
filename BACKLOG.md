@@ -452,52 +452,6 @@ questions" section)
       whether a Cache API layer (keyed scope+subject, invalidated on save)
       is still wanted. The boolean `state` field this was originally
       motivated by was removed 2026-10-12 (nothing read it).
-- [ ] Upstream leftovers for `ai_vdb_provider_mariadb` after 1.0.2
-      (2026-11-23), which fixed every override `AimMariaDBProvider` carried
-      (#3609961 with `CREATE TABLE IF NOT EXISTS`, not MR 8's drop;
-      #3626257; #3626262; #3605665's `m`/`mhnsw_ef_search`) and made
-      `ai_search` optional, so the shim was deleted (ADR-0023's addendum).
-      The maintainer agreed to all four asks below; they are built on the
-      issue fork branch `3641260-index-filter-columns`
-      ([#3641260](https://www.drupal.org/i/3641260)). Once a release ships
-      them: delete `AimHooks::ensureColumnIndex()`, `vectorIndexUpdate()` and
-      `BTREE_INDEXED_COLUMNS` (the provider then indexes every "attributes"
-      field, under the same `idx_<column>` names), update DEVELOPING.md's
-      "What ties recall to MariaDB" paragraph, and drop the `scope`/`subject` half of the
-      BTREE measuring item below. The asks:
-      (a) 1.0.2 changed Search API scores from cosine distance to
-      similarity (#3635830, deliberate: `ai_search` reads scores as
-      higher-is-better). Its README says positive `min_score` thresholds
-      "keep their existing meaning", true only against `ai_search`'s
-      intent: a threshold tuned on 1.0.1 inverts silently. Ask for a BC
-      note on the release. It also added `$server_id` to `getVdbIds()`,
-      fatal for any subclass overriding it (aim's did);
-      (b) one `Incorrect column specifier for column 'embedding'` error
-      logged on every fresh install. Cause (reproduced 2026-11-24 by saving
-      a size-0 server config): `ai_search`'s `NewServerEventSubscriber`
-      runs on every `search_api.server.*` config save, raw data, enabled or
-      not, and calls `ensureCollectionExists()`, which creates the table at
-      the server's `dimensions`. aim ships `aim_vector` at 0 (the model is
-      per site; the recipe's `aimUseDefaultModels` sets it), so the import
-      asks MariaDB for `VECTOR(0)`. Harmless (the real table follows once
-      the model is set), but it reads as a failure to anyone checking the
-      log. Ask: `MariaDBProvider::createCollection()` returns early on
-      `dimension <= 0`, which covers every path (1.0.2 guards only its own
-      index-save hook). No clean aim-side fix: a shipped guess would build
-      the table at the wrong size for another model;
-      (c) the requirements hook and config page still load only the
-      server with ID `mariadb`, so the debug-logging warning never checks
-      `aim_vector` - minor;
-      (d) a BTREE index on each filter column (`ai_search`'s
-      "attributes" fields) when the provider creates it: the HNSW index
-      post-filters, so every MariaDB user who filters returns short
-      results without one (ADR-0018). aim does it in
-      `AimHooks::ensureColumnIndex()` for `user` and `trusted`, the last
-      raw MariaDB SQL in aim's hooks.
-      (A built-M-vs-configured-`m` warning was dropped from this list
-      2026-11-24: since 1.0.2 the provider writes M from `m` at create, so
-      it only matters after a later edit of `m`; aim keeps its own
-      `AimStatusChecker::checkHnswTuning()`.)
 - [ ] Read a fact's stored vector instead of re-embedding it:
       `ai_vdb_provider_mariadb` 1.0.2 implements
       `getRawEmbeddingFieldName()` (#3626352), so with the server's
@@ -513,15 +467,54 @@ questions" section)
       about tenfold, the embeddings model or dimensions change, or the
       provider is upgraded. Method in DEVELOPING.md, "Rechecking accuracy".
       Still unmeasured: where the optimizer switches from the BTREE index to
-      HNSW for a user, and whether MariaDB's 16 MB `mhnsw_max_cache_size`
-      matters at larger sizes.
+      HNSW for a user.
+- [ ] **Scale limits found in a 2026-11-27 code read** (30 facts live, none
+      urgent; ordered by which bites first):
+      (1) The literals finder sends every visible literal's key and gist in
+      one model call per uncached question, so the prompt grows with the
+      pool. Measured to 225 (`scale225`); the parked two-step grouping is
+      the next step, not the removed embedding shortlist.
+      (2) `drush aim:consolidate` re-embeds every trusted fact (see "Read a
+      fact's stored vector" above) and makes a model call per close pair,
+      so a sweep of 100,000 facts takes hours. Its memory was fixed
+      2026-11-27: it loaded every fact at once and now loads 200 at a time
+      (`SWEEP_CHUNK_SIZE`), clearing the storage cache between chunks. What
+      still grows with the table is small: the ID list, the compared-pair
+      and retired-ID records, and the report rows.
+      (3) The status page's parity and orphan checks hold every vector row
+      ID (`AimVectorStore::listItemIds()`, pages of 1,000) and every fact
+      ID in PHP. On demand only (the status page and `aim:status`, not
+      `hook_requirements`). Fine to about 100,000. The provider's
+      `querySearch()` pages by `LIMIT/OFFSET` with no `ORDER BY`, so each
+      page rescans the ones before it, and a write during the listing can
+      skip or repeat a row. Upstream ask: ordered, keyset paging.
+      (4) `AimRecallService` recent-facts listing checks access per fact
+      and pages on (twice the limit at a time) until it fills, so a viewer
+      who may see few facts in a big scope reads most of the scope. Fix:
+      decide scope-level access once, and check per fact only where it
+      varies (the user scope's role grid).
+      Fine as is: recall itself, the queue path, the expiry sweep, and
+      `ai_log` (capped by `ai_logging` at 10,000 messages and 90 days).
+      Grows, not slow: retired facts and revisions (the retention item
+      below).
+- [ ] **Recheck the HNSW cache when `aim_fact_vectors` passes about
+      100,000 rows (30 on 2026-11-27) or recall latency matters.** MariaDB
+      keeps the vector graph in a cache capped by `mhnsw_max_cache_size`
+      (16 MB default, global, a server setting aim cannot change). Measured
+      2026-11-27 on a throwaway table of 30,000 random 1536-dim vectors
+      (M=16, cosine, ef_search=100, warm): 12 ms per search at 16 MB, 1.9 ms
+      at 1 GB. No cliff, and both are small next to the embedding call
+      (33-540 ms). Inserts slowed as the table grew (5 ms each for the first
+      1,000, 41 ms on average over 30,000), cache share unmeasured. Random
+      vectors are HNSW's worst case; real facts cluster. If it starts to
+      matter: document the setting for site operators, add an
+      `AimStatusChecker` note, or use fewer embedding dimensions.
 - [ ] Measure whether `scope`, `subject`, `target_type` and `target_id` need
-      BTREE indexes on `aim_fact_vectors` (only `user` and `trusted` have
-      one, `AimHooks::BTREE_INDEXED_COLUMNS`; the provider fix above indexes
-      `scope` and `subject` too, as "attributes"). Matters when one scope is a
-      large share of the table, and for entity-scope lookups by target.
-      Same method as ADR-0018. `target_type`/`target_id` are not even
-      indexed attributes yet, check that first.
+      BTREE indexes on `aim_fact_vectors`: since provider 1.0.3 `scope`
+      and `subject` have one like every attribute, so only `target_type`
+      and `target_id` remain, and they are not indexed attributes yet
+      (check that first). Matters for entity-scope lookups by target. Same
+      method as ADR-0018.
 - [ ] Retention/erasure policy for retired facts (prune or archive old
       `retired` rows out of `aim_fact`) - retired facts about a person are
       still personal data. Own ADR when needed, see ADR-0022's

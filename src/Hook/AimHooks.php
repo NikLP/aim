@@ -8,14 +8,10 @@ use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Hook\Attribute\Hook;
-use Drupal\Core\Hook\Order\Order;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\ai\AiVdbProviderPluginManager;
 use Drupal\aim\AimScopeTypePluginManagerInterface;
 use Drupal\aim\Entity\AimFact;
 use Drupal\aim\Service\AimMemoryManager;
-use Drupal\ai_vdb_provider_mariadb\Plugin\VdbProvider\MariaDBProvider;
-use Drupal\search_api\IndexInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
@@ -39,8 +35,6 @@ class AimHooks {
    *
    * @param \Drupal\aim\Service\AimMemoryManager $memoryManager
    *   The aim memory manager.
-   * @param \Drupal\ai\AiVdbProviderPluginManager $vdbProviders
-   *   The VDB provider plugin manager.
    * @param \Drupal\aim\AimScopeTypePluginManagerInterface $scopeTypeManager
    *   The scope type plugin manager, used by entityBaseFieldInfo() to
    *   merge every registered scope type's own base fields onto aim_fact,
@@ -53,8 +47,6 @@ class AimHooks {
    */
   public function __construct(
     private readonly AimMemoryManager $memoryManager,
-    #[Autowire(service: 'ai.vdb_provider')]
-    private readonly AiVdbProviderPluginManager $vdbProviders,
     #[Autowire(service: 'plugin.manager.aim_scope_type')]
     private readonly AimScopeTypePluginManagerInterface $scopeTypeManager,
     #[Autowire(service: 'current_user')]
@@ -277,95 +269,6 @@ class AimHooks {
   #[Hook('cron')]
   public function cron(): void {
     $this->memoryManager->retireExpired();
-  }
-
-  /**
-   * Columns that need a BTREE index once they exist on the collection table.
-   *
-   * `user`: ADR-0018 (renamed from subject_uid 2026-09-28,
-   * aim_update_10001()). `trusted`: ADR-0002's addendum, the same
-   * treatment - recall() filters on it by default (a selective condition
-   * once most facts are untrusted), so it needs the same pre-filtering fix
-   * user needed rather than reproducing ADR-0018's finding 3.
-   */
-  protected const BTREE_INDEXED_COLUMNS = ['user', 'trusted'];
-
-  /**
-   * Implements hook_search_api_index_update().
-   *
-   * Gives aim_vector_index's indexed attribute columns listed in
-   * BTREE_INDEXED_COLUMNS a BTREE index, when its server uses the mariadb
-   * provider. Runs last so the provider's own hook has already created the
-   * columns.
-   *
-   * @param \Drupal\search_api\IndexInterface $index
-   *   The index that was saved.
-   */
-  #[Hook('search_api_index_update', order: Order::Last)]
-  public function vectorIndexUpdate(IndexInterface $index): void {
-    if ($index->id() !== 'aim_vector_index' || !$index->hasValidServer()) {
-      return;
-    }
-
-    // MariaDB's HNSW index post-filters, so the BTREE fix is MariaDB's
-    // alone; on another provider its SQL would hit a table that is not
-    // there.
-    $config = $index->getServerInstance()->getBackendConfig();
-    if (($config['database'] ?? NULL) !== 'mariadb') {
-      return;
-    }
-
-    $settings = $config['database_settings'] ?? [];
-
-    if (empty($settings['collection'])) {
-      return;
-    }
-
-    $provider = $this->vdbProviders->createInstance('mariadb');
-    if (!$provider instanceof MariaDBProvider) {
-      return;
-    }
-
-    foreach (self::BTREE_INDEXED_COLUMNS as $column) {
-      if ($index->getField($column)) {
-        $this->ensureColumnIndex($provider, $settings['collection'], $column, $settings['database_name'] ?? NULL);
-      }
-    }
-  }
-
-  /**
-   * Adds a BTREE index on a collection column, if the column exists.
-   *
-   * MariaDB's HNSW index post-filters, so a selective condition on an
-   * attribute column returns short results until the column has a BTREE
-   * index, which makes the optimizer pre-filter (ADR-0018, finding 4). The
-   * provider adds plain columns and never a secondary index. Idempotent.
-   *
-   * @param \Drupal\ai_vdb_provider_mariadb\Plugin\VdbProvider\MariaDBProvider $provider
-   *   The MariaDB VDB provider.
-   * @param string $collection_name
-   *   The collection (table) name.
-   * @param string $column
-   *   The attribute column to index.
-   * @param string|null $database
-   *   The database name, or NULL for the default connection.
-   *
-   * @return bool
-   *   TRUE if the index exists afterward, FALSE if the column does not.
-   */
-  protected function ensureColumnIndex(MariaDBProvider $provider, string $collection_name, string $column, ?string $database = NULL): bool {
-    $connection = $provider->getConnection($database);
-    $client = $provider->getClient();
-    $table = $client->escapeIdentifierForSql(identifier_to_escape: $collection_name, connection: $connection);
-    $column_literal = $client->escapeStringForSql(string_to_escape: $column, connection: $connection);
-    $result = $connection->query("SHOW COLUMNS FROM {$table} LIKE {$column_literal}");
-    if (!$result || $result->num_rows === 0) {
-      return FALSE;
-    }
-    $column_id = $client->escapeIdentifierForSql(identifier_to_escape: $column, connection: $connection);
-    $index_id = $client->escapeIdentifierForSql(identifier_to_escape: 'idx_' . $column, connection: $connection);
-    $connection->query("ALTER TABLE {$table} ADD INDEX IF NOT EXISTS {$index_id} ({$column_id})");
-    return TRUE;
   }
 
 }

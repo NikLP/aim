@@ -3,7 +3,8 @@
 **Status:** Sections 1 and 2 built 2026-10-08 to 10-15 (tokens at recall,
 `aim_literal`, the finder-first gate); section 3 item 2's live source
 built 2026-11-16 (see the addendum), the rest of sections 3 and 4
-unbuilt. Split out
+unbuilt; tokens on write proposed 2026-11-26 (second addendum), unbuilt.
+Split out
 of `literals`' ADR-0040 (sections 6 and 7, the gate measurements and the
 aim-side deferred and rejected items) on 2026-10-23, when `literals` went
 to drupal.org as `drupal/literals` and stopped carrying aim's design.
@@ -190,4 +191,73 @@ the assistant asks the finder a second time when the assistant recalls;
 skipping that needs the invoker in `AimRecall`'s method body (tool#3583125
 or a plugin-class tool), not built until a measurement calls for it.
 Section 2 notes what its `tool` row measured and gives the current figure.
+
+## Addendum (2026-11-26): tokens on write (proposed, unbuilt)
+
+**Before:** a fact carries `[literal:key]` only if its writer typed the
+token. Facts written by chat, extraction, ingest or MCP carry the raw
+value (a phone number, a URL), so when the literal changes those facts
+go stale. Fixing them means finding each one and writing a superseding
+fact (ADR-0064: a changed world is a new fact, not an edit), and every
+new fact goes through Guardrails, the grounded check and consolidation.
+
+**After (proposed):** before a fact is saved, a matcher looks for
+existing literals' values in its text and replaces each with its token,
+on every write path. A changed value is then one edit to the literal, and
+the value in the fact stays exact and access-checked at recall. Matches
+come in two tiers:
+
+| Match | Example | Action |
+| --- | --- | --- |
+| Exact, or equal after normalizing | `01234 567890` and `+44 1234 567890`; `Example.com/` and `https://example.com` | Substitute automatically: deterministic, no model, no person |
+| Near | "open 9 till 5" against a literal "9am-5pm"; a reworded address | A suggestion, never applied automatically |
+
+A suggestion is accepted or dismissed at the review points that already
+exist: the chat persona's confirmation before saving (it can show the
+fact with the token in place), and the fact form or trust review for
+other paths. No new queue, and a suggestion never blocks a write: one
+nobody acts on leaves a raw value that was right when written. That keeps
+the upkeep mostly self-maintaining rather than adding a review chore.
+
+The same matcher can run once as a backfill over existing facts.
+
+**Relation to the rest of this record:** section 3.1 (convert-a-fact)
+turns a fact that *is* a value into a literal and retires the fact; this
+keeps longer facts as facts and swaps the values inside them for tokens.
+Autocomplete for literals in an input field is the smaller, later piece:
+it only helps where a person types a fact (the add form, a console), and
+belongs with [ADR-0049](0049-finder-family-parked.md)'s inline `@` picker
+and [ADR-0029](0029-context-carrying-turns.md)'s mention tokens, both
+parked.
+
+**Open questions:**
+
+1. **Normalization.** `literals` compares nothing today. A per-type
+   comparison ("are these two strings the same value of this kind?")
+   belongs in `literals` as a consumer-neutral seam the finder could use
+   too; logged in its BACKLOG.md.
+2. **Resolved as whom.** Only the Text type has a stored value; Path,
+   Token, Content, Entity and Field compute theirs at read time. The
+   matcher compares against current resolved values as some account:
+   the writer (substitute only what the writer can read) is the likely
+   answer.
+3. **Access changes with the token.** A fact naming a literal its viewer
+   cannot read is withheld whole (section 1). Substituting a restricted
+   literal would hide a fact from viewers who saw it before. Likely rule:
+   automatic substitution for unrestricted literals only, a suggestion
+   for restricted ones.
+4. **Short or common values.** "9am" or a one-word name could match text
+   that does not mean that literal: a minimum length or distinctiveness,
+   or opt-in per literal type.
+5. **Finding near matches and storing suggestions.** String distance (no
+   model call) or a decision-model call per write (cost). A suggestion
+   needs somewhere to live: a field on `aim_fact` cuts across section 4's
+   parked "no pointer field naming a literal", so a separate store or the
+   review UI computing it on view are the alternatives.
+6. **Order on the write path.** The grounded check compares fact text
+   with the source text, which holds the raw value, so substitution runs
+   after the check, just before save. A backfill substitution changes
+   `text`, so `applyRevisionPolicy()` makes a revision and clears
+   `grounding_score`, although the meaning is unchanged; whether the
+   score should survive a token-only change is open.
 

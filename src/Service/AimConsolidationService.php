@@ -31,6 +31,11 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 class AimConsolidationService {
 
   /**
+   * How many facts consolidate()'s sweep loads at a time.
+   */
+  protected const SWEEP_CHUNK_SIZE = 200;
+
+  /**
    * Constructs a AimConsolidationService object.
    *
    * @param \Drupal\aim\Service\AimSettings $settings
@@ -131,15 +136,22 @@ class AimConsolidationService {
     $retired = [];
     $rows = [];
 
-    foreach ($fact_storage->loadMultiple($ids) as $fact) {
-      if (isset($retired[$fact->id()])) {
-        continue;
-      }
+    // Facts load a chunk at a time and the storage cache is cleared after
+    // each, so the sweep holds IDs, not every trusted fact (neighbors it
+    // loads included). A retired fact is skipped by ID, so a fresh load
+    // after a reset changes nothing.
+    foreach (array_chunk($ids, self::SWEEP_CHUNK_SIZE) as $chunk) {
+      foreach ($fact_storage->loadMultiple($chunk) as $fact) {
+        if (isset($retired[$fact->id()])) {
+          continue;
+        }
 
-      $rows = array_merge($rows, $this->consolidateAgainstNeighbors($index, $fact, $providerId, $modelId, $compareDistance, $dryRun, $handled_pairs, $retired));
+        $rows[] = $this->consolidateAgainstNeighbors($index, $fact, $providerId, $modelId, $compareDistance, $dryRun, $handled_pairs, $retired);
+      }
+      $fact_storage->resetCache();
     }
 
-    return ['rows' => $rows, 'has_facts' => TRUE];
+    return ['rows' => array_merge(...$rows), 'has_facts' => TRUE];
   }
 
   /**

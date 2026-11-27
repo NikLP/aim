@@ -155,3 +155,8 @@ The upgrade itself broke the site until this landed: 1.0.2 added a
 matched (fatal on any provider load). A subclass of a contrib plugin is
 exposed to that on every release, one more reason to keep none.
 
+1.0.3 (#3641260, 2026-11-26) gives every filterable attribute column a
+BTREE index, so `AimHooks::vectorIndexUpdate()`, `ensureColumnIndex()` and
+`BTREE_INDEXED_COLUMNS` were deleted and aim requires `^1.0.3`. aim now
+carries no MariaDB SQL in its hooks; only `AimStatusChecker::checkHnswTuning()`
+reads the table directly.

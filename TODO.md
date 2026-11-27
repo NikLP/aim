@@ -190,6 +190,15 @@ addendum) are built. Work on the literals modules themselves is in
       `[literal:key]` tokens (resolved by `recall()` for the viewer), so
       the widget needs no lookup call - a data-model choice, not tuning to
       pass the eval.
+- [ ] **Tokens on write (proposed 2026-11-26, ADR-0061's second
+      addendum).** Swap existing literals' values in fact text for
+      `[literal:key]` before save, on every write path: exact or
+      normalized matches automatically, near matches as suggestions at
+      the existing review points; same matcher for a one-off backfill.
+      Six open questions in the addendum (normalization in `literals`,
+      resolving account, restricted literals, short values, suggestion
+      storage, order after the grounded check). Settle those before
+      building.
 - [ ] **After the finder went into recall (2026-11-16).** Chat scenarios
       re-run 2026-11-17 (site's `demo/chat-eval/`): 23/24, all literal turns
       right, one decision call more per recall, median 3.9 s (now

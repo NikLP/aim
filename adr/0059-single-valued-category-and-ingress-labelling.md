@@ -60,8 +60,8 @@ notes. That use is real but small, and it is the one a single value costs.
    on the `aim_category` vocabulary, stored as a base-table column. Update
    hook copies each fact's first term across (lowest weight, then lowest term
    ID, so the result is deterministic).
-2. **Index it.** Add `category` to `aim_vector_index` as an attribute and to
-   `AimHooks::BTREE_INDEXED_COLUMNS`. Re-run ADR-0018's probe method first to
+2. **Index it.** Add `category` to `aim_vector_index` as an attribute (the
+   MariaDB provider gives every attribute a BTREE index since 1.0.3). Re-run ADR-0018's probe method first to
    see whether the optimizer pre-filters it or post-filters it (a category
    holding a large share of the table will post-filter, as a big user does,
    so the 5x over-fetch applies there too).
