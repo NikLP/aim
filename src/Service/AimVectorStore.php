@@ -96,6 +96,56 @@ class AimVectorStore {
   }
 
   /**
+   * Returns the stored embedding of one indexed item, if it has exactly one.
+   *
+   * Lets a caller search with a fact's own vector instead of embedding its
+   * text again. NULL whenever that is not safe or possible: the collection
+   * can't be read, the provider exposes no raw embedding field, the item is
+   * not indexed yet, or it is stored as several chunks.
+   *
+   * @param string $itemId
+   *   The Search API item ID, for example "entity:aim_fact/7:en".
+   *
+   * @return float[]|null
+   *   The vector, or NULL.
+   */
+  public function getVector(string $itemId): ?array {
+    $index = $this->loadIndex();
+    $provider = $this->getProvider();
+    $settings = $this->getBackendConfig()['database_settings'] ?? [];
+    if (!$index || !$provider instanceof AiVdbProviderSearchApiInterface || empty($settings['collection'])) {
+      return NULL;
+    }
+    $field = $provider->getRawEmbeddingFieldName();
+    if (!$field) {
+      return NULL;
+    }
+
+    try {
+      $filters = $provider->prepareFilters($index->query()->addCondition('drupal_entity_id', $itemId));
+      if (!is_string($filters)) {
+        return NULL;
+      }
+      $rows = $provider->querySearch(
+        collection_name: $settings['collection'],
+        output_fields: ['drupal_entity_id', $field],
+        filters: $filters,
+        limit: 2,
+        offset: 0,
+        database: $settings['database_name'] ?? 'default',
+      );
+    }
+    catch (\Exception) {
+      return NULL;
+    }
+
+    if (count($rows) !== 1 || empty($rows[0][$field]) || !is_array($rows[0][$field])) {
+      return NULL;
+    }
+    return array_values($rows[0][$field]);
+  }
+
+  /**
    * Drops the collection, for aim's uninstall.
    *
    * Runs before Drupal removes the index and server config, which it still

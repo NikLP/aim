@@ -18,8 +18,9 @@ appended to `mcp_server.handle`'s `_auth`, not swapped in.
   `composer require drupal/mcp_server_tool_bridge drupal/mcp_server` (plus the
   OAuth packages below) **before** `drush en aim_tool_oauth`. This module
   ships the `mcp_tool_config` entities that expose `aim_recall`,
-  `aim_brief`, `aim_remember` and `aim_literal` over MCP, so MCP is on exactly when it
-  is enabled. It also adds aim's usage notes and scope guide to the MCP
+  `aim_brief` and `aim_remember` over MCP, so MCP is on exactly when it
+  is enabled. `aim_literal` is not shipped: `aim_recall` returns exact
+  values itself (see [aim_tool's README](../aim_tool/README.md)). It also adds aim's usage notes and scope guide to the MCP
   server instructions a client receives on connecting (after any text the
   site sets in `mcp_server.settings`). See [aim_tool's DEVELOPING.md](../aim_tool/DEVELOPING.md) for
   the version-constraint reasoning.

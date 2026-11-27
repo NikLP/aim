@@ -56,6 +56,8 @@ class AimConsolidationService {
    *   The decision backend.
    * @param \Drupal\aim\Service\AimGroundingChecker $groundingChecker
    *   The grounded check, run on merged text.
+   * @param \Drupal\aim\Service\AimVectorStore $vectorStore
+   *   The vector collection, for a fact's stored embedding.
    */
   public function __construct(
     protected AimSettings $settings,
@@ -70,6 +72,7 @@ class AimConsolidationService {
     #[Autowire(service: 'aim.backend.decision')]
     protected ActivityBackendInterface $decisionBackend,
     protected AimGroundingChecker $groundingChecker,
+    protected AimVectorStore $vectorStore,
   ) {}
 
   /**
@@ -714,7 +717,17 @@ class AimConsolidationService {
     $scope = $fact->bundle();
     $is_user_scope = $this->manager->scopeRequiresAccount($scope);
 
-    $query = $index->query()->keys($fact->get('text')->value);
+    // Search with the fact's stored vector when there is one: the same
+    // neighbors without an embedding call per fact. The text is the
+    // fallback (not indexed yet, or stored as several chunks).
+    $query = $index->query();
+    $vector = $this->vectorStore->getVector('entity:aim_fact/' . $fact->id() . ':' . $fact->language()->getId());
+    if ($vector !== NULL) {
+      $query->setOption('vector_input', $vector);
+    }
+    else {
+      $query->keys($fact->get('text')->value);
+    }
     $query->addCondition('scope', $scope);
     $query->addCondition('trusted', TRUE);
     if ($is_user_scope) {

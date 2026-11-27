@@ -85,7 +85,10 @@ an undeclared Write tool counts as destructive, which MCP clients read as
   an aim site uses; `literals_tool`'s `literals:lookup` wraps the same
   service for sites without aim. Only the attribute (ID, descriptions) and
   the permission live here. Chat callers no longer need it: `aim_recall`
-  returns exact values itself (below); it stays for MCP, by key.
+  returns exact values itself (below), and `aim_tool_oauth` no longer
+  ships it over MCP. It stays for a site without `literals_finder` or
+  with `recall_literals` off, which can add it to a toolset or as an
+  MCP tool (`/admin/config/services/mcp-server/tools`).
 - MCP exposure (`mcp_server_tool_bridge.mcp_tool_config.*.yml`) ships in
   `aim_tool_oauth/config/install`, not here: `aim_tool` alone is Tool API
   only, with no MCP packages needed. Those configs carry no

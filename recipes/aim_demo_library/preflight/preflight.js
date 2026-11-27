@@ -247,9 +247,10 @@ async function askWidget(page, question) {
         if (!/- site: /.test(text)) throw new Error('instructions lack the scope guide');
         return text.length + ' chars';
       });
-      await check('MCP: all four tools listed', async () => {
+      await check('MCP: recall, remember and brief listed, aim_literal not', async () => {
         const names = ((await rpc('tools/list', {})).result.tools || []).map((t) => t.name);
-        for (const n of ['tool_api__aim_recall', 'tool_api__aim_remember', 'tool_api__aim_brief', 'tool_api__aim_literal']) if (!names.includes(n)) throw new Error(n + ' missing; have ' + names.join(', '));
+        for (const n of ['tool_api__aim_recall', 'tool_api__aim_remember', 'tool_api__aim_brief']) if (!names.includes(n)) throw new Error(n + ' missing; have ' + names.join(', '));
+        if (names.includes('tool_api__aim_literal')) throw new Error('aim_literal is exposed (aim_recall returns exact values; ADR-0061)');
         return names.join(', ');
       });
       await check('MCP: recall answers an on-topic question', async () => {

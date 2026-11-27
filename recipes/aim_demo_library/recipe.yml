@@ -48,8 +48,8 @@ config:
       simpleConfigUpdate:
         recall_max_distance: 0.6
         activities.verifier.threshold: 0.9
-    # The finder's own cutoff, used by aim_recall's exact values and the
-    # aim_literal tool, matching the chat block's gate
+    # The finder's own cutoff, used by aim_recall's exact values, matching
+    # the chat block's gate
     # (config/block.block.olivero_aimdemochat.yml).
     literals_finder.settings:
       simpleConfigUpdate:

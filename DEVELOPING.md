@@ -175,6 +175,20 @@ ADR-0036's 2026-10-27 addendum). The `auto_threshold` setting that did
 that was removed. **Retune `compare_distance` if the embeddings model
 changes.**
 
+**Neighbors are found with the fact's stored vector** (`findNeighbors()`
+through `AimVectorStore::getVector()`, the provider's raw embedding
+field), so neither the sweep nor the queue makes an embedding call per
+fact. The fact's text is embedded only when there is no single stored row
+(not indexed yet, or chunked). Measured 2026-11-27 on 30 facts with hosted
+`text-embedding-3-small` and a cold embedding cache: a dry-run sweep took
+3 s, against 24 s re-embedding, with the same decisions (one hosted
+embedding call is about 1 s from this site: a recall took 1.9-2.4 s with a
+new query, 1.1-1.2 s with a cached one). Distances run
+0.01-0.025 lower than through a re-embedded query (index-time embedding
+input is not exactly the bare text: a fact's own text scored 0.008-0.019
+against its row), so a pair just above `compare_distance` can now reach
+the model; it never merges without one.
+
 **Nothing is destroyed** (ADR-0005 addendum, 2026-10-01). Every outcome
 that removes a fact from recall is a soft retire (`retired` set), so it
 is auditable and reversible with the Un-retire action (which also clears
@@ -621,8 +635,10 @@ literals is the value store behind it. They meet in two small places:
   warning (uid only) and says exact values could not be checked. The
   recall service (`aim.recall`, Drush `aim:recall`) does not ask the
   finder: only the tool does.
-- **A lookup tool by key.** `aim_tool`'s `aim_literal` (over MCP; Site
-  Agent and the demo chatbot no longer list it) and `literals_tool`'s
+- **A lookup tool by key.** `aim_tool`'s `aim_literal` (offered nowhere
+  by default: Site Agent, the demo chatbot and `aim_tool_oauth`'s MCP
+  config dropped it; a site without the finder, or with
+  `recall_literals` off, can add it) and `literals_tool`'s
   `literals:lookup` (for sites running `literals` without aim) are thin
   wrappers over the one `literals.lookup` service, so they behave
   identically. The finder is optional; `aim` does not depend on it.

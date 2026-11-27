@@ -97,7 +97,10 @@ provider events.** No contrib patch, no decorated service.
   `findNearestNeighbor()` embeds each fact's stored text as a query, so
   every sweep after the first re-embeds unchanged facts for free. The
   second is probably the larger win, and being async it saves cost and
-  wall time rather than user-facing latency.
+  wall time rather than user-facing latency. (Superseded for consolidation
+  2026-11-27: `findNeighbors()` now searches with the fact's stored
+  vector, so the sweep makes no embedding call at all; the cache still
+  serves repeat recall queries.)
 - Hit rate for free-form chatbot questions is likely low; not measured.
   The subscriber's logging (decision 5) is what will answer it.
 - The win is small on local Ollama (33-35ms). This is a hosted-embeddings

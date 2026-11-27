@@ -2,7 +2,9 @@
 
 Exposes AIM memory as Tool API tools (`aim_remember`/`aim_recall`/`aim_brief`,
 plus `aim_literal` for exact values), and through them, over MCP via
-`mcp_server_tool_bridge`. Any scope, gated by permission. Part of
+`mcp_server_tool_bridge`. `aim_recall` returns exact values itself when
+`literals_finder` is on, so `aim_literal` is not offered over MCP or in
+chat by default; add it for a site without the finder. Any scope, gated by permission. Part of
 [AIM](../../README.md).
 
 Over MCP the tools are listed as `tool_api__aim_remember` and

@@ -16,10 +16,10 @@ use Drupal\Core\Config\Entity\ConfigEntityInterface;
  * third-party settings) to the mcp_tool_config entities this module ships in
  * config/install, which exist by the time this runs. Only aim_remember,
  * aim_recall and aim_brief are given scopes; aim_brief shares aim_recall's
- * aim:recall, being the same read permission. aim_literal gets none for now:
- * its access is checked per literal value through the "view literals"/"view
- * restricted literals" permissions, not the aim scopes. No ADR decides this
- * either way.
+ * aim:recall, being the same read permission. aim_literal is not shipped
+ * over MCP (aim_recall returns exact values, ADR-0061); a site that adds it
+ * by hand gets no scope from here: its access is checked per literal value
+ * through the "view literals"/"view restricted literals" permissions.
  */
 function aim_tool_oauth_install(): void {
   $storage = \Drupal::entityTypeManager()->getStorage('mcp_tool_config');

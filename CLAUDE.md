@@ -45,7 +45,8 @@ copy in `web/modules/contrib/literals/`, the exact-value store; `recall()` repla
 it). `literals_finder` and `literals_tool` are optional: with the finder,
 `aim_tool`'s `aim_recall` also returns exact values through the
 `literals.lookup` service (`aim.settings:recall_literals`), and
-`aim_literal` wraps the same service for a lookup by key. See
+`aim_literal` wraps the same service for a lookup by key (offered by no
+chat agent or MCP config by default; for sites without the finder). See
 [DEVELOPING.md](DEVELOPING.md)'s "Exact values from `literals`". Memory is
 aim's job; literals is the value store behind it, not a second recall path.
 **Composer-present but not enabled:** `eca` (no `aim` code uses it -

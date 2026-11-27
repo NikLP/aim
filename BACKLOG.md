@@ -452,17 +452,6 @@ questions" section)
       whether a Cache API layer (keyed scope+subject, invalidated on save)
       is still wanted. The boolean `state` field this was originally
       motivated by was removed 2026-10-12 (nothing read it).
-- [ ] Read a fact's stored vector instead of re-embedding it:
-      `ai_vdb_provider_mariadb` 1.0.2 implements
-      `getRawEmbeddingFieldName()` (#3626352), so with the server's
-      `include_raw_embedding_vector` on, a result's
-      `getExtraData('raw_vector')` can feed
-      `$query->setOption('vector_input', $vector)`
-      (`SearchApiAiSearchBackend::getSearchVectorInput()`). That would stop
-      `findNeighbors()` re-embedding each fact's own text on every
-      consolidation sweep ([ADR-0017](adr/resolved/0017-query-embedding-cache.md)'s
-      cache covers repeats only). Unblocked 2026-11-23, not built; measure
-      the embed cost first (local Ollama is fast).
 - [ ] Recheck the HNSW tuning (M=16, ef_search=100) when the table grows
       about tenfold, the embeddings model or dimensions change, or the
       provider is upgraded. Method in DEVELOPING.md, "Rechecking accuracy".
@@ -474,19 +463,22 @@ questions" section)
       one model call per uncached question, so the prompt grows with the
       pool. Measured to 225 (`scale225`); the parked two-step grouping is
       the next step, not the removed embedding shortlist.
-      (2) `drush aim:consolidate` re-embeds every trusted fact (see "Read a
-      fact's stored vector" above) and makes a model call per close pair,
-      so a sweep of 100,000 facts takes hours. Its memory was fixed
-      2026-11-27: it loaded every fact at once and now loads 200 at a time
-      (`SWEEP_CHUNK_SIZE`), clearing the storage cache between chunks. What
-      still grows with the table is small: the ID list, the compared-pair
-      and retired-ID records, and the report rows.
+      (2) `drush aim:consolidate` makes a model call per close pair, so a
+      large sweep still takes time. Fixed 2026-11-27: it loaded every fact
+      at once and now loads 200 at a time (`SWEEP_CHUNK_SIZE`), and it
+      searches with each fact's stored vector instead of re-embedding it
+      (3 s against 24 s for 30 facts on hosted embeddings, DEVELOPING.md).
+      What still grows with the table is small: the ID list, the
+      compared-pair and retired-ID records, and the report rows. Next, only
+      if sweeps get run often on a big table: remember each pair's verdict
+      (keyed by both text revisions, cleared on a model or
+      `compare_distance` change) so repeat sweeps skip decided pairs.
       (3) The status page's parity and orphan checks hold every vector row
       ID (`AimVectorStore::listItemIds()`, pages of 1,000) and every fact
       ID in PHP. On demand only (the status page and `aim:status`, not
       `hook_requirements`). Fine to about 100,000. The provider's
       `querySearch()` pages by `LIMIT/OFFSET` with no `ORDER BY`, so each
-      page rescans the ones before it, and a write during the listing can
+      page reads past every row before it, and a write during the listing can
       skip or repeat a row. Upstream ask: ordered, keyset paging.
       (4) `AimRecallService` recent-facts listing checks access per fact
       and pages on (twice the limit at a time) until it fills, so a viewer

@@ -176,8 +176,12 @@ come back empty the reply says neither was found, and a lookup that could
 not run says exact values could not be checked rather than that none are
 recorded. A call narrowed to a scope or account asks too: a literal is
 not always a site value (a per-user account page). The model never has to choose a second memory tool, so Site Agent's toolset
-and the demo chatbot dropped `aim_literal`; it stays for MCP, for a
-lookup by key.
+and the demo chatbot dropped `aim_literal`. MCP dropped it too
+(2026-11-27, `aim_tool_oauth` no longer ships its `mcp_tool_config`):
+recall and brief already replace `[literal:key]` in what they return, so
+an MCP client never holds a bare key, and in one live MCP exchange Claude
+called both tools for the same value. The tool stays for a site without
+`literals_finder` or with `recall_literals` off, added by hand.
 
 **Rejected:** a `site_agent.prompt_section` injecting finder hits into the
 system prompt (Site Agent only, and from the person's message rather than

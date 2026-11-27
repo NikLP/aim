@@ -1,8 +1,0 @@
-langcode: en
-status: true
-dependencies:
-  enforced:
-    module:
-      - aim_tool_oauth
-id: aim_literal
-tool_id: aim_literal
